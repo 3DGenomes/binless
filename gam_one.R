@@ -34,7 +34,7 @@ ggplot(data)+geom_point(aes(x,y))+geom_line(aes(x,f))#+scale_y_log10()
 #fit it with stan
 sm = stan_model(file = "gam_one.stan")
 #smi = stan_model(file = "gam_one_nointercept.stan")
-smi = stan_model(file = "scam_one_new.stan")
+smi = stan_model(file = "gam_one_sparse.stan")
 op = optimizing(sm, data = list(N=data[,.N], K=10, y=data[,y], x=data[,x]),
                 as_vector=F, hessian=F, iter=10000)
 opi = optimizing(smi, data = list(N=data[,.N], K=10, y=data[,y], x=data[,x]),
@@ -57,7 +57,7 @@ data[,gam:=fit$fitted.values]
 ggplot(data)+geom_point(aes(x,y),alpha=0.2)+geom_line(aes(x,f),colour="black")+#ylim(0,40)+
   #geom_line(data=mat, aes(x,value,colour=variable))+
   geom_line(aes(x,gam),colour="blue")+
-  #geom_line(aes(x,predi),colour="green")+
+  geom_line(aes(x,predi),colour="green")+
   geom_line(aes(x,pred),colour="red")#+scale_y_log10()
 
 
