@@ -9,23 +9,23 @@ functions {
   int difforder() {return 2;} //set 2 for 2nd order difference penalty
 
   // Evaluate b-spline basis functions of degree q at the values
-  // in x within support [xmin,xmax] and with ndx intervals.
+  // in x within support [xmin,xmax] and with K basis functions.
   // Use q=3 for cubic spline.
   // adapted from Eilers and Marx, Stat Sci, 1996
-  matrix bspline(vector x, int ndx, int q) {
+  matrix bspline(vector x, int K, int q) {
     real dx;
-    row_vector[ndx+q] t;
-    int r[ndx+q];
-    matrix[rows(x), ndx+q] T;
-    matrix[rows(x), ndx+q] X;
-    matrix[rows(x), ndx+q] P;
-    matrix[rows(x), ndx+q] B;
-    dx <- 1.01*(max(x)-min(x))/ndx; //make it slightly larger
-    t <- min(x) - dx*0.01 + dx * range(-q,ndx-1)';
-    for (i in 2:ndx+q) r[i-1] <- i;
-    r[ndx+q] <- 1;
+    row_vector[K] t;
+    int r[K];
+    matrix[rows(x), K] T;
+    matrix[rows(x), K] X;
+    matrix[rows(x), K] P;
+    matrix[rows(x), K] B;
+    dx <- 1.01*(max(x)-min(x))/(K-q); //make it slightly larger
+    t <- min(x) - dx*0.01 + dx * range(-q,K-q-1)';
+    for (i in 2:K) r[i-1] <- i;
+    r[K] <- 1;
     T <- rep_matrix(t, rows(x));
-    X <- rep_matrix(x, ndx+q);
+    X <- rep_matrix(x, K);
     P <- (X - T) / dx;
     for (i in 1:rows(x))
       for (j in 1:cols(t))
@@ -114,7 +114,7 @@ functions {
   // design matrix for 1D b-spline fit of degree q with K functions
   matrix design(vector x, int K, int q) {
     matrix[rows(x),K] X;
-    X <- bspline(x, K-q, q);
+    X <- bspline(x, K, q);
     ////only bspline basis: K params
     //return X;
     ////intercept and bspline basis: K params
@@ -124,7 +124,7 @@ functions {
   // difference operator for that design matrix
   matrix difference_op(vector x, int K, int q, int d) {
     matrix[K-d,K-1] diff;
-    diff <- center(bspline(x, K-q, q), difference_matrix_sqrt(K,d));
+    diff <- center(bspline(x, K, q), difference_matrix_sqrt(K,d));
     return append_col(rep_vector(0,K-d), diff); //intercept has no constraint
   }
 }
@@ -173,6 +173,6 @@ generated quantities {
     edfvec <- diagonal(inverse_spd(XtX+lambda*crossprod(P)) * XtX);
     edf <- sum(edfvec);
   }
-  u <- centering_constraint(bspline(x, K-splinedegree(), splinedegree()));
+  u <- centering_constraint(bspline(x, K, splinedegree()));
   betaU <- beta - 2 * u * (u' * beta);
 }
