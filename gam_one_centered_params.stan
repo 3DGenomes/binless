@@ -1,5 +1,8 @@
 ////
 // GAM : y ~ s(X) using cubic splines with log-link
+// The design matrix is the original spline base
+// Intercept is modelled explicitly, and the spline is centered at each
+// iteration
 ////
 functions {
   vector range(int imin, int imax) {

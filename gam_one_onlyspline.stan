@@ -1,5 +1,7 @@
 ////
 // GAM : y ~ s(X) using cubic splines with log-link
+// In this version, the design matrix is the uncentered spline,
+// which contains an implicit intercept
 ////
 functions {
   vector range(int imin, int imax) {
@@ -113,13 +115,11 @@ functions {
 
   // design matrix for 1D b-spline fit of degree q with K functions
   matrix design(vector x, int K, int q) {
-    matrix[rows(x),K] X;
-    X <- bspline(x, K-q, q);
-    return append_col(rep_vector(1,rows(x)), X);
+    return bspline(x, K-q, q);
   }
   
   // difference operator for that design matrix
-  matrix difference_op(vector x, int K, int q, int d) {
+  matrix difference_op(int K, int d) {
     return difference_matrix_sqrt(K,d);
   }
 }
@@ -127,59 +127,43 @@ functions {
 data {
   int<lower=1> N; //number of data points
   int<lower=1> K; //number of parameters
-  vector[N] y; //dependent variable
+  int y[N]; //dependent variable
   vector[N] x; //independent variable
 }
 transformed data {
-  matrix[N,K+1] X; //design matrix
+  matrix[N,K] X; //design matrix
   matrix[K-difforder(),K] P;
-  vector[K] spline_hh;
+  //vector[K] zero;
   X <- design(x, K, splinedegree());
-  P <- difference_op(x, K, splinedegree(), difforder());
-  {
-    vector[K] spline_v;
-    spline_v <- centering_constraint(X[,2:(K+1)]);
-    spline_hh <- -2*spline_v[1]*spline_v;
-    spline_hh[1] <- 1+spline_hh[1];
-  }
+  P <- difference_op(K, difforder());
+  //zero <- rep_vector(0,K);
 }
 parameters {
-  real intercept;
-  ordered[K] beta_spline;
+  vector[K] beta;
   real<lower=0> sigma2;
   real<lower=0> lambda;
 }
-transformed parameters {
-  vector[K+1] beta; //intercept and centered spline
-  beta[1] <- intercept;
-  beta[2:] <- beta_spline - (spline_hh'*beta_spline)*spline_hh; //center the coefs
-}
 model {
   //exponential GAM
-  y ~ normal(X * beta, sigma2);
+  y ~ neg_binomial_2(exp(X * beta), sigma2);
   //P-spline prior on the differences (K-1 params)
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
-  P*beta_spline ~ normal(0, sigma2/lambda);
+  P*beta ~ normal(0, sigma2/lambda);
 }
 generated quantities {
-  matrix[N,K+1] designmat; //design matrix
-  matrix[N,K+1] weighted; //weighted basis functions
+  matrix[N,K] designmat; //design matrix
+  matrix[N,K] weighted; //weighted basis functions
   vector[N] pred; //spline interpolant
   real edf; //effective degrees of freedom
-  vector[K+1] edfvec;
+  vector[K] edfvec;
   designmat <- X;
   weighted <- X .* rep_matrix(beta', rows(x));
-  pred <- (X * beta);
+  pred <- exp(X * beta);
   {
-    matrix[K+1,K+1] XtX;
-    matrix[K+1,K+1] S;
+    matrix[K,K] XtX;
     XtX <- crossprod(X);
-    S[2:,2:] <- crossprod(P);
-    S[1,1] <- 1;
-    S[2:,1] <- rep_vector(0,K);
-    S[1,2:] <- rep_row_vector(0,K);
-    edfvec <- diagonal(inverse_spd(XtX+lambda*S) * XtX);
+    edfvec <- diagonal(inverse_spd(XtX+lambda*crossprod(P)) * XtX);
     edf <- sum(edfvec);
   }
 }
