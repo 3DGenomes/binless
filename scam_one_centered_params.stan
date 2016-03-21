@@ -160,7 +160,7 @@ functions {
   
   // difference operator for that design matrix
   matrix difference_op(int K, int d) {
-    return scam_difference_op(K,d); //difference_matrix_sqrt(K,d);
+    return difference_matrix_sqrt(K,d);
   }
 }
 ////////////////////////////////////////////////////////////////
