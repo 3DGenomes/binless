@@ -1,6 +1,6 @@
 ////
-// GAM : y ~ s(X) using cubic splines with log-link
-// The design matrix is the original spline base
+// SCAM : y ~ s(X) using monotone decreasing cubic splines with log-link
+// The design matrix is the original spline base,
 // Intercept is modelled explicitly, and the spline is centered at each
 // iteration
 ////
@@ -9,7 +9,8 @@ functions {
     return cumulative_sum(rep_vector(1,imax-imin+1))-1+imin;
   }
   int splinedegree() {return 3;} //set 3 for cubic spline
-  
+  int difforder() {return 2;} //set 2 for 2nd order difference penalty
+
   // Evaluate b-spline basis functions of degree q at the values
   // in x within support [xmin,xmax] and with K basis functions.
   // Use q=3 for cubic spline.
@@ -127,7 +128,7 @@ functions {
 data {
   int<lower=1> N; //number of data points
   int<lower=1> K; //number of parameters
-  int y[N]; //dependent variable
+  vector[N] y; //dependent variable
   vector[N] x; //independent variable
 }
 transformed data {
@@ -141,20 +142,23 @@ transformed data {
 }
 parameters {
   real intercept;
-  vector[K-1] beta;
+  ordered[K-1] beta;
   real<lower=0> sigma2;
   real<lower=0> lambda;
 }
 transformed parameters {
   vector[K] beta_centered;
   vector[K] beta_aug;
-  beta_aug[1] <- sum(beta);
-  beta_aug[2:] <- beta;
+  //careful here: beta_aug must be monotonous,
+  //beta_aug[1] not too hard on the optimizer (e.g. a smooth function of all beta[i])
+  //and close to beta[1] to be nice with the difference penalty
+  beta_aug[1] <- -beta[1];
+  beta_aug[2:] <- -beta;
   beta_centered <- beta_aug - (beta_aug' * p) * p;
 }
 model {
   //exponential GAM
-  y ~ neg_binomial_2(exp(intercept + Xs * beta_centered), sigma2);
+  y ~ normal(intercept + Xs * beta_centered, sigma2);
   //P-spline prior on the differences (K-1 params)
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
@@ -171,7 +175,7 @@ generated quantities {
   designmat <- Xs;
   //weighted <-  bspline(x, K, splinedegree());
   //weighted <- X .* rep_matrix(beta', rows(x));
-  pred <- exp(intercept + Xs * beta_centered);
+  pred <- intercept + Xs * beta_centered;
   {
     matrix[K,K] XtX;
     XtX <- crossprod(Xs);
