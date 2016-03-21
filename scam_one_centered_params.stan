@@ -38,6 +38,66 @@ functions {
     return B;
   }
   
+  //collection of householder vectors to decompose A
+  //if A is n x m then the function returns a n x 2m matrix [U : R]
+  // U will be n x m and the vectors are stored in the lower triangle of U.
+  // Q is prod_i 1 - 2u_iu_iT 
+  // R is upper triangular.
+  matrix householder(matrix A) {
+    int n;
+    int m;
+    n <- rows(A);
+    m <- cols(A);
+    {
+      matrix[n,m] U;
+      matrix[n,m] R;
+      vector[n] e;
+      U <- rep_matrix(0,n,m);
+      e[2:n] <- rep_vector(0,n-1);
+      e[1] <- 1;
+      R <- A;
+      for (k in 1:m) {
+        vector[n-k+1] x;
+        vector[n-k+1] u;
+        x <- R[k:n,k];
+        u <- sqrt(x'*x)*e[1:(n-k+1)] + x;
+        if (x[1]<0) u <- -u;
+        u <- u/sqrt(u'*u);
+        {
+          matrix[n-k+1,m-k+1] tmp; //stan 2.9.0 issues compile error for deep_copy
+          tmp <- R[k:n,k:m] - 2*u*transpose(u)*R[k:n,k:m];
+          R[k:n,k:m] <- tmp;
+        }
+        U[k:n,k] <- u;
+      }
+      return append_col(U,R);
+    }
+  }
+    
+  //compute householder vector of centering constraint X^T * 1
+  vector centering_constraint(matrix X) {
+    int N;
+    int K;
+    N <- rows(X);
+    K <- cols(X);
+    {
+      //form QR decomposition of Xt1
+      matrix[K,1] sums;
+      vector[K] u;
+      sums <- to_matrix(rep_row_vector(1,N)*X)';
+      return householder(sums)[,1];
+    }
+  }
+  
+  //apply centering constraint on X to a matrix D: D -> DZ
+  // where Z is such that X^T 1 = QR with Q=[u:Z]
+  // if D is LxK, and X is NxK, returns a Lx(K-1) matrix
+  matrix center(matrix X, matrix D) {
+    vector[cols(X)] u;
+    u <- centering_constraint(X);
+    return D[,2:] - (2*D*u)*u[2:]';
+  }
+  
   //difference penalty for P-splines
   //K is the size of the parameter vector
   //d is the order of the difference
@@ -81,22 +141,28 @@ transformed data {
   p <- p / sqrt(dot_self(p));
 }
 parameters {
-  //real intercept;
-  ordered[K] beta;
+  real intercept;
+  ordered[K-1] beta;
   real<lower=0> sigma2;
   real<lower=0> lambda;
 }
 transformed parameters {
-  real intercept;
-  intercept <- sum(beta);
+  vector[K] beta_centered;
+  vector[K] beta_aug;
+  //careful here: beta_aug must be monotonous,
+  //beta_aug[1] not too hard on the optimizer (e.g. a smooth function of all beta[i])
+  //and close to beta[1] to be nice with the difference penalty
+  beta_aug[1] <- -beta[1];
+  beta_aug[2:] <- -beta;
+  beta_centered <- beta_aug - (beta_aug' * p) * p;
 }
 model {
   //exponential GAM
-  y ~ normal(intercept - Xs * beta, sigma2);
+  y ~ normal(intercept + Xs * beta_centered, sigma2);
   //P-spline prior on the differences (K-1 params)
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
-  Diff*beta ~ normal(0, sigma2/lambda);
+  Diff*beta_aug ~ normal(0, sigma2/lambda);
 }
 generated quantities {
   matrix[N,K] designmat; //design matrix
@@ -109,14 +175,12 @@ generated quantities {
   designmat <- Xs;
   //weighted <-  bspline(x, K, splinedegree());
   //weighted <- X .* rep_matrix(beta', rows(x));
-  pred <- intercept + Xs * beta;
+  pred <- intercept + Xs * beta_centered;
   {
     matrix[K,K] XtX;
-    vector[K] jitter;
     XtX <- crossprod(Xs);
-    jitter <- rep_vector(0.01*mean(diagonal(XtX)), K);
     edfvec[1] <- 1;
-    edfvec[2:] <- diagonal(inverse_spd(XtX+lambda*crossprod(Diff)+diag_matrix(jitter)) * XtX);
+    edfvec[2:] <- diagonal(inverse_spd(XtX+lambda*crossprod(Diff)) * XtX);
     edf <- sum(edfvec);
   }
 }
