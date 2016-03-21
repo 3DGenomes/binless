@@ -186,17 +186,14 @@ transformed data {
 }
 parameters {
   real intercept;
-  vector[K-1] beta;
+  vector<lower=0>[K-1] beta;
   real<lower=0> sigma2;
   real<lower=0> lambda;
 }
 transformed parameters {
-  vector[K] beta_aug;
   vector[K] beta_centered;
-  beta_aug[2:] <- beta;
-  beta_centered[2:] <- exp(beta);
+  beta_centered[2:] <- beta;
   beta_centered[1] <- p*beta_centered[2:];
-  beta_aug[1] <- beta_centered[1];
   beta_centered <- Sigma*beta_centered;
 }
 model {
@@ -205,7 +202,7 @@ model {
   //P-spline prior on the differences (K-1 params)
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
-  Diff*beta_aug ~ normal(0, sigma2/lambda);
+  Diff*beta_centered ~ normal(0, sigma2/lambda);
 }
 generated quantities {
   matrix[N,K] designmat; //design matrix
