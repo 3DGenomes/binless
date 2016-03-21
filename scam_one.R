@@ -27,16 +27,16 @@ stan_matrix_to_datatable = function(opt, x) {
 
 
 #plot initial data
-data=generate_data(fun=function(x){1+6*x+x^3}, sd=3, xmin=0,xmax=3, npoints=1000)
+data=generate_data(fun=function(x){1+6*x-x^3}, sd=3, xmin=0,xmax=3, npoints=1000)
 #data[,c("y","f"):=list(y-mean(f),f-mean(f))]
 #data=data[y>0]
 #data=generate_data(fun=function(x){5*sin(3*x)+5.1}, sd=1, xmin=0,xmax=3, npoints=500)
 ggplot(data)+geom_point(aes(x,y))+geom_line(aes(x,f))#+scale_y_log10()
 
 #fit it with stan
-scmi = stan_model(file = "scam_one_nointercept.stan")
-scm = stan_model(file = "scam_one_new.stan")
-op = optimizing(scm, data = list(N=data[,.N], K=11, y=data[,y], x=data[,x]),
+scm = stan_model(file = "scam_one_centered_params.stan")
+scmi = stan_model(file = "scam_one_onlyspline.stan")
+op = optimizing(scm, data = list(N=data[,.N], K=10, y=data[,y], x=data[,x]),
                 as_vector=F, hessian=F, iter=10000)
 opi = optimizing(scmi, data = list(N=data[,.N], K=10, y=data[,y], x=data[,x]),
                 as_vector=F, hessian=F, iter=10000)
