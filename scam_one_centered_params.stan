@@ -176,25 +176,27 @@ transformed data {
   row_vector[K-1] p; //projector on centering constraint
   matrix[K,K] Sigma;
   Xs <- design_spline(x, K, splinedegree());
-  Diff <- difference_op(K, 2); //difforder());
-  Sigma <- scam_sigma(K, 2); //monotone decreasing
+  Diff <- difference_op(K, difforder());
   {
     row_vector[K] tmp;
     tmp <- rep_row_vector(1,N) * Xs;
-    p <- (-tmp * Sigma[,2:]) / (tmp * Sigma[,1]);
+    p <- -tmp[2:] / (tmp * rep_vector(1,K));
   }
 }
 parameters {
   real intercept;
-  vector<lower=0>[K-1] beta;
+  positive_ordered[K-1] beta;
   real<lower=0> sigma2;
   real<lower=0> lambda;
 }
 transformed parameters {
   vector[K] beta_centered;
-  beta_centered[2:] <- beta;
-  beta_centered[1] <- p*beta_centered[2:];
-  beta_centered <- Sigma*beta_centered;
+  {
+    real val;
+    val <- -p*beta;
+    beta_centered[1] <- val;
+    beta_centered[2:] <- val-beta; //+ for increasing, - for decreasing spline
+  }
 }
 model {
   //exponential GAM

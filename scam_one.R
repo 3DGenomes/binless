@@ -27,7 +27,7 @@ stan_matrix_to_datatable = function(opt, x) {
 
 
 #plot initial data
-data=generate_data(fun=function(x){1+6*x+x^3}, sd=3, xmin=0,xmax=3, npoints=1000)
+data=generate_data(fun=function(x){1-6*x+0.5*x^3}, sd=3, xmin=0,xmax=3, npoints=1000)
 #data[,c("y","f"):=list(y-mean(f),f-mean(f))]
 #data=data[y>0]
 #data=generate_data(fun=function(x){5*sin(3*x)+5.1}, sd=1, xmin=0,xmax=3, npoints=500)
@@ -36,15 +36,17 @@ ggplot(data)+geom_point(aes(x,y))+geom_line(aes(x,f))#+scale_y_log10()
 #fit it with stan
 scm = stan_model(file = "scam_one_centered_params.stan")
 scmi = stan_model(file = "scam_one_onlyspline.stan")
+op=NULL
+opi=NULL
 op = optimizing(scm, data = list(N=data[,.N], K=10, y=data[,y], x=data[,x]),
-                as_vector=F, hessian=F, iter=10000)
+                as_vector=F, hessian=F, iter=1000)
 opi = optimizing(scmi, data = list(N=data[,.N], K=10, y=data[,y], x=data[,x]),
-                as_vector=F, hessian=F, iter=10000)
+                as_vector=F, hessian=F, iter=1000)
 #sf = stan(file="spline.stan", data = list(N=data[,.N], K=20, y=data[,y], x=data[,x]))
 #launch_shinystan(sf)
 
-c(op$par$lambda,op$par$edf)
-c(opi$par$lambda,opi$par$edf)
+c(op$par$lambda,op$par$edf,op$value)
+c(opi$par$lambda,opi$par$edf,opi$value)
 #mat=stan_matrix_to_datatable(op$par$designmat, data[,x])
 mat=stan_matrix_to_datatable(opi$par$weighted, data[,x])
 #mat=stan_matrix_to_datatable(op$par$dofmat, 1:10)
