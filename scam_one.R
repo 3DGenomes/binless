@@ -34,9 +34,9 @@ data=generate_data(fun=function(x){1+6*x+x^3}, sd=3, xmin=0,xmax=3, npoints=1000
 ggplot(data)+geom_point(aes(x,y))+geom_line(aes(x,f))#+scale_y_log10()
 
 #fit it with stan
-scmi = stan_model(file = "scam_one_nointercept.stan")
-scm = stan_model(file = "scam_one_new.stan")
-op = optimizing(scm, data = list(N=data[,.N], K=11, y=data[,y], x=data[,x]),
+scm = stan_model(file = "scam_one_centered_params.stan")
+scmi = stan_model(file = "scam_one_onlyspline.stan")
+op = optimizing(scm, data = list(N=data[,.N], K=10, y=data[,y], x=data[,x]),
                 as_vector=F, hessian=F, iter=10000)
 opi = optimizing(scmi, data = list(N=data[,.N], K=10, y=data[,y], x=data[,x]),
                 as_vector=F, hessian=F, iter=10000)
@@ -60,6 +60,7 @@ ggplot(data)+geom_point(aes(x,y),alpha=0.2)+geom_line(aes(x,f),colour="black")+#
   geom_line(aes(x,gam),colour="blue")+
   geom_line(aes(x,predi),colour="green")+
   geom_line(aes(x,pred),colour="red")#+scale_y_log10()
+
 
 
 

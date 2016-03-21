@@ -98,6 +98,27 @@ functions {
     return D[,2:] - (2*D*u)*u[2:]';
   }
   
+  //Sigma matrix for SCAM smoothing spline with K params.
+  //Sigma is K x K
+  //t=1: monotone increasing
+  //t=2: monotone decreasing
+  matrix scam_sigma(int K, int t);
+  matrix scam_sigma(int K, int t) {
+    matrix[K,K] Sigma;
+    if (t==1) { //monotone increasing
+      Sigma[,1] <- rep_vector(1,K);
+      for (j in 2:K) {
+        Sigma[:(j-1),j] <- rep_vector(0,j-1);
+        Sigma[j:,j] <- rep_vector(1,K-j+1);
+      }
+    } else if (t==2) { //monotone decreasing
+      Sigma[2:K,2:K] <- -scam_sigma(K-1, 1);
+      Sigma[,1] <- rep_vector(1,K);
+      Sigma[1,2:K] <- rep_row_vector(0,K-1);
+    }
+    return Sigma;
+  }
+  
   //difference penalty for P-splines
   //K is the size of the parameter vector
   //d is the order of the difference
@@ -113,6 +134,24 @@ functions {
     }
     return P[1:(K-d),];
   }
+  //difference penalty for SCAM
+  //K is the size of the parameter vector
+  //Returns P, which is K-2 x K
+  //D=t(P)P is the difference matrix, P*beta is the difference vector
+  //t=1: monotone increasing
+  //t=2: monotone decreasing
+  matrix scam_difference_op(int K, int t) {
+    matrix[K-2,K] P;
+    P <- rep_matrix(0,K-2,K);
+    if (t == 1 || t == 2) {
+      for (i in 1:(K-2)){
+        P[i,i+1] <- 1;
+        P[i,i+2] <- -1;
+      }
+    }
+    return P;
+  }
+
 
   // design matrix for 1D b-spline fit of degree q with K functions
   matrix design_spline(vector x, int K, int q) {
@@ -121,7 +160,7 @@ functions {
   
   // difference operator for that design matrix
   matrix difference_op(int K, int d) {
-    return difference_matrix_sqrt(K,d);
+    return scam_difference_op(K,d); //difference_matrix_sqrt(K,d);
   }
 }
 ////////////////////////////////////////////////////////////////
@@ -134,27 +173,31 @@ data {
 transformed data {
   matrix[N,K] Xs; //design matrix for spline
   matrix[K-difforder(),K] Diff; //difference operator for penalty
-  vector[K] p; //projector on centering constraint
+  row_vector[K-1] p; //projector on centering constraint
+  matrix[K,K] Sigma;
   Xs <- design_spline(x, K, splinedegree());
-  Diff <- difference_op(K, difforder());
-  p <- Xs' * rep_vector(1,N);
-  p <- p / sqrt(dot_self(p));
+  Diff <- difference_op(K, 2); //difforder());
+  Sigma <- scam_sigma(K, 2); //monotone decreasing
+  {
+    row_vector[K] tmp;
+    tmp <- rep_row_vector(1,N) * Xs;
+    p <- (-tmp * Sigma[,2:]) / (tmp * Sigma[,1]);
+  }
 }
 parameters {
   real intercept;
-  ordered[K-1] beta;
+  vector[K-1] beta;
   real<lower=0> sigma2;
   real<lower=0> lambda;
 }
 transformed parameters {
-  vector[K] beta_centered;
   vector[K] beta_aug;
-  //careful here: beta_aug must be monotonous,
-  //beta_aug[1] not too hard on the optimizer (e.g. a smooth function of all beta[i])
-  //and close to beta[1] to be nice with the difference penalty
-  beta_aug[1] <- -beta[1];
-  beta_aug[2:] <- -beta;
-  beta_centered <- beta_aug - (beta_aug' * p) * p;
+  vector[K] beta_centered;
+  beta_aug[2:] <- beta;
+  beta_centered[2:] <- exp(beta);
+  beta_centered[1] <- p*beta_centered[2:];
+  beta_aug[1] <- beta_centered[1];
+  beta_centered <- Sigma*beta_centered;
 }
 model {
   //exponential GAM
