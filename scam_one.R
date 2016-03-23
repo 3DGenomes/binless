@@ -28,6 +28,7 @@ stan_matrix_to_datatable = function(opt, x) {
 
 #plot initial data
 data=generate_data(fun=function(x){1-6*x+0.5*x^3}, sd=3, xmin=0,xmax=3, npoints=1000)
+#data=generate_data(fun=function(x){1-6*x}, sd=3, xmin=0,xmax=3, npoints=1000)
 #data[,c("y","f"):=list(y-mean(f),f-mean(f))]
 #data=data[y>0]
 #data=generate_data(fun=function(x){5*sin(3*x)+5.1}, sd=1, xmin=0,xmax=3, npoints=500)

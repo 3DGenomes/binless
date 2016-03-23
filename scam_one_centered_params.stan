@@ -1,8 +1,8 @@
 ////
 // SCAM : y ~ s(X) using monotone decreasing cubic splines with log-link
 // The design matrix is the original spline base,
-// Intercept is modelled explicitly, and the spline is centered at each
-// iteration
+// Intercept is modelled explicitly, and the spline is centered at each iteration
+// Need to verify EDF calculation
 ////
 functions {
   vector range(int imin, int imax) {
@@ -38,87 +38,6 @@ functions {
     return B;
   }
   
-  //collection of householder vectors to decompose A
-  //if A is n x m then the function returns a n x 2m matrix [U : R]
-  // U will be n x m and the vectors are stored in the lower triangle of U.
-  // Q is prod_i 1 - 2u_iu_iT 
-  // R is upper triangular.
-  matrix householder(matrix A) {
-    int n;
-    int m;
-    n <- rows(A);
-    m <- cols(A);
-    {
-      matrix[n,m] U;
-      matrix[n,m] R;
-      vector[n] e;
-      U <- rep_matrix(0,n,m);
-      e[2:n] <- rep_vector(0,n-1);
-      e[1] <- 1;
-      R <- A;
-      for (k in 1:m) {
-        vector[n-k+1] x;
-        vector[n-k+1] u;
-        x <- R[k:n,k];
-        u <- sqrt(x'*x)*e[1:(n-k+1)] + x;
-        if (x[1]<0) u <- -u;
-        u <- u/sqrt(u'*u);
-        {
-          matrix[n-k+1,m-k+1] tmp; //stan 2.9.0 issues compile error for deep_copy
-          tmp <- R[k:n,k:m] - 2*u*transpose(u)*R[k:n,k:m];
-          R[k:n,k:m] <- tmp;
-        }
-        U[k:n,k] <- u;
-      }
-      return append_col(U,R);
-    }
-  }
-    
-  //compute householder vector of centering constraint X^T * 1
-  vector centering_constraint(matrix X) {
-    int N;
-    int K;
-    N <- rows(X);
-    K <- cols(X);
-    {
-      //form QR decomposition of Xt1
-      matrix[K,1] sums;
-      vector[K] u;
-      sums <- to_matrix(rep_row_vector(1,N)*X)';
-      return householder(sums)[,1];
-    }
-  }
-  
-  //apply centering constraint on X to a matrix D: D -> DZ
-  // where Z is such that X^T 1 = QR with Q=[u:Z]
-  // if D is LxK, and X is NxK, returns a Lx(K-1) matrix
-  matrix center(matrix X, matrix D) {
-    vector[cols(X)] u;
-    u <- centering_constraint(X);
-    return D[,2:] - (2*D*u)*u[2:]';
-  }
-  
-  //Sigma matrix for SCAM smoothing spline with K params.
-  //Sigma is K x K
-  //t=1: monotone increasing
-  //t=2: monotone decreasing
-  matrix scam_sigma(int K, int t);
-  matrix scam_sigma(int K, int t) {
-    matrix[K,K] Sigma;
-    if (t==1) { //monotone increasing
-      Sigma[,1] <- rep_vector(1,K);
-      for (j in 2:K) {
-        Sigma[:(j-1),j] <- rep_vector(0,j-1);
-        Sigma[j:,j] <- rep_vector(1,K-j+1);
-      }
-    } else if (t==2) { //monotone decreasing
-      Sigma[2:K,2:K] <- -scam_sigma(K-1, 1);
-      Sigma[,1] <- rep_vector(1,K);
-      Sigma[1,2:K] <- rep_row_vector(0,K-1);
-    }
-    return Sigma;
-  }
-  
   //difference penalty for P-splines
   //K is the size of the parameter vector
   //d is the order of the difference
@@ -134,24 +53,6 @@ functions {
     }
     return P[1:(K-d),];
   }
-  //difference penalty for SCAM
-  //K is the size of the parameter vector
-  //Returns P, which is K-2 x K
-  //D=t(P)P is the difference matrix, P*beta is the difference vector
-  //t=1: monotone increasing
-  //t=2: monotone decreasing
-  matrix scam_difference_op(int K, int t) {
-    matrix[K-2,K] P;
-    P <- rep_matrix(0,K-2,K);
-    if (t == 1 || t == 2) {
-      for (i in 1:(K-2)){
-        P[i,i+1] <- 1;
-        P[i,i+2] <- -1;
-      }
-    }
-    return P;
-  }
-
 
   // design matrix for 1D b-spline fit of degree q with K functions
   matrix design_spline(vector x, int K, int q) {
@@ -174,7 +75,6 @@ transformed data {
   matrix[N,K] Xs; //design matrix for spline
   matrix[K-difforder(),K] Diff; //difference operator for penalty
   row_vector[K-1] p; //projector on centering constraint
-  matrix[K,K] Sigma;
   Xs <- design_spline(x, K, splinedegree());
   Diff <- difference_op(K, difforder());
   {
@@ -192,10 +92,12 @@ parameters {
 transformed parameters {
   vector[K] beta_centered;
   {
+    real epsilon;
     real val;
-    val <- -p*beta;
+    epsilon <- -1; //+1 for increasing, -1 for decreasing spline
+    val <- epsilon*p*beta;
     beta_centered[1] <- val;
-    beta_centered[2:] <- val-beta; //+ for increasing, - for decreasing spline
+    beta_centered[2:] <- val+epsilon*beta; 
   }
 }
 model {
