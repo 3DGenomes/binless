@@ -27,7 +27,7 @@ stan_matrix_to_datatable = function(opt, x) {
 
 
 #plot initial data
-data=generate_data(fun=function(x){1-6*x+0.5*x^3}, sd=3, xmin=0,xmax=3, npoints=1000)
+data=generate_data(fun=function(x){1-6*x+0.5*x^3}, sd=3, xmin=0,xmax=3, npoints=100)
 #data=generate_data(fun=function(x){1-6*x}, sd=3, xmin=0,xmax=3, npoints=1000)
 #data[,c("y","f"):=list(y-mean(f),f-mean(f))]
 #data=data[y>0]
@@ -66,6 +66,27 @@ ggplot(data)+geom_point(aes(x,y),alpha=0.2)+geom_line(aes(x,f),colour="black")+#
 
 
 
+data[seq(length(y)/2,length(y),2),y:=NA]
+data=data[complete.cases(data)]
+scz = stan_model(file = "build_spline.stan")
+sm = stan("build_spline.stan", chains=1, iter=1, verbose=F, algorithm="Fixed_param",
+          data = list(N=data[,.N], K=5, y=data[,y], x=data[,x]))
+opz = optimizing(scz, iter=1, as_vector=F, verbose=T,
+           data = list(N=data[,.N], K=100, y=data[,y], x=data[,x]))
+matw=stan_matrix_to_datatable(opz$par$Xw, data[,.I])
+setnames(matw, c("x", "base", "Xw"))
+matp=stan_matrix_to_datatable(opz$par$Xp, data[,.I])
+setnames(matp, c("x", "base", "Xp"))
+mat=merge(matp,matw, by=c("x","base"))
+mat[,diff:=Xp-Xw]
+mat[,all(diff==0)]
+mat=melt(mat, id.vars=c("x","base"))
+ggplot(mat)+geom_tile(aes(base,x,fill=log(value)))+scale_y_reverse()+facet_wrap(~variable)
+ggplot(mat)+geom_tile(aes(base,x,fill=value))+scale_y_reverse()+facet_wrap(~variable)
 
-
+ggplot(data)+geom_point(aes(x,y),alpha=0.2)+geom_line(aes(x,f),colour="black")+#ylim(0,40)+
+  geom_line(data=mat, aes(x,value,colour=base))
+ggplot(mat)+geom_tile(aes(base,x,fill=(value>0)))+scale_y_reverse()  
+ggplot(mat)+geom_tile(aes(base,x,fill=Xw-Xp))+scale_y_reverse()  
+ggplot(mat)+geom_tile(aes(base,x,fill=Xw>0))+scale_y_reverse()  
 
