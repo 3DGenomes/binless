@@ -27,6 +27,10 @@ functions {
   }
   int splinedegree() {return 3;} //set 3 for cubic spline
   int difforder() {return 2;} //set 2 for 2nd order difference penalty
+  int nnz(int N) {
+    //nnz is (splinedegree()+1)*N
+    return 4*N;
+  }
   matrix bspl_gen(vector x, real dx, row_vector t, int q) {
     int N;
     int K;
@@ -67,36 +71,6 @@ functions {
     return bspl_gen(x, dx, t, q);
   }
 
-  matrix bspline_piecewise(vector x, int K, int q) {
-    real dx; //interval length
-    row_vector[K] t; //knot locations (except last)
-    int x_n[K-q+1]; //cumulative histogram of x values
-    matrix[rows(x),K] Xs; //spline base
-    print("bspline calculation with K=",K," and q=",q);
-    //
-    dx <- 1.01*(max(x)-min(x))/(K-q); //make it slightly larger
-    t <- min(x) - dx*0.01 + dx * range(-q,K-q-1)';
-    //get indices of x which cross to the next segment and build x_n.
-    x_n[1] <- 1;
-    x_n[2:(K-q)] <- cumulative_hist(x, t[(q+2):]);
-    x_n[K-q+1] <- rows(x)+1;
-    print("cut points: ",t);
-    print("histogram: ",x_n);
-    //
-    //build spline, interval per interval
-    Xs <- rep_matrix(0,rows(x),K);
-    for (i in 1:(K-q)) {
-      //at any x, there are q+1 nonzero b-splines. Compute them.
-      int xbegin;
-      int xend;
-      xbegin <- x_n[i];
-      xend <- x_n[i+1]-1;
-      Xs[xbegin:xend,i:(i+q)] <- bspl_gen(x[xbegin:xend], dx, t[i:(i+q)], q);
-      print("   loop iteration ",i, " x=", xbegin, ":",xend, " K=", i, ":", i+q);
-    }
-    return Xs;
-  }
-  
   //difference penalty for P-splines
   //K is the size of the parameter vector
   //d is the order of the difference
@@ -125,8 +99,66 @@ parameters {
 model {
 }
 generated quantities {
-  matrix[N,K] Xw; //design matrix
-  matrix[N,K] Xp; //design matrix
-  Xw <- bspline(x,K,splinedegree());
-  Xp <- bspline_piecewise(x,K,splinedegree());
+  matrix[N,K] X; //design matrix
+  matrix[N,K] Xs; //sparse matrix converted to dense
+  vector[4*N] Xw; //sparse vectors
+  int Xv[4*N];
+  int Xu[N+1];
+  matrix[K-2,K] D;
+  int q;
+  q <- splinedegree();
+  X <- bspline(x,K,q);
+  print("Sparse bspline calculation with K=",K," and q=",q);
+  //BEGIN sparse calculation
+  //cannot write function that modifies its arguments so we put it here
+  //input: vector[N] x, int K, int q
+  //output: vector[nnz(N)] Xw, int Xv[nnz(N)], int Xu[N+1]
+  {
+    real dx; //interval length
+    row_vector[K] t; //knot locations (except last)
+    int x_n[K-q+1]; //cumulative histogram of x values
+    int idx_u; //counters for filling of sparse matrix
+    int idx_w;
+    print("bspline calculation with K=",K," and q=",q);
+    //
+    dx <- 1.01*(max(x)-min(x))/(K-q); //make it slightly larger
+    t <- min(x) - dx*0.01 + dx * range(-q,K-q-1)';
+    //get indices of x which cross to the next segment and build x_n.
+    x_n[1] <- 1;
+    x_n[2:(K-q)] <- cumulative_hist(x, t[(q+2):]);
+    x_n[K-q+1] <- rows(x)+1;
+    print("cut points: ",t);
+    print("histogram: ",x_n);
+    //
+    //build spline, interval per interval
+    idx_u <- 1;
+    idx_w <- 1;
+    for (i in 1:(K-q)) {
+      //at any x, there are q+1 nonzero b-splines. Compute them.
+      int xbegin;
+      int xend;
+      xbegin <- x_n[i];
+      xend <- x_n[i+1]-1;
+      {
+        matrix[xend-xbegin+1,q+1] tmp;
+        tmp <- bspl_gen(x[xbegin:xend], dx, t[i:(i+q)], q);
+        for (ti in 1:(xend-xbegin+1)) {
+          Xu[idx_u] <- idx_w;
+          idx_u <- idx_u + 1;
+          for (tj in 1:(q+1)) {
+            Xw[idx_w] <- tmp[ti,tj];
+            Xv[idx_w] <- i+tj-1;
+            idx_w <- idx_w + 1;
+          }
+        }
+      }
+      print("   loop iteration ",i, " x=", xbegin, ":",xend, " K=", i, ":", i+q,
+      " idx_w=", idx_w, " idx_u=", idx_u,"                                     ");
+    }
+    Xu[idx_u] <- idx_w; 
+  }
+  //END sparse calculation
+  Xs <- csr_to_dense_matrix(N, K, Xw, Xv, Xu);
+  //
+  D <- difference_matrix_sqrt(K, difforder());
 }
