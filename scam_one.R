@@ -73,12 +73,12 @@ sm = stan("build_spline.stan", chains=1, iter=1, verbose=F, algorithm="Fixed_par
           data = list(N=data[,.N], K=5, y=data[,y], x=data[,x]))
 opz = optimizing(scz, iter=1, as_vector=F, verbose=T,
            data = list(N=data[,.N], K=100, y=data[,y], x=data[,x]))
-matw=stan_matrix_to_datatable(opz$par$Xw, data[,.I])
-setnames(matw, c("x", "base", "Xw"))
-matp=stan_matrix_to_datatable(opz$par$Xp, data[,.I])
-setnames(matp, c("x", "base", "Xp"))
+matw=stan_matrix_to_datatable(opz$par$X, data[,.I])
+setnames(matw, c("x", "base", "X"))
+matp=stan_matrix_to_datatable(opz$par$Xs, data[,.I])
+setnames(matp, c("x", "base", "Xs"))
 mat=merge(matp,matw, by=c("x","base"))
-mat[,diff:=Xp-Xw]
+mat[,diff:=Xs-X]
 mat[,all(diff==0)]
 mat=melt(mat, id.vars=c("x","base"))
 ggplot(mat)+geom_tile(aes(base,x,fill=log(value)))+scale_y_reverse()+facet_wrap(~variable)
@@ -87,6 +87,6 @@ ggplot(mat)+geom_tile(aes(base,x,fill=value))+scale_y_reverse()+facet_wrap(~vari
 ggplot(data)+geom_point(aes(x,y),alpha=0.2)+geom_line(aes(x,f),colour="black")+#ylim(0,40)+
   geom_line(data=mat, aes(x,value,colour=base))
 ggplot(mat)+geom_tile(aes(base,x,fill=(value>0)))+scale_y_reverse()  
-ggplot(mat)+geom_tile(aes(base,x,fill=Xw-Xp))+scale_y_reverse()  
-ggplot(mat)+geom_tile(aes(base,x,fill=Xw>0))+scale_y_reverse()  
+ggplot(mat)+geom_tile(aes(base,x,fill=X-Xs))+scale_y_reverse()  
+ggplot(mat)+geom_tile(aes(base,x,fill=X>0))+scale_y_reverse()  
 
