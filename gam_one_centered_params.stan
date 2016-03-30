@@ -38,66 +38,6 @@ functions {
     return B;
   }
   
-  //collection of householder vectors to decompose A
-  //if A is n x m then the function returns a n x 2m matrix [U : R]
-  // U will be n x m and the vectors are stored in the lower triangle of U.
-  // Q is prod_i 1 - 2u_iu_iT 
-  // R is upper triangular.
-  matrix householder(matrix A) {
-    int n;
-    int m;
-    n <- rows(A);
-    m <- cols(A);
-    {
-      matrix[n,m] U;
-      matrix[n,m] R;
-      vector[n] e;
-      U <- rep_matrix(0,n,m);
-      e[2:n] <- rep_vector(0,n-1);
-      e[1] <- 1;
-      R <- A;
-      for (k in 1:m) {
-        vector[n-k+1] x;
-        vector[n-k+1] u;
-        x <- R[k:n,k];
-        u <- sqrt(x'*x)*e[1:(n-k+1)] + x;
-        if (x[1]<0) u <- -u;
-        u <- u/sqrt(u'*u);
-        {
-          matrix[n-k+1,m-k+1] tmp; //stan 2.9.0 issues compile error for deep_copy
-          tmp <- R[k:n,k:m] - 2*u*transpose(u)*R[k:n,k:m];
-          R[k:n,k:m] <- tmp;
-        }
-        U[k:n,k] <- u;
-      }
-      return append_col(U,R);
-    }
-  }
-    
-  //compute householder vector of centering constraint X^T * 1
-  vector centering_constraint(matrix X) {
-    int N;
-    int K;
-    N <- rows(X);
-    K <- cols(X);
-    {
-      //form QR decomposition of Xt1
-      matrix[K,1] sums;
-      vector[K] u;
-      sums <- to_matrix(rep_row_vector(1,N)*X)';
-      return householder(sums)[,1];
-    }
-  }
-  
-  //apply centering constraint on X to a matrix D: D -> DZ
-  // where Z is such that X^T 1 = QR with Q=[u:Z]
-  // if D is LxK, and X is NxK, returns a Lx(K-1) matrix
-  matrix center(matrix X, matrix D) {
-    vector[cols(X)] u;
-    u <- centering_constraint(X);
-    return D[,2:] - (2*D*u)*u[2:]';
-  }
-  
   //difference penalty for P-splines
   //K is the size of the parameter vector
   //d is the order of the difference
