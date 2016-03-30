@@ -33,7 +33,7 @@ data=generate_data(fun=function(x){3+2*sin(5*x)+3*x}, sd=100, xmin=0,xmax=3, npo
 ggplot(data)+geom_point(aes(x,y))+geom_line(aes(x,f))#+scale_y_log10()
 
 #fit it with stan
-sm = stan_model(file = "gam_one_centered_design.stan")
+sm = stan_model(file = "gam_one_sparse.stan")
 #smi = stan_model(file = "gam_one_onlyspline.stan")
 smi = stan_model(file = "gam_one_centered_params.stan")
 op = optimizing(sm, data = list(N=data[,.N], K=10, y=data[,y], x=data[,x]),
