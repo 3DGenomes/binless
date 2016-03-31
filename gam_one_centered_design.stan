@@ -1,5 +1,5 @@
 ////
-// GAM : y ~ s(X) using cubic splines with log-link
+// GAM : y ~ s(X) using cubic splines with negative binomial and log-link
 // The spline design matrix is centered and augmented with an intercept
 ////
 functions {
@@ -116,9 +116,7 @@ functions {
   matrix design(vector x, int K, int q) {
     matrix[rows(x),K] X;
     X <- bspline(x, K, q);
-    ////only bspline basis: K params
-    //return X;
-    ////intercept and bspline basis: K params
+    //intercept and bspline basis: K params
     return append_col(rep_vector(1,rows(x)), center(X,X));
   }
   
@@ -138,21 +136,19 @@ data {
 }
 transformed data {
   matrix[N,K] X; //design matrix
-  matrix[K-difforder(),K] P;
-  //vector[K] zero;
+  matrix[K-difforder(),K] P; //difference operator
   X <- design(x, K, splinedegree());
   P <- difference_op(x, K, splinedegree(), difforder());
-  //zero <- rep_vector(0,K);
 }
 parameters {
-  vector[K] beta;
-  real<lower=0> alpha;
-  real<lower=0> lambda;
+  vector[K] beta; //parameter vector for intercept + centered spline
+  real<lower=0> alpha; //precision of negative binomial
+  real<lower=0> lambda; //regularization parameter
 }
 model {
-  //exponential GAM
+  //negative binomial GAM
   y ~ neg_binomial_2(exp(X * beta), alpha);
-  //P-spline prior on the differences (K-1 params)
+  //P-spline prior on the 2nd order differences (K-2 params)
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
   P*beta ~ normal(0, 1./(alpha*lambda));
@@ -163,8 +159,6 @@ generated quantities {
   vector[N] pred; //spline interpolant
   real edf; //effective degrees of freedom
   vector[K] edfvec;
-  vector[K] u;
-  vector[K] betaU;
   designmat <- X;
   weighted <- X .* rep_matrix(beta', rows(x));
   pred <- exp(X * beta);
@@ -174,6 +168,4 @@ generated quantities {
     edfvec <- diagonal(inverse_spd(XtX+lambda*crossprod(P)) * XtX);
     edf <- sum(edfvec);
   }
-  u <- centering_constraint(bspline(x, K, splinedegree()));
-  betaU <- beta - 2 * u * (u' * beta);
 }
