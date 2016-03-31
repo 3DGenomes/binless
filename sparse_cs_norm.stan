@@ -154,18 +154,19 @@ parameters {
   real eRJ; //exposure for rejoined ends
   real eDE; //exposure for dangling ends
   vector[Krow-1] beta_nu;
-  //vector[Krow-1] beta_delta;
+  vector[Krow-1] beta_delta;
   //positive_ordered[Kdiag-1] beta_diag;
   real<lower=0> alpha;
-  real<lower=0> lambda;
+  real<lower=0> lambda_nu;
+  real<lower=0> lambda_delta;
 }
 transformed parameters {
   //nu
   vector[S] log_nu; // log(nu)
   vector[Krow-2] beta_nu_diff; //2nd order difference on beta_nu_aug
   //delta
-  //vector[S] log_delta; // log(delta)
-  //vector[Krow-2] beta_delta_diff; //2nd order difference on beta_delta_aug
+  vector[S] log_delta; // log(delta)
+  vector[Krow-2] beta_delta_diff; //2nd order difference on beta_delta_aug
   
   //nu
   {
@@ -177,7 +178,7 @@ transformed parameters {
     log_nu <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_nu_centered);
     beta_nu_diff <- beta_nu_aug[:(Krow-2)]-2*beta_nu_aug[2:(Krow-1)]+beta_nu_aug[3:];
   }
-  /*//delta
+  //delta
   {
     vector[Krow] beta_delta_centered;
     vector[Krow] beta_delta_aug;
@@ -186,7 +187,7 @@ transformed parameters {
     beta_delta_centered <- beta_delta_aug - (beta_delta_aug' * prow) * prow;
     log_delta <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
     beta_delta_diff <- beta_delta_aug[:(Krow-2)]-2*beta_delta_aug[2:(Krow-1)]+beta_delta_aug[3:];
-  }*/
+  }
 }
 model {
   //// build regression components
@@ -196,14 +197,14 @@ model {
   //// likelihoods
   //biases
   rejoined ~ neg_binomial_2(exp(intercept + eRJ + log_nu), alpha);
-  //danglingL ~ neg_binomial_2(exp(intercept + eDE + log_nu - log_delta), alpha);
-  //danglingR ~ neg_binomial_2(exp(intercept + eDE + log_nu + log_delta), alpha);
+  danglingL ~ neg_binomial_2(exp(intercept + eDE + log_nu - log_delta), alpha);
+  danglingR ~ neg_binomial_2(exp(intercept + eDE + log_nu + log_delta), alpha);
   //counts
   
   //// Priors
   //P-spline prior on the differences (K-2 params)
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
-  beta_nu_diff ~ normal(0, 1./(alpha*lambda));
-  //beta_delta_diff ~ normal(0, 1./(alpha*lambda));
+  beta_nu_diff ~ normal(0, 1./(alpha*lambda_nu));
+  beta_delta_diff ~ normal(0, 1./(alpha*lambda_delta));
 }

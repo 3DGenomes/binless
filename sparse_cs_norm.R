@@ -41,38 +41,44 @@ counts=fread("cs_norm_rao_HiC035_chr22.dat", stringsAsFactors = T)
 data=unique(rbind(counts[,.(id=id1,pos=pos1)],counts[,.(id=id2,pos=pos2)]))[biases,,on="id"]
 data=fread("rao_HICall_chr19_35400000-35500000_biases.dat")
 setnames(data, "re.pos","pos")
-
 ggplot(melt(data,id.vars=c("id","pos")),aes(pos,value,colour=variable))+geom_point()+geom_line()+scale_y_log10()
 
-
-
+data=fread("rao_HICall_chr19_35400000-35500000_counts.dat")
+setnames(data, "re.pos1","pos1")
+setnames(data, "re.pos2","pos2")
 
 #fit it with stan and gam
 sm = stan_model(file = "sparse_cs_norm.stan")
-smi = stan_model(file = "gam_one_sparse.stan")
-system.time(op <- optimizing(sm, data = list(Krow=100, S=data[,.N], cutsites=data[,pos], rejoined=data[,y],
+
+system.time(op <- optimizing(sm, data = list(Krow=5, S=data[,.N], cutsites=data[,pos], rejoined=data[,rejoined],
                                              danglingL=data[,dangling.L], danglingR=data[,dangling.R]),
-                             as_vector=F, hessian=F, iter=100000, verbose=T))
-opi = optimizing(smi, data = list(N=data[,.N], K=10, y=data[,y], x=data[,pos]),
-                as_vector=F, hessian=F, iter=10000)
-                #init=list(intercept=fit$coefficients["(Intercept)"]))
+                             as_vector=F, hessian=F, iter=1000, verbose=F))
+data[,nu1:=exp(op$par$log_nu)]
+system.time(op <- optimizing(sm, data = list(Krow=5, S=data[,.N], cutsites=data[,pos], rejoined=data[,rejoined],
+                                             danglingL=data[,dangling.L], danglingR=data[,dangling.R]),
+                             as_vector=F, hessian=F, iter=1000, verbose=F))
+data[,nu2:=exp(op$par$log_nu)]
+system.time(op <- optimizing(sm, data = list(Krow=5, S=data[,.N], cutsites=data[,pos], rejoined=data[,rejoined],
+                                             danglingL=data[,dangling.L], danglingR=data[,dangling.R]),
+                             as_vector=F, hessian=F, iter=1000, verbose=F))
+data[,nu3:=exp(op$par$log_nu)]
 
 
-fit=gam(data=data, formula = y~s(pos,bs="ps", m=c(2,2), k=100), family=nb())
-data[,gam:=fit$fitted.values]
-
-data[,nui:=opi$par$pred]
-
-data[,nu:=exp(op$par$eRJ+1+op$par$log_nu)]
-data[,delta:=exp(op$par$log_delta)]
+#data[,delta:=exp(op$par$log_delta)]
 #data[,fij:=op$par$decay]
 #plot result
+ggplot()+scale_y_log10()+
+  geom_line(data=melt(data,id.vars=c("id","pos"))[variable%in%c("nu1","nu2","nu3")],
+            aes(pos,value,colour=variable))+
+  geom_point(data=melt(data,id.vars=c("id","pos"))[!(variable%in%c("nu1","nu2","nu3"))],
+            aes(pos,value,colour=variable))
+
+
 ggplot(melt(data,id.vars=c("id","pos")),aes(pos,value,colour=variable))+geom_point()+geom_line()+scale_y_log10()
 ggplot(melt(data,id.vars=c("id","pos")),aes(pos,value,colour=variable))+geom_point()+geom_line()+scale_y_log10()+xlim(35450000, 35475000)
-ggplot(data) + geom_line(aes(pos,f))+geom_point(aes(pos,y))+
-  geom_line(aes(pos,nu),colour="green")+ geom_line(aes(pos,gam), colour="red")+
-  geom_line(aes(pos,nui),colour="blue")
-ggplot(melt(data,id.vars=c("id","pos"))[variable%in%c("nu","nu3","nu3b","nu3c")],aes(pos,value,colour=variable))+geom_point()+geom_line()+scale_y_log10()
+ggplot(data) +
+  geom_line(aes(pos,nu),colour="green")+
+  geom_line(aes(pos,delta),colour="blue")
 
 
 

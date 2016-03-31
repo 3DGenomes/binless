@@ -26,7 +26,7 @@ stan_matrix_to_datatable = function(opt, x) {
 
 
 #plot initial data
-data=generate_data(fun=function(x){3+2*sin(5*x)+3*x}, sd=100, xmin=0,xmax=3, npoints=100)
+data=generate_data(fun=function(x){3+2*sin(5*x)+3*x}, sd=100, xmin=0,xmax=3, npoints=1000)
 data[,pos:=x]
 data[,x:=x*1e5/3.+35400000]
 #data=generate_data(fun=function(x){1+5*exp(-(x-1.5)**2*2)}, sd=5, xmin=0,xmax=3, npoints=1000)
