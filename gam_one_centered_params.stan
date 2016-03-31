@@ -83,7 +83,7 @@ transformed data {
 parameters {
   real intercept;
   vector[K-1] beta;
-  real<lower=0> sigma2;
+  real<lower=0> alpha;
   real<lower=0> lambda;
 }
 transformed parameters {
@@ -95,11 +95,11 @@ transformed parameters {
 }
 model {
   //exponential GAM
-  y ~ neg_binomial_2(exp(intercept + Xs * beta_centered), sigma2);
+  y ~ neg_binomial_2(exp(intercept + Xs * beta_centered), alpha);
   //P-spline prior on the differences (K-1 params)
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
-  Diff*beta_aug ~ normal(0, sigma2/lambda);
+  Diff*beta_centered ~ normal(0, 1./(alpha*lambda));
 }
 generated quantities {
   matrix[N,K] designmat; //design matrix

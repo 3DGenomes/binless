@@ -155,16 +155,16 @@ transformed data {
 }
 parameters {
   vector[K1+K2-1] beta;
-  real<lower=0> sigma2;
+  real<lower=0> alpha;
   vector<lower=0>[2] lambda;
 }
 model {
   //exponential GAM
-  y ~ neg_binomial_2(X * beta, sigma2);
+  y ~ neg_binomial_2(X * beta, alpha);
   //P-spline prior on the differences
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
-  P*beta ~ normal(0, sigma2 ./ (Z*lambda));
+  P*beta ~ normal(0, 1. ./ (Z*lambda*alpha));
 }
 generated quantities {
   matrix[N,K1+K2-1] weighted; //weighted basis functions
