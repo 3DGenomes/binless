@@ -33,25 +33,31 @@ data=fread("cs_norm_binned_caulo.dat", stringsAsFactors = T)
 
 biases=fread("caulo_toy_biases.dat")
 counts=fread("caulo_toy_counts.dat")
-data=unique(rbind(counts[,.(id=id1,pos=pos1, rejoined=rejoined.1, )],counts[,.(id=id2,pos=pos2)]))[biases,,on="id"]
+data=unique(rbind(counts[,.(id=id1,pos=pos1, rejoined=rejoined.1)],counts[,.(id=id2,pos=pos2)]))[biases,,on="id"]
 
 
 data=fread("cs_norm_caulo.dat", stringsAsFactors = T)
 counts=fread("cs_norm_rao_HiC035_chr22.dat", stringsAsFactors = T)
 data=unique(rbind(counts[,.(id=id1,pos=pos1)],counts[,.(id=id2,pos=pos2)]))[biases,,on="id"]
-data=fread("rao_HICall_chr19_35400000-35500000_biases.dat")
-setnames(data, "re.pos","pos")
+biases=fread("rao_HICall_chr19_35400000-35500000_biases.dat")
+setkey(biases,id)
+
+setnames(biases, "re.pos","pos")
+data=biases
 ggplot(melt(data,id.vars=c("id","pos")),aes(pos,value,colour=variable))+geom_point()+geom_line()+scale_y_log10()
 
-data=fread("rao_HICall_chr19_35400000-35500000_counts.dat")
-setnames(data, "re.pos1","pos1")
-setnames(data, "re.pos2","pos2")
+counts=fread("rao_HICall_chr19_35400000-35500000_counts.dat")
+setnames(counts, "re.pos1","pos1")
+setnames(counts, "re.pos2","pos2")
+counts=dcast(counts[,.(category,pos1,pos2,N)], pos1+pos2~category, fill=0, value.var="N")
 
 #fit it with stan and gam
 sm = stan_model(file = "sparse_cs_norm.stan")
 
-system.time(op <- optimizing(sm, data = list(Krow=5, S=data[,.N], cutsites=data[,pos], rejoined=data[,rejoined],
-                                             danglingL=data[,dangling.L], danglingR=data[,dangling.R]),
+system.time(op <- optimizing(sm, data = list(Krow=5, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
+                                             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+                                             Kdiag=5, N=counts[,.N], ),
+                             
                              as_vector=F, hessian=F, iter=1000, verbose=F))
 data[,nu1:=exp(op$par$log_nu)]
 system.time(op <- optimizing(sm, data = list(Krow=5, S=data[,.N], cutsites=data[,pos], rejoined=data[,rejoined],
