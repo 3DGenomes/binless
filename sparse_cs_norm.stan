@@ -242,8 +242,8 @@ model {
   //// likelihoods
   //biases
   rejoined ~ neg_binomial_2(exp(base_bias + eRJ), alpha);
-  danglingL ~ neg_binomial_2(exp(base_bias + eDE - log_delta), alpha);
-  danglingR ~ neg_binomial_2(exp(base_bias + eDE + log_delta), alpha);
+  danglingL ~ neg_binomial_2(exp(base_bias + eDE + log_delta), alpha);
+  danglingR ~ neg_binomial_2(exp(base_bias + eDE - log_delta), alpha);
   //counts: Close, Far, Up, Down
   counts[1] ~ neg_binomial_2(exp(base_count - log_deltai + log_deltaj), alpha); // Close
   counts[2] ~ neg_binomial_2(exp(base_count + log_deltai - log_deltaj), alpha); // Far

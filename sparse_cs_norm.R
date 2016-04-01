@@ -42,33 +42,31 @@ data=unique(rbind(counts[,.(id=id1,pos=pos1)],counts[,.(id=id2,pos=pos2)]))[bias
 biases=fread("rao_HICall_chr19_35400000-35500000_biases.dat")
 setkey(biases,id)
 
-setnames(biases, "re.pos","pos")
 data=biases
 ggplot(melt(data,id.vars=c("id","pos")),aes(pos,value,colour=variable))+geom_point()+geom_line()+scale_y_log10()
 
 counts=fread("rao_HICall_chr19_35400000-35500000_counts.dat")
-setnames(counts, "re.pos1","pos1")
-setnames(counts, "re.pos2","pos2")
-counts=dcast(counts[,.(category,pos1,pos2,N)], pos1+pos2~category, fill=0, value.var="N")
 
 #fit it with stan and gam
 sm = stan_model(file = "sparse_cs_norm.stan")
 
 system.time(op <- optimizing(sm, data = list(Krow=5, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
                                              danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-                                             Kdiag=5, N=counts[,.N], ),
-                             
-                             as_vector=F, hessian=F, iter=1000, verbose=F))
-data[,nu1:=exp(op$par$log_nu)]
-system.time(op <- optimizing(sm, data = list(Krow=5, S=data[,.N], cutsites=data[,pos], rejoined=data[,rejoined],
-                                             danglingL=data[,dangling.L], danglingR=data[,dangling.R]),
-                             as_vector=F, hessian=F, iter=1000, verbose=F))
-data[,nu2:=exp(op$par$log_nu)]
-system.time(op <- optimizing(sm, data = list(Krow=5, S=data[,.N], cutsites=data[,pos], rejoined=data[,rejoined],
-                                             danglingL=data[,dangling.L], danglingR=data[,dangling.R]),
-                             as_vector=F, hessian=F, iter=1000, verbose=F))
-data[,nu3:=exp(op$par$log_nu)]
+                                             Kdiag=5, N=counts[,.N],
+                                             counts=t(data.matrix(counts[,.(contact.close,contact.far,contact.up,contact.down)])),
+                                             cidx=t(data.matrix(counts[,.(id1,id2)]))),
+                             as_vector=F, hessian=F, iter=1000, verbose=T))
+biases[,nu1:=exp(op$par$log_nu)]
+biases[,delta1:=exp(op$par$log_delta)]
+counts[,fij1:=exp(op$par$log_decay)]
 
+biases[,nu2:=exp(op$par$log_nu)]
+biases[,delta3:=exp(op$par$log_delta)]
+counts[,fij2:=exp(op$par$log_decay)]
+
+biases[,nu3:=exp(op$par$log_nu)]
+biases[,delta3:=exp(op$par$log_delta)]
+counts[,fij3:=exp(op$par$log_decay)]
 
 #data[,delta:=exp(op$par$log_delta)]
 #data[,fij:=op$par$decay]
