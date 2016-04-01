@@ -193,9 +193,14 @@ transformed parameters {
   //diag
   vector[N] log_decay;
   vector[Kdiag-2] beta_diag_diff;
-  //misc
-  vector[S] base_bias;
-  vector[N] base_count;
+  //means
+  vector[S] mean_DL;
+  vector[S] mean_DR;
+  vector[S] mean_RJ;
+  vector[N] mean_cup;
+  vector[N] mean_cdown;
+  vector[N] mean_cfar;
+  vector[N] mean_cclose;
   
   //nu
   {
@@ -234,21 +239,34 @@ transformed parameters {
     beta_diag_diff <- beta_diag_centered[:(Kdiag-2)]-2*beta_diag_centered[2:(Kdiag-1)]+beta_diag_centered[3:];
   }
 
-  //misc
-  base_bias <- intercept + log_nu;
-  base_count <- intercept + log_decay + log_nui + log_nuj;
+  //means
+  {
+    vector[S] base_bias;
+    vector[N] base_count;
+    //
+    base_bias <- intercept + log_nu;
+    mean_RJ <- exp(base_bias + eRJ);
+    mean_DL <- exp(base_bias + eDE + log_delta);
+    mean_DR <- exp(base_bias + eDE - log_delta);
+    //
+    base_count <- intercept + log_decay + log_nui + log_nuj;
+    mean_cclose <- exp(base_count - log_deltai + log_deltaj);
+    mean_cfar <- exp(base_count + log_deltai - log_deltaj);
+    mean_cup <- exp(base_count + log_deltai + log_deltaj);
+    mean_cdown <- exp(base_count - log_deltai - log_deltaj);
+  }
 }
 model {
   //// likelihoods
   //biases
-  rejoined ~ neg_binomial_2(exp(base_bias + eRJ), alpha);
-  danglingL ~ neg_binomial_2(exp(base_bias + eDE + log_delta), alpha);
-  danglingR ~ neg_binomial_2(exp(base_bias + eDE - log_delta), alpha);
+  rejoined ~ neg_binomial_2(mean_RJ, alpha);
+  danglingL ~ neg_binomial_2(mean_DL, alpha);
+  danglingR ~ neg_binomial_2(mean_DR, alpha);
   //counts: Close, Far, Up, Down
-  counts[1] ~ neg_binomial_2(exp(base_count - log_deltai + log_deltaj), alpha); // Close
-  counts[2] ~ neg_binomial_2(exp(base_count + log_deltai - log_deltaj), alpha); // Far
-  counts[3] ~ neg_binomial_2(exp(base_count + log_deltai + log_deltaj), alpha); // Up
-  counts[4] ~ neg_binomial_2(exp(base_count - log_deltai - log_deltaj), alpha); // Down
+  counts[1] ~ neg_binomial_2(mean_cclose, alpha); // Close
+  counts[2] ~ neg_binomial_2(mean_cfar, alpha); // Far
+  counts[3] ~ neg_binomial_2(mean_cup, alpha); // Up
+  counts[4] ~ neg_binomial_2(mean_cdown, alpha); // Down
   
   //// Priors
   //P-spline prior on the differences (K-2 params)
