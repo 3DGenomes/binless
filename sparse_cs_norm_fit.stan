@@ -101,7 +101,10 @@ transformed data {
   //diagonal SCAM spline, dense
   matrix[N,Kdiag] Xdiag;
   row_vector[Kdiag-1] pdiag;
-  
+  //lambdas
+  real<lower=0> lambda_nu;
+  real<lower=0> lambda_delta;
+
   ////bias spline, sparse (nu and delta have the same design)
   //BEGIN sparse calculation
   //cannot write function that modifies its arguments so we put it here
@@ -166,6 +169,10 @@ transformed data {
     tmp <- rep_row_vector(1,N) * Xdiag;
     pdiag <- -tmp[2:] / (tmp * rep_vector(1,Kdiag));
   }
+  
+  //lambdas
+  lambda_nu <- 1;
+  lambda_delta <- 1;
 }
 parameters {
   real intercept;
@@ -175,8 +182,6 @@ parameters {
   vector[Krow-1] beta_delta;
   positive_ordered[Kdiag-1] beta_diag;
   real<lower=0> alpha;
-  real<lower=0> lambda_nu;
-  real<lower=0> lambda_delta;
   real<lower=0> lambda_diag;
 }
 transformed parameters {
