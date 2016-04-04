@@ -24,14 +24,14 @@ convert_to_simple = function(data) {
                                    "dangling.R.1","dangling.R.2","distance")])
 }
 
-biases=fread("rao_HICall_chr19_35400000-35500000_biases.dat")
+biases=fread("data/rao_HICall_chr19_35000000-36000000_biases.dat")
 setkey(biases,id)
-counts=fread("rao_HICall_chr19_35400000-35500000_counts.dat")
+counts=fread("data/rao_HICall_chr19_35000000-36000000_counts.dat")
 
-biases=fread("caulo_1000000-1100000_biases.dat")
+biases=fread("data/caulo_3000000-4000000_biases.dat")
 setkey(biases,id)
-counts=fread("caulo_1000000-1100000_counts.dat")
-both=fread("caulo_1000000-1100000_both.dat")
+counts=fread("data/caulo_3000000-4000000_counts.dat")
+both=fread("data/caulo_3000000-4000000_both.dat")
 
 
 
@@ -56,10 +56,11 @@ biases.pred=data.table(pos=pred$par$genome, nu=exp(pred$par$log_nu), delta=exp(p
 counts.pred=data.table(distance=pred$par$distnce, decay=exp(pred$par$log_decay))
 
 #compare with previous 6-cutter model
-fit=gam(N ~ s(log(distance)) + category:(log(dangling.L.1+1) + log(dangling.R.1+1) + log(rejoined.1+1) +
+fit=scam(N ~ s(log(distance), bs="mpd", m=2, k=10) + category:(log(dangling.L.1+1) + log(dangling.R.1+1) + log(rejoined.1+1) +
                                          log(dangling.L.2+1) + log(dangling.R.2+1) + log(rejoined.2+1)),
-        data=both, family=nb())
+        data=both, family=negbin(1.9))
 counts[,decay.gam:=exp(predict(fit, both[category=="contact.up"], type = "terms", terms="s(log(distance))"))]
+counts[,mean_cup.gam:=predict(fit, both[category=="contact.up"], type = "response")]
 
 #
 biases[,mean_RJ1:=op$par$mean_RJ]
@@ -91,12 +92,10 @@ counts[,decay3:=exp(op$par$log_decay)]
 
 
 
-ggplot(counts)+scale_y_log10() + geom_point(aes(pos2-pos1,contact.up-mean_cup1)) +
+ggplot(counts)+scale_y_log10() + geom_point(aes(pos2-pos1,contact.up/mean_cup1*decay1), alpha=0.01) +
   geom_line(aes(pos2-pos1,decay1), colour="red") + geom_line(aes(pos2-pos1,decay.gam),colour="green")
-ggplot(counts)+scale_y_log10() + geom_point(aes(pos2-pos1,contact.up-mean_cup2)) +
-  geom_line(aes(pos2-pos1,decay2), colour="red")
-ggplot(counts)+scale_y_log10() + geom_point(aes(pos2-pos1,contact.up-mean_cup3)) +
-  geom_line(aes(pos2-pos1,decay3), colour="red")
+ggplot(counts)+scale_y_log10() + geom_point(aes(pos2-pos1,contact.up/mean_cup.gam*decay.gam), alpha=0.01) +
+  geom_line(aes(pos2-pos1,decay1), colour="red") + geom_line(aes(pos2-pos1,decay.gam),colour="green")
 
 ggplot(biases)+scale_y_log10() + geom_point(aes(pos,dangling.L)) +
   geom_line(aes(pos,mean_DL1))+
