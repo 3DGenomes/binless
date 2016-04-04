@@ -1,5 +1,5 @@
 ////
-// Cut-site normalization model: fit available data
+// Cut-site normalization model: predict expected biases/counts at new locations
 ////
 functions {
   ///////////
@@ -82,17 +82,21 @@ data {
   int Krow; //number of functions in spline base for row biases
   int Kdiag; //number of functions in spline base for diagonal decay
   //biases
-  int<lower=1> S; //number of cut sites
-  vector[S] cutsites; //cut site locations
-  int rejoined[S];
-  int danglingL[S];
-  int danglingR[S];
+  vector[2] cutsites; //first and last cut site locations, used for range
+  int<lower=1> S; //number of samples along genome
   //counts
-  int<lower=1> N; //number of data points
-  int<lower=0> counts[4,N]; //raw counts: Close, Far, Up, Down
-  int<lower=1,upper=S> cidx[2,N]; //index of its associated cut site
+  int<lower=1> N; //number of samples along diagonal
+  //fitted things
+  real intercept;
+  real eRJ; //exposure for rejoined ends
+  real eDE; //exposure for dangling ends
+  vector[Krow-1] beta_nu;
+  vector[Krow-1] beta_delta;
+  positive_ordered[Kdiag-1] beta_diag;
 }
 transformed data {
+  vector[S] gen; //where to look at on the genome, has to be within bounds of cutsites
+  vector[N] dist; //where to look at in the decay, has to be <= cutsites[2]-cutsites[1]
   //bias spline, sparse (nu and delta have the same design)
   vector[nnz(S)] Xrow_w;
   int Xrow_v[nnz(S)];
@@ -103,36 +107,37 @@ transformed data {
   row_vector[Kdiag-1] pdiag;
   
   ////bias spline, sparse (nu and delta have the same design)
+  gen <- cutsites[1] + range(0,S-1)*(cutsites[2]-cutsites[1])/(S-1);
   //BEGIN sparse calculation
   //cannot write function that modifies its arguments so we put it here
-  //input: vector[N] cutsites, int Krow, int splinedegree()
+  //input: vector[N] genome, int Krow, int splinedegree()
   //output: vector[nnz(S)] Xrow_w, int Xrow_v[nnz(S)], int Xrow_u[S+1]
   {
     real dx; //interval length
     row_vector[Krow] t; //Krownot locations (except last)
-    int x_n[Krow-splinedegree()+1]; //cumulative histogram of cutsites values
+    int x_n[Krow-splinedegree()+1]; //cumulative histogram of genome values
     int idx_u; //counters for filling of sparse matrix
     int idx_w;
     //
     dx <- 1.01*(max(cutsites)-min(cutsites))/(Krow-splinedegree()); //maKrowe it slightly larger
     t <- min(cutsites) - dx*0.01 + dx * range(-splinedegree(),Krow-splinedegree()-1)';
-    //get indices of cutsites which cross to the next segment and build x_n.
+    //get indices of genome which cross to the next segment and build x_n.
     x_n[1] <- 1;
-    x_n[2:(Krow-splinedegree())] <- cumulative_hist(cutsites, t[(splinedegree()+2):]);
-    x_n[Krow-splinedegree()+1] <- rows(cutsites)+1;
+    x_n[2:(Krow-splinedegree())] <- cumulative_hist(gen, t[(splinedegree()+2):]);
+    x_n[Krow-splinedegree()+1] <- rows(gen)+1;
     //
     //build spline, interval per interval
     idx_u <- 1;
     idx_w <- 1;
     for (i in 1:(Krow-splinedegree())) {
-      //at any cutsites, there are splinedegree()+1 nonzero b-splines. Compute them.
+      //at any genome, there are splinedegree()+1 nonzero b-splines. Compute them.
       int xbegin;
       int xend;
       xbegin <- x_n[i];
       xend <- x_n[i+1]-1;
       {
         matrix[xend-xbegin+1,splinedegree()+1] tmp;
-        tmp <- bspl_gen(cutsites[xbegin:xend], dx, t[i:(i+splinedegree())], splinedegree());
+        tmp <- bspl_gen(gen[xbegin:xend], dx, t[i:(i+splinedegree())], splinedegree());
         for (ti in 1:(xend-xbegin+1)) {
           Xrow_u[idx_u] <- idx_w;
           idx_u <- idx_u + 1;
@@ -149,11 +154,9 @@ transformed data {
   //END sparse calculation
 
   //diagonal SCAM spline, dense
+  dist <- range(1,N)*(cutsites[2]-cutsites[1])/N; //avoid 0
   {
-    //can't do abs() on a vector so be inventive
-    vector[N] tmp;
-    tmp <- cutsites[cidx[2]]-cutsites[cidx[1]];
-    Xdiag <- bspline(0.5*log(tmp .* tmp), Kdiag, splinedegree());
+    Xdiag <- bspline(log(dist), Kdiag, splinedegree());
   }
   
   
@@ -167,41 +170,25 @@ transformed data {
     pdiag <- -tmp[2:] / (tmp * rep_vector(1,Kdiag));
   }
 }
-parameters {
-  real intercept;
-  real eRJ; //exposure for rejoined ends
-  real eDE; //exposure for dangling ends
-  vector[Krow-1] beta_nu;
-  vector[Krow-1] beta_delta;
-  positive_ordered[Kdiag-1] beta_diag;
-  real<lower=0> alpha;
-  real<lower=0> lambda_nu;
-  real<lower=0> lambda_delta;
-  real<lower=0> lambda_diag;
-}
-transformed parameters {
+parameters {}
+model {}
+generated quantities {
+  //viewpoints
+  vector[S] genome;
+  vector[N] distnce;
   //nu
   vector[S] log_nu; // log(nu)
-  vector[Krow-2] beta_nu_diff; //2nd order difference on beta_nu_aug
-  vector[N] log_nui;
-  vector[N] log_nuj;
   //delta
   vector[S] log_delta; // log(delta)
-  vector[Krow-2] beta_delta_diff; //2nd order difference on beta_delta_aug
-  vector[N] log_deltai;
-  vector[N] log_deltaj;
   //diag
   vector[N] log_decay;
-  vector[Kdiag-2] beta_diag_diff;
   //means
   vector[S] mean_DL;
   vector[S] mean_DR;
   vector[S] mean_RJ;
-  vector[N] mean_cup;
-  vector[N] mean_cdown;
-  vector[N] mean_cfar;
-  vector[N] mean_cclose;
   
+  genome <- gen;
+  distnce <- dist;
   //nu
   {
     vector[Krow] beta_nu_centered;
@@ -210,10 +197,7 @@ transformed parameters {
     beta_nu_aug[2:] <- beta_nu;
     beta_nu_centered <- beta_nu_aug - (beta_nu_aug' * prow) * prow;
     log_nu <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_nu_centered);
-    beta_nu_diff <- beta_nu_aug[:(Krow-2)]-2*beta_nu_aug[2:(Krow-1)]+beta_nu_aug[3:];
   }
-  log_nui <- log_nu[cidx[1]];
-  log_nuj <- log_nu[cidx[2]];
   //delta
   {
     vector[Krow] beta_delta_centered;
@@ -222,10 +206,7 @@ transformed parameters {
     beta_delta_aug[2:] <- beta_delta;
     beta_delta_centered <- beta_delta_aug - (beta_delta_aug' * prow) * prow;
     log_delta <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
-    beta_delta_diff <- beta_delta_aug[:(Krow-2)]-2*beta_delta_aug[2:(Krow-1)]+beta_delta_aug[3:];
   }
-  log_deltai <- log_delta[cidx[1]];
-  log_deltaj <- log_delta[cidx[2]];
   //decay
   {
     vector[Kdiag] beta_diag_centered;
@@ -236,10 +217,8 @@ transformed parameters {
     beta_diag_centered[1] <- val;
     beta_diag_centered[2:] <- val+epsilon*beta_diag;
     log_decay <- Xdiag * beta_diag_centered;
-    beta_diag_diff <- beta_diag_centered[:(Kdiag-2)]-2*beta_diag_centered[2:(Kdiag-1)]+beta_diag_centered[3:];
   }
-
-  //means
+   //means
   {
     vector[S] base_bias;
     vector[N] base_count;
@@ -248,31 +227,5 @@ transformed parameters {
     mean_RJ <- exp(base_bias + eRJ);
     mean_DL <- exp(base_bias + eDE + log_delta);
     mean_DR <- exp(base_bias + eDE - log_delta);
-    //
-    base_count <- intercept + log_decay + log_nui + log_nuj;
-    mean_cclose <- exp(base_count - log_deltai + log_deltaj);
-    mean_cfar <- exp(base_count + log_deltai - log_deltaj);
-    mean_cup <- exp(base_count + log_deltai + log_deltaj);
-    mean_cdown <- exp(base_count - log_deltai - log_deltaj);
   }
-}
-model {
-  //// likelihoods
-  //biases
-  rejoined ~ neg_binomial_2(mean_RJ, alpha);
-  danglingL ~ neg_binomial_2(mean_DL, alpha);
-  danglingR ~ neg_binomial_2(mean_DR, alpha);
-  //counts: Close, Far, Up, Down
-  counts[1] ~ neg_binomial_2(mean_cclose, alpha); // Close
-  counts[2] ~ neg_binomial_2(mean_cfar, alpha); // Far
-  counts[3] ~ neg_binomial_2(mean_cup, alpha); // Up
-  counts[4] ~ neg_binomial_2(mean_cdown, alpha); // Down
-  
-  //// Priors
-  //P-spline prior on the differences (K-2 params)
-  //warning on jacobian can be ignored
-  //see GAM, Wood (2006), section 4.8.2 (p.187)
-  beta_nu_diff ~ normal(0, 1./(alpha*lambda_nu));
-  beta_delta_diff ~ normal(0, 1./(alpha*lambda_delta));
-  beta_diag_diff ~ normal(0, 1./(alpha*lambda_diag));
 }

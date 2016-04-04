@@ -24,38 +24,43 @@ convert_to_simple = function(data) {
                                    "dangling.R.1","dangling.R.2","distance")])
 }
 
-#load data
-data=fread("cs_norm_binned_rao_HiC035_chr22.dat", stringsAsFactors = T)
-data=fread("cs_norm_binned_rao_HiC036_chr22.dat", stringsAsFactors = T)
-data=fread("cs_norm_binned_rao_HiC036_chr22_10k.dat", stringsAsFactors = T)
-data=fread("cs_norm_binned_rao_HiCall_chr22.dat", stringsAsFactors = T)
-data=fread("cs_norm_binned_caulo.dat", stringsAsFactors = T)
-
-biases=fread("caulo_toy_biases.dat")
-counts=fread("caulo_toy_counts.dat")
-data=unique(rbind(counts[,.(id=id1,pos=pos1, rejoined=rejoined.1)],counts[,.(id=id2,pos=pos2)]))[biases,,on="id"]
-
-
-data=fread("cs_norm_caulo.dat", stringsAsFactors = T)
-counts=fread("cs_norm_rao_HiC035_chr22.dat", stringsAsFactors = T)
-data=unique(rbind(counts[,.(id=id1,pos=pos1)],counts[,.(id=id2,pos=pos2)]))[biases,,on="id"]
 biases=fread("rao_HICall_chr19_35400000-35500000_biases.dat")
 setkey(biases,id)
-
-data=biases
-ggplot(melt(data,id.vars=c("id","pos")),aes(pos,value,colour=variable))+geom_point()+geom_line()+scale_y_log10()
-
 counts=fread("rao_HICall_chr19_35400000-35500000_counts.dat")
 
-#fit it with stan and gam
-sm = stan_model(file = "sparse_cs_norm_pred.stan")
+biases=fread("caulo_1000000-1100000_biases.dat")
+setkey(biases,id)
+counts=fread("caulo_1000000-1100000_counts.dat")
+both=fread("caulo_1000000-1100000_both.dat")
 
-system.time(op <- optimizing(sm, data = list(Krow=100, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
+
+
+#fit it with stan and gam
+sm = stan_model(file = "sparse_cs_norm_fit.stan")
+
+system.time(op <- optimizing(sm, data = list(Krow=150, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
                                              danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
                                              Kdiag=10, N=counts[,.N],
                                              counts=t(data.matrix(counts[,.(contact.close,contact.far,contact.up,contact.down)])),
                                              cidx=t(data.matrix(counts[,.(id1,id2)]))),
-                             as_vector=F, hessian=F, iter=1000, verbose=T, init_alpha=1))
+                             as_vector=F, hessian=F, iter=2000, verbose=T, init_alpha=1))
+#predict fits
+smp = stan_model(file="sparse_cs_norm_predict.stan")
+system.time(pred <- optimizing(smp, data = list(Krow=150, Kdiag=10, cutsites=biases[,c(min(pos),max(pos))],
+                                                N=10000, S=10000, intercept=op$par$intercept,
+                                                eRJ=op$par$eRJ, eDE=op$par$eDE, beta_nu=op$par$beta_nu,
+                                                beta_delta=op$par$beta_delta, beta_diag=op$par$beta_diag),
+                             as_vector=F, hessian=F, iter=1, verbose=T, init_alpha=1))
+biases.pred=data.table(pos=pred$par$genome, nu=exp(pred$par$log_nu), delta=exp(pred$par$log_delta),
+                       mean_DL=pred$par$mean_DL, mean_DR=pred$par$mean_DR, mean_RJ=pred$par$mean_RJ)
+counts.pred=data.table(distance=pred$par$distnce, decay=exp(pred$par$log_decay))
+
+#compare with previous 6-cutter model
+fit=gam(N ~ s(log(distance)) + category:(log(dangling.L.1+1) + log(dangling.R.1+1) + log(rejoined.1+1) +
+                                         log(dangling.L.2+1) + log(dangling.R.2+1) + log(rejoined.2+1)),
+        data=both, family=nb())
+counts[,decay.gam:=exp(predict(fit, both[category=="contact.up"], type = "terms", terms="s(log(distance))"))]
+
 #
 biases[,mean_RJ1:=op$par$mean_RJ]
 biases[,mean_DL1:=op$par$mean_DL]
@@ -87,7 +92,7 @@ counts[,decay3:=exp(op$par$log_decay)]
 
 
 ggplot(counts)+scale_y_log10() + geom_point(aes(pos2-pos1,contact.up-mean_cup1)) +
-  geom_line(aes(pos2-pos1,decay1), colour="red")
+  geom_line(aes(pos2-pos1,decay1), colour="red") + geom_line(aes(pos2-pos1,decay.gam),colour="green")
 ggplot(counts)+scale_y_log10() + geom_point(aes(pos2-pos1,contact.up-mean_cup2)) +
   geom_line(aes(pos2-pos1,decay2), colour="red")
 ggplot(counts)+scale_y_log10() + geom_point(aes(pos2-pos1,contact.up-mean_cup3)) +
@@ -105,13 +110,13 @@ ggplot(biases)+scale_y_log10() + geom_point(aes(pos,rejoined)) +
   geom_line(aes(pos,mean_RJ1))+
   geom_line(aes(pos,mean_RJ2))+
   geom_line(aes(pos,mean_RJ3))
-ggplot(biases)+scale_y_log10() +
+ggplot(biases) + scale_y_log10() +
   geom_point(aes(pos,dangling.L),colour="red") +
   geom_point(aes(pos,dangling.R),colour="green") +
   geom_point(aes(pos,rejoined),colour="blue") +
-  geom_line(aes(pos,mean_DL1),colour="red")+
-  geom_line(aes(pos,mean_DR1),colour="green")+
-  geom_line(aes(pos,mean_RJ1),colour="blue")+xlim(35400000,35405000)
+  geom_line(data=biases.pred[mean_DL<biases[,max(dangling.L)]&mean_DL>.1], aes(pos,mean_DL),colour="red")+
+  geom_line(data=biases.pred[mean_DR<biases[,max(dangling.R)]&mean_DR>.1], aes(pos,mean_DR),colour="green")+
+  geom_line(data=biases.pred[mean_RJ<biases[,max(rejoined)]&mean_RJ>.1], aes(pos,mean_RJ),colour="blue")#+xlim(35400000,35415000)
 
 
 #data[,delta:=exp(op$par$log_delta)]
