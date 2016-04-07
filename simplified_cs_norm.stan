@@ -156,7 +156,7 @@ parameters {
 }
 model {
   //negative binomial GAM with log link
-  count ~ neg_binomial_2(exp(X * beta), alpha);
+  count ~ neg_binomial_2_log(X * beta, alpha);
   //P-spline prior on the differences (K-1 params)
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)

@@ -160,7 +160,7 @@ parameters {
 }
 model {
   //exponential GAM
-  y ~ neg_binomial_2(X * beta, alpha);
+  y ~ neg_binomial_2_log(X * beta, alpha);
   //P-spline prior on the differences
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
