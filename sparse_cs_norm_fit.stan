@@ -168,7 +168,7 @@ transformed data {
   }
 }
 parameters {
-  real intercept;
+  real eC;  //exposure for counts
   real eRJ; //exposure for rejoined ends
   real eDE; //exposure for dangling ends
   vector[Krow-1] beta_nu;
@@ -241,15 +241,13 @@ transformed parameters {
 
   //means
   {
-    vector[S] base_bias;
     vector[N] base_count;
     //
-    base_bias <- intercept + log_nu;
-    log_mean_RJ <- base_bias + eRJ;
-    log_mean_DL <- base_bias + eDE + log_delta;
-    log_mean_DR <- base_bias + eDE - log_delta;
+    log_mean_RJ <- log_nu + eRJ;
+    log_mean_DL <- log_nu + eDE + log_delta;
+    log_mean_DR <- log_nu + eDE - log_delta;
     //
-    base_count <- intercept + log_decay + log_nui + log_nuj;
+    base_count <- eC + log_decay + log_nui + log_nuj;
     log_mean_cclose <- base_count - log_deltai + log_deltaj;
     log_mean_cfar   <- base_count + log_deltai - log_deltaj;
     log_mean_cup    <- base_count + log_deltai + log_deltaj;
