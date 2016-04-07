@@ -26,22 +26,23 @@ stan_matrix_to_datatable = function(opt, x) {
 
 
 #plot initial data
-data=generate_data(fun=function(x){3+2*sin(5*x)+3*x}, sd=100, xmin=0,xmax=3, npoints=1000)
-data[,pos:=x]
-data[,x:=x*1e5/3.+35400000]
+#data=generate_data(fun=function(x){3+2*sin(5*x)+3*x}, sd=100, xmin=0,xmax=3, npoints=1000)
+#data[,pos:=x]
+#data[,x:=x*1e5/3.+35400000]
 #data=generate_data(fun=function(x){1+5*exp(-(x-1.5)**2*2)}, sd=5, xmin=0,xmax=3, npoints=1000)
 #data=data[y>0]
 #data=generate_data(fun=function(x){5*sin(3*x)+5.1}, sd=1, xmin=0,xmax=3, npoints=500)
-ggplot(data)+geom_point(aes(x,y))+geom_line(aes(x,f))#+scale_y_log10()
+data=generate_data(fun=function(x){300+20*sin(x)+.1*x}, sd=10000, xmin=0,xmax=100, npoints=100000)
+ggplot(data)+geom_point(aes(x,y))+geom_line(aes(x,f),colour="red") #+ xlim(0,5) #+scale_y_log10()
 
 #fit it with stan
 sm = stan_model(file = "gam_one_sparse.stan")
 #smi = stan_model(file = "gam_one_onlyspline.stan")
 smi = stan_model(file = "gam_one_centered_params.stan")
-op = optimizing(sm, data = list(N=data[,.N], K=10, y=data[,y], x=data[,x]),
-                as_vector=F, hessian=F, iter=10000)
-opi = optimizing(smi, data = list(N=data[,.N], K=10, y=data[,y], x=data[,x]),
-                as_vector=F, hessian=F, iter=10000)
+op = optimizing(sm, data = list(N=data[,.N], K=100, y=data[,y], x=data[,x]),
+                as_vector=F, hessian=F, iter=10000, verbose=T)
+opi = optimizing(smi, data = list(N=data[,.N], K=100, y=data[,y], x=data[,x]),
+                as_vector=F, hessian=F, iter=10000, verbose=T)
 #sf = stan(file="spline.stan", data = list(N=data[,.N], K=20, y=data[,y], x=data[,x]))
 #launch_shinystan(sf)
 
@@ -59,8 +60,8 @@ data[,gam:=fit$fitted.values]
 #plot result
 ggplot(data)+geom_point(aes(x,y),alpha=0.2)+geom_line(aes(x,f),colour="black")+#ylim(0,40)+
   #geom_line(data=mat, aes(x,value,colour=variable))+
-  geom_line(aes(x,gam),colour="blue")+
+  #geom_line(aes(x,gam),colour="blue")+
   geom_line(aes(x,predi),colour="green")+
-  geom_line(aes(x,pred),colour="red")#+scale_y_log10()
-
+  geom_line(aes(x,pred),colour="red") + xlim(0,10) #+scale_y_log10()
+ggplot(data.table(cbind(op$par$beta, opi$par$beta)))+geom_point(aes(V1,V2))+stat_function(fun=identity)
 
