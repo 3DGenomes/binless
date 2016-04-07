@@ -24,30 +24,91 @@ convert_to_simple = function(data) {
                                    "dangling.R.1","dangling.R.2","distance")])
 }
 
+build_stan_list = function(counts, biases, Krow=100, Kdiag=10) {
+  return(list(Krow=Krow, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
+              danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+              Kdiag=Kdiag, N=counts[,.N],
+              counts=t(data.matrix(counts[,.(contact.close,contact.far,contact.up,contact.down)])),
+              cidx=t(data.matrix(counts[,.(id1,id2)]))))
+}
+
+subsample_counts_logspaced = function(counts, sub=1000) {
+  prob=counts[,-log(pos2-pos1)]
+  prob=prob/sum(prob)
+  return(counts[sample(.N, min(.N,sub), prob=prob)])
+}
+
+double_genomic_params = function(params, mult=2) {
+  params$beta_nu=c(params$beta_nu[1], rep(params$beta_nu, each=mult))
+  params$beta_nu_diff=c(params$beta_nu_diff[1:2], rep(params$beta_nu_diff, each=mult))
+  params$beta_delta=c(params$beta_delta[1], rep(params$beta_delta, each=mult))
+  params$beta_delta_diff=c(params$beta_delta_diff[1:2], rep(params$beta_delta_diff, each=mult))
+  return(params)
+}
+
+optimized_fit = function(sm, counts, biases, iter=2000, verbose=T, init.counts=10000, mult=2) {
+  #fit with a small number of counts first, ~100k resolution
+  message("*** Initial fits with increasing basis size and ",init.counts," counts")
+  datarange = biases[,max(pos)-min(pos)]
+  cts = subsample_counts_logspaced(counts,init.counts)
+  data = build_stan_list(cts, biases, Krow=as.integer(datarange/1e5))
+  message("*** optimization with Krow=",data$Krow," and N=",data$N)
+  op <- optimizing(sm, data = data, as_vector=F, hessian=F, iter=iter, verbose=verbose)
+  #increase the number of basis functions by doubling until we reach 1k resolution
+  while (datarange/data$Krow>1000) {
+    data = build_stan_list(cts, biases, Krow=data$Krow*mult)
+    init = double_genomic_params(op$par, mult=mult)
+    message("*** optimization with Krow=",data$Krow," and N=",data$N)
+    op <- optimizing(sm, data = data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init)
+  }
+  #do 10, 25 and 100% of counts at 1k res
+  message("*** Now increasing the amount of fitted counts")
+  for (pc in c(.10,.25,1)) {
+    ncounts = as.integer(pc * counts[,.N])
+    if (ncounts < cts[,.N]) next
+    cts = subsample_counts_logspaced(counts, ncounts)
+    data = build_stan_list(cts, biases, Krow=data$Krow)
+    message("*** optimization with Krow=",data$Krow," and N=",data$N)
+    op <- optimizing(sm, data = data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init)
+  }
+  return(op)
+}
+
+
+
+
 biases=fread("data/rao_HICall_chr19_35000000-36000000_biases.dat")
 setkey(biases,id)
 counts=fread("data/rao_HICall_chr19_35000000-36000000_counts.dat")
 
-biases=fread("data/caulo_3000000-4000000_biases.dat")
+biases=fread("data/caulo_all_biases.dat")
 setkey(biases,id)
-counts=fread("data/caulo_3000000-4000000_counts.dat")
-both=fread("data/caulo_3000000-4000000_both.dat")
+counts=fread("data/caulo_all_counts.dat")
+both=fread("data/caulo_all_both.dat")
 
-
+counts[,prob:=-log(pos2-pos1)]
+counts[,prob:=prob/sum(prob)]
+counts=counts[sample(.N, min(.N,50000), prob=prob)]
 
 #fit it with stan and gam
 sm = stan_model(file = "sparse_cs_norm_fit.stan")
 
-system.time(op <- optimizing(sm, data = list(Krow=150, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
+
+counts[,dbin:=cut(log(pos2-pos1),10, ordered_result = T, right=F)]
+ggplot(subsample_counts_logspaced(counts,50000)[,.N,by=dbin])+geom_bar(aes(dbin,log(N)), stat = "identity")
+system.time(op <- optimized_fit(sm, counts, biases))
+
+system.time(op <- optimizing(sm, data = list(Krow=4000, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
                                              danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
                                              Kdiag=10, N=counts[,.N],
                                              counts=t(data.matrix(counts[,.(contact.close,contact.far,contact.up,contact.down)])),
                                              cidx=t(data.matrix(counts[,.(id1,id2)]))),
-                             as_vector=F, hessian=F, iter=2000, verbose=T, init_alpha=1))
+                             as_vector=F, hessian=F, iter=1000000, verbose=T, init_alpha=1))
+
 #predict fits
 smp = stan_model(file="sparse_cs_norm_predict.stan")
-system.time(pred <- optimizing(smp, data = list(Krow=150, Kdiag=10, cutsites=biases[,c(min(pos),max(pos))],
-                                                N=10000, S=10000, intercept=op$par$intercept,
+system.time(pred <- optimizing(smp, data = list(Krow=4000, Kdiag=10, cutsites=biases[,c(min(pos),max(pos))],
+                                                N=10000, S=100000, intercept=op$par$intercept,
                                                 eRJ=op$par$eRJ, eDE=op$par$eDE, beta_nu=op$par$beta_nu,
                                                 beta_delta=op$par$beta_delta, beta_diag=op$par$beta_diag),
                              as_vector=F, hessian=F, iter=1, verbose=T, init_alpha=1))
@@ -56,9 +117,9 @@ biases.pred=data.table(pos=pred$par$genome, nu=exp(pred$par$log_nu), delta=exp(p
 counts.pred=data.table(distance=pred$par$distnce, decay=exp(pred$par$log_decay))
 
 #compare with previous 6-cutter model
-fit=scam(N ~ s(log(distance), bs="mpd", m=2, k=10) + category:(log(dangling.L.1+1) + log(dangling.R.1+1) + log(rejoined.1+1) +
+fit=gam(N ~ s(log(distance)) + category:(log(dangling.L.1+1) + log(dangling.R.1+1) + log(rejoined.1+1) +
                                          log(dangling.L.2+1) + log(dangling.R.2+1) + log(rejoined.2+1)),
-        data=both, family=negbin(1.9))
+        data=sub, family=nb())
 counts[,decay.gam:=exp(predict(fit, both[category=="contact.up"], type = "terms", terms="s(log(distance))"))]
 counts[,mean_cup.gam:=predict(fit, both[category=="contact.up"], type = "response")]
 
@@ -92,11 +153,25 @@ counts[,decay3:=exp(op$par$log_decay)]
 
 
 
-ggplot(counts)+scale_y_log10() + geom_point(aes(pos2-pos1,contact.up/mean_cup1*decay1), alpha=0.01) +
+ggplot(counts[pos2-pos1>1e4][sample(.N,100000)])+scale_y_log10() +scale_x_log10() +
+  geom_point(aes(pos2-pos1,contact.up/mean_cup1*decay1), alpha=0.01) +
   geom_line(aes(pos2-pos1,decay1), colour="red") + geom_line(aes(pos2-pos1,decay.gam),colour="green")
-ggplot(counts)+scale_y_log10() + geom_point(aes(pos2-pos1,contact.up/mean_cup.gam*decay.gam), alpha=0.01) +
+ggplot(counts)+scale_y_log10() + geom_point(aes(pos2-pos1,contact.up/mean_cup.gam*decay.gam), alpha=0.1) +
   geom_line(aes(pos2-pos1,decay1), colour="red") + geom_line(aes(pos2-pos1,decay.gam),colour="green")
 
+ggplot(biases) + scale_y_log10() +
+  geom_point(aes(pos,dangling.L),colour="red") +
+  geom_point(aes(pos,dangling.R),colour="green") +
+  geom_point(aes(pos,rejoined),colour="blue") +
+  geom_line(data=biases.pred[mean_DL<biases[,max(dangling.L)]&mean_DL>.1], aes(pos,mean_DL),colour="red")+
+  geom_line(data=biases.pred[mean_DR<biases[,max(dangling.R)]&mean_DR>.1], aes(pos,mean_DR),colour="green")+
+  geom_line(data=biases.pred[mean_RJ<biases[,max(rejoined)]&mean_RJ>.1], aes(pos,mean_RJ),colour="blue")+xlim(3500000,3550000)
+
+ggplot(melt(biases[,.(id,pos,GC.R.400,GC.L.400,GC.R.10,GC.L.10)], id.vars = c("id","pos"))) +
+  geom_point(aes(pos, value, colour=variable)) +
+  geom_line(aes(pos, value, colour=variable))
+pairs(~log(1+dangling.L)+log(1+dangling.R)+log(1+rejoined)+GC.R.400+GC.L.400+GC.R.10+GC.L.10, data=biases)               
+  
 ggplot(biases)+scale_y_log10() + geom_point(aes(pos,dangling.L)) +
   geom_line(aes(pos,mean_DL1))+
   geom_line(aes(pos,mean_DL2))+
@@ -109,13 +184,6 @@ ggplot(biases)+scale_y_log10() + geom_point(aes(pos,rejoined)) +
   geom_line(aes(pos,mean_RJ1))+
   geom_line(aes(pos,mean_RJ2))+
   geom_line(aes(pos,mean_RJ3))
-ggplot(biases) + scale_y_log10() +
-  geom_point(aes(pos,dangling.L),colour="red") +
-  geom_point(aes(pos,dangling.R),colour="green") +
-  geom_point(aes(pos,rejoined),colour="blue") +
-  geom_line(data=biases.pred[mean_DL<biases[,max(dangling.L)]&mean_DL>.1], aes(pos,mean_DL),colour="red")+
-  geom_line(data=biases.pred[mean_DR<biases[,max(dangling.R)]&mean_DR>.1], aes(pos,mean_DR),colour="green")+
-  geom_line(data=biases.pred[mean_RJ<biases[,max(rejoined)]&mean_RJ>.1], aes(pos,mean_RJ),colour="blue")#+xlim(35400000,35415000)
 
 
 #data[,delta:=exp(op$par$log_delta)]
