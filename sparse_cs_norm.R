@@ -81,10 +81,16 @@ biases=fread("data/rao_HICall_chr19_35000000-36000000_biases.dat")
 setkey(biases,id)
 counts=fread("data/rao_HICall_chr19_35000000-36000000_counts.dat")
 
+biases=fread("data/caulo_3000000-4000000_biases.dat")
+setkey(biases,id)
+counts=fread("data/caulo_3000000-4000000_counts.dat")
+both=fread("data/caulo_3000000-4000000_both.dat")
+
 biases=fread("data/caulo_all_biases.dat")
 setkey(biases,id)
 counts=fread("data/caulo_all_counts.dat")
 both=fread("data/caulo_all_both.dat")
+
 
 counts[,prob:=-log(pos2-pos1)]
 counts[,prob:=prob/sum(prob)]
@@ -93,11 +99,34 @@ counts=counts[sample(.N, min(.N,50000), prob=prob)]
 #fit it with stan and gam
 sm = stan_model(file = "sparse_cs_norm_fit.stan")
 
-
+#iterative optimization
 counts[,dbin:=cut(log(pos2-pos1),10, ordered_result = T, right=F)]
 ggplot(subsample_counts_logspaced(counts,50000)[,.N,by=dbin])+geom_bar(aes(dbin,log(N)), stat = "identity")
 system.time(op <- optimized_fit(sm, counts, biases))
 
+
+#initial guesses for nu
+smb1 = stan_model(file = "sparse_cs_norm_init_1_nu.stan")
+op <- optimizing(smb1, data = list(Krow=10, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
+                                   danglingL=biases[,dangling.L], danglingR=biases[,dangling.R]),
+                 as_vector=F, hessian=F, iter=1000000, verbose=T, init_alpha=1)
+op2 <- optimizing(smb1, data = list(Krow=10, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
+                                 danglingL=biases[,dangling.L], danglingR=biases[,dangling.R]),
+                 as_vector=F, hessian=F, iter=1000000, verbose=T, init_alpha=1)
+
+a=data.table(nu1=cbind(op$par)[,1], nu2=cbind(op2$par)[,1])
+a[,diff:=abs(nu1-nu2)]
+#a=data.table(nu1=op$par$beta_nu, nu2=op2$par$beta_nu)
+#a[,diff:=abs(nu1-nu2)]
+#setkey(a,diff)
+a[,idx:=.I]
+ggplot(a)+geom_point(aes(idx,diff))
+ggplot(a)+geom_point(aes(nu1,nu2))+stat_function(fun=identity)
+ggplot(a)+geom_point(aes(idx,nu1-nu2))+stat_function(fun=function(x){0})
+
+
+
+#simple optimization
 system.time(op <- optimizing(sm, data = list(Krow=4000, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
                                              danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
                                              Kdiag=10, N=counts[,.N],
