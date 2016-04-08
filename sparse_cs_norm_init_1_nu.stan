@@ -64,17 +64,6 @@ functions {
     }
     return sums;
   }
-  
-  matrix bspline(vector x, int K, int q) {
-    real dx; //interval length
-    row_vector[K] t; //knot locations (except last)
-    //
-    dx <- 1.01*(max(x)-min(x))/(K-q); //make it slightly larger
-    t <- min(x) - dx*0.01 + dx * range(-q,K-q-1)';
-    return bspl_gen(x, dx, t, q);
-  }
-
-
 }
 ////////////////////////////////////////////////////////////////
 data {
@@ -86,6 +75,10 @@ data {
   int rejoined[S];
   int danglingL[S];
   int danglingR[S];
+  //parameters
+  real eRJ; //exposure for rejoined ends
+  real eDE; //exposure for dangling ends
+  real<lower=0> lambda_nu;
 }
 transformed data {
   //bias spline, sparse (nu and delta have the same design)
@@ -145,11 +138,8 @@ transformed data {
   prow <- prow / sqrt(dot_self(prow));
 }
 parameters {
-  real eRJ; //exposure for rejoined ends
-  real eDE; //exposure for dangling ends
   vector[Krow-1] beta_nu;
   real<lower=0> alpha;
-  real<lower=0> lambda_nu;
 }
 transformed parameters {
   vector[S] log_nu; // log(nu)
