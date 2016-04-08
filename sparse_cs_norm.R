@@ -107,14 +107,14 @@ system.time(op <- optimized_fit(sm, counts, biases))
 
 #initial guesses for nu
 smb1 = stan_model(file = "sparse_cs_norm_init_1_nu.stan")
-op <- optimizing(smb1, data = list(Krow=10, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
+op.b1 <- optimizing(smb1, data = list(Krow=1000, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
                                    danglingL=biases[,dangling.L], danglingR=biases[,dangling.R]),
                  as_vector=F, hessian=F, iter=1000000, verbose=T, init_alpha=1)
-op2 <- optimizing(smb1, data = list(Krow=10, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
+op2.b1 <- optimizing(smb1, data = list(Krow=1000, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
                                  danglingL=biases[,dangling.L], danglingR=biases[,dangling.R]),
                  as_vector=F, hessian=F, iter=1000000, verbose=T, init_alpha=1)
 
-a=data.table(nu1=cbind(op$par)[,1], nu2=cbind(op2$par)[,1])
+a=data.table(nu1=cbind(op.b1$par)[,1], nu2=cbind(op2.b1$par)[,1])
 a[,diff:=abs(nu1-nu2)]
 #a=data.table(nu1=op$par$beta_nu, nu2=op2$par$beta_nu)
 #a[,diff:=abs(nu1-nu2)]
@@ -123,6 +123,27 @@ a[,idx:=.I]
 ggplot(a)+geom_point(aes(idx,diff))
 ggplot(a)+geom_point(aes(nu1,nu2))+stat_function(fun=identity)
 ggplot(a)+geom_point(aes(idx,nu1-nu2))+stat_function(fun=function(x){0})
+
+#initial guesses for delta
+smb2 = stan_model(file = "sparse_cs_norm_init_2_delta.stan")
+op.b2 <- optimizing(smb2, data = list(Krow=10, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
+                                   danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+                                   eRJ=op.b1$par$eRJ, eDE=op.b1$par$eDE, beta_nu=op.b1$par$beta_nu),
+                 as_vector=F, hessian=F, iter=1000000, verbose=T, init_alpha=1)
+op2.b2 <- optimizing(smb2, data = list(Krow=10, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
+                                      danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+                                      eRJ=op.b1$par$eRJ, eDE=op.b1$par$eDE, beta_nu=op.b1$par$beta_nu),
+                    as_vector=F, hessian=F, iter=1000000, verbose=T, init_alpha=1)
+
+a=data.table(delta1=op.b2$par$beta_delta, delta2=op2.b2$par$beta_delta)
+a[,diff:=abs(delta1-delta2)]
+setkey(a,diff)
+a[,idx:=.I]
+ggplot(a)+geom_point(aes(idx,diff))
+ggplot(a)+geom_point(aes(delta1,delta2))+stat_function(fun=identity)
+ggplot(a)+geom_point(aes(idx,delta1-delta2))+stat_function(fun=function(x){0})
+
+
 
 
 
