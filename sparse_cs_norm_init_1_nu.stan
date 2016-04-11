@@ -1,5 +1,5 @@
 ////
-// Cut-site normalization model: get initial guess of eRJ, eDE, beta_nu and lambda_nu
+// Cut-site normalization model: get initial guess of eRJ, eDE, beta_nu
 ////
 functions {
   ///////////

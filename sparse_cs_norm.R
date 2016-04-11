@@ -10,11 +10,10 @@ library(scam)
 
 setwd("/home/yannick/simulations/spline_stan")
 
-stan_matrix_to_datatable = function(opt, x1, x2) {
+stan_matrix_to_datatable = function(opt, x) {
   vals=data.table(opt)
-  vals[,x1:=x1]
-  vals[,x2:=x2]
-  melt(data.table(vals), id.vars=c("x1","x2"))
+  vals[,x:=x]
+  melt(data.table(vals), id.vars="x")
 }
 
 convert_to_simple = function(data) {
@@ -74,7 +73,20 @@ optimized_fit = function(sm, counts, biases, iter=2000, verbose=T, init.counts=1
   return(op)
 }
 
+optimize_exposures = function(model, biases, counts, iter=1000000, verbose=T) {
+  optimizing(model, data = list(S=biases[,.N], rejoined=biases[,rejoined],
+                                danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+                                N=counts[,.N],
+                                counts=t(data.matrix(counts[,.(contact.close,contact.far,contact.up,contact.down)]))),
+             as_vector=F, hessian=F, iter=iter, verbose=verbose)
+}
 
+optimize_nu = function(model, biases, op0, Krow=1000, lambda_nu=1, iter=1000000, verbose=T) {
+  optimizing(model, data = list(Krow=Krow, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
+                               danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+                               eRJ=op0$par$eRJ, eDE=op0$par$eDE, lambda_nu=lambda_nu),
+             as_vector=F, hessian=F, iter=iter, verbose=verbose)
+}
 
 
 biases=fread("data/rao_HICall_chr19_35000000-36000000_biases.dat")
@@ -105,44 +117,83 @@ ggplot(subsample_counts_logspaced(counts,50000)[,.N,by=dbin])+geom_bar(aes(dbin,
 system.time(op <- optimized_fit(sm, counts, biases))
 
 
-#initial guesses for nu
+#initial guesses for exposures
+smb0 = stan_model(file = "sparse_cs_norm_init_0_exposures.stan")
+op.b0 <- optimize_exposures(smb0, biases, counts)
+op2.b0 <- optimize_exposures(smb0, biases, counts)
+#
+a=data.table(op1=as.numeric(cbind(op.b0$par)[,1]), op2=as.numeric(cbind(op2.b0$par)[,1]),
+             name=names(op2.b0$par))
+ggplot(a)+geom_bar(aes(name,op2-op1),stat="identity", position="dodge")+ylim(-.1,.1)
+ggplot(a)+geom_bar(aes(name,(op2-op1)/max(op2,op1)),stat="identity", position="dodge")+ylim(-.01,.01)
+
+
+#initial guesses for nu, need to set lambda appropriately
 smb1 = stan_model(file = "sparse_cs_norm_init_1_nu.stan")
-op.b1 <- optimizing(smb1, data = list(Krow=1000, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
-                                   danglingL=biases[,dangling.L], danglingR=biases[,dangling.R]),
-                 as_vector=F, hessian=F, iter=1000000, verbose=T, init_alpha=1)
-op2.b1 <- optimizing(smb1, data = list(Krow=1000, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
-                                 danglingL=biases[,dangling.L], danglingR=biases[,dangling.R]),
-                 as_vector=F, hessian=F, iter=1000000, verbose=T, init_alpha=1)
+op.b1 <- optimize_nu(smb1, biases, op.b0, Krow=1000, lambda_nu=.1)
+op2.b1 <- optimize_nu(smb1, biases, op.b0, Krow=1000, lambda_nu=.1)
+#predict nu everywhere
+pred = stan_model(file = "predict_spline_sparse.stan")
+op.pred <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
+                                        intercept=0, beta=op.b1$par$beta_nu),
+                      as_vector=F, hessian=F, iter=1, verbose=F)
+op2.pred <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
+                                        intercept=0, beta=op2.b1$par$beta_nu),
+                      as_vector=F, hessian=F, iter=1, verbose=F)
+nu.pred.weighted <- stan_matrix_to_datatable(exp(op.pred$par$weighted), op.pred$par$x)
+nu.pred <- data.table(pos=op.pred$par$x, nu1=exp(op.pred$par$log_mean), nu2=exp(op2.pred$par$log_mean))
+#
+a=data.table(name=c("alpha","lambda_nu"),
+             op1=c(op.b1$par$alpha, op.b1$par$lambda_nu), 
+             op2=c(op2.b1$par$alpha, op2.b1$par$lambda_nu))
+ggplot(a)+geom_bar(aes(name,(op2-op1)/max(op2,op1)),stat="identity", position="dodge")#+scale_y_continuous(-.01,.01)
+#
+a=cbind(biases,data.table(op1=exp(op.b1$par$log_nu), op2=exp(op2.b1$par$log_nu)))
+ggplot(a[pos>=3166716&pos<=3191637])+scale_y_log10()+
+  geom_point(aes(pos, dangling.L/exp(op.b0$par$eDE)),colour="orange")+
+  geom_point(aes(pos, dangling.R/exp(op.b0$par$eDE)),colour="pink")+
+  geom_point(aes(pos, rejoined/exp(op.b0$par$eRJ)),colour="red")+
+  geom_point(aes(pos, op1),colour="blue")+
+  geom_point(aes(pos, op2),colour="green")+
+  geom_line(data=nu.pred[pos>=3166716&pos<=3191637], aes(pos, nu1), colour="blue")+
+  geom_line(data=nu.pred[pos>=3166716&pos<=3191637], aes(pos, nu2), colour="green")+
+  geom_line(data=nu.pred.weighted[x>=3166716&x<=3191637], aes(x,value,colour=variable))
+message("MAD for nu: ", mad(a$op1-a$op2))
+#
 
-a=data.table(nu1=cbind(op.b1$par)[,1], nu2=cbind(op2.b1$par)[,1])
-a[,diff:=abs(nu1-nu2)]
-#a=data.table(nu1=op$par$beta_nu, nu2=op2$par$beta_nu)
-#a[,diff:=abs(nu1-nu2)]
-#setkey(a,diff)
-a[,idx:=.I]
-ggplot(a)+geom_point(aes(idx,diff))
-ggplot(a)+geom_point(aes(nu1,nu2))+stat_function(fun=identity)
-ggplot(a)+geom_point(aes(idx,nu1-nu2))+stat_function(fun=function(x){0})
 
-#initial guesses for delta
+#initial guesses for delta, need to set lambda appropriately
 smb2 = stan_model(file = "sparse_cs_norm_init_2_delta.stan")
-op.b2 <- optimizing(smb2, data = list(Krow=10, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
-                                   danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-                                   eRJ=op.b1$par$eRJ, eDE=op.b1$par$eDE, beta_nu=op.b1$par$beta_nu),
-                 as_vector=F, hessian=F, iter=1000000, verbose=T, init_alpha=1)
-op2.b2 <- optimizing(smb2, data = list(Krow=10, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
-                                      danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-                                      eRJ=op.b1$par$eRJ, eDE=op.b1$par$eDE, beta_nu=op.b1$par$beta_nu),
-                    as_vector=F, hessian=F, iter=1000000, verbose=T, init_alpha=1)
-
-a=data.table(delta1=op.b2$par$beta_delta, delta2=op2.b2$par$beta_delta)
-a[,diff:=abs(delta1-delta2)]
-setkey(a,diff)
-a[,idx:=.I]
-ggplot(a)+geom_point(aes(idx,diff))
-ggplot(a)+geom_point(aes(delta1,delta2))+stat_function(fun=identity)
-ggplot(a)+geom_point(aes(idx,delta1-delta2))+stat_function(fun=function(x){0})
-
+op.b2 <- optimize_delta(smb2, biases, op.b0, Krow=1000, lambda_delta=.1)
+op2.b2 <- optimize_delta(smb2, biases, op.b0, Krow=1000, lambda_delta=.1)
+#predict delta everywhere
+pred = stan_model(file = "predict_spline_sparse.stan")
+op.pred <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
+                                        intercept=0, beta=op.b2$par$beta_delta),
+                      as_vector=F, hessian=F, iter=1, verbose=F)
+op2.pred <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
+                                         intercept=0, beta=op2.b2$par$beta_delta),
+                       as_vector=F, hessian=F, iter=1, verbose=F)
+delta.pred.weighted <- stan_matrix_to_datatable(exp(op.pred$par$weighted), op.pred$par$x)
+delta.pred <- data.table(pos=op.pred$par$x, delta1=exp(op.pred$par$log_mean), delta2=exp(op2.pred$par$log_mean))
+#
+a=data.table(name=c("alpha","lambda_delta"),
+             op1=c(op.b2$par$alpha, op.b2$par$lambda_delta), 
+             op2=c(op2.b2$par$alpha, op2.b2$par$lambda_delta))
+ggplot(a)+geom_bar(aes(name,(op2-op1)/max(op2,op1)),stat="identity", position="dodge")#+scale_y_contideltaous(-.01,.01)
+#
+a=cbind(biases,data.table(op1=exp(op.b2$par$log_delta), op2=exp(op2.b2$par$log_delta)))
+ggplot(a[pos>=3166716&pos<=3191637])+scale_y_log10()+
+  geom_point(aes(pos, dangling.L/exp(op.b0$par$eDE)),colour="orange")+
+  geom_point(aes(pos, dangling.R/exp(op.b0$par$eDE)),colour="pink")+
+  geom_point(aes(pos, rejoined/exp(op.b0$par$eRJ)),colour="red")+
+  geom_point(aes(pos, op1),colour="blue")+
+  geom_point(aes(pos, op2),colour="green")+
+  geom_line(data=delta.pred[pos>=3166716&pos<=3191637], aes(pos, delta1), colour="blue")+
+  geom_line(data=delta.pred[pos>=3166716&pos<=3191637], aes(pos, delta2), colour="green")+
+  geom_line(data=delta.pred.weighted[x>=3166716&x<=3191637], aes(x,value,colour=variable))
+message("MAD for delta: ", mad(a$op1-a$op2))
+#
 
 
 
@@ -153,7 +204,7 @@ system.time(op <- optimizing(sm, data = list(Krow=4000, S=biases[,.N], cutsites=
                                              Kdiag=10, N=counts[,.N],
                                              counts=t(data.matrix(counts[,.(contact.close,contact.far,contact.up,contact.down)])),
                                              cidx=t(data.matrix(counts[,.(id1,id2)]))),
-                             as_vector=F, hessian=F, iter=1000000, verbose=T, init_alpha=1))
+                             as_vector=F, hessian=F, iter=1000000, verbose=T))
 
 #predict fits
 smp = stan_model(file="sparse_cs_norm_predict.stan")
@@ -161,7 +212,7 @@ system.time(pred <- optimizing(smp, data = list(Krow=4000, Kdiag=10, cutsites=bi
                                                 N=10000, S=100000, intercept=op$par$intercept,
                                                 eRJ=op$par$eRJ, eDE=op$par$eDE, beta_nu=op$par$beta_nu,
                                                 beta_delta=op$par$beta_delta, beta_diag=op$par$beta_diag),
-                             as_vector=F, hessian=F, iter=1, verbose=T, init_alpha=1))
+                             as_vector=F, hessian=F, iter=1, verbose=T))
 biases.pred=data.table(pos=pred$par$genome, nu=exp(pred$par$log_nu), delta=exp(pred$par$log_delta),
                        mean_DL=pred$par$mean_DL, mean_DR=pred$par$mean_DR, mean_RJ=pred$par$mean_RJ)
 counts.pred=data.table(distance=pred$par$distnce, decay=exp(pred$par$log_decay))
