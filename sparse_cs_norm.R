@@ -83,8 +83,15 @@ optimize_exposures = function(model, biases, counts, iter=1000000, verbose=T) {
 
 optimize_nu = function(model, biases, op0, Krow=1000, lambda_nu=1, iter=1000000, verbose=T) {
   optimizing(model, data = list(Krow=Krow, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
+                                danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+                                eRJ=op0$par$eRJ, eDE=op0$par$eDE, lambda_nu=lambda_nu),
+             as_vector=F, hessian=F, iter=iter, verbose=verbose)
+}
+
+optimize_delta = function(model, biases, op0, op1, Krow=1000, lambda_delta=1, iter=1000000, verbose=T) {
+  optimizing(model, data = list(Krow=Krow, S=biases[,.N], cutsites=biases[,pos],
                                danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-                               eRJ=op0$par$eRJ, eDE=op0$par$eDE, lambda_nu=lambda_nu),
+                               eDE=op0$par$eDE, beta_nu=op1$par$beta_nu, lambda_delta=lambda_delta),
              as_vector=F, hessian=F, iter=iter, verbose=verbose)
 }
 
@@ -134,14 +141,14 @@ op.b1 <- optimize_nu(smb1, biases, op.b0, Krow=1000, lambda_nu=.1)
 op2.b1 <- optimize_nu(smb1, biases, op.b0, Krow=1000, lambda_nu=.1)
 #predict nu everywhere
 pred = stan_model(file = "predict_spline_sparse.stan")
-op.pred <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
+op.pred_nu <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
                                         intercept=0, beta=op.b1$par$beta_nu),
                       as_vector=F, hessian=F, iter=1, verbose=F)
-op2.pred <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
+op2.pred_nu <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
                                         intercept=0, beta=op2.b1$par$beta_nu),
                       as_vector=F, hessian=F, iter=1, verbose=F)
-nu.pred.weighted <- stan_matrix_to_datatable(exp(op.pred$par$weighted), op.pred$par$x)
-nu.pred <- data.table(pos=op.pred$par$x, nu1=exp(op.pred$par$log_mean), nu2=exp(op2.pred$par$log_mean))
+nu.pred.weighted <- stan_matrix_to_datatable(exp(op.pred_nu$par$weighted), op.pred_nu$par$x)
+nu.pred <- data.table(pos=op.pred_nu$par$x, nu1=exp(op.pred_nu$par$log_mean), nu2=exp(op2.pred_nu$par$log_mean))
 #
 a=data.table(name=c("alpha","lambda_nu"),
              op1=c(op.b1$par$alpha, op.b1$par$lambda_nu), 
@@ -164,34 +171,51 @@ message("MAD for nu: ", mad(a$op1-a$op2))
 
 #initial guesses for delta, need to set lambda appropriately
 smb2 = stan_model(file = "sparse_cs_norm_init_2_delta.stan")
-op.b2 <- optimize_delta(smb2, biases, op.b0, Krow=1000, lambda_delta=.1)
-op2.b2 <- optimize_delta(smb2, biases, op.b0, Krow=1000, lambda_delta=.1)
+op.b2 <- optimize_delta(smb2, biases, op.b0, op.b1, Krow=1000, lambda_delta=.1)
+op2.b2 <- optimize_delta(smb2, biases, op.b0, op.b1, Krow=1000, lambda_delta=.1)
 #predict delta everywhere
 pred = stan_model(file = "predict_spline_sparse.stan")
-op.pred <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
+op.pred_delta <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
                                         intercept=0, beta=op.b2$par$beta_delta),
                       as_vector=F, hessian=F, iter=1, verbose=F)
-op2.pred <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
+op2.pred_delta <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
                                          intercept=0, beta=op2.b2$par$beta_delta),
                        as_vector=F, hessian=F, iter=1, verbose=F)
-delta.pred.weighted <- stan_matrix_to_datatable(exp(op.pred$par$weighted), op.pred$par$x)
-delta.pred <- data.table(pos=op.pred$par$x, delta1=exp(op.pred$par$log_mean), delta2=exp(op2.pred$par$log_mean))
+delta.pred.weighted <- stan_matrix_to_datatable(exp(op.pred_delta$par$weighted), op.pred_delta$par$x)
+delta.pred <- data.table(pos=op.pred_delta$par$x, delta1=exp(op.pred_delta$par$log_mean), delta2=exp(op2.pred_delta$par$log_mean))
 #
-a=data.table(name=c("alpha","lambda_delta"),
-             op1=c(op.b2$par$alpha, op.b2$par$lambda_delta), 
-             op2=c(op2.b2$par$alpha, op2.b2$par$lambda_delta))
-ggplot(a)+geom_bar(aes(name,(op2-op1)/max(op2,op1)),stat="identity", position="dodge")#+scale_y_contideltaous(-.01,.01)
-#
-a=cbind(biases,data.table(op1=exp(op.b2$par$log_delta), op2=exp(op2.b2$par$log_delta)))
+data.table(name=c("alpha"),
+             op1=c(op.b2$par$alpha), 
+             op2=c(op2.b2$par$alpha))
+#DE op1 vs op2, centered on RJ
+a=cbind(biases,data.table(op1=exp(op.b2$par$log_delta),
+                          op2=exp(op2.b2$par$log_delta),
+                          log_nu=op.b1$par$log_nu))
 ggplot(a[pos>=3166716&pos<=3191637])+scale_y_log10()+
-  geom_point(aes(pos, dangling.L/exp(op.b0$par$eDE)),colour="orange")+
-  geom_point(aes(pos, dangling.R/exp(op.b0$par$eDE)),colour="pink")+
-  geom_point(aes(pos, rejoined/exp(op.b0$par$eRJ)),colour="red")+
-  geom_point(aes(pos, op1),colour="blue")+
-  geom_point(aes(pos, op2),colour="green")+
+  geom_point(aes(pos, dangling.L/(exp(log_nu+op.b0$par$eDE))),colour="orange")+
+  geom_point(aes(pos, dangling.R/(exp(log_nu+op.b0$par$eDE))),colour="pink")+
+  geom_point(aes(pos, rejoined/(exp(log_nu+op.b0$par$eRJ))),colour="red")+
+  geom_point(aes(pos, op1),colour="blue", shape=0)+
+  geom_point(aes(pos, op2),colour="green", shape=0)+
+  geom_point(aes(pos, 1/op1),colour="blue", shape=0)+
+  geom_point(aes(pos, 1/op2),colour="green", shape=0)+
   geom_line(data=delta.pred[pos>=3166716&pos<=3191637], aes(pos, delta1), colour="blue")+
   geom_line(data=delta.pred[pos>=3166716&pos<=3191637], aes(pos, delta2), colour="green")+
+  geom_line(data=delta.pred[pos>=3166716&pos<=3191637], aes(pos, 1/delta1), colour="blue", linetype=2)+
+  geom_line(data=delta.pred[pos>=3166716&pos<=3191637], aes(pos, 1/delta2), colour="green", linetype=2)+
   geom_line(data=delta.pred.weighted[x>=3166716&x<=3191637], aes(x,value,colour=variable))
+#all 3 types
+a=cbind(biases,data.table(RJ=exp(op.b0$par$eRJ+op.b1$par$log_nu),
+                          DL=exp(op.b0$par$eDE+op.b1$par$log_nu+op.b2$par$log_delta),
+                          DR=exp(op.b0$par$eDE+op.b1$par$log_nu-op.b2$par$log_delta)))
+a.pred=data.table(pos=nu.pred$pos, RJ=exp(op.b0$par$eRJ)*nu.pred$nu1,
+                  DL=exp(op.b0$par$eDE)*nu.pred$nu1*delta.pred$delta1,
+                  DR=exp(op.b0$par$eDE)*nu.pred$nu1/delta.pred$delta1)
+ggplot(a[pos>=3166716&pos<=3191637])+scale_y_log10()+
+  geom_point(aes(pos, rejoined), colour="red")+ geom_point(aes(pos, RJ), shape=0, colour="red")+ geom_line(data=a.pred[pos>=3166716&pos<=3191637], aes(pos, RJ), colour="red")+
+  geom_point(aes(pos, dangling.L), colour="orange")+ geom_point(aes(pos, DL), shape=0, colour="orange")+ geom_line(data=a.pred[pos>=3166716&pos<=3191637], aes(pos, DL), colour="orange")+
+  geom_point(aes(pos, dangling.R), colour="pink")+ geom_point(aes(pos, DR), shape=0, colour="pink")+ geom_line(data=a.pred[pos>=3166716&pos<=3191637], aes(pos, DR), colour="pink")
+
 message("MAD for delta: ", mad(a$op1-a$op2))
 #
 
