@@ -64,6 +64,19 @@ functions {
     }
     return sums;
   }
+
+  real neg_binomial_2_log_deviance(int[] y, vector log_mu, real alpha) {
+    vector[size(y)] y_vec;
+    vector[size(y)] y_mod;
+    vector[rows(log_mu)] mu;
+    if (rows(log_mu) != size(y)) reject("sizes of y (",size(y),") and log_mu (", rows(log_mu),
+                                        ") must match")
+    y_vec <- to_vector(y);
+    for (i in 1:size(y)) if (y[i]>0) {y_mod[i] <- y[i];} else {y_mod[i] <-1;}
+    mu <- exp(log_mu);
+    return 2*sum( (y_vec+alpha) .* log( (mu+alpha) ./ (y_vec+alpha) )
+                  + y_vec .* log(y_mod ./ mu));
+  }
 }
 ////////////////////////////////////////////////////////////////
 data {
@@ -163,4 +176,22 @@ model {
   danglingR ~ neg_binomial_2_log(log_nu + eDE, alpha);
   //prior
   beta_nu_diff ~ normal(0, 1/(alpha*lambda_nu));
+}
+generated quantities {
+  real deviance;
+  real deviance_null;
+  real deviance_proportion_explained;
+  deviance <- neg_binomial_2_log_deviance(rejoined, log_nu + eRJ, alpha)+
+              neg_binomial_2_log_deviance(danglingL, log_nu + eDE, alpha)+
+              neg_binomial_2_log_deviance(danglingR, log_nu + eDE, alpha);
+  {
+    vector[S] offset;
+    offset <- rep_vector(eRJ, S);
+    deviance_null <- neg_binomial_2_log_deviance(rejoined, offset, alpha);
+    offset <- rep_vector(eDE, S);
+    deviance_null <- deviance_null +
+                neg_binomial_2_log_deviance(danglingL, offset, alpha)+
+                neg_binomial_2_log_deviance(danglingR, offset, alpha);
+  }
+  deviance_proportion_explained <- 100*(deviance_null - deviance)/deviance_null;
 }
