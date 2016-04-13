@@ -74,7 +74,18 @@ functions {
     return bspl_gen(x, dx, t, q);
   }
 
-
+  real neg_binomial_2_log_deviance(int[] y, vector log_mu, real alpha) {
+    vector[size(y)] y_vec;
+    vector[size(y)] y_mod;
+    vector[rows(log_mu)] mu;
+    if (rows(log_mu) != size(y)) reject("sizes of y (",size(y),") and log_mu (", rows(log_mu),
+                                        ") must match")
+    y_vec <- to_vector(y);
+    for (i in 1:size(y)) if (y[i]>0) {y_mod[i] <- y[i];} else {y_mod[i] <-1;}
+    mu <- exp(log_mu);
+    return 2*sum( (y_vec+alpha) .* log( (mu+alpha) ./ (y_vec+alpha) )
+                  + y_vec .* log(y_mod ./ mu));
+  }
 }
 ////////////////////////////////////////////////////////////////
 data {
@@ -91,6 +102,10 @@ data {
   int<lower=1> N; //number of data points
   int<lower=0> counts[4,N]; //raw counts: Close, Far, Up, Down
   int<lower=1,upper=S> cidx[2,N]; //index of its associated cut site
+  //fixed parameters
+  real<lower=0> lambda_nu;
+  real<lower=0> lambda_delta;
+  real<lower=0> lambda_diag;
 }
 transformed data {
   //bias spline, sparse (nu and delta have the same design)
@@ -175,9 +190,6 @@ parameters {
   vector[Krow-1] beta_delta;
   positive_ordered[Kdiag-1] beta_diag;
   real<lower=0> alpha;
-  real<lower=0> lambda_nu;
-  real<lower=0> lambda_delta;
-  real<lower=0> lambda_diag;
 }
 transformed parameters {
   //nu
@@ -197,6 +209,8 @@ transformed parameters {
   vector[S] log_mean_DL;
   vector[S] log_mean_DR;
   vector[S] log_mean_RJ;
+  vector[N] base_count;
+  //
   vector[N] log_mean_cup;
   vector[N] log_mean_cdown;
   vector[N] log_mean_cfar;
@@ -241,8 +255,6 @@ transformed parameters {
 
   //means
   {
-    vector[N] base_count;
-    //
     log_mean_RJ <- log_nu + eRJ;
     log_mean_DL <- log_nu + eDE + log_delta;
     log_mean_DR <- log_nu + eDE - log_delta;
@@ -273,4 +285,33 @@ model {
   beta_nu_diff ~ normal(0, 1./(alpha*lambda_nu));
   beta_delta_diff ~ normal(0, 1./(alpha*lambda_delta));
   beta_diag_diff ~ normal(0, 1./(alpha*lambda_diag));
+}
+generated quantities {
+  real deviance;
+  real deviance_null;
+  real deviance_proportion_explained;
+  deviance <- neg_binomial_2_log_deviance(rejoined, log_mean_RJ, alpha) +
+              neg_binomial_2_log_deviance(danglingL, log_mean_DL, alpha) +
+              neg_binomial_2_log_deviance(danglingR, log_mean_DR, alpha) +
+              neg_binomial_2_log_deviance(counts[1], log_mean_cclose, alpha) +
+              neg_binomial_2_log_deviance(counts[2], log_mean_cfar, alpha) +
+              neg_binomial_2_log_deviance(counts[3], log_mean_cup, alpha) +
+              neg_binomial_2_log_deviance(counts[4], log_mean_cdown, alpha);
+  {
+    vector[S] offsetS;
+    vector[N] offsetN;
+    offsetS <- rep_vector(eRJ, S);
+    deviance_null <- neg_binomial_2_log_deviance(rejoined, offsetS, alpha);
+    offsetS <- rep_vector(eDE, S);
+    deviance_null <- deviance_null +
+                     neg_binomial_2_log_deviance(danglingL, offsetS, alpha) +
+                     neg_binomial_2_log_deviance(danglingR, offsetS, alpha);
+    offsetN <- rep_vector(eC, N);
+    deviance_null <- deviance_null +
+                     neg_binomial_2_log_deviance(counts[1], offsetN, alpha) +
+                     neg_binomial_2_log_deviance(counts[2], offsetN, alpha) +
+                     neg_binomial_2_log_deviance(counts[3], offsetN, alpha) +
+                     neg_binomial_2_log_deviance(counts[4], offsetN, alpha);
+  }
+  deviance_proportion_explained <- 100*(deviance_null - deviance)/deviance_null;
 }
