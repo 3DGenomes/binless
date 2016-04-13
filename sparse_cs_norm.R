@@ -357,10 +357,55 @@ ggplot(a[pos2-pos1>1e4][sample(.N,min(.N,10000))])+scale_y_log10()+scale_x_log10
 
 
 
+biases=fread("data/caulo_3000000-4000000_biases.dat")
+setkey(biases,id)
+counts=fread("data/caulo_3000000-4000000_counts.dat")
+both=fread("data/caulo_3000000-4000000_both.dat")
 
+system.time(op.full <- optimize_all_noinit(smfit, biases, counts, Krow=1000, Kdiag=10,
+                                      lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
+system.time(op.100000 <- optimize_all_noinit(smfit, biases, counts[sample(.N,100000)], Krow=1000, Kdiag=10,
+                                      lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
+system.time(op.60000 <- optimize_all_noinit(smfit, biases, counts[sample(.N,60000)], Krow=1000, Kdiag=10,
+                                             lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
+system.time(op.30000 <- optimize_all_noinit(smfit, biases, counts[sample(.N,30000)], Krow=1000, Kdiag=10,
+                                            lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
+system.time(op.10000 <- optimize_all_noinit(smfit, biases, counts[sample(.N,10000)], Krow=1000, Kdiag=10,
+                                            lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
+system.time(op.5000 <- optimize_all_noinit(smfit, biases, counts[sample(.N,5000)], Krow=1000, Kdiag=10,
+                                            lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
+rel_var = function(a,b) {
+  return(mean((a-b)/a))
+}
+max_var = function(a,b) {
+  return(max(abs((a-b)/a)))
+}
+times=data.table(name=c("full","100k", "60k", "30k", "10k", "5k"), nsteps=c(1602, 1779, 1424, 1043, 832, 598),
+           time=c(681, 608, 299, 110, 32, 11), npoints=c(counts[,.N], 100000, 60000, 30000, 10000, 5000))
+ggplot(times)+geom_point(aes(npoints,time))+scale_x_log10()+scale_y_log10()
+lm(data=times, log(time)~log(npoints))
 
+exps=list(n100000=op.100000,n60000=op.60000,n30000=op.30000,n10000=op.10000,n5000=op.5000)
+names(op.full$par)
+sapply(exps, function(x){rel_var(op.full$par$eC, x$par$eC)})
+sapply(exps, function(x){rel_var(op.full$par$eRJ, x$par$eRJ)})
+sapply(exps, function(x){mean(op.full$par$log_nu-x$par$log_nu, na.rm=T)})
+sapply(exps, function(x){max(abs(op.full$par$log_nu-x$par$log_nu), na.rm=T)})
+sapply(exps, function(x){sum(abs(op.full$par$log_nu-x$par$log_nu)>0.01, na.rm=T)/length(op.full$par$log_nu)})\
+#output:
+#n100000    n60000    n30000    n10000     n5000 
+#0.4723810 0.7390476 0.8552381 0.9238095 0.9504762 
+sapply(exps, function(x){sum(abs(op.full$par$log_nu-x$par$log_nu)>0.1, na.rm=T)/length(op.full$par$log_nu)})
+#output:
+#n100000     n60000     n30000     n10000      n5000 
+#0.00000000 0.02095238 0.09523810 0.31047619 0.49714286 
 
-#compare with previous 6-cutter model
-fit=gam(N ~ s(log(distance)) + category:(log(dangling.L.1+1) + log(dangling.R.1+1) + log(rejoined.1+1) +
-                                         log(dangling.L.2+1) + log(dangling.R.2+1) + log(rejoined.2+1)),
-        data=sub, family=nb())
+a=data.table(sapply(exps, function(x){abs(op.full$par$log_nu-x$par$log_nu)}))
+ggplot(melt(a)[value<0.5])+geom_histogram(aes(x=value, y=..density..),binwidth=0.01)+facet_grid(variable ~ .)+
+  ggtitle("error on nu by downsampling 125k counts")
+ggsave(filename = "error_nu.png", width=5, height=4)
+#
+a=data.table(sapply(exps, function(x){abs(op.full$par$log_delta-x$par$log_delta)}))
+ggplot(melt(a)[value<0.5])+geom_histogram(aes(x=value, y=..density..),binwidth=0.01)+facet_grid(variable ~ .)+
+  ggtitle("error on delta by downsampling 125k counts")
+ggsave(filename = "error_delta.png", width=5, height=4)
