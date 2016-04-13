@@ -104,6 +104,32 @@ optimize_decay = function(model, biases, counts, op0, op1, op2, Kdiag=10, lambda
              as_vector=F, hessian=F, iter=iter, verbose=verbose)
 }
 
+optimize_all = function(model, biases, counts, op0, op1, op2, op3, Krow=1000, Kdiag=10,
+                        lambda_nu=1, lambda_delta=1, lambda_diag=1, iter=1000000, verbose=T) {
+  optimizing(model, data = list( Krow=Krow, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
+                                 danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+                                 Kdiag=Kdiag, N=counts[,.N],
+                                 counts=t(data.matrix(counts[,.(contact.close,contact.far,contact.up,contact.down)])),
+                                 cidx=t(data.matrix(counts[,.(id1,id2)])),
+                                 lambda_nu=lambda_nu, lambda_delta=lambda_delta, lambda_diag=lambda_diag),
+             init = list(eC=op0$par$eC, eRJ=op0$par$eRJ, eDE=op0$par$eDE,
+                         beta_nu=op1$par$beta_nu, beta_delta=op2$par$beta_delta, beta_diag=op3$par$beta_diag,
+                         alpha=op3$par$alpha),
+             as_vector=F, hessian=F, iter=iter, verbose=verbose)
+}
+
+optimize_all_noinit = function(model, biases, counts, Krow=1000, Kdiag=10, 
+                               lambda_nu=1, lambda_delta=1, lambda_diag=1, iter=1000000, verbose=T) {
+  optimizing(model, data = list( Krow=Krow, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
+                                 danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+                                 Kdiag=Kdiag, N=counts[,.N],
+                                 counts=t(data.matrix(counts[,.(contact.close,contact.far,contact.up,contact.down)])),
+                                 cidx=t(data.matrix(counts[,.(id1,id2)])),
+                                 lambda_nu=lambda_nu, lambda_delta=lambda_delta, lambda_diag=lambda_diag),
+             as_vector=F, hessian=F, iter=iter, verbose=verbose)
+}
+
+
 
 biases=fread("data/rao_HICall_chr19_35000000-36000000_biases.dat")
 setkey(biases,id)
@@ -171,6 +197,7 @@ nu.pred <- data.table(pos=op.pred_nu$par$x, nu1=exp(op.pred_nu$par$log_mean), nu
 a=data.table(name=c("alpha","deviance_proportion_explained"),
              op1=c(op.b1$par$alpha, op.b1$par$deviance_proportion_explained), 
              op2=c(op2.b1$par$alpha, op2.b1$par$deviance_proportion_explained))
+a
 ggplot(a)+geom_bar(aes(name,(op2-op1)/max(op2,op1)),stat="identity", position="dodge")#+scale_y_continuous(-.01,.01)
 #
 a=cbind(biases,data.table(op1=exp(op.b1$par$log_nu), op2=exp(op2.b1$par$log_nu)))
@@ -185,6 +212,8 @@ ggplot(a[pos>=3166716&pos<=3191637])+scale_y_log10()+
   geom_line(data=nu.pred.weighted[x>=3166716&x<=3191637], aes(x,value,colour=variable))
 message("MAD for nu: ", mad(a$op1-a$op2))
 #
+
+
 
 
 #initial guesses for delta, need to set lambda appropriately
@@ -273,18 +302,93 @@ ggplot(a)+geom_point(aes(log_deltai, log(contact.close)))
 
 
 
+###final optimization
+smfit = stan_model(file = "sparse_cs_norm_fit.stan")
+system.time(op.all <- optimize_all(smfit, biases, counts, op.b0, op.b1, op.b2, op.b3, Krow=1000, Kdiag=10,
+                      lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
+system.time(op2.all <- optimize_all(smfit, biases, counts, Krow=1000, Kdiag=10,
+                       lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
+#compare deviances
+data.table(name=c("alpha","deviance_proportion_explained"),
+           op1=c(op.all$par$alpha, op.all$par$deviance_proportion_explained), 
+           op2=c(op2.all$par$alpha, op2.all$par$deviance_proportion_explained))
+#predict nu everywhere
+pred = stan_model(file = "predict_spline_sparse.stan")
+op.all.pred_nu <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
+                                           intercept=0, beta=op.all$par$beta_nu),
+                         as_vector=F, hessian=F, iter=1, verbose=F)
+op2.all.pred_nu <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
+                                            intercept=0, beta=op2.all$par$beta_nu),
+                          as_vector=F, hessian=F, iter=1, verbose=F)
+nu.all.pred.weighted <- stan_matrix_to_datatable(exp(op.all.pred_nu$par$weighted), op.all.pred_nu$par$x)
+nu.all.pred <- data.table(pos=op.all.pred_nu$par$x, nu1=exp(op.all.pred_nu$par$log_mean), nu2=exp(op2.all.pred_nu$par$log_mean))
+#predict delta everywhere
+op.all.pred_delta <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
+                                              intercept=0, beta=op.all$par$beta_delta),
+                            as_vector=F, hessian=F, iter=1, verbose=F)
+op2.all.pred_delta <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
+                                               intercept=0, beta=op2.all$par$beta_delta),
+                             as_vector=F, hessian=F, iter=1, verbose=F)
+delta.all.pred.weighted <- stan_matrix_to_datatable(exp(op.all.pred_delta$par$weighted), op.all.pred_delta$par$x)
+delta.all.pred <- data.table(pos=op.pred_delta$par$x, delta1=exp(op.all.pred_delta$par$log_mean), delta2=exp(op2.all.pred_delta$par$log_mean))
+###plots: op1 vs op2
+#nu
+a=cbind(biases,data.table(op1=exp(op.all$par$log_nu), op2=exp(op2.all$par$log_nu)))
+ggplot(a[pos>=3166716&pos<=3191637])+scale_y_log10()+
+  geom_point(aes(pos, dangling.L/exp(op.all$par$eDE)),colour="orange")+
+  geom_point(aes(pos, dangling.R/exp(op.all$par$eDE)),colour="pink")+
+  geom_point(aes(pos, rejoined/exp(op.all$par$eRJ)),colour="red")+
+  geom_point(aes(pos, op1),colour="blue")+
+  geom_point(aes(pos, op2),colour="green")+
+  geom_line(data=nu.all.pred[pos>=3166716&pos<=3191637], aes(pos, nu1), colour="blue")+
+  geom_line(data=nu.all.pred[pos>=3166716&pos<=3191637], aes(pos, nu2), colour="green")+
+  geom_line(data=nu.pred[pos>=3166716&pos<=3191637], aes(pos, nu1), colour="red")
+#delta
+a=cbind(biases,data.table(op1=exp(op.all$par$log_delta),
+                          op2=exp(op2.all$par$log_delta),
+                          log_nu=op.all$par$log_nu))
+ggplot(a[pos>=3166716&pos<=3191637])+scale_y_log10()+
+  geom_point(aes(pos, dangling.L/(exp(log_nu+op.all$par$eDE))), colour="orange")+
+  geom_point(aes(pos, dangling.R/(exp(log_nu+op.all$par$eDE))),  shape=0, colour="pink")+
+  geom_point(aes(pos, rejoined/(exp(log_nu+op.all$par$eRJ))), shape=0, colour="red")+
+  geom_point(aes(pos, op1),colour="blue")+
+  geom_point(aes(pos, op2),colour="green")+
+  geom_line(data=delta.all.pred[pos>=3166716&pos<=3191637], aes(pos, delta1), colour="blue")+
+  geom_line(data=delta.all.pred[pos>=3166716&pos<=3191637], aes(pos, delta2), colour="green")+
+  geom_line(data=delta.pred[pos>=3166716&pos<=3191637], aes(pos, delta1), colour="yellow")
+#decay
+a=cbind(counts,data.table(decay1=exp(op.all$par$log_decay),
+                          decay2=exp(op2.all$par$log_decay),
+                          decay.init=exp(op.b3$par$log_decay),
+                          cclose1=exp(op.all$par$log_mean_cclose),
+                          cclose2=exp(op2.all$par$log_mean_cclose),
+                          cfar1=exp(op.all$par$log_mean_cfar),
+                          cfar2=exp(op2.all$par$log_mean_cfar),
+                          cup1=exp(op.all$par$log_mean_cup),
+                          cup2=exp(op2.all$par$log_mean_cup),
+                          cdown1=exp(op.all$par$log_mean_cdown),
+                          cdown2=exp(op2.all$par$log_mean_cdown)))
+ggplot(a[pos2-pos1>1e4][sample(.N,min(.N,10000))])+scale_y_log10()+scale_x_log10()+
+  geom_point(aes(pos2-pos1, contact.close*decay1/cclose1), colour="blue", alpha=0.01)+
+  geom_point(aes(pos2-pos1, contact.far*decay1/cclose1), colour="green", alpha=0.01)+
+  geom_point(aes(pos2-pos1, contact.up*decay1/cclose1), colour="darkblue", alpha=0.01)+
+  geom_point(aes(pos2-pos1, contact.down*decay1/cclose1), colour="darkgreen", alpha=0.01)+
+  geom_line(aes(pos2-pos1, decay1) ,colour="pink")+
+  geom_line(aes(pos2-pos1, decay2) ,colour="orange")+
+  geom_line(aes(pos2-pos1, decay.init) ,colour="yellow")
+
+
+
+
+
 
 
 
 
 
 #simple optimization
-system.time(op <- optimizing(sm, data = list(Krow=4000, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
-                                             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-                                             Kdiag=10, N=counts[,.N],
-                                             counts=t(data.matrix(counts[,.(contact.close,contact.far,contact.up,contact.down)])),
-                                             cidx=t(data.matrix(counts[,.(id1,id2)]))),
-                             as_vector=F, hessian=F, iter=1000000, verbose=T))
+system.time(op <- optimize_all_noinit(smfit, biases, counts, Krow=1000, Kdiag=10,
+                                      lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
 
 #predict fits
 smp = stan_model(file="sparse_cs_norm_predict.stan")

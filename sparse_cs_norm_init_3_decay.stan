@@ -132,9 +132,9 @@ transformed parameters {
 
   //means
   {
-    base_count <- eC + log_decay + log_nu[cidx[1]] + log_nu[cidx[2]];
-    log_deltai <- log_delta[cidx[1]];
-    log_deltaj <- log_delta[cidx[2]];
+    base_count <- eC + log_decay + log_nu[cidx[1]]/2 + log_nu[cidx[2]]/2;
+    log_deltai <- log_delta[cidx[1]]/2;
+    log_deltaj <- log_delta[cidx[2]]/2;
     log_mean_cclose <- base_count - log_deltai + log_deltaj;
     log_mean_cfar   <- base_count + log_deltai - log_deltaj;
     log_mean_cup    <- base_count + log_deltai + log_deltaj;
