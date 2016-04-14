@@ -161,7 +161,7 @@ generated quantities {
     beta_aug[1] <- sum(beta);
     beta_aug[2:] <- beta;
     beta_centered <- beta_aug - (beta_aug' * prow) * prow;
-    log_mean <- csr_matrix_times_vector(N, K, Xrow_w, Xrow_v, Xrow_u, beta_centered);
+    log_mean <- intercept + csr_matrix_times_vector(N, K, Xrow_w, Xrow_v, Xrow_u, beta_centered);
   }
   //basis functions
   {
