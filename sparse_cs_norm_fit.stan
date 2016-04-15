@@ -185,9 +185,11 @@ transformed data {
 parameters {
   real eC;  //exposure for counts
   real eRJ; //exposure for rejoined ends
-  real eDE; //exposure for dangling ends
+  real eDL; //exposure for dangling ends
+  real eDR; //exposure for dangling ends
   vector[Krow-1] beta_nu;
-  vector[Krow-1] beta_delta;
+  vector[Krow-1] beta_DL;
+  vector[Krow-1] beta_DR;
   positive_ordered[Kdiag-1] beta_diag;
   real<lower=0> alpha;
 }
@@ -197,11 +199,16 @@ transformed parameters {
   vector[Krow-2] beta_nu_diff; //2nd order difference on beta_nu_aug
   vector[N] log_nui;
   vector[N] log_nuj;
-  //delta
-  vector[S] log_delta; // log(delta)
-  vector[Krow-2] beta_delta_diff; //2nd order difference on beta_delta_aug
-  vector[N] log_deltai;
-  vector[N] log_deltaj;
+  //DL
+  vector[S] log_DL; // log(DL)
+  vector[Krow-2] beta_DL_diff; //2nd order difference on beta_DL_aug
+  vector[N] log_DLi;
+  vector[N] log_DLj;
+  //DR
+  vector[S] log_DR; // log(DR)
+  vector[Krow-2] beta_DR_diff; //2nd order difference on beta_DR_aug
+  vector[N] log_DRi;
+  vector[N] log_DRj;
   //diag
   vector[N] log_decay;
   vector[Kdiag-2] beta_diag_diff;
@@ -228,18 +235,30 @@ transformed parameters {
   }
   log_nui <- log_nu[cidx[1]];
   log_nuj <- log_nu[cidx[2]];
-  //delta
+  //DL
   {
-    vector[Krow] beta_delta_centered;
-    vector[Krow] beta_delta_aug;
-    beta_delta_aug[1] <- sum(beta_delta);
-    beta_delta_aug[2:] <- beta_delta;
-    beta_delta_centered <- beta_delta_aug - (beta_delta_aug' * prow) * prow;
-    log_delta <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
-    beta_delta_diff <- beta_delta_aug[:(Krow-2)]-2*beta_delta_aug[2:(Krow-1)]+beta_delta_aug[3:];
+    vector[Krow] beta_DL_centered;
+    vector[Krow] beta_DL_aug;
+    beta_DL_aug[1] <- sum(beta_DL);
+    beta_DL_aug[2:] <- beta_DL;
+    beta_DL_centered <- beta_DL_aug - (beta_DL_aug' * prow) * prow;
+    log_DL <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_DL_centered);
+    beta_DL_diff <- beta_DL_aug[:(Krow-2)]-2*beta_DL_aug[2:(Krow-1)]+beta_DL_aug[3:];
   }
-  log_deltai <- log_delta[cidx[1]];
-  log_deltaj <- log_delta[cidx[2]];
+  log_DLi <- log_DL[cidx[1]];
+  log_DLj <- log_DL[cidx[2]];
+  //DR
+  {
+    vector[Krow] beta_DR_centered;
+    vector[Krow] beta_DR_aug;
+    beta_DR_aug[1] <- sum(beta_DR);
+    beta_DR_aug[2:] <- beta_DR;
+    beta_DR_centered <- beta_DR_aug - (beta_DR_aug' * prow) * prow;
+    log_DR <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_DR_centered);
+    beta_DR_diff <- beta_DR_aug[:(Krow-2)]-2*beta_DR_aug[2:(Krow-1)]+beta_DR_aug[3:];
+  }
+  log_DRi <- log_DR[cidx[1]];
+  log_DRj <- log_DR[cidx[2]];
   //decay
   {
     vector[Kdiag] beta_diag_centered;
@@ -255,15 +274,15 @@ transformed parameters {
 
   //means
   {
-    log_mean_RJ <- log_nu + eRJ;
-    log_mean_DL <- log_nu + eDE + log_delta;
-    log_mean_DR <- log_nu + eDE - log_delta;
+    log_mean_RJ <- log_nu + eRJ - log_DL - log_DR;
+    log_mean_DL <- log_nu + eDL + log_DL;
+    log_mean_DR <- log_nu + eDR + log_DR;
     //
     base_count <- eC + log_decay + log_nui + log_nuj;
-    log_mean_cclose <- base_count - log_deltai + log_deltaj;
-    log_mean_cfar   <- base_count + log_deltai - log_deltaj;
-    log_mean_cup    <- base_count + log_deltai + log_deltaj;
-    log_mean_cdown  <- base_count - log_deltai - log_deltaj;
+    log_mean_cclose <- base_count - log_DLi - log_DRj;
+    log_mean_cfar   <- base_count - log_DRi - log_DLj;
+    log_mean_cup    <- base_count - log_DRi - log_DRj;
+    log_mean_cdown  <- base_count - log_DLi - log_DLj;
   }
 }
 model {
@@ -283,7 +302,8 @@ model {
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
   beta_nu_diff ~ normal(0, 1./(alpha*lambda_nu));
-  beta_delta_diff ~ normal(0, 1./(alpha*lambda_delta));
+  beta_DL_diff ~ normal(0, 1./(alpha*lambda_delta));
+  beta_DR_diff ~ normal(0, 1./(alpha*lambda_delta));
   beta_diag_diff ~ normal(0, 1./(alpha*lambda_diag));
 }
 generated quantities {
@@ -302,9 +322,11 @@ generated quantities {
     vector[N] offsetN;
     offsetS <- rep_vector(eRJ, S);
     deviance_null <- neg_binomial_2_log_deviance(rejoined, offsetS, alpha);
-    offsetS <- rep_vector(eDE, S);
+    offsetS <- rep_vector(eDL, S);
     deviance_null <- deviance_null +
-                     neg_binomial_2_log_deviance(danglingL, offsetS, alpha) +
+                     neg_binomial_2_log_deviance(danglingL, offsetS, alpha);
+    offsetS <- rep_vector(eDR, S);
+    deviance_null <- deviance_null +
                      neg_binomial_2_log_deviance(danglingR, offsetS, alpha);
     offsetN <- rep_vector(eC, N);
     deviance_null <- deviance_null +
