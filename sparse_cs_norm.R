@@ -155,35 +155,6 @@ ggplot(a[pos2-pos1>1e4][sample(.N,min(.N,10000))])+scale_y_log10()+scale_x_log10
   geom_line(aes(pos2-pos1, decay) ,colour="pink")
 
 
-smfit = stan_model(file = "sparse_cs_norm_fit.stan")
-system.time(op.sep <- optimize_all_noinit(smfit, biases, counts, Krow=10000, Kdiag=10,
-                                      lambda_nu=1, lambda_delta=1, lambda_diag=1))
-#compare deviances
-c(op$par$deviance_proportion_explained, op.sep$par$deviance_proportion_explained,
-  op.new$par$deviance_proportion_explained)
-#compare dispersions
-c(op$par$alpha, op.sep$par$alpha, op.sep$par$aDE, op.sep$par$aRJ)
-c(op$par$alpha, op.new$par$aC, op.new$par$aDE, op.new$par$aRJ)
-#compare decay
-a=cbind(counts,data.table(decay=exp(op$par$log_decay),
-                          cclose=exp(op$par$log_mean_cclose)),
-        data.table(decay.sep=exp(op.sep$par$log_decay),
-                   cclose.sep=exp(op.sep$par$log_mean_cclose)),
-        data.table(decay.new=exp(op.new$par$log_decay),
-                   cclose.new=exp(op.new$par$log_mean_cclose)))
-ggplot(a[pos2-pos1>1e4])+scale_y_log10()+scale_x_log10()+
-  geom_point(aes(pos2-pos1, contact.close*decay.new/cclose.new), colour="blue", alpha=0.01)+
-  geom_point(aes(pos2-pos1, contact.far*decay.new/cclose.new), colour="green", alpha=0.01)+
-  geom_point(aes(pos2-pos1, contact.up*decay.new/cclose.new), colour="darkblue", alpha=0.01)+
-  geom_point(aes(pos2-pos1, contact.down*decay.new/cclose.new), colour="darkgreen", alpha=0.01)+
-  geom_line(aes(pos2-pos1, decay) ,colour="pink")+
-  geom_line(aes(pos2-pos1, decay.new) ,colour="red")+
-  geom_line(aes(pos2-pos1, decay.sep) ,colour="purple")+
-  geom_line(aes(distance, fij), colour="blue", data=sub[distance>1e4])
-
-
-
-
 
 
 ### initialization + optimization
