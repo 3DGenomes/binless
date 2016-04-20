@@ -110,11 +110,10 @@ bin_counts = function(counts, biases, resolution, b1=NULL, b2=NULL, e1=NULL, e2=
   sub=sub[complete.cases(sub)]
   #divide by number of rsites in each bin
   if (normalized==T) {
-    rsites = data.table(pos=biases[,pos])
-    ns1 = rsites[,.(bin1=cut2(pos, bins1, oneval=F, onlycuts=T, digits=10))][,.(nsites1=.N),keyby=bin1]
+    ns1 = biases[,.(bin1=cut2(pos, bins1, oneval=F, onlycuts=F, digits=10))][,.(nsites1=.N),keyby=bin1]
     setkey(sub, bin1)
     sub=ns1[sub]
-    ns2 = rsites[,.(bin2=cut2(pos, bins2, oneval=F, onlycuts=T, digits=10))][,.(nsites2=.N),keyby=bin2]
+    ns2 = biases[,.(bin2=cut2(pos, bins2, oneval=F, onlycuts=F, digits=10))][,.(nsites2=.N),keyby=bin2]
     setkey(sub, bin2)
     sub=ns2[sub]
     sub[,N:=N/(nsites1*nsites2)]
@@ -137,40 +136,40 @@ bin_counts = function(counts, biases, resolution, b1=NULL, b2=NULL, e1=NULL, e2=
 
 
 
-biases=fread("data/rao_HICall_chr20_all_biases.dat")
+biases=fread("data/rao_HICall_chr20_all_biases.dat") #157438
 setkey(biases,id)
 counts=fread("data/rao_HICall_chr20_all_counts.dat")
 both=fread("data/rao_HICall_chr20_all_both.dat")
 
 
-biases=fread("data/rao_HIC035_chr20_all_biases.dat")
+biases=fread("data/rao_HIC035_chr20_all_biases.dat") #16345
 setkey(biases,id)
 counts=fread("data/rao_HIC035_chr20_all_counts.dat")
 both=fread("data/rao_HIC035_chr20_all_both.dat")
 
 
-biases=fread("data/rao_HICall_chr20_35000000-36000000_biases.dat")
+biases=fread("data/rao_HICall_chr20_35000000-36000000_biases.dat") #3215
 setkey(biases,id)
 counts=fread("data/rao_HICall_chr20_35000000-36000000_counts.dat")
 both=fread("data/rao_HICall_chr20_35000000-36000000_both.dat")
 
-biases=fread("data/rao_HIC035_chr20_35000000-36000000_biases.dat")
+biases=fread("data/rao_HIC035_chr20_35000000-36000000_biases.dat") #212
 setkey(biases,id)
 counts=fread("data/rao_HIC035_chr20_35000000-36000000_counts.dat")
 both=fread("data/rao_HIC035_chr20_35000000-36000000_both.dat")
 
 
-
-biases=fread("data/caulo_3000000-4000000_biases.dat")
-setkey(biases,id)
-counts=fread("data/caulo_3000000-4000000_counts.dat")
-both=fread("data/caulo_3000000-4000000_both.dat")
-
-biases=fread("data/caulo_all_biases.dat")
+biases=fread("data/caulo_all_biases.dat") #2010
 setkey(biases,id)
 counts=fread("data/caulo_all_counts.dat")
 both=fread("data/caulo_all_both.dat")
 counts=counts[sample(.N,min(25000,.N))]
+
+biases=fread("data/caulo_3000000-4000000_biases.dat") #525
+setkey(biases,id)
+counts=fread("data/caulo_3000000-4000000_counts.dat")
+both=fread("data/caulo_3000000-4000000_both.dat")
+
 
 
 
@@ -179,7 +178,7 @@ counts=counts[sample(.N,min(25000,.N))]
 
 
 #make sure the 6-cutter model fits it nicely
-sub=both[,.SD[sample(.N,min(25000,.N))],by=category]
+sub=both[,.SD[sample(.N,min(100000,.N))],by=category]
 fit=gam(N ~ s(log(distance)) + category:(log(dangling.L.1+1) + log(dangling.R.1+1) + log(rejoined.1+1) +
                                            log(dangling.L.2+1) + log(dangling.R.2+1) + log(rejoined.2+1)),
         data=sub, family=nb())
@@ -195,7 +194,7 @@ ggplot(sub[distance>70e4])+
 
 
 #### optimization wihout prior guesses
-counts.sub=counts[sample(.N,25000)]
+counts.sub=counts[sample(.N,100000)]
 smfit = stan_model(file = "sparse_cs_norm_fit.stan")
 system.time(op <- optimize_all_noinit(smfit, biases, counts.sub, Krow=65000, Kdiag=10,
                                       lambda_nu=1, lambda_delta=1, lambda_diag=1, verbose = T))
@@ -250,17 +249,28 @@ counts[,log_mean_cup:=op.pred$par$log_mean_cup]
 counts[,log_mean_cdown:=op.pred$par$log_mean_cdown]
 counts[,log_mean_cfar:=op.pred$par$log_mean_cfar]
 counts[,log_mean_cclose:=op.pred$par$log_mean_cclose]
-write.table(counts, file = "data/rao_HIC035_chr20_all_counts_fitted_147.9279.dat", quote = F, row.names = F)
+write.table(counts, file = "data/rao_HICall_chr20_all_counts_fitted_3.88013.dat", quote = F, row.names = F)
 
 #visualize at lower res
-binned = bin_counts(counts=counts, biases=biases, resolution=1000000, normalized=F)
+binned = bin_counts(counts=counts, biases=biases, resolution=1000000, normalized=F, b1=0, b2=0)
 ggplot(binned, aes(begin1,begin2, fill=log(N)))+geom_raster()+scale_fill_gradient(low="white", high="black")
-ggsave(filename = "images/rao_HIC035_chr20_all_1M_raw.png", width=10, height=7.5)
+ggsave(filename = "images/rao_HICall_chr20_all_1M_raw.png", width=10, height=7.5)
+write.table(binned[,.(begin1,end1,begin2,end2,N)], file = "binned_Rao_MboI_chr20_raw_1M.dat", quote = F, row.names = F)
 #
-binned = bin_counts(counts=counts, biases=biases, resolution=50000, normalized=T, b1 = 35e6, e1=45e6, b2=35e6, e2=45e6)
+binned = bin_counts(counts=counts, biases=biases, resolution=1000000, normalized=T, b1=0, b2=0)
 ggplot(binned, aes(begin1,begin2, fill=log(N)))+geom_raster()+scale_fill_gradient(low="white", high="black")
-ggsave(filename = "images/rao_HIC035_chr20_35000000-45000000_50k_raw.png", width=10, height=7.5)
-
+ggsave(filename = "images/rao_HICall_chr20_all_1M_normalized.png", width=10, height=7.5)
+write.table(binned[,.(begin1,end1,begin2,end2,N)], file = "binned_Rao_MboI_chr20_normalized_1M.dat", quote = F, row.names = F)
+#
+binned = bin_counts(counts=counts, biases=biases, resolution=20000, normalized=T, b1 = 35e6, e1=45e6, b2=35e6, e2=45e6)
+ggplot(binned, aes(begin1,begin2, fill=log(N)))+geom_raster()+scale_fill_gradient(low="white", high="black")
+binned = bin_counts(counts=counts, biases=biases, resolution=10000, normalized=T, b1 = 35e6, e1=36e6, b2=35e6, e2=36e6)
+ggplot(binned, aes(begin1,begin2, fill=log(N)))+geom_raster()+scale_fill_gradient(low="white", high="black")
+#zoom on loop
+binned = bin_counts(counts=counts[pos1>=53983461&pos1<=54783461&pos2>=53983461&pos2<=54783461], biases=biases[pos>=53983461&pos<=54783461],
+                    resolution=5000, normalized=T, b1 = 53983461, e1=54783461, b2=53983461, e2=54783461)
+ggplot(binned, aes(begin1,begin2, fill=N))+geom_raster()+scale_fill_gradient(low="white", high="black")
+ggsave(filename = "images/rao_HICall_chr20_53983461-54783461_raw.png", width=10, height=7.5)
 
 
 
