@@ -103,7 +103,7 @@ model {
 }
 generated quantities {
   matrix[N,K] designmat; //design matrix
-  //matrix[N,K] weighted; //weighted basis functions
+  matrix[N,K] weighted; //weighted basis functions
   real offset;
   vector[N] pred; //spline interpolant
   real edf; //effective degrees of freedom
@@ -111,7 +111,7 @@ generated quantities {
   offset <- intercept;
   designmat <- Xs;
   //weighted <-  bspline(x, K, splinedegree());
-  //weighted <- X .* rep_matrix(beta', rows(x));
+  weighted <- Xs .* rep_matrix(beta_centered', rows(x));
   pred <- exp(intercept + Xs * beta_centered);
   {
     matrix[K,K] XtX;
