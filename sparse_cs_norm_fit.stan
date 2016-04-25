@@ -290,28 +290,44 @@ generated quantities {
   real deviance;
   real deviance_null;
   real deviance_proportion_explained;
-  deviance <- neg_binomial_2_log_deviance(rejoined, log_mean_RJ, alpha) +
-              neg_binomial_2_log_deviance(danglingL, log_mean_DL, alpha) +
-              neg_binomial_2_log_deviance(danglingR, log_mean_DR, alpha) +
-              neg_binomial_2_log_deviance(counts[1], log_mean_cclose, alpha) +
+  #
+  real rejoined_deviance;
+  real rejoined_deviance_null;
+  real rejoined_deviance_proportion_explained;
+  #
+  real dangling_deviance;
+  real dangling_deviance_null;
+  real dangling_deviance_proportion_explained;
+  #
+  real count_deviance;
+  real count_deviance_null;
+  real count_deviance_proportion_explained;
+  #
+  count_deviance <- neg_binomial_2_log_deviance(counts[1], log_mean_cclose, alpha) +
               neg_binomial_2_log_deviance(counts[2], log_mean_cfar, alpha) +
               neg_binomial_2_log_deviance(counts[3], log_mean_cup, alpha) +
               neg_binomial_2_log_deviance(counts[4], log_mean_cdown, alpha);
+  rejoined_deviance <- neg_binomial_2_log_deviance(rejoined, log_mean_RJ, alpha);
+  dangling_deviance <- neg_binomial_2_log_deviance(danglingL, log_mean_DL, alpha) +
+                       neg_binomial_2_log_deviance(danglingR, log_mean_DR, alpha);
+  deviance <- rejoined_deviance + dangling_deviance + count_deviance;
   {
     vector[S] offsetS;
     vector[N] offsetN;
     offsetS <- rep_vector(eRJ, S);
-    deviance_null <- neg_binomial_2_log_deviance(rejoined, offsetS, alpha);
+    rejoined_deviance_null <- neg_binomial_2_log_deviance(rejoined, offsetS, alpha);
     offsetS <- rep_vector(eDE, S);
-    deviance_null <- deviance_null +
-                     neg_binomial_2_log_deviance(danglingL, offsetS, alpha) +
-                     neg_binomial_2_log_deviance(danglingR, offsetS, alpha);
+    dangling_deviance_null <- neg_binomial_2_log_deviance(danglingL, offsetS, alpha) +
+                              neg_binomial_2_log_deviance(danglingR, offsetS, alpha);
     offsetN <- rep_vector(eC, N);
-    deviance_null <- deviance_null +
-                     neg_binomial_2_log_deviance(counts[1], offsetN, alpha) +
+    count_deviance_null <- neg_binomial_2_log_deviance(counts[1], offsetN, alpha) +
                      neg_binomial_2_log_deviance(counts[2], offsetN, alpha) +
                      neg_binomial_2_log_deviance(counts[3], offsetN, alpha) +
                      neg_binomial_2_log_deviance(counts[4], offsetN, alpha);
+    deviance_null <- rejoined_deviance_null + dangling_deviance_null + count_deviance_null;
   }
+  rejoined_deviance_proportion_explained <- 100*(rejoined_deviance_null - rejoined_deviance)/rejoined_deviance_null;
+  dangling_deviance_proportion_explained <- 100*(dangling_deviance_null - dangling_deviance)/dangling_deviance_null;
+  count_deviance_proportion_explained <- 100*(count_deviance_null - count_deviance)/count_deviance_null;
   deviance_proportion_explained <- 100*(deviance_null - deviance)/deviance_null;
 }
