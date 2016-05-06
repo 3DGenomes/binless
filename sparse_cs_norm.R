@@ -7,6 +7,7 @@ library(ggplot2)
 library(shinystan)
 library(mgcv)
 library(scam)
+library(Hmisc)
 
 setwd("/home/yannick/simulations/spline_stan")
 
@@ -134,6 +135,24 @@ bin_counts = function(counts, biases, resolution, b1=NULL, b2=NULL, e1=NULL, e2=
   return(sub)
 }
 
+gammaQuery=function(mu,theta,count){
+  alpha1=theta
+  alpha2=theta+count
+  beta1=theta/mu
+  beta2=beta1+1
+  return(function(x){dgamma(x,alpha2,rate=beta2)*pgamma(x,alpha1,rate=beta1)})
+}
+igammaQuery_c=function(mu,theta,threshold=0.95){
+  function(x){integrate(gammaQuery(mu=mu,theta=theta,count=x),0,+Inf)$value-threshold}
+}
+uniroot(igammaQuery_c(mu=2,theta=2,threshold=0.9),c(0,10))$root
+uniroot(igammaQuery_c(mu=2,theta=20,threshold=0.9),c(10,30))$root
+igammaQuery_theta=function(mu,count,threshold=0.95){
+  function(x){integrate(gammaQuery(mu=mu,theta=x,count=count),0,+Inf)$value-threshold}
+}
+uniroot(igammaQuery_theta(mu=2,count=3,threshold=0.9),c(0,30))$root
+uniroot(igammaQuery_theta(mu=2,count=10,threshold=0.9),c(1,30))$root
+
 
 
 biases=fread("data/rao_HICall_chr20_all_biases.dat") #157438
@@ -147,6 +166,11 @@ setkey(biases,id)
 counts=fread("data/rao_HIC035_chr20_all_counts.dat")
 both=fread("data/rao_HIC035_chr20_all_both.dat")
 
+
+biases=fread("data/rao_HICall_chrX_73780165-74230165_biases.dat") #1201
+setkey(biases,id)
+counts=fread("data/rao_HICall_chrX_73780165-74230165_counts.dat")
+both=fread("data/rao_HICall_chrX_73780165-74230165_both.dat")
 
 biases=fread("data/rao_HICall_chr20_35000000-36000000_biases.dat") #3215
 setkey(biases,id)
@@ -194,10 +218,11 @@ ggplot(sub[distance>1e4][sample(.N,min(.N,10000))])+
 
 
 #### optimization wihout prior guesses
-counts.sub=counts[sample(.N,100000)]
+counts.sub=counts[sample(.N,min(.N,100000))]
 smfit = stan_model(file = "sparse_cs_norm_fit.stan")
 system.time(op <- optimize_all_noinit(smfit, biases, counts.sub, Krow=4000, Kdiag=10,
-                                      lambda_nu=.1, lambda_delta=.1, lambda_diag=.1, verbose = T))
+                                      lambda_nu=10, lambda_delta=10, lambda_diag=.1, verbose = T))
+save(op, file = "data/rao_HICall_chrX_73780165-74230165_op_lambda10.RData")
 #compare deviances
 c(100*(fit$null.deviance-fit$deviance)/fit$null.deviance, op$par$deviance_proportion_explained)
 #compare dispersions
@@ -217,9 +242,11 @@ ggplot(a[pos2-pos1>1e4][sample(.N,min(.N,10000))])+scale_y_log10()+scale_x_log10
 #nu
 a=cbind(biases,data.table(opt=exp(op$par$log_nu)))
 #pbegin=35100000 
-pbegin=3166716
 #pend=35200000 
-pend=3191637
+#pbegin=3166716
+#pend=3191637
+pbegin=73780165
+pend=74230165
 ggplot(a[pos>=pbegin&pos<=pend])+scale_y_log10()+
   geom_point(aes(pos, dangling.L/exp(op$par$eDE)),colour="orange")+
   geom_point(aes(pos, dangling.R/exp(op$par$eDE)),colour="pink")+
@@ -251,28 +278,25 @@ counts[,log_mean_cup:=op.pred$par$log_mean_cup]
 counts[,log_mean_cdown:=op.pred$par$log_mean_cdown]
 counts[,log_mean_cfar:=op.pred$par$log_mean_cfar]
 counts[,log_mean_cclose:=op.pred$par$log_mean_cclose]
-write.table(counts, file = "data/rao_HICall_chr20_all_counts_fitted_3.88013.dat", quote = F, row.names = F)
+write.table(counts, file = "data/rao_HICall_chrX_73780165-74230165_counts_fitted_disp3.84_dev_14.3_lambda10.dat", quote = F, row.names = F)
+#divide by rsites only
+counts[,log_decay:=0]
+counts[,log_mean_cup:=log(contact.up)]
+counts[,log_mean_cdown:=log(contact.down)]
+counts[,log_mean_cfar:=log(contact.far)]
+counts[,log_mean_cclose:=log(contact.close)]
 
-#visualize at lower res
-binned = bin_counts(counts=counts, biases=biases, resolution=1000000, normalized=F, b1=0, b2=0)
+
+#visualize binned matrices
+binned = bin_counts(counts=counts, biases=biases, resolution=5000, normalized=F)
 ggplot(binned, aes(begin1,begin2, fill=log(N)))+geom_raster()+scale_fill_gradient(low="white", high="black")
-ggsave(filename = "images/rao_HICall_chr20_all_1M_raw.png", width=10, height=7.5)
-write.table(binned[,.(begin1,end1,begin2,end2,N)], file = "binned_Rao_MboI_chr20_raw_1M.dat", quote = F, row.names = F)
+ggsave(filename = "images/rao_HICall_chrX_73780165-74230165_5k_raw.png", width=10, height=7.5)
+write.table(binned[,.(begin1,end1,begin2,end2,N)], file = "data/binned_Rao_MboI_chrX_73780165-74230165_raw_5k.dat", quote = F, row.names = F)
 #
-binned = bin_counts(counts=counts, biases=biases, resolution=1000000, normalized=T, b1=0, b2=0)
+binned = bin_counts(counts=counts, biases=biases, resolution=5000, normalized=T)
 ggplot(binned, aes(begin1,begin2, fill=log(N)))+geom_raster()+scale_fill_gradient(low="white", high="black")
-ggsave(filename = "images/rao_HICall_chr20_all_1M_normalized.png", width=10, height=7.5)
-write.table(binned[,.(begin1,end1,begin2,end2,N)], file = "binned_Rao_MboI_chr20_normalized_1M.dat", quote = F, row.names = F)
-#
-binned = bin_counts(counts=counts, biases=biases, resolution=20000, normalized=T, b1 = 35e6, e1=45e6, b2=35e6, e2=45e6)
-ggplot(binned, aes(begin1,begin2, fill=log(N)))+geom_raster()+scale_fill_gradient(low="white", high="black")
-binned = bin_counts(counts=counts, biases=biases, resolution=10000, normalized=T, b1 = 35e6, e1=36e6, b2=35e6, e2=36e6)
-ggplot(binned, aes(begin1,begin2, fill=log(N)))+geom_raster()+scale_fill_gradient(low="white", high="black")
-#zoom on loop
-binned = bin_counts(counts=counts[pos1>=53983461&pos1<=54783461&pos2>=53983461&pos2<=54783461], biases=biases[pos>=53983461&pos<=54783461],
-                    resolution=5000, normalized=T, b1 = 53983461, e1=54783461, b2=53983461, e2=54783461)
-ggplot(binned, aes(begin1,begin2, fill=N))+geom_raster()+scale_fill_gradient(low="white", high="black")
-ggsave(filename = "images/rao_HICall_chr20_53983461-54783461_raw.png", width=10, height=7.5)
+ggsave(filename = "images/rao_HICall_chrX_73780165-74230165_5k_div_nsites.png", width=10, height=7.5)
+write.table(binned[,.(begin1,end1,begin2,end2,N)], file = "data/binned_Rao_MboI_chrX_73780165-74230165_div_nsites.dat", quote = F, row.names = F)
 
 
 
