@@ -30,22 +30,19 @@ optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, Kr
   mf$Nkl=meanfield$Nkl[count<=maxcount]
   mf$Nkr=meanfield$Nkr[count<=maxcount]
   mf$Nkd=meanfield$Nkd[count<=maxcount]
-  optimizing(model, data = list( Krow=Krow, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
-                                 danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-                                 Kdiag=Kdiag,
-                                 Nclose=cclose[,.N], counts_close=cclose[,count],
-                                 index_close=t(data.matrix(cclose[,.(id1,id2)])),
-                                 Nfar=cfar[,.N], counts_far=cfar[,count],
-                                 index_far=t(data.matrix(cfar[,.(id1,id2)])),
-                                 Nup=cup[,.N], counts_up=cup[,count],
-                                 index_up=t(data.matrix(cup[,.(id1,id2)])),
-                                 Ndown=cdown[,.N], counts_down=cdown[,count],
-                                 index_down=t(data.matrix(cdown[,.(id1,id2)])),
-                                 Nl=mf$Nkl[,.N], Nkl_count=mf$Nkl[,count], Nkl_cidx=mf$Nkl[,id], Nkl_N=mf$Nkl[,N],
-                                 Nr=mf$Nkr[,.N], Nkr_count=mf$Nkr[,count], Nkr_cidx=mf$Nkr[,id], Nkr_N=mf$Nkr[,N],
-                                 Nd=mf$Nkd[,.N], Nkd_count=mf$Nkd[,count], Nkd_d=mf$Nkl[,mdist], Nkd_N=mf$Nkd[,N],
-                                 lambda_nu=lambda_nu, lambda_delta=lambda_delta, lambda_diag=lambda_diag),
-             as_vector=F, hessian=F, iter=iter, verbose=verbose)
+  data = list( Krow=Krow, S=biases[,.N],
+               cutsites=biases[,pos], rejoined=biases[,rejoined],
+               danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+               Kdiag=Kdiag,
+               Nclose=cclose[,.N], counts_close=cclose[,count], index_close=t(data.matrix(cclose[,.(id1,id2)])),
+               Nfar=cfar[,.N],     counts_far=cfar[,count],     index_far=t(data.matrix(cfar[,.(id1,id2)])),
+               Nup=cup[,.N],       counts_up=cup[,count],       index_up=t(data.matrix(cup[,.(id1,id2)])),
+               Ndown=cdown[,.N],   counts_down=cdown[,count],   index_down=t(data.matrix(cdown[,.(id1,id2)])),
+               Nl=mf$Nkl[,.N], Nkl_count=mf$Nkl[,count], Nkl_cidx=mf$Nkl[,id], Nkl_N=mf$Nkl[,N],
+               Nr=mf$Nkr[,.N], Nkr_count=mf$Nkr[,count], Nkr_cidx=mf$Nkr[,id], Nkr_N=mf$Nkr[,N],
+               Nd=mf$Nkd[,.N], Nkd_count=mf$Nkd[,count], Nkd_d=mf$Nkd[,mdist], Nkd_N=mf$Nkd[,N],
+               lambda_nu=lambda_nu, lambda_delta=lambda_delta, lambda_diag=lambda_diag)
+  optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose)
 }
 
 predict_full = function(model, biases, counts, opt, Kdiag=10, verbose=T) {
