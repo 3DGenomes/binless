@@ -228,6 +228,9 @@ both=fread("data/rao_HIC035_chr20_all_both.dat")
 biases=fread("data/rao_HICall_chrX_73780165-74230165_biases.dat") #1201
 setkey(biases,id)
 counts=fread("data/rao_HICall_chrX_73780165-74230165_counts.dat")
+load("data/rao_HICall_chrX_73780165-74230165_meanfield.RData")
+#meanfield = bin_for_mean_field(biases, counts, distance_bins_per_decade = 10)
+#save(meanfield, file = "data/rao_HICall_chrX_73780165-74230165_meanfield.RData")
 both=fread("data/rao_HICall_chrX_73780165-74230165_both.dat")
 
 biases=fread("data/rao_HICall_chr20_35000000-36000000_biases.dat") #3215
