@@ -138,10 +138,11 @@ bin_counts = function(counts, biases, resolution, b1=NULL, b2=NULL, e1=NULL, e2=
   return(sub)
 }
 
-bin_for_mean_field = function(biases, counts, distance_bins_per_decade=10) {
+bin_for_mean_field = function(biases, counts, distance_bins_per_decade=10, maxcount=NULL) {
   stopifnot(counts[id1>=id2,.N]==0)
   mcounts=melt(counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
-               variable.name = "category", value.name = "count")[count>0]
+               variable.name = "category", value.name = "count")
+  if (is.na(maxcount)) {mcounts=mcounts[count>0]} else {mcounts=mcounts[[count>0 & count<=maxcount]]}
   ### accumulate counts
   ci=mcounts[,.(id=id1,count,category)][,.N,by=c("id","count","category")]
   cj=mcounts[,.(id=id2,count,category)][,.N,by=c("id","count","category")]
@@ -152,7 +153,7 @@ bin_for_mean_field = function(biases, counts, distance_bins_per_decade=10) {
                   cj[category=="contact.up",.(id,count,category="Nj.up",N)],
                   cj[category=="contact.close",.(id,count,category="Nj.close",N)]),
             ...~category, value.var="N", fill=0)[,.(id,count,N=Ni.far+Ni.up+Nj.up+Nj.close)]
-  Nkl=rbind(Nkl,Nkl[,.(count=0,N=2*nsites-sum(N)),by=id])
+  Nkl=rbind(Nkl,Nkl[,.(count=0,N=2*nsites-sum(N)),by=id]) #each rsite is counted twice
   setkey(Nkl,N,id,count)
   Nkr=dcast(rbind(ci[category=="contact.close",.(id,count,category="Ni.close",N)],
                   ci[category=="contact.down",.(id,count,category="Ni.down",N)],
