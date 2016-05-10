@@ -8,6 +8,9 @@ library(shinystan)
 library(mgcv)
 library(scam)
 library(Hmisc)
+library(foreach)
+library(doParallel)
+registerDoParallel()
 
 setwd("/home/yannick/simulations/spline_stan")
 
@@ -34,8 +37,8 @@ optimize_nu = function(model, biases, op0, Krow=1000, lambda_nu=1, iter=10000, v
 
 optimize_delta = function(model, biases, op0, op1, Krow=1000, lambda_delta=1, iter=10000, verbose=T) {
   optimizing(model, data = list(Krow=Krow, S=biases[,.N], cutsites=biases[,pos],
-                               danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-                               eDE=op0$par$eDE, beta_nu=op1$par$beta_nu, lambda_delta=lambda_delta),
+                                danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+                                eDE=op0$par$eDE, beta_nu=op1$par$beta_nu, lambda_delta=lambda_delta),
              as_vector=F, hessian=F, iter=iter, verbose=verbose)
 }
 
@@ -97,10 +100,10 @@ bin_counts = function(counts, biases, resolution, b1=NULL, b2=NULL, e1=NULL, e2=
                                 counts[,.(pos1,pos2,contact.down,log_decay,log_mean_cdown)]))
   setnames(counts.wrapped, c("pos1","pos2","count","log_decay","log_mean"))
   if (normalized==T) {
-      sub = counts.wrapped[,.(pos1,pos2,bin1=cut2(pos1, bins1, oneval=F, onlycuts=T, digits=10, minmax=F),
-                              bin2=cut2(pos2,bins2, oneval=F, onlycuts=T, digits=10, minmax=F),
-                              weight=exp(log_mean-log_decay))
-                           ][,.(N=sum(weight, na.rm = T)),by=c("bin1","bin2")]
+    sub = counts.wrapped[,.(pos1,pos2,bin1=cut2(pos1, bins1, oneval=F, onlycuts=T, digits=10, minmax=F),
+                            bin2=cut2(pos2,bins2, oneval=F, onlycuts=T, digits=10, minmax=F),
+                            weight=exp(log_mean-log_decay))
+                         ][,.(N=sum(weight, na.rm = T)),by=c("bin1","bin2")]
   } else {
     sub = counts.wrapped[,.(pos1,pos2,bin1=cut2(pos1, bins1, oneval=F, onlycuts=T, digits=10, minmax=F),
                             bin2=cut2(pos2,bins2, oneval=F, onlycuts=T, digits=10, minmax=F),
@@ -135,6 +138,59 @@ bin_counts = function(counts, biases, resolution, b1=NULL, b2=NULL, e1=NULL, e2=
   return(sub)
 }
 
+bin_for_mean_field = function(biases, counts, distance_bins_per_decade=10, maxcount=NULL) {
+  stopifnot(counts[id1>=id2,.N]==0)
+  mcounts=melt(counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
+               variable.name = "category", value.name = "count")
+  if (is.na(maxcount)) {mcounts=mcounts[count>0]} else {mcounts=mcounts[[count>0 & count<=maxcount]]}
+  ### accumulate counts
+  ci=mcounts[,.(id=id1,count,category)][,.N,by=c("id","count","category")]
+  cj=mcounts[,.(id=id2,count,category)][,.N,by=c("id","count","category")]
+  nsites=biases[,.N]
+  ### make histograms for biases
+  Nkl=dcast(rbind(ci[category=="contact.up",.(id,count,category="Ni.up",N)],
+                  ci[category=="contact.far",.(id,count,category="Ni.far",N)],
+                  cj[category=="contact.up",.(id,count,category="Nj.up",N)],
+                  cj[category=="contact.close",.(id,count,category="Nj.close",N)]),
+            ...~category, value.var="N", fill=0)[,.(id,count,N=Ni.far+Ni.up+Nj.up+Nj.close)]
+  Nkl=rbind(Nkl,Nkl[,.(count=0,N=2*nsites-sum(N)),by=id]) #each rsite is counted twice
+  setkey(Nkl,N,id,count)
+  Nkr=dcast(rbind(ci[category=="contact.close",.(id,count,category="Ni.close",N)],
+                  ci[category=="contact.down",.(id,count,category="Ni.down",N)],
+                  cj[category=="contact.far",.(id,count,category="Nj.far",N)],
+                  cj[category=="contact.down",.(id,count,category="Nj.down",N)]),
+            ...~category, value.var="N", fill=0)[,.(id,count,N=Ni.close+Ni.down+Nj.far+Nj.down)]
+  Nkr=rbind(Nkr,Nkr[,.(count=0,N=2*nsites-sum(N)),by=id]) #each rsite is counted twice
+  setkey(Nkr,N,id,count)
+  ### make histogram for distance
+  #make distance bins and their factor
+  stepsz=1/distance_bins_per_decade
+  dbins=10**seq(0,biases[,log10(max(pos)-min(pos))]+stepsz,stepsz)
+  mcounts[,distance:=abs(pos1-pos2)]
+  mcounts[,bdist:=cut(distance,dbins,ordered_result=T,right=F)]
+  #Count positive counts in these bins
+  Nkd = mcounts[,.N,keyby=c("bdist","count")]
+  Nkd[,mdist:=sqrt(dbins[unclass(bdist)+1]*dbins[unclass(bdist)])]
+  #Count the number of crossings per distance bin
+  positions=biases[,pos]
+  npos=length(positions)
+  ncrossings <- rowSums(sapply(1:(npos-1), #this loop is still 5x faster in python
+                       function(i){hist(positions[(i+1):npos]-positions[i],breaks=dbins,plot=F)$counts}
+                       ))
+  #deduce zero counts
+  Nkz = data.table(bdist=Nkd[,ordered(levels(bdist), levels(bdist))], ncrossings=ncrossings, key="bdist")
+  Nkz = Nkd[,.(nnz=sum(N)),by=bdist][Nkz[ncrossings>0]]
+  Nkz[,mdist:=sqrt(dbins[unclass(bdist)+1]*dbins[unclass(bdist)])]
+  Nkz[is.na(nnz),nnz:=0]
+  Nkd = rbind(Nkd, Nkz[,.(bdist,mdist,count=0,N=4*ncrossings-nnz)]) # one crossing for each of 4 count types
+  setkey(Nkd,N,bdist,count)
+  stopifnot(Nkd[count==0,all(N>=0)])
+  #plot decay
+  #ggplot(Nkd[,.(decay=sum(N*count)/sum(N)),by=bdist])+geom_point(aes(bdist,decay))+scale_y_log10()+
+  #  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  return(list(Nkd=Nkd, Nkr=Nkr, Nkl=Nkl))
+}
+
 gammaQuery=function(mu,theta,count){
   alpha1=theta
   alpha2=theta+count
@@ -164,12 +220,18 @@ both=fread("data/rao_HICall_chr20_all_both.dat")
 biases=fread("data/rao_HIC035_chr20_all_biases.dat") #16345
 setkey(biases,id)
 counts=fread("data/rao_HIC035_chr20_all_counts.dat")
+load("data/rao_HIC035_chr20_all_meanfield.RData")
+#meanfield = bin_for_mean_field(biases, counts, distance_bins_per_decade = 10)
+#save(meanfield, file = "data/rao_HIC035_chr20_all_meanfield.RData")
 both=fread("data/rao_HIC035_chr20_all_both.dat")
 
 
 biases=fread("data/rao_HICall_chrX_73780165-74230165_biases.dat") #1201
 setkey(biases,id)
 counts=fread("data/rao_HICall_chrX_73780165-74230165_counts.dat")
+load("data/rao_HICall_chrX_73780165-74230165_meanfield.RData")
+#meanfield = bin_for_mean_field(biases, counts, distance_bins_per_decade = 10)
+#save(meanfield, file = "data/rao_HICall_chrX_73780165-74230165_meanfield.RData")
 both=fread("data/rao_HICall_chrX_73780165-74230165_both.dat")
 
 biases=fread("data/rao_HICall_chr20_35000000-36000000_biases.dat") #3215
@@ -229,10 +291,10 @@ c(100*(fit$null.deviance-fit$deviance)/fit$null.deviance, op$par$deviance_propor
 c(fit$family$getTheta(T), op$par$alpha)
 #compare decay
 a=cbind(counts.sub,data.table(decay=exp(op$par$log_decay),
-                          cclose=exp(op$par$log_mean_cclose),
-                          cfar=exp(op$par$log_mean_cfar),
-                          cup=exp(op$par$log_mean_cup),
-                          cdown=exp(op$par$log_mean_cdown)))
+                              cclose=exp(op$par$log_mean_cclose),
+                              cfar=exp(op$par$log_mean_cfar),
+                              cup=exp(op$par$log_mean_cup),
+                              cdown=exp(op$par$log_mean_cdown)))
 ggplot(a[pos2-pos1>1e4][sample(.N,min(.N,10000))])+scale_y_log10()+scale_x_log10()+
   geom_point(aes(pos2-pos1, contact.close*decay/cclose), colour="blue", alpha=0.01)+
   geom_point(aes(pos2-pos1, contact.far*decay/cclose), colour="green", alpha=0.01)+
@@ -338,11 +400,11 @@ op2.b1 <- optimize_nu(smb1, biases, op.b0, Krow=4000, lambda_nu=.1)
 #predict nu everywhere
 pred = stan_model(file = "predict_spline_sparse.stan")
 op.pred_nu <- optimizing(pred, data = list(K=10000, N=100000, xrange=biases[,c(min(pos),max(pos))],
-                                        intercept=0, beta=op.b1$par$beta_nu),
-                      as_vector=F, hessian=F, iter=1, verbose=F)
+                                           intercept=0, beta=op.b1$par$beta_nu),
+                         as_vector=F, hessian=F, iter=1, verbose=F)
 op2.pred_nu <- optimizing(pred, data = list(K=10000, N=100000, xrange=biases[,c(min(pos),max(pos))],
-                                        intercept=0, beta=op2.b1$par$beta_nu),
-                      as_vector=F, hessian=F, iter=1, verbose=F)
+                                            intercept=0, beta=op2.b1$par$beta_nu),
+                          as_vector=F, hessian=F, iter=1, verbose=F)
 nu.pred.weighted <- stan_matrix_to_datatable(exp(op.pred_nu$par$weighted), op.pred_nu$par$x)
 nu.pred <- data.table(pos=op.pred_nu$par$x, nu1=exp(op.pred_nu$par$log_mean), nu2=exp(op2.pred_nu$par$log_mean))
 #
@@ -382,17 +444,17 @@ op2.b2 <- optimize_delta(smb2, biases, op.b0, op.b1, Krow=4000, lambda_delta=.1)
 #predict delta everywhere
 pred = stan_model(file = "predict_spline_sparse.stan")
 op.pred_delta <- optimizing(pred, data = list(K=65000, N=100000, xrange=biases[,c(min(pos),max(pos))],
-                                        intercept=0, beta=op.b2$par$beta_delta),
-                      as_vector=F, hessian=F, iter=1, verbose=F)
+                                              intercept=0, beta=op.b2$par$beta_delta),
+                            as_vector=F, hessian=F, iter=1, verbose=F)
 op2.pred_delta <- optimizing(pred, data = list(K=65000, N=100000, xrange=biases[,c(min(pos),max(pos))],
-                                         intercept=0, beta=op2.b2$par$beta_delta),
-                       as_vector=F, hessian=F, iter=1, verbose=F)
+                                               intercept=0, beta=op2.b2$par$beta_delta),
+                             as_vector=F, hessian=F, iter=1, verbose=F)
 delta.pred.weighted <- stan_matrix_to_datatable(exp(op.pred_delta$par$weighted), op.pred_delta$par$x)
 delta.pred <- data.table(pos=op.pred_delta$par$x, delta1=exp(op.pred_delta$par$log_mean), delta2=exp(op2.pred_delta$par$log_mean))
 #
 data.table(name=c("alpha","deviance_proportion_explained"),
-             op1=c(op.b2$par$alpha, op.b2$par$deviance_proportion_explained), 
-             op2=c(op2.b2$par$alpha, op2.b2$par$deviance_proportion_explained))
+           op1=c(op.b2$par$alpha, op.b2$par$deviance_proportion_explained), 
+           op2=c(op2.b2$par$alpha, op2.b2$par$deviance_proportion_explained))
 #DE op1 vs op2, centered on RJ
 a=cbind(biases,data.table(op1=exp(op.b2$par$log_delta),
                           op2=exp(op2.b2$par$log_delta),
@@ -431,8 +493,8 @@ op.b3 <- optimize_decay(smb3, biases, counts, op.b0, op.b1, op.b2, Kdiag=10, lam
 op2.b3 <- optimize_decay(smb3, biases, counts, op.b0, op.b1, op.b2, Kdiag=10, lambda_diag=.1)
 #
 data.table(name=c("alpha","deviance_proportion_explained"),
-             op1=c(op.b3$par$alpha, op.b3$par$deviance_proportion_explained), 
-             op2=c(op2.b3$par$alpha, op2.b3$par$deviance_proportion_explained))
+           op1=c(op.b3$par$alpha, op.b3$par$deviance_proportion_explained), 
+           op2=c(op2.b3$par$alpha, op2.b3$par$deviance_proportion_explained))
 #DE op1 vs op2, centered on RJ
 a=cbind(counts,data.table(decay1=exp(op.b3$par$log_decay),
                           decay2=exp(op2.b3$par$log_decay),
@@ -481,9 +543,9 @@ lm(data=a.1000[distance<7e5], log(fij)~log(distance))
 ###final optimization
 smfit = stan_model(file = "sparse_cs_norm_fit.stan")
 system.time(op.all <- optimize_all(smfit, biases, counts, op.b0, op.b1, op.b2, op.b3, Krow=1000, Kdiag=10,
-                      lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
+                                   lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
 system.time(op2.all <- optimize_all(smfit, biases, counts, Krow=1000, Kdiag=10,
-                       lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
+                                    lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
 #compare deviances
 data.table(name=c("alpha","deviance_proportion_explained"),
            op1=c(op.all$par$alpha, op.all$par$deviance_proportion_explained), 
@@ -491,20 +553,20 @@ data.table(name=c("alpha","deviance_proportion_explained"),
 #predict nu everywhere
 pred = stan_model(file = "predict_spline_sparse.stan")
 op.all.pred_nu <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
-                                           intercept=0, beta=op.all$par$beta_nu),
-                         as_vector=F, hessian=F, iter=1, verbose=F)
+                                               intercept=0, beta=op.all$par$beta_nu),
+                             as_vector=F, hessian=F, iter=1, verbose=F)
 op2.all.pred_nu <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
-                                            intercept=0, beta=op2.all$par$beta_nu),
-                          as_vector=F, hessian=F, iter=1, verbose=F)
+                                                intercept=0, beta=op2.all$par$beta_nu),
+                              as_vector=F, hessian=F, iter=1, verbose=F)
 nu.all.pred.weighted <- stan_matrix_to_datatable(exp(op.all.pred_nu$par$weighted), op.all.pred_nu$par$x)
 nu.all.pred <- data.table(pos=op.all.pred_nu$par$x, nu1=exp(op.all.pred_nu$par$log_mean), nu2=exp(op2.all.pred_nu$par$log_mean))
 #predict delta everywhere
 op.all.pred_delta <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
-                                              intercept=0, beta=op.all$par$beta_delta),
-                            as_vector=F, hessian=F, iter=1, verbose=F)
+                                                  intercept=0, beta=op.all$par$beta_delta),
+                                as_vector=F, hessian=F, iter=1, verbose=F)
 op2.all.pred_delta <- optimizing(pred, data = list(K=1000, N=10000, xrange=biases[,c(min(pos),max(pos))],
-                                               intercept=0, beta=op2.all$par$beta_delta),
-                             as_vector=F, hessian=F, iter=1, verbose=F)
+                                                   intercept=0, beta=op2.all$par$beta_delta),
+                                 as_vector=F, hessian=F, iter=1, verbose=F)
 delta.all.pred.weighted <- stan_matrix_to_datatable(exp(op.all.pred_delta$par$weighted), op.all.pred_delta$par$x)
 delta.all.pred <- data.table(pos=op.pred_delta$par$x, delta1=exp(op.all.pred_delta$par$log_mean), delta2=exp(op2.all.pred_delta$par$log_mean))
 ###plots: op1 vs op2
@@ -581,17 +643,17 @@ counts=fread("data/caulo_3000000-4000000_counts.dat")
 both=fread("data/caulo_3000000-4000000_both.dat")
 
 system.time(op.full <- optimize_all_noinit(smfit, biases, counts, Krow=1000, Kdiag=10,
-                                      lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
+                                           lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
 system.time(op.100000 <- optimize_all_noinit(smfit, biases, counts[sample(.N,100000)], Krow=1000, Kdiag=10,
-                                      lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
-system.time(op.60000 <- optimize_all_noinit(smfit, biases, counts[sample(.N,60000)], Krow=1000, Kdiag=10,
                                              lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
+system.time(op.60000 <- optimize_all_noinit(smfit, biases, counts[sample(.N,60000)], Krow=1000, Kdiag=10,
+                                            lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
 system.time(op.30000 <- optimize_all_noinit(smfit, biases, counts[sample(.N,30000)], Krow=1000, Kdiag=10,
                                             lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
 system.time(op.10000 <- optimize_all_noinit(smfit, biases, counts[sample(.N,10000)], Krow=1000, Kdiag=10,
                                             lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
 system.time(op.5000 <- optimize_all_noinit(smfit, biases, counts[sample(.N,5000)], Krow=1000, Kdiag=10,
-                                            lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
+                                           lambda_nu=.2, lambda_delta=.2, lambda_diag=.1))
 rel_var = function(a,b) {
   return(mean((a-b)/a))
 }
@@ -599,7 +661,7 @@ max_var = function(a,b) {
   return(max(abs((a-b)/a)))
 }
 times=data.table(name=c("full","100k", "60k", "30k", "10k", "5k"), nsteps=c(1602, 1779, 1424, 1043, 832, 598),
-           time=c(681, 608, 299, 110, 32, 11), npoints=c(counts[,.N], 100000, 60000, 30000, 10000, 5000))
+                 time=c(681, 608, 299, 110, 32, 11), npoints=c(counts[,.N], 100000, 60000, 30000, 10000, 5000))
 ggplot(times)+geom_point(aes(npoints,time))+scale_x_log10()+scale_y_log10()
 lm(data=times, log(time)~log(npoints))
 
