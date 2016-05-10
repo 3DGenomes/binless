@@ -130,10 +130,6 @@ data {
   int<lower=0> Ndown; //number of downstream counts modelled explicitly
   int<lower=0> counts_down[Ndown]; //value of the count
   int<lower=0> index_down[2,Ndown]; //indices of rsite pairs
-  //
-  int<lower=0> Nexpl; 
-  int<lower=0> counts[4,Nexpl]; //raw counts: Close, Far, Up, Down
-  int<lower=1,upper=S> cidx[2,Nexpl]; //index of its associated cut site
   //counts : mean field
   int<lower=0> Nl; //number of data points for left side of rsites
   int<lower=0> Nkl_count[Nl]; //value of the count
@@ -300,8 +296,8 @@ transformed parameters {
     log_decay_close <- log_decay[:Nclose];
     log_decay_far <- log_decay[(Nclose+1):(Nclose+Nfar)];
     log_decay_up <- log_decay[(Nclose+Nfar+1):(Nclose+Nfar+Nup)];
-    log_decay_down <- log_decay[(Nclose+Nfar+Ndown+1):(Nclose+Nfar+Nup+Ndown)];
-    log_decay_mf <- log_decay[(Nclose+Nfar+Nup+Ndown):];
+    log_decay_down <- log_decay[(Nclose+Nfar+Nup+1):(Nclose+Nfar+Nup+Ndown)];
+    log_decay_mf <- log_decay[(Nclose+Nfar+Nup+Ndown+1):];
     beta_diag_diff <- beta_diag_centered[:(Kdiag-2)]-2*beta_diag_centered[2:(Kdiag-1)]+beta_diag_centered[3:];
   }
 
