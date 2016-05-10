@@ -204,7 +204,7 @@ transformed data {
     vector[Nexpl] tmp;
     row_vector[Kdiag] tmp2;
     tmp <- cutsites[cidx[2]]-cutsites[cidx[1]];
-    Xdiag <- bspline(append_row(0.5*log(tmp .* tmp),Nkd_d), Kdiag, splinedegree());
+    Xdiag <- bspline(append_row(0.5*log(tmp .* tmp), log(Nkd_d)), Kdiag, splinedegree());
     //projector for diagonal (SCAM)
     tmp2 <- rep_row_vector(1,Nexpl+Nd) * Xdiag;
     pdiag <- -tmp2[2:] / (tmp2 * rep_vector(1,Kdiag)); //should it be weighted along MF?
@@ -277,7 +277,7 @@ transformed parameters {
     beta_diag_centered[2:] <- val+epsilon*beta_diag;
     log_decay <- Xdiag * beta_diag_centered;
     log_decay_ex <- log_decay[:Nexpl];
-    log_decay_mf <- log_decay[(Nexpl+1):]
+    log_decay_mf <- log_decay[(Nexpl+1):];
     beta_diag_diff <- beta_diag_centered[:(Kdiag-2)]-2*beta_diag_centered[2:(Kdiag-1)]+beta_diag_centered[3:];
   }
 
@@ -293,7 +293,7 @@ transformed parameters {
     log_deltai <- log_delta[cidx[1]];
     log_deltaj <- log_delta[cidx[2]];
     //exact counts  
-    base_count <- eC + log_decay + log_nu[cidx[1]] + log_nu[cidx[2]];
+    base_count <- eC + log_decay_ex + log_nu[cidx[1]] + log_nu[cidx[2]];
     log_mean_cclose <- base_count - log_deltai + log_deltaj;
     log_mean_cfar   <- base_count + log_deltai - log_deltaj;
     log_mean_cup    <- base_count + log_deltai + log_deltaj;
@@ -319,15 +319,15 @@ model {
   //// Mean field likelihoods
   //Left
   for (i in 1:Nl) {
-    increment_log_prob(Nkl_N[i]*neg_binomial_2_log_log(log_mean_left[i], alpha));
+    increment_log_prob(Nkl_N[i]*neg_binomial_2_log_log(Nkl_count, log_mean_left[i], alpha));
   }
   //Right
   for (i in 1:Nr) {
-    increment_log_prob(Nkr_N[i]*neg_binomial_2_log_log(log_mean_right[i], alpha));
+    increment_log_prob(Nkr_N[i]*neg_binomial_2_log_log(Nkr_count, log_mean_right[i], alpha));
   }
   //Decay
   for (i in 1:Nd) {
-    increment_log_prob(Nkd_N[i]*neg_binomial_2_log_log(log_mean_decay[i], alpha));
+    increment_log_prob(Nkd_N[i]*neg_binomial_2_log_log(Nkd_count, log_mean_decay[i], alpha));
   }
   
   //// Priors
@@ -359,33 +359,33 @@ generated quantities {
   real count_deviance_mf_null;
   real count_deviance_mf_proportion_explained;
   #deviances
-  count_deviance_mf <- neg_binomial_2_log_deviance(Nkl_count, log_mean_left, alpha, Nkl_N) +
-                       neg_binomial_2_log_deviance(Nkr_count, log_mean_right, alpha, Nkr_N) +
-                       neg_binomial_2_log_deviance(Nkd_count, log_mean_decay, alpha, Nkd_N);
-  count_deviance_ex <- neg_binomial_2_log_deviance(counts[1], log_mean_cclose, alpha, to_vector(1)) +
-              neg_binomial_2_log_deviance(counts[2], log_mean_cfar, alpha, to_vector(1)) +
-              neg_binomial_2_log_deviance(counts[3], log_mean_cup, alpha, to_vector(1)) +
-              neg_binomial_2_log_deviance(counts[4], log_mean_cdown, alpha, to_vector(1));
-  rejoined_deviance <- neg_binomial_2_log_deviance(rejoined, log_mean_RJ, alpha, to_vector(1));
-  dangling_deviance <- neg_binomial_2_log_deviance(danglingL, log_mean_DL, alpha, to_vector(1)) +
-                       neg_binomial_2_log_deviance(danglingR, log_mean_DR, alpha, to_vector(1));
+  count_deviance_mf <- neg_binomial_2_log_deviance(Nkl_count, log_mean_left, alpha, to_vector(Nkl_N)) +
+                       neg_binomial_2_log_deviance(Nkr_count, log_mean_right, alpha, to_vector(Nkr_N)) +
+                       neg_binomial_2_log_deviance(Nkd_count, log_mean_decay, alpha, to_vector(Nkd_N));
+  count_deviance_ex <- neg_binomial_2_log_deviance(counts[1], log_mean_cclose, alpha, rep_vector(1,1)) +
+              neg_binomial_2_log_deviance(counts[2], log_mean_cfar, alpha, rep_vector(1,1)) +
+              neg_binomial_2_log_deviance(counts[3], log_mean_cup, alpha, rep_vector(1,1)) +
+              neg_binomial_2_log_deviance(counts[4], log_mean_cdown, alpha, rep_vector(1,1));
+  rejoined_deviance <- neg_binomial_2_log_deviance(rejoined, log_mean_RJ, alpha, rep_vector(1,1));
+  dangling_deviance <- neg_binomial_2_log_deviance(danglingL, log_mean_DL, alpha, rep_vector(1,1)) +
+                       neg_binomial_2_log_deviance(danglingR, log_mean_DR, alpha, rep_vector(1,1));
   deviance <- rejoined_deviance + dangling_deviance + count_deviance_ex + count_deviance_mf;
   #null deviances
-  rejoined_deviance_null <- neg_binomial_2_log_deviance(rejoined, to_vector(eRJ), alpha, to_vector(1));
-  dangling_deviance_null <- neg_binomial_2_log_deviance(danglingL, to_vector(eDE), alpha, to_vector(1)) +
-                            neg_binomial_2_log_deviance(danglingR, to_vector(eDE), alpha, to_vector(1));
-  count_deviance_null <- neg_binomial_2_log_deviance(counts[1], to_vector(eC), alpha, to_vector(1)) +
-                   neg_binomial_2_log_deviance(counts[2], to_vector(eC), alpha, to_vector(1)) +
-                   neg_binomial_2_log_deviance(counts[3], to_vector(eC), alpha, to_vector(1)) +
-                   neg_binomial_2_log_deviance(counts[4], to_vector(eC), alpha, to_vector(1));
-  count_deviance_mf_null <- neg_binomial_2_log_deviance(Nkl_count, to_vector(eC), log_mean_left, alpha, Nkl_N) +
-                            neg_binomial_2_log_deviance(Nkr_count, to_vector(eC), alpha, Nkr_N) +
-                            neg_binomial_2_log_deviance(Nkd_count, to_vector(eC), alpha, Nkd_N);
-  deviance_null <- rejoined_deviance_null + dangling_deviance_null + count_deviance_null + count_deviance_mf_null;
+  rejoined_deviance_null <- neg_binomial_2_log_deviance(rejoined, rep_vector(eRJ,1), alpha, rep_vector(1,1));
+  dangling_deviance_null <- neg_binomial_2_log_deviance(danglingL, rep_vector(eDE,1), alpha, rep_vector(1,1)) +
+                            neg_binomial_2_log_deviance(danglingR, rep_vector(eDE,1), alpha, rep_vector(1,1));
+  count_deviance_ex_null <- neg_binomial_2_log_deviance(counts[1], rep_vector(eC,1), alpha, rep_vector(1,1)) +
+                   neg_binomial_2_log_deviance(counts[2], rep_vector(eC,1), alpha, rep_vector(1,1)) +
+                   neg_binomial_2_log_deviance(counts[3], rep_vector(eC,1), alpha, rep_vector(1,1)) +
+                   neg_binomial_2_log_deviance(counts[4], rep_vector(eC,1), alpha, rep_vector(1,1));
+  count_deviance_mf_null <- neg_binomial_2_log_deviance(Nkl_count, rep_vector(eC,1), alpha, to_vector(Nkl_N)) +
+                            neg_binomial_2_log_deviance(Nkr_count, rep_vector(eC,1), alpha, to_vector(Nkr_N)) +
+                            neg_binomial_2_log_deviance(Nkd_count, rep_vector(eC,1), alpha, to_vector(Nkd_N));
+  deviance_null <- rejoined_deviance_null + dangling_deviance_null + count_deviance_ex_null + count_deviance_mf_null;
   #proportions explained
   rejoined_deviance_proportion_explained <- 100*(rejoined_deviance_null - rejoined_deviance)/rejoined_deviance_null;
   dangling_deviance_proportion_explained <- 100*(dangling_deviance_null - dangling_deviance)/dangling_deviance_null;
-  count_deviance_proportion_explained <- 100*(count_deviance_null - count_deviance)/count_deviance_null;
+  count_deviance_ex_proportion_explained <- 100*(count_deviance_ex_null - count_deviance_ex)/count_deviance_ex_null;
   count_deviance_mf_proportion_explained <- 100*(count_deviance_mf_null - count_deviance_mf)/count_deviance_mf_null;
   deviance_proportion_explained <- 100*(deviance_null - deviance)/deviance_null;
 }
