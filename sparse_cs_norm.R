@@ -142,45 +142,51 @@ bin_for_mean_field = function(biases, counts, distance_bins_per_decade=10) {
   stopifnot(counts[id1>=id2,.N]==0)
   mcounts=melt(counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
                variable.name = "category", value.name = "count")[count>0]
-  #accumulate counts
+  ### accumulate counts
   ci=mcounts[,.(id=id1,count,category)][,.N,by=c("id","count","category")]
   cj=mcounts[,.(id=id2,count,category)][,.N,by=c("id","count","category")]
   nsites=biases[,.N]
-  #make histograms for biases
+  ### make histograms for biases
   Nkl=dcast(rbind(ci[category=="contact.up",.(id,count,category="Ni.up",N)],
                   ci[category=="contact.far",.(id,count,category="Ni.far",N)],
                   cj[category=="contact.up",.(id,count,category="Nj.up",N)],
                   cj[category=="contact.close",.(id,count,category="Nj.close",N)]),
             ...~category, value.var="N", fill=0)[,.(id,count,N=Ni.far+Ni.up+Nj.up+Nj.close)]
   Nkl=rbind(Nkl,Nkl[,.(count=0,N=2*nsites-sum(N)),by=id])
-  setkey(Nkl,id,count)
+  setkey(Nkl,N,id,count)
   Nkr=dcast(rbind(ci[category=="contact.close",.(id,count,category="Ni.close",N)],
                   ci[category=="contact.down",.(id,count,category="Ni.down",N)],
                   cj[category=="contact.far",.(id,count,category="Nj.far",N)],
                   cj[category=="contact.down",.(id,count,category="Nj.down",N)]),
             ...~category, value.var="N", fill=0)[,.(id,count,N=Ni.close+Ni.down+Nj.far+Nj.down)]
   Nkr=rbind(Nkr,Nkr[,.(count=0,N=2*nsites-sum(N)),by=id]) #each rsite is counted twice
-  setkey(Nkr,id,count)
-  #make histogram for distance
-  mcounts[,distance:=abs(pos1-pos2)]
+  setkey(Nkr,N,id,count)
+  ### make histogram for distance
+  #make distance bins and their factor
   stepsz=1/distance_bins_per_decade
   dbins=10**seq(0,biases[,log10(max(pos)-min(pos))]+stepsz,stepsz)
+  mcounts[,distance:=abs(pos1-pos2)]
   mcounts[,bdist:=cut(distance,dbins,ordered_result=T,right=F)]
-  Nkd=mcounts[,.N,keyby=c("bdist","count")]
+  #Count positive counts in these bins
+  Nkd = mcounts[,.N,keyby=c("bdist","count")]
+  Nkd[,mdist:=sqrt(dbins[unclass(bdist)+1]*dbins[unclass(bdist)])]
+  #Count the number of crossings per distance bin
   positions=biases[,pos]
   npos=length(positions)
   ncrossings <- rowSums(sapply(1:(npos-1), #this loop is still 5x faster in python
                        function(i){hist(positions[(i+1):npos]-positions[i],breaks=dbins,plot=F)$counts}
                        ))
+  #deduce zero counts
   Nkz = data.table(bdist=Nkd[,ordered(levels(bdist), levels(bdist))], ncrossings=ncrossings, key="bdist")
   Nkz = Nkd[,.(nnz=sum(N)),by=bdist][Nkz[ncrossings>0]]
+  Nkz[,mdist:=sqrt(dbins[unclass(bdist)+1]*dbins[unclass(bdist)])]
   Nkz[is.na(nnz),nnz:=0]
-  Nkd = rbind(Nkd, Nkz[,.(bdist,count=0,N=4*ncrossings-nnz)]) # one crossing for each of 4 count types
-  setkey(Nkd,bdist,count)
+  Nkd = rbind(Nkd, Nkz[,.(bdist,mdist,count=0,N=4*ncrossings-nnz)]) # one crossing for each of 4 count types
+  setkey(Nkd,N,bdist,count)
   stopifnot(Nkd[count==0,all(N>=0)])
-  #decay
-  ggplot(Nkd[,.(decay=sum(N*count)/sum(N)),by=bdist])+geom_point(aes(bdist,decay))+scale_y_log10()+
-    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  #plot decay
+  #ggplot(Nkd[,.(decay=sum(N*count)/sum(N)),by=bdist])+geom_point(aes(bdist,decay))+scale_y_log10()+
+  #  theme(axis.text.x = element_text(angle = 90, hjust = 1))
   return(list(Nkd=Nkd, Nkr=Nkr, Nkl=Nkl))
 }
 
