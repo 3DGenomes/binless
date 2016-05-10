@@ -22,16 +22,25 @@ stan_matrix_to_datatable = function(opt, x) {
 
 optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, Krow=1000, Kdiag=10, 
                                lambda_nu=1, lambda_delta=1, lambda_diag=1, iter=10000, verbose=T) {
-  counts_ex=counts[count>maxcount]
+  cclose=counts[contact.close>maxcount,.(id1,id2,count=contact.close)]
+  cfar=counts[contact.far>maxcount,.(id1,id2,count=contact.far)]
+  cup=counts[contact.up>maxcount,.(id1,id2,count=contact.up)]
+  cdown=counts[contact.down>maxcount,.(id1,id2,count=contact.down)]
   mf=list()
   mf$Nkl=meanfield$Nkl[count<=maxcount]
   mf$Nkr=meanfield$Nkr[count<=maxcount]
   mf$Nkd=meanfield$Nkd[count<=maxcount]
   optimizing(model, data = list( Krow=Krow, S=biases[,.N], cutsites=biases[,pos], rejoined=biases[,rejoined],
                                  danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-                                 Kdiag=Kdiag, Nexpl=counts[,.N],
-                                 counts=t(data.matrix(counts_ex[,.(contact.close,contact.far,contact.up,contact.down)])),
-                                 cidx=t(data.matrix(counts_ex[,.(id1,id2)])),
+                                 Kdiag=Kdiag,
+                                 Nclose=cclose[,.N], counts_close=cclose[,count],
+                                 index_close=t(data.matrix(cclose[,.(id1,id2)])),
+                                 Nfar=cfar[,.N], counts_far=cfar[,count],
+                                 index_far=t(data.matrix(cfar[,.(id1,id2)])),
+                                 Nup=cup[,.N], counts_up=cup[,count],
+                                 index_up=t(data.matrix(cup[,.(id1,id2)])),
+                                 Ndown=cdown[,.N], counts_down=cdown[,count],
+                                 index_down=t(data.matrix(cdown[,.(id1,id2)])),
                                  Nl=mf$Nkl[,.N], Nkl_count=mf$Nkl[,count], Nkl_cidx=mf$Nkl[,id], Nkl_N=mf$Nkl[,N],
                                  Nr=mf$Nkr[,.N], Nkr_count=mf$Nkr[,count], Nkr_cidx=mf$Nkr[,id], Nkr_N=mf$Nkr[,N],
                                  Nd=mf$Nkd[,.N], Nkd_count=mf$Nkd[,count], Nkd_d=mf$Nkl[,mdist], Nkd_N=mf$Nkd[,N],
@@ -224,8 +233,8 @@ both=fread("data/caulo_3000000-4000000_both.dat")
 #### optimization wihout prior guesses
 counts.sub=counts[sample(.N,min(.N,100000))]
 smfit = stan_model(file = "sparse_cs_norm_fit_meanfield.stan")
-system.time(op <- optimize_all_meanfield(smfit, biases, counts.sub, Krow=4000, Kdiag=10,
-                                      lambda_nu=10, lambda_delta=10, lambda_diag=.1, verbose = T))
+system.time(op <- optimize_all_meanfield(smfit, biases, counts.sub, meanfield, maxcount=10, Krow=400, Kdiag=10,
+                                      lambda_nu=1, lambda_delta=1, lambda_diag=.1, verbose = T))
 save(op, file = "data/rao_HICall_chrX_73780165-74230165_op_lambda10.RData")
 #compare deviances
 c(100*(fit$null.deviance-fit$deviance)/fit$null.deviance, op$par$deviance_proportion_explained)
