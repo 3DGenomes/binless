@@ -115,7 +115,23 @@ data {
   int danglingL[S];
   int danglingR[S];
   //counts : explicit
-  int<lower=0> Nexpl; //number of data points modelled explicitly
+  int<lower=0> Nclose; //number of close counts modelled explicitly
+  int<lower=0> counts_close[Nclose]; //value of the count
+  int<lower=0> index_close[2,Nclose]; //indices of rsite pairs
+  //
+  int<lower=0> Nfar; //number of far counts modelled explicitly
+  int<lower=0> counts_far[Nfar]; //value of the count
+  int<lower=0> index_far[2,Nfar]; //indices of rsite pairs
+  //
+  int<lower=0> Nup; //number of upstream counts modelled explicitly
+  int<lower=0> counts_up[Nup]; //value of the count
+  int<lower=0> index_up[2,Nup]; //indices of rsite pairs
+  //
+  int<lower=0> Ndown; //number of downstream counts modelled explicitly
+  int<lower=0> counts_down[Ndown]; //value of the count
+  int<lower=0> index_down[2,Ndown]; //indices of rsite pairs
+  //
+  int<lower=0> Nexpl; 
   int<lower=0> counts[4,Nexpl]; //raw counts: Close, Far, Up, Down
   int<lower=1,upper=S> cidx[2,Nexpl]; //index of its associated cut site
   //counts : mean field
@@ -145,13 +161,13 @@ transformed data {
   int Xrow_u[S+1];
   vector[Krow] prow;
   //diagonal SCAM spline, dense, exact and mean field
-  matrix[Nexpl+Nd,Kdiag] Xdiag;
+  matrix[Nclose+Nfar+Nup+Ndown+Nd,Kdiag] Xdiag;
   row_vector[Kdiag-1] pdiag;
   
   ////bias spline, sparse (nu and delta have the same design)
   //BEGIN sparse calculation
   //cannot write function that modifies its arguments so we put it here
-  //input: vector[Nexpl] cutsites, int Krow, int splinedegree()
+  //input: vector[Nup+Ndown+Nclose+Nfar] cutsites, int Krow, int splinedegree()
   //output: vector[nnz(S)] Xrow_w, int Xrow_v[nnz(S)], int Xrow_u[S+1]
   {
     real dx; //interval length
@@ -201,12 +217,15 @@ transformed data {
   //diagonal SCAM spline, dense, exact and mean field model
   {
     //can't do abs() on a vector so be inventive
-    vector[Nexpl] tmp;
+    vector[Nclose+Nfar+Nup+Ndown] tmp;
     row_vector[Kdiag] tmp2;
-    tmp <- cutsites[cidx[2]]-cutsites[cidx[1]];
+    tmp[:Nclose] <- cutsites[index_close[2]]-cutsites[index_close[1]];
+    tmp[(Nclose+1):(Nclose+Nfar)] <- cutsites[index_far[2]]-cutsites[index_far[1]];
+    tmp[(Nclose+Nfar+1):(Nclose+Nfar+Nup)] <- cutsites[index_up[2]]-cutsites[index_up[1]];
+    tmp[(Nclose+Nfar+Nup+1):] <- cutsites[index_down[2]]-cutsites[index_down[1]];
     Xdiag <- bspline(append_row(0.5*log(tmp .* tmp), log(Nkd_d)), Kdiag, splinedegree());
     //projector for diagonal (SCAM)
-    tmp2 <- rep_row_vector(1,Nexpl+Nd) * Xdiag;
+    tmp2 <- rep_row_vector(1,Nup+Ndown+Nclose+Nfar+Nd) * Xdiag;
     pdiag <- -tmp2[2:] / (tmp2 * rep_vector(1,Kdiag)); //should it be weighted along MF?
   }
 }
@@ -227,7 +246,10 @@ transformed parameters {
   vector[S] log_delta; // log(delta)
   vector[Krow-2] beta_delta_diff; //2nd order difference on beta_delta_aug
   //diag
-  vector[Nexpl] log_decay_ex;
+  vector[Nclose] log_decay_close;
+  vector[Nfar] log_decay_far;
+  vector[Nup] log_decay_up;
+  vector[Ndown] log_decay_down;
   vector[Nd] log_decay_mf;
   vector[Kdiag-2] beta_diag_diff;
   //means
@@ -235,11 +257,10 @@ transformed parameters {
   vector[S] log_mean_DR;
   vector[S] log_mean_RJ;
   //
-  vector[Nexpl] base_count;
-  vector[Nexpl] log_mean_cup;
-  vector[Nexpl] log_mean_cdown;
-  vector[Nexpl] log_mean_cfar;
-  vector[Nexpl] log_mean_cclose;
+  vector[Nclose] log_mean_cclose;
+  vector[Nfar] log_mean_cfar;
+  vector[Nup] log_mean_cup;
+  vector[Ndown] log_mean_cdown;
   //
   vector[Nl] log_mean_left;
   vector[Nr] log_mean_right;
@@ -267,7 +288,7 @@ transformed parameters {
   }
   //decay
   {
-    vector[Nexpl+Nd] log_decay;
+    vector[Nclose+Nfar+Nup+Ndown+Nd] log_decay;
     vector[Kdiag] beta_diag_centered;
     real epsilon;
     real val;
@@ -276,28 +297,25 @@ transformed parameters {
     beta_diag_centered[1] <- val;
     beta_diag_centered[2:] <- val+epsilon*beta_diag;
     log_decay <- Xdiag * beta_diag_centered;
-    log_decay_ex <- log_decay[:Nexpl];
-    log_decay_mf <- log_decay[(Nexpl+1):];
+    log_decay_close <- log_decay[:Nclose];
+    log_decay_far <- log_decay[(Nclose+1):(Nclose+Nfar)];
+    log_decay_up <- log_decay[(Nclose+Nfar+1):(Nclose+Nfar+Nup)];
+    log_decay_down <- log_decay[(Nclose+Nfar+Ndown+1):(Nclose+Nfar+Nup+Ndown)];
+    log_decay_mf <- log_decay[(Nclose+Nfar+Nup+Ndown):];
     beta_diag_diff <- beta_diag_centered[:(Kdiag-2)]-2*beta_diag_centered[2:(Kdiag-1)]+beta_diag_centered[3:];
   }
 
   //means
   {
-    vector[Nexpl] log_deltai;
-    vector[Nexpl] log_deltaj;
     //biases
     log_mean_RJ <- log_nu + eRJ;
     log_mean_DL <- log_nu + eDE + log_delta;
     log_mean_DR <- log_nu + eDE - log_delta;
-    //helpers
-    log_deltai <- log_delta[cidx[1]];
-    log_deltaj <- log_delta[cidx[2]];
     //exact counts  
-    base_count <- eC + log_decay_ex + log_nu[cidx[1]] + log_nu[cidx[2]];
-    log_mean_cclose <- base_count - log_deltai + log_deltaj;
-    log_mean_cfar   <- base_count + log_deltai - log_deltaj;
-    log_mean_cup    <- base_count + log_deltai + log_deltaj;
-    log_mean_cdown  <- base_count - log_deltai - log_deltaj;
+    log_mean_cclose <- eC + log_decay_close + (log_nu - log_delta)[index_close[1]] + (log_nu + log_delta)[index_close[2]];
+    log_mean_cfar   <- eC + log_decay_far   + (log_nu + log_delta)[index_far[1]]   + (log_nu - log_delta)[index_far[2]];
+    log_mean_cup    <- eC + log_decay_up    + (log_nu + log_delta)[index_up[1]]    + (log_nu + log_delta)[index_up[2]];
+    log_mean_cdown  <- eC + log_decay_down  + (log_nu - log_delta)[index_down[1]]  + (log_nu - log_delta)[index_down[2]];
     //mean field counts
     log_mean_left <- eC + (log_nu + log_delta)[Nkl_cidx];
     log_mean_right <- eC + (log_nu - log_delta)[Nkr_cidx];
@@ -307,14 +325,14 @@ transformed parameters {
 model {
   //// Exact likelihoods
   //biases
-  rejoined ~ neg_binomial_2_log(log_mean_RJ, alpha);
+  rejoined  ~ neg_binomial_2_log(log_mean_RJ, alpha);
   danglingL ~ neg_binomial_2_log(log_mean_DL, alpha);
   danglingR ~ neg_binomial_2_log(log_mean_DR, alpha);
   //counts: Close, Far, Up, Down
-  counts[1] ~ neg_binomial_2_log(log_mean_cclose, alpha); // Close
-  counts[2] ~ neg_binomial_2_log(log_mean_cfar, alpha); // Far
-  counts[3] ~ neg_binomial_2_log(log_mean_cup, alpha); // Up
-  counts[4] ~ neg_binomial_2_log(log_mean_cdown, alpha); // Down
+  counts_close ~ neg_binomial_2_log(log_mean_cclose, alpha); // Close
+  counts_far   ~ neg_binomial_2_log(log_mean_cfar, alpha); // Far
+  counts_up    ~ neg_binomial_2_log(log_mean_cup, alpha); // Up
+  counts_down  ~ neg_binomial_2_log(log_mean_cdown, alpha); // Down
   
   //// Mean field likelihoods
   //Left
@@ -362,10 +380,10 @@ generated quantities {
   count_deviance_mf <- neg_binomial_2_log_deviance(Nkl_count, log_mean_left, alpha, to_vector(Nkl_N)) +
                        neg_binomial_2_log_deviance(Nkr_count, log_mean_right, alpha, to_vector(Nkr_N)) +
                        neg_binomial_2_log_deviance(Nkd_count, log_mean_decay, alpha, to_vector(Nkd_N));
-  count_deviance_ex <- neg_binomial_2_log_deviance(counts[1], log_mean_cclose, alpha, rep_vector(1,1)) +
-              neg_binomial_2_log_deviance(counts[2], log_mean_cfar, alpha, rep_vector(1,1)) +
-              neg_binomial_2_log_deviance(counts[3], log_mean_cup, alpha, rep_vector(1,1)) +
-              neg_binomial_2_log_deviance(counts[4], log_mean_cdown, alpha, rep_vector(1,1));
+  count_deviance_ex <- neg_binomial_2_log_deviance(counts_close, log_mean_cclose, alpha, rep_vector(1,1)) +
+              neg_binomial_2_log_deviance(counts_far, log_mean_cfar, alpha, rep_vector(1,1)) +
+              neg_binomial_2_log_deviance(counts_up, log_mean_cup, alpha, rep_vector(1,1)) +
+              neg_binomial_2_log_deviance(counts_down, log_mean_cdown, alpha, rep_vector(1,1));
   rejoined_deviance <- neg_binomial_2_log_deviance(rejoined, log_mean_RJ, alpha, rep_vector(1,1));
   dangling_deviance <- neg_binomial_2_log_deviance(danglingL, log_mean_DL, alpha, rep_vector(1,1)) +
                        neg_binomial_2_log_deviance(danglingR, log_mean_DR, alpha, rep_vector(1,1));
@@ -374,10 +392,10 @@ generated quantities {
   rejoined_deviance_null <- neg_binomial_2_log_deviance(rejoined, rep_vector(eRJ,1), alpha, rep_vector(1,1));
   dangling_deviance_null <- neg_binomial_2_log_deviance(danglingL, rep_vector(eDE,1), alpha, rep_vector(1,1)) +
                             neg_binomial_2_log_deviance(danglingR, rep_vector(eDE,1), alpha, rep_vector(1,1));
-  count_deviance_ex_null <- neg_binomial_2_log_deviance(counts[1], rep_vector(eC,1), alpha, rep_vector(1,1)) +
-                   neg_binomial_2_log_deviance(counts[2], rep_vector(eC,1), alpha, rep_vector(1,1)) +
-                   neg_binomial_2_log_deviance(counts[3], rep_vector(eC,1), alpha, rep_vector(1,1)) +
-                   neg_binomial_2_log_deviance(counts[4], rep_vector(eC,1), alpha, rep_vector(1,1));
+  count_deviance_ex_null <- neg_binomial_2_log_deviance(counts_close, rep_vector(eC,1), alpha, rep_vector(1,1)) +
+                   neg_binomial_2_log_deviance(counts_far, rep_vector(eC,1), alpha, rep_vector(1,1)) +
+                   neg_binomial_2_log_deviance(counts_up, rep_vector(eC,1), alpha, rep_vector(1,1)) +
+                   neg_binomial_2_log_deviance(counts_down, rep_vector(eC,1), alpha, rep_vector(1,1));
   count_deviance_mf_null <- neg_binomial_2_log_deviance(Nkl_count, rep_vector(eC,1), alpha, to_vector(Nkl_N)) +
                             neg_binomial_2_log_deviance(Nkr_count, rep_vector(eC,1), alpha, to_vector(Nkr_N)) +
                             neg_binomial_2_log_deviance(Nkd_count, rep_vector(eC,1), alpha, to_vector(Nkd_N));
