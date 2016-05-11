@@ -74,6 +74,22 @@ functions {
     return bspl_gen(x, dx, t, q);
   }
 
+  int[] change_points(int[] Nvals, int levels) {
+    int Nidx[levels+1];
+    int i;
+    int nN;
+    Nidx[1] <- 1;
+    i <- 2;
+    nN <- size(Nvals);
+    for (N in 2:(levels+1)) {
+      while (i <= nN && Nvals[i] == Nvals[i-1]) i <- i + 1;
+      Nidx[N] <- i;
+      i <- i + 1;
+    }
+    if (Nidx[levels+1] != nN+1) reject("Nidx badly built or incorrect number of levels");
+    return Nidx;
+  }
+  
   real neg_binomial_2_log_deviance(int[] y, vector log_mu, real alpha, vector weights) {
     vector[size(y)] y_vec;
     vector[size(y)] y_mod;
@@ -135,16 +151,19 @@ data {
   int<lower=0> Nkl_count[Nl]; //value of the count
   int<lower=0> Nkl_cidx[Nl]; //index of that rsite
   int<lower=0> Nkl_N[Nl]; //Nkl(c), i.e. how many contacts have count c in left side of row k
+  int<lower=0> Nkl_levels; //number of levels of N
   #
   int<lower=0> Nr; //number of data points for right side of rsites
   int<lower=0> Nkr_count[Nr]; //value of the count
   int<lower=0> Nkr_cidx[Nr]; //index of that rsite
   int<lower=0> Nkr_N[Nr]; //Nkr(c), i.e. how many contacts have count c in right side of row k
+  int<lower=0> Nkr_levels; //number of levels of N
   #
   int<lower=0> Nd; //number of data points for mean field on decay
   int<lower=0> Nkd_count[Nd]; //value of the count
   vector[Nd] Nkd_d; //geometric mean distance in bin k
   int<lower=0> Nkd_N[Nd]; //Nkd(c), i.e. how many contacts have count c in decay bin k
+  int<lower=0> Nkd_levels; //number of levels of N
   //fixed parameters
   real<lower=0> lambda_nu;
   real<lower=0> lambda_delta;
@@ -159,6 +178,10 @@ transformed data {
   //diagonal SCAM spline, dense, exact and mean field
   matrix[Nclose+Nfar+Nup+Ndown+Nd,Kdiag] Xdiag;
   row_vector[Kdiag-1] pdiag;
+  //indices of changes for N
+  int Nkl_Nidx[Nkl_levels+1];
+  int Nkr_Nidx[Nkr_levels+1];
+  int Nkd_Nidx[Nkd_levels+1];
   
   ////bias spline, sparse (nu and delta have the same design)
   //BEGIN sparse calculation
@@ -224,6 +247,12 @@ transformed data {
     tmp2 <- rep_row_vector(1,Nup+Ndown+Nclose+Nfar+Nd) * Xdiag;
     pdiag <- -tmp2[2:] / (tmp2 * rep_vector(1,Kdiag)); //should it be weighted along MF?
   }
+  
+  //indices of changes for N
+  Nkl_Nidx <- change_points(Nkl_N, Nkl_levels);  
+  Nkr_Nidx <- change_points(Nkr_N, Nkr_levels);  
+  Nkd_Nidx <- change_points(Nkd_N, Nkd_levels);
+  
 }
 parameters {
   real eC;  //exposure for counts
@@ -331,17 +360,30 @@ model {
   counts_down  ~ neg_binomial_2_log(log_mean_cdown, alpha); // Down
   
   //// Mean field likelihoods
+  // weights must sum to 1, here they are 1/3 1/3 1/3
   //Left
-  for (i in 1:Nl) {
-    increment_log_prob(Nkl_N[i]*neg_binomial_2_log_log(Nkl_count, log_mean_left[i], alpha));
+  for (i in 1:Nkl_levels) {
+    int begin;
+    int end;
+    begin <- Nkl_Nidx[i];
+    end <- Nkl_Nidx[i+1]-1;
+    increment_log_prob(Nkl_N[begin]*neg_binomial_2_log_log(Nkl_count[begin:end], log_mean_left[begin:end], alpha)/3);
   }
   //Right
-  for (i in 1:Nr) {
-    increment_log_prob(Nkr_N[i]*neg_binomial_2_log_log(Nkr_count, log_mean_right[i], alpha));
+  for (i in 1:Nkr_levels) {
+    int begin;
+    int end;
+    begin <- Nkr_Nidx[i];
+    end <- Nkr_Nidx[i+1]-1;
+    increment_log_prob(Nkr_N[begin]*neg_binomial_2_log_log(Nkr_count[begin:end], log_mean_right[begin:end], alpha)/3);
   }
   //Decay
-  for (i in 1:Nd) {
-    increment_log_prob(Nkd_N[i]*neg_binomial_2_log_log(Nkd_count, log_mean_decay[i], alpha));
+  for (i in 1:Nkd_levels) {
+    int begin;
+    int end;
+    begin <- Nkd_Nidx[i];
+    end <- Nkd_Nidx[i+1]-1;
+    increment_log_prob(Nkd_N[begin]*neg_binomial_2_log_log(Nkd_count[begin:end], log_mean_decay[begin:end], alpha)/3);
   }
   
   //// Priors

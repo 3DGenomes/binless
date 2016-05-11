@@ -38,20 +38,28 @@ optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, Kr
                Nfar=cfar[,.N],     counts_far=cfar[,count],     index_far=t(data.matrix(cfar[,.(id1,id2)])),
                Nup=cup[,.N],       counts_up=cup[,count],       index_up=t(data.matrix(cup[,.(id1,id2)])),
                Ndown=cdown[,.N],   counts_down=cdown[,count],   index_down=t(data.matrix(cdown[,.(id1,id2)])),
-               Nl=mf$Nkl[,.N], Nkl_count=mf$Nkl[,count], Nkl_cidx=mf$Nkl[,id], Nkl_N=mf$Nkl[,N],
-               Nr=mf$Nkr[,.N], Nkr_count=mf$Nkr[,count], Nkr_cidx=mf$Nkr[,id], Nkr_N=mf$Nkr[,N],
-               Nd=mf$Nkd[,.N], Nkd_count=mf$Nkd[,count], Nkd_d=mf$Nkd[,mdist], Nkd_N=mf$Nkd[,N],
+               Nl=mf$Nkl[,.N], Nkl_count=mf$Nkl[,count], Nkl_cidx=mf$Nkl[,id], Nkl_N=mf$Nkl[,N], Nkl_levels=mf$Nkl[,sum(diff(N)!=0)+1],
+               Nr=mf$Nkr[,.N], Nkr_count=mf$Nkr[,count], Nkr_cidx=mf$Nkr[,id], Nkr_N=mf$Nkr[,N], Nkr_levels=mf$Nkr[,sum(diff(N)!=0)+1],
+               Nd=mf$Nkd[,.N], Nkd_count=mf$Nkd[,count], Nkd_d=mf$Nkd[,mdist], Nkd_N=mf$Nkd[,N], Nkd_levels=mf$Nkd[,sum(diff(N)!=0)+1],
                lambda_nu=lambda_nu, lambda_delta=lambda_delta, lambda_diag=lambda_diag)
+  message("Biases      : ", biases[,.N])
+  message("Close counts: ", cclose[,.N])
+  message("Far counts  : ", cfar[,.N])
+  message("Up counts   : ", cup[,.N])
+  message("Down counts : ", cdown[,.N])
+  message("Left counts : ", mf$Nkl[,.N], " (", data$Nkl_levels, " levels)")
+  message("Right counts: ", mf$Nkr[,.N], " (", data$Nkr_levels, " levels)")
+  message("Decay counts: ", mf$Nkd[,.N], " (", data$Nkd_levels, " levels)")
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose)
 }
 
 predict_full = function(model, biases, counts, opt, Kdiag=10, verbose=T) {
-  optimizing(model, data = list( Kdiag=Kdiag, S=biases[,.N], cutsites=biases[,pos], N=counts[,.N],
-                                 counts=t(data.matrix(counts[,.(contact.close,contact.far,contact.up,contact.down)])),
-                                 cidx=t(data.matrix(counts[,.(id1,id2)])),
-                                 eC=opt$par$eC, log_nu=opt$par$log_nu, log_delta=opt$par$log_delta,
-                                 beta_diag=opt$par$beta_diag, alpha=opt$par$alpha),
-             as_vector=F, hessian=F, iter=1, verbose=verbose)
+  data = list( Kdiag=Kdiag, S=biases[,.N], cutsites=biases[,pos], N=counts[,.N],
+               counts=t(data.matrix(counts[,.(contact.close,contact.far,contact.up,contact.down)])),
+               cidx=t(data.matrix(counts[,.(id1,id2)])),
+               eC=opt$par$eC, log_nu=opt$par$log_nu, log_delta=opt$par$log_delta,
+               beta_diag=opt$par$beta_diag, alpha=opt$par$alpha)
+  optimizing(model, data = data, as_vector=F, hessian=F, iter=1, verbose=verbose)
 }
 
 
@@ -159,6 +167,7 @@ bin_for_mean_field = function(biases, counts, distance_bins_per_decade=10) {
   return(list(Nkd=Nkd, Nkr=Nkr, Nkl=Nkl))
 }
 
+
 gammaQuery=function(mu,theta,count){
   alpha1=theta
   alpha2=theta+count
@@ -216,6 +225,7 @@ both=fread("data/rao_HIC035_chr20_35000000-36000000_both.dat")
 biases=fread("data/caulo_all_biases.dat") #2010
 setkey(biases,id)
 counts=fread("data/caulo_all_counts.dat")
+meanfield = bin_for_mean_field(biases, counts, distance_bins_per_decade = 10)
 both=fread("data/caulo_all_both.dat")
 counts=counts[sample(.N,min(25000,.N))]
 
@@ -225,44 +235,45 @@ counts=fread("data/caulo_3000000-4000000_counts.dat")
 both=fread("data/caulo_3000000-4000000_both.dat")
 
 
-
-
 #### optimization wihout prior guesses
-counts.sub=counts[sample(.N,min(.N,100000))]
 smfit = stan_model(file = "sparse_cs_norm_fit_meanfield.stan")
-system.time(op <- optimize_all_meanfield(smfit, biases, counts.sub, meanfield, maxcount=10, Krow=400, Kdiag=10,
+maxcount=3
+system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, Krow=100, Kdiag=10,
                                       lambda_nu=1, lambda_delta=1, lambda_diag=.1, verbose = T))
-save(op, file = "data/rao_HICall_chrX_73780165-74230165_op_lambda10.RData")
+save(op, file = "data/caulo_all_op_lambda1.RData")
 #compare deviances
 c(100*(fit$null.deviance-fit$deviance)/fit$null.deviance, op$par$deviance_proportion_explained)
 #compare dispersions
 c(fit$family$getTheta(T), op$par$alpha)
-#compare decay
-a=cbind(counts.sub,data.table(decay=exp(op$par$log_decay),
-                              cclose=exp(op$par$log_mean_cclose),
-                              cfar=exp(op$par$log_mean_cfar),
-                              cup=exp(op$par$log_mean_cup),
-                              cdown=exp(op$par$log_mean_cdown)))
-ggplot(a[pos2-pos1>1e4][sample(.N,min(.N,10000))])+scale_y_log10()+scale_x_log10()+
-  geom_point(aes(pos2-pos1, contact.close*decay/cclose), colour="blue", alpha=0.01)+
-  geom_point(aes(pos2-pos1, contact.far*decay/cclose), colour="green", alpha=0.01)+
-  geom_point(aes(pos2-pos1, contact.up*decay/cclose), colour="darkblue", alpha=0.01)+
-  geom_point(aes(pos2-pos1, contact.down*decay/cclose), colour="darkgreen", alpha=0.01)+
-  geom_line(aes(pos2-pos1, decay) ,colour="pink")
-#nu
-a=cbind(biases,data.table(opt=exp(op$par$log_nu)))
+#compare decays
+mcounts=melt(counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
+             variable.name = "category", value.name = "count")[count>maxcount]
+mcounts[,distance:=abs(pos2-pos1)]
+mcounts=rbind(mcounts[,.(distance,count,category)],meanfield$Nkd[count<=maxcount,.(distance=mdist,count,category="meanfield")])
+mcounts[category=="contact.close",fij:=exp(op$par$log_decay_close)]
+mcounts[category=="contact.far",fij:=exp(op$par$log_decay_far)]
+mcounts[category=="contact.up",fij:=exp(op$par$log_decay_up)]
+mcounts[category=="contact.down",fij:=exp(op$par$log_decay_down)]
+mcounts[category=="meanfield",fij:=exp(op$par$log_decay_mf)]
+ggplot(mcounts[distance>1e4][,.SD[sample(.N,min(.N,10000))],by=category])+scale_y_log10()+scale_x_log10()+
+  geom_line(aes(distance, fij, colour=category) ,colour="pink")
+#biases
 #pbegin=35100000 
 #pend=35200000 
 #pbegin=3166716
 #pend=3191637
-pbegin=73780165
-pend=74230165
+#pbegin=73780165
+#pend=74230165
+pbegin=1
+pend=10000
+#nu
+a=cbind(biases,data.table(opt=exp(op$par$log_nu)))
 ggplot(a[pos>=pbegin&pos<=pend])+scale_y_log10()+
   geom_point(aes(pos, dangling.L/exp(op$par$eDE)),colour="orange")+
   geom_point(aes(pos, dangling.R/exp(op$par$eDE)),colour="pink")+
   geom_point(aes(pos, rejoined/exp(op$par$eRJ)),colour="red")+
-  geom_point(aes(pos, opt),colour="blue")
-#delta
+  geom_point(aes(pos, opt),colour="blue", shape=0)
+#delta relative to nu
 a=cbind(biases,data.table(opt=exp(op$par$log_delta),
                           log_nu=op$par$log_nu))
 ggplot(a[pos>=pbegin&pos<=pend])+scale_y_log10()+
@@ -289,6 +300,14 @@ counts[,log_mean_cdown:=op.pred$par$log_mean_cdown]
 counts[,log_mean_cfar:=op.pred$par$log_mean_cfar]
 counts[,log_mean_cclose:=op.pred$par$log_mean_cclose]
 write.table(counts, file = "data/rao_HICall_chrX_73780165-74230165_counts_fitted_disp3.84_dev_14.3_lambda10.dat", quote = F, row.names = F)
+#diagonal decay
+ggplot(counts[abs(pos2-pos1)>1e4][sample(.N,min(.N,10000))])+scale_y_log10()+scale_x_log10()+
+  geom_point(aes(abs(pos2-pos1), contact.close/exp(log_mean_cclose-log_decay)), alpha=0.1) +
+  geom_line(aes(abs(pos2-pos1), exp(5*log_decay)))
+#residuals
+ggplot(counts[abs(pos2-pos1)>1e4][sample(.N,min(.N,10000))])+scale_y_log10()+scale_x_log10()+
+  geom_point(aes(abs(pos2-pos1), contact.far/exp(log_mean_cfar)), alpha=0.1)
+
 #divide by rsites only
 counts[,log_decay:=0]
 counts[,log_mean_cup:=log(contact.up)]
