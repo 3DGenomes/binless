@@ -164,10 +164,6 @@ data {
   vector[Nd] Nkd_d; //geometric mean distance in bin k
   int<lower=0> Nkd_N[Nd]; //Nkd(c), i.e. how many contacts have count c in decay bin k
   int<lower=0> Nkd_levels; //number of levels of N
-  //fixed parameters
-  real<lower=0> lambda_nu;
-  real<lower=0> lambda_delta;
-  real<lower=0> lambda_diag;
 }
 transformed data {
   //bias spline, sparse (nu and delta have the same design)
@@ -262,6 +258,10 @@ parameters {
   vector[Krow-1] beta_delta;
   positive_ordered[Kdiag-1] beta_diag;
   real<lower=0> alpha;
+  //fixed parameters
+  real<lower=0> lambda_nu;
+  real<lower=0> lambda_delta;
+  real<lower=0> lambda_diag;
 }
 transformed parameters {
   //nu
