@@ -258,7 +258,7 @@ parameters {
   vector[Krow-1] beta_delta;
   positive_ordered[Kdiag-1] beta_diag;
   real<lower=0> alpha;
-  //real<lower=0> alpha_mf;
+  real<lower=0> alpha_mf;
   //fixed parameters
   real<lower=0> lambda_nu;
   real<lower=0> lambda_delta;
@@ -368,7 +368,7 @@ model {
     int end;
     begin <- Nkl_Nidx[i];
     end <- Nkl_Nidx[i+1]-1;
-    increment_log_prob(Nkl_N[begin]*neg_binomial_2_log_log(Nkl_count[begin:end], log_mean_left[begin:end], alpha)/3);
+    increment_log_prob(Nkl_N[begin]*neg_binomial_2_log_log(Nkl_count[begin:end], log_mean_left[begin:end], alpha_mf)/3);
   }
   //Right
   for (i in 1:Nkr_levels) {
@@ -376,7 +376,7 @@ model {
     int end;
     begin <- Nkr_Nidx[i];
     end <- Nkr_Nidx[i+1]-1;
-    increment_log_prob(Nkr_N[begin]*neg_binomial_2_log_log(Nkr_count[begin:end], log_mean_right[begin:end], alpha)/3);
+    increment_log_prob(Nkr_N[begin]*neg_binomial_2_log_log(Nkr_count[begin:end], log_mean_right[begin:end], alpha_mf)/3);
   }
   //Decay
   for (i in 1:Nkd_levels) {
@@ -384,7 +384,7 @@ model {
     int end;
     begin <- Nkd_Nidx[i];
     end <- Nkd_Nidx[i+1]-1;
-    increment_log_prob(Nkd_N[begin]*neg_binomial_2_log_log(Nkd_count[begin:end], log_mean_decay[begin:end], alpha)/3);
+    increment_log_prob(Nkd_N[begin]*neg_binomial_2_log_log(Nkd_count[begin:end], log_mean_decay[begin:end], alpha_mf)/3);
   }
   
   //// Priors
