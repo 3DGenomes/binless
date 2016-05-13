@@ -258,6 +258,7 @@ parameters {
   vector[Krow-1] beta_delta;
   positive_ordered[Kdiag-1] beta_diag;
   real<lower=0> alpha;
+  //real<lower=0> alpha_mf;
   //fixed parameters
   real<lower=0> lambda_nu;
   real<lower=0> lambda_delta;
@@ -390,9 +391,9 @@ model {
   //P-spline prior on the differences (K-2 params)
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
-  beta_nu_diff ~ normal(0, 1./(alpha*lambda_nu));
-  beta_delta_diff ~ normal(0, 1./(alpha*lambda_delta));
-  beta_diag_diff ~ normal(0, 1./(alpha*lambda_diag));
+  beta_nu_diff ~ normal(0, 1./lambda_nu);
+  beta_delta_diff ~ normal(0, 1./lambda_delta);
+  beta_diag_diff ~ normal(0, 1./lambda_diag);
 }
 generated quantities {
   real deviance;
