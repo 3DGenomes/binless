@@ -21,11 +21,11 @@ stan_matrix_to_datatable = function(opt, x) {
 }
 
 optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, Krow=1000, Kdiag=10, 
-                               lambda_nu=1, lambda_delta=1, lambda_diag=1, iter=10000, verbose=T) {
-  cclose=counts[contact.close>maxcount,.(id1,id2,count=contact.close)]
-  cfar=counts[contact.far>maxcount,.(id1,id2,count=contact.far)]
-  cup=counts[contact.up>maxcount,.(id1,id2,count=contact.up)]
-  cdown=counts[contact.down>maxcount,.(id1,id2,count=contact.down)]
+                               lambda_nu=1, lambda_delta=1, lambda_diag=1, iter=10000, verbose=T, mincount=-1) {
+  cclose=counts[contact.close>maxcount,.(id1,id2,count=contact.close)][count>mincount]
+  cfar=counts[contact.far>maxcount,.(id1,id2,count=contact.far)][count>mincount]
+  cup=counts[contact.up>maxcount,.(id1,id2,count=contact.up)][count>mincount]
+  cdown=counts[contact.down>maxcount,.(id1,id2,count=contact.down)][count>mincount]
   mf=list()
   mf$Nkl=meanfield$Nkl[count<=maxcount]
   mf$Nkr=meanfield$Nkr[count<=maxcount]
@@ -42,6 +42,9 @@ optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, Kr
                Nr=mf$Nkr[,.N], Nkr_count=mf$Nkr[,count], Nkr_cidx=mf$Nkr[,id], Nkr_N=mf$Nkr[,N], Nkr_levels=mf$Nkr[,sum(diff(N)!=0)+1],
                Nd=mf$Nkd[,.N], Nkd_count=mf$Nkd[,count], Nkd_d=mf$Nkd[,mdist], Nkd_N=mf$Nkd[,N], Nkd_levels=mf$Nkd[,sum(diff(N)!=0)+1],
                lambda_nu=lambda_nu, lambda_delta=lambda_delta, lambda_diag=lambda_diag)
+  if (data$Nl==0) data$Nkl_levels=0
+  if (data$Nr==0) data$Nkr_levels=0
+  if (data$Nd==0) data$Nkd_levels=0
   message("Biases      : ", biases[,.N])
   message("Close counts: ", cclose[,.N])
   message("Far counts  : ", cfar[,.N])
@@ -165,6 +168,33 @@ bin_for_mean_field = function(biases, counts, distance_bins_per_decade=10) {
   #ggplot(Nkd[,.(decay=sum(N*count)/sum(N)),by=bdist])+geom_point(aes(bdist,decay))+scale_y_log10()+
   #  theme(axis.text.x = element_text(angle = 90, hjust = 1))
   return(list(Nkd=Nkd, Nkr=Nkr, Nkl=Nkl))
+}
+
+dset_statistics = function(biases,counts){
+  message("Mean counts")
+  message("   Rejoined  : ", biases[,mean(rejoined)])
+  message("   Dangling L: ", biases[,mean(dangling.L)])
+  message("   Dangling R: ", biases[,mean(dangling.R)])
+  message("   C. close  : ", counts[,mean(contact.close)])
+  message("   C. far    : ", counts[,mean(contact.far)])
+  message("   C. up     : ", counts[,mean(contact.up)])
+  message("   C. down   : ", counts[,mean(contact.down)])
+  message("Median counts")
+  message("   Rejoined  : ", biases[,median(rejoined)])
+  message("   Dangling L: ", biases[,median(dangling.L)])
+  message("   Dangling R: ", biases[,median(dangling.R)])
+  message("   C. close  : ", counts[,median(contact.close)])
+  message("   C. far    : ", counts[,median(contact.far)])
+  message("   C. up     : ", counts[,median(contact.up)])
+  message("   C. down   : ", counts[,median(contact.down)])
+  message("Percent of zero counts")
+  message("   Rejoined  : ", biases[rejoined==0,.N]/biases[,.N]*100)
+  message("   Dangling L: ", biases[dangling.L==0,.N]/biases[,.N]*100)
+  message("   Dangling R: ", biases[dangling.R==0,.N]/biases[,.N]*100)
+  message("   C. close  : ", counts[contact.close==0,.N]/counts[,.N]*100)
+  message("   C. far    : ", counts[contact.far==0,.N]/counts[,.N]*100)
+  message("   C. up     : ", counts[contact.up==0,.N]/counts[,.N]*100)
+  message("   C. down   : ", counts[contact.down==0,.N]/counts[,.N]*100)
 }
 
 
