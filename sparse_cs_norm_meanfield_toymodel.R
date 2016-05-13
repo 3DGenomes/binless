@@ -21,11 +21,11 @@ stan_matrix_to_datatable = function(opt, x) {
 }
 
 optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, Krow=1000, Kdiag=10, 
-                               lambda_nu=1, lambda_delta=1, lambda_diag=1, iter=10000, verbose=T) {
-  cclose=counts[contact.close>maxcount,.(id1,id2,count=contact.close)]
-  cfar=counts[contact.far>maxcount,.(id1,id2,count=contact.far)]
-  cup=counts[contact.up>maxcount,.(id1,id2,count=contact.up)]
-  cdown=counts[contact.down>maxcount,.(id1,id2,count=contact.down)]
+                               lambda_nu=1, lambda_delta=1, lambda_diag=1, iter=10000, verbose=T, mincount=-1) {
+  cclose=counts[contact.close>maxcount,.(id1,id2,count=contact.close)][count>mincount]
+  cfar=counts[contact.far>maxcount,.(id1,id2,count=contact.far)][count>mincount]
+  cup=counts[contact.up>maxcount,.(id1,id2,count=contact.up)][count>mincount]
+  cdown=counts[contact.down>maxcount,.(id1,id2,count=contact.down)][count>mincount]
   mf=list()
   mf$Nkl=meanfield$Nkl[count<=maxcount]
   mf$Nkr=meanfield$Nkr[count<=maxcount]
@@ -387,8 +387,9 @@ for (maxcount in -1:10) {
     ops[[paste0("op_",maxcount,"_",repetition)]]=op
   }
 }
-save(ops, file = "toy_mf_low.RData")
-#accuracy on single-valued params
+#save(ops, file = "toy_mf_low.RData")
+load("data/toy_mf_high.RData")
+#precision and accuracy on single-valued params
 single_params = data.table(
   sapply(c("eC","eRJ","eDE","lambda_nu","lambda_delta","lambda_diag","alpha","deviance_proportion_explained",
            "repetition","maxcount","time"),
@@ -398,9 +399,9 @@ single_params[maxcount=="-1",maxcount:="exact"]
 single_params[,maxcount:=ordered(maxcount,levels=unique(maxcount))]
 ggplot(melt(single_params[alpha<100000&lambda_diag<1000],id.vars=c("maxcount","repetition")))+geom_boxplot(aes(maxcount,value,colour=(maxcount=="exact")))+
   facet_wrap(~variable, scales="free_y")+guides(colour=F)+
-  labs(title="Toy dataset, low coverage, 75% zeros", x="mean field threshold", y=NULL)
+  labs(title="Toy dataset, high coverage, 75% zeros", x="mean field threshold", y=NULL)
 ggsave(filename = "toy_mf_singleparams_low.png", width=10, height=7.5)
-#accuracy on vector-valued params
+#precision on vector-valued params
 all_params = data.table(
   sapply(names(ops$`op_-1_1`$par), function(y){lapply(names(ops), function(x){ops[[x]]$par[[y]]})}))
 all_params[,maxcount:=as.character(maxcount)]
@@ -412,7 +413,91 @@ mult_params=mult_params[,.(idx=c(1:length(unlist(value))),value=unlist(value)),b
                          ,.(std=sd(value)),by=c("maxcount","idx","variable")]
 ggplot(mult_params)+
   geom_boxplot(aes(maxcount,std,colour=(maxcount=="exact")))+facet_wrap(~variable)+
-  guides(colour=F)+scale_y_log10()+labs(title="Toy dataset, low coverage, 75% zeros", x="mean field threshold",
+  guides(colour=F)+scale_y_log10()+labs(title="Toy dataset, high coverage, 40% zeros: precision", x="mean field threshold",
                                         y="standard deviation across repeats, for each coefficient")
-ggsave(filename = "toy_mf_multiparams_low.png", width=10, height=7.5)
+ggsave(filename = "toy_mf_multiparams_precision_high.png", width=10, height=7.5)
+#accuracy on vector-valued params
+ref_params=melt(all_params[maxcount=="exact",.(repetition,log_nu,log_delta,beta_diag)], id.vars="repetition")
+ref_params=ref_params[,.(idx=c(1:length(unlist(value))),value=unlist(value)),by=c("variable","repetition")][
+  ,.(med=median(value)),keyby=c("idx","variable")]
+mult_params=melt(all_params[,.(maxcount,repetition,log_nu,log_delta,beta_diag)], id.vars=c("maxcount","repetition"))
+mult_params=mult_params[,.(idx=c(1:length(unlist(value))),value=unlist(value)),by=c("maxcount","repetition","variable")]
+setkey(mult_params, idx, variable)
+mult_params=ref_params[mult_params][,.(prec=dist(rbind(value,med))),by=c("maxcount","idx","variable")]
+ggplot(mult_params)+
+  geom_boxplot(aes(maxcount,prec,colour=(maxcount=="exact")))+facet_wrap(~variable)+
+  guides(colour=F)+labs(title="Toy dataset, high coverage, 40% zeros: accuracy", x="mean field threshold",
+                                        y="distance from median of exact calculation")
+ggsave(filename = "toy_mf_multiparams_accuracy_high.png", width=10, height=7.5)
+
+
+
+
+### effect of removing zeros and ones
+dset=generate_fake_dataset(num_rsites=100, genome_size = 100000, eC = .1, eRJ = 5, eDE = 7) #high coverage
+dset=generate_fake_dataset(num_rsites=100, genome_size = 100000, eC = -2, eRJ = 1, eDE = 3) #low coverage
+dset_statistics(dset$biases, dset$counts)
+counts=dset$counts
+biases=dset$biases
+meanfield=bin_for_mean_field(biases, counts, distance_bins_per_decade = 50)
+smfit = stan_model(file = "sparse_cs_norm_fit_meanfield.stan")
+ops=list()
+for (mincount in -1:2) {
+  for (repetition in 1:10) {
+    message("***** ",mincount)
+    #fit
+    a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=-1, Krow=100, Kdiag=10,
+                                               lambda_nu=.3, lambda_delta=1.2, lambda_diag=1.6, verbose = T,
+                                               mincount=mincount))
+    op$par$time=a[1]+a[4]
+    op$par$mincount=mincount
+    op$par$repetition=repetition
+    #predict
+    op.pred <- predict_full(smpred, biases, counts, op, Kdiag=10, verbose = T)
+    op$pred=op.pred$par
+    ops[[paste0("op_",mincount,"_",repetition)]]=op
+  }
+}
+save(ops, file = "data/toy_zero_high.RData")
+#load("data/toy_mf_high.RData")
+#precision and accuracy on single-valued params
+single_params = data.table(
+  sapply(c("eC","eRJ","eDE","lambda_nu","lambda_delta","lambda_diag","alpha","deviance_proportion_explained",
+           "repetition","mincount","time"),
+         function(y){sapply(names(ops), function(x){ops[[x]]$par[[y]]})}))
+single_params[,mincount:=as.character(mincount)]
+single_params[mincount=="-1",mincount:="exact"]
+single_params[,mincount:=ordered(mincount,levels=unique(mincount))]
+ggplot(melt(single_params[alpha<100000&lambda_diag<1000],id.vars=c("mincount","repetition")))+geom_boxplot(aes(mincount,value,colour=(mincount=="exact")))+
+  facet_wrap(~variable, scales="free_y")+guides(colour=F)+
+  labs(title="Toy dataset, high coverage, 75% zeros", x="mean field threshold", y=NULL)
+ggsave(filename = "toy_zero_singleparams_low.png", width=10, height=7.5)
+#precision on vector-valued params
+all_params = data.table(
+  sapply(names(ops$`op_-1_1`$par), function(y){lapply(names(ops), function(x){ops[[x]]$par[[y]]})}))
+all_params[,mincount:=as.character(mincount)]
+all_params[mincount=="-1",mincount:="exact"]
+all_params[,mincount:=ordered(mincount,levels=unique(mincount))]
+all_params[,repetition:=as.integer(repetition)]
+mult_params=melt(all_params[,.(mincount,repetition,log_nu,log_delta,beta_diag)], id.vars=c("mincount","repetition"))
+mult_params=mult_params[,.(idx=c(1:length(unlist(value))),value=unlist(value)),by=c("mincount","repetition","variable")][
+  ,.(std=sd(value)),by=c("mincount","idx","variable")]
+ggplot(mult_params)+
+  geom_boxplot(aes(mincount,std,colour=(mincount=="exact")))+facet_wrap(~variable)+
+  guides(colour=F)+scale_y_log10()+labs(title="Toy dataset, high coverage, 40% zeros: precision", x="mean field threshold",
+                                        y="standard deviation across repeats, for each coefficient")
+ggsave(filename = "toy_zero_multiparams_precision_high.png", width=10, height=7.5)
+#accuracy on vector-valued params
+ref_params=melt(all_params[mincount=="exact",.(repetition,log_nu,log_delta,beta_diag)], id.vars="repetition")
+ref_params=ref_params[,.(idx=c(1:length(unlist(value))),value=unlist(value)),by=c("variable","repetition")][
+  ,.(med=median(value)),keyby=c("idx","variable")]
+mult_params=melt(all_params[,.(mincount,repetition,log_nu,log_delta,beta_diag)], id.vars=c("mincount","repetition"))
+mult_params=mult_params[,.(idx=c(1:length(unlist(value))),value=unlist(value)),by=c("mincount","repetition","variable")]
+setkey(mult_params, idx, variable)
+mult_params=ref_params[mult_params][,.(prec=dist(rbind(value,med))),by=c("mincount","idx","variable")]
+ggplot(mult_params)+
+  geom_boxplot(aes(mincount,prec,colour=(mincount=="exact")))+facet_wrap(~variable)+
+  guides(colour=F)+labs(title="Toy dataset, high coverage, 40% zeros: accuracy", x="mean field threshold",
+                        y="distance from median of exact calculation")
+ggsave(filename = "toy_zero_multiparams_accuracy_high.png", width=10, height=7.5)
 
