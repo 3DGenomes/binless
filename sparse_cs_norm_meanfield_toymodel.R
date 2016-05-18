@@ -20,8 +20,8 @@ stan_matrix_to_datatable = function(opt, x) {
   melt(data.table(vals), id.vars="x")
 }
 
-optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, Krow=1000, Kdiag=10, 
-                               lambda_nu=1, lambda_delta=1, lambda_diag=1, iter=10000, verbose=T, mincount=-1) {
+optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, bf_per_kb=1, bf_per_decade=5,
+                                  iter=10000, verbose=T, mincount=-1) {
   cclose=counts[contact.close>maxcount,.(id1,id2,count=contact.close)][count>mincount]
   cfar=counts[contact.far>maxcount,.(id1,id2,count=contact.far)][count>mincount]
   cup=counts[contact.up>maxcount,.(id1,id2,count=contact.up)][count>mincount]
@@ -30,6 +30,8 @@ optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, Kr
   mf$Nkl=meanfield$Nkl[count<=maxcount]
   mf$Nkr=meanfield$Nkr[count<=maxcount]
   mf$Nkd=meanfield$Nkd[count<=maxcount]
+  Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
+  Kdiag=round(counts[,(log10(max(pos2-pos1))-log10(min(pos2-pos1)))*bf_per_decade])
   data = list( Krow=Krow, S=biases[,.N],
                cutsites=biases[,pos], rejoined=biases[,rejoined],
                danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
@@ -40,11 +42,13 @@ optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, Kr
                Ndown=cdown[,.N],   counts_down=cdown[,count],   index_down=t(data.matrix(cdown[,.(id1,id2)])),
                Nl=mf$Nkl[,.N], Nkl_count=mf$Nkl[,count], Nkl_cidx=mf$Nkl[,id], Nkl_N=mf$Nkl[,N], Nkl_levels=mf$Nkl[,sum(diff(N)!=0)+1],
                Nr=mf$Nkr[,.N], Nkr_count=mf$Nkr[,count], Nkr_cidx=mf$Nkr[,id], Nkr_N=mf$Nkr[,N], Nkr_levels=mf$Nkr[,sum(diff(N)!=0)+1],
-               Nd=mf$Nkd[,.N], Nkd_count=mf$Nkd[,count], Nkd_d=mf$Nkd[,mdist], Nkd_N=mf$Nkd[,N], Nkd_levels=mf$Nkd[,sum(diff(N)!=0)+1],
-               lambda_nu=lambda_nu, lambda_delta=lambda_delta, lambda_diag=lambda_diag)
+               Nd=mf$Nkd[,.N], Nkd_count=mf$Nkd[,count], Nkd_d=mf$Nkd[,mdist], Nkd_N=mf$Nkd[,N], Nkd_levels=mf$Nkd[,sum(diff(N)!=0)+1])
   if (data$Nl==0) data$Nkl_levels=0
   if (data$Nr==0) data$Nkr_levels=0
   if (data$Nd==0) data$Nkd_levels=0
+  message("Mean field optimization")
+  message("Krow        : ", Krow)
+  message("Kdiag       : ", Kdiag)
   message("Biases      : ", biases[,.N])
   message("Close counts: ", cclose[,.N])
   message("Far counts  : ", cfar[,.N])
@@ -56,8 +60,9 @@ optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, Kr
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose)
 }
 
-predict_full = function(model, biases, counts, opt, Kdiag=10, verbose=T) {
-  data = list( Kdiag=Kdiag, S=biases[,.N], cutsites=biases[,pos], N=counts[,.N],
+predict_full = function(model, biases, counts, opt, verbose=T) {
+  #need to ensure that counts span exactly the same distance range as during fitting
+  data = list( Kdiag=length(op$par$beta_diag)+1, S=biases[,.N], cutsites=biases[,pos], N=counts[,.N],
                counts=t(data.matrix(counts[,.(contact.close,contact.far,contact.up,contact.down)])),
                cidx=t(data.matrix(counts[,.(id1,id2)])),
                eC=opt$par$eC, log_nu=opt$par$log_nu, log_delta=opt$par$log_delta,
@@ -396,9 +401,9 @@ setkey(biases,id)
 counts=fread("data/rao_HIC035_chr20_35000000-36000000_counts.dat")
 counts=fill_zeros(biases,counts)
 
-biases=fread("data/caulo_3000000-4000000_biases.dat") #525
+biases=fread("data/caulo_3000000-4000000_biases.dat")[id<100] #525
 setkey(biases,id)
-counts=fread("data/caulo_3000000-4000000_counts.dat")
+counts=fread("data/caulo_3000000-4000000_counts.dat")[id1<100&id2<100]
 counts=fill_zeros(biases,counts)
 
 dset=generate_fake_dataset(num_rsites=100, genome_size = 100000, eC = .1, eRJ = 5, eDE = 7) #high coverage
@@ -409,16 +414,23 @@ biases=dset$biases
 dset_statistics(biases, counts)
 meanfield=bin_for_mean_field(biases, counts, distance_bins_per_decade = 100)
 smfit = stan_model(file = "sparse_cs_norm_fit_meanfield.stan")
-ops = foreach (maxcount=-1:10) %:% foreach (repetition=1:10) %dopar% {
+smpred = stan_model(file = "sparse_cs_norm_predict.stan")
+ops = foreach (maxcount=c(-1,0,1,2,3,4,6,10,1e18)) %:% foreach (repetition=1:10) %dopar% {
   message("***** ",maxcount)
   #fit
-  a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, Krow=1000, Kdiag=10,
-                                       lambda_nu=.3, lambda_delta=1.2, lambda_diag=1.6, verbose = T, iter=100000))
+  a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, bf_per_kb=10,
+                                             bf_per_decade=5, verbose = T, iter=100000))
   op$par$time=a[1]+a[4]
-  op$par$maxcount=maxcount
+  if (maxcount == -1) {
+    op$par$maxcount="exact"
+  } else if (maxcount>counts[,max(c(contact.close,contact.far,contact.down,contact.up))]) {
+    op$par$maxcount="meanfield"
+  } else {
+    op$par$maxcount=maxcount
+  }
   op$par$repetition=repetition
   #predict
-  op.pred <- predict_full(smpred, biases, counts, op, Kdiag=10, verbose = T)
+  op.pred <- predict_full(smpred, biases, counts, op, verbose = T)
   op$pred=op.pred$par
   op#ops[[paste0("op_",maxcount,"_",repetition)]]=op
 }
