@@ -251,15 +251,18 @@ transformed data {
   
 }
 parameters {
-  real eC;  //exposure for counts
-  real eRJ; //exposure for rejoined ends
-  real eDE; //exposure for dangling ends
+  //exposures
+  real eC;
+  real eRJ;
+  real eDE;
+  //spline parameters
   vector[Krow-1] beta_nu;
   vector[Krow-1] beta_delta;
   positive_ordered[Kdiag-1] beta_diag;
+  //deviances
   real<lower=0> alpha;
   real<lower=0> alpha_mf;
-  //fixed parameters
+  //length scales
   real<lower=0> lambda_nu;
   real<lower=0> lambda_delta;
   real<lower=0> lambda_diag;
