@@ -134,6 +134,7 @@ bin_for_mean_field = function(biases, counts, distance_bins_per_decade=10) {
             ...~category, value.var="N", fill=0)[,.(id,count,N=Ni.far+Ni.up+Nj.up+Nj.close)]
   Nkl=rbind(Nkl,Nkl[,.(count=0,N=2*nsites-sum(N)),by=id]) #each rsite is counted twice
   setkey(Nkl,N,id,count)
+  Nkl=Nkl[N>0]
   Nkr=dcast(rbind(ci[category=="contact.close",.(id,count,category="Ni.close",N)],
                   ci[category=="contact.down",.(id,count,category="Ni.down",N)],
                   cj[category=="contact.far",.(id,count,category="Nj.far",N)],
@@ -141,12 +142,13 @@ bin_for_mean_field = function(biases, counts, distance_bins_per_decade=10) {
             ...~category, value.var="N", fill=0)[,.(id,count,N=Ni.close+Ni.down+Nj.far+Nj.down)]
   Nkr=rbind(Nkr,Nkr[,.(count=0,N=2*nsites-sum(N)),by=id]) #each rsite is counted twice
   setkey(Nkr,N,id,count)
+  Nkr=Nkr[N>0]
   ### make histogram for distance
   #make distance bins and their factor
   stepsz=1/distance_bins_per_decade
   dbins=10**seq(0,biases[,log10(max(pos)-min(pos))]+stepsz,stepsz)
   mcounts[,distance:=abs(pos1-pos2)]
-  mcounts[,bdist:=cut(distance,dbins,ordered_result=T,right=F)]
+  mcounts[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T)]
   #Count positive counts in these bins
   Nkd = mcounts[,.N,keyby=c("bdist","count")]
   Nkd[,mdist:=sqrt(dbins[unclass(bdist)+1]*dbins[unclass(bdist)])]
@@ -154,7 +156,8 @@ bin_for_mean_field = function(biases, counts, distance_bins_per_decade=10) {
   positions=biases[,pos]
   npos=length(positions)
   ncrossings <- rowSums(sapply(1:(npos-1), #this loop is still 5x faster in python
-                               function(i){hist(positions[(i+1):npos]-positions[i],breaks=dbins,plot=F)$counts}
+                               function(i){hist(positions[(i+1):npos]-positions[i],breaks=dbins,plot=F,
+                                                right=F, include.lowest=T)$counts}
   ))
   #deduce zero counts
   Nkz = data.table(bdist=Nkd[,ordered(levels(bdist), levels(bdist))], ncrossings=ncrossings, key="bdist")
@@ -163,10 +166,11 @@ bin_for_mean_field = function(biases, counts, distance_bins_per_decade=10) {
   Nkz[is.na(nnz),nnz:=0]
   Nkd = rbind(Nkd, Nkz[,.(bdist,mdist,count=0,N=4*ncrossings-nnz)]) # one crossing for each of 4 count types
   setkey(Nkd,N,bdist,count)
-  stopifnot(Nkd[count==0,all(N>=0)])
+  Nkd=Nkd[N>0]
   #plot decay
   #ggplot(Nkd[,.(decay=sum(N*count)/sum(N)),by=bdist])+geom_point(aes(bdist,decay))+scale_y_log10()+
   #  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  stopifnot(Nkr[,all(N>=0)],Nkl[,all(N>=0)],Nkd[,all(N>=0)])
   return(list(Nkd=Nkd, Nkr=Nkr, Nkl=Nkl))
 }
 
@@ -408,7 +412,7 @@ smfit = stan_model(file = "sparse_cs_norm_fit_meanfield.stan")
 ops = foreach (maxcount=-1:10) %:% foreach (repetition=1:10) %dopar% {
   message("***** ",maxcount)
   #fit
-  a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, Krow=100, Kdiag=10,
+  a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, Krow=1000, Kdiag=10,
                                        lambda_nu=.3, lambda_delta=1.2, lambda_diag=1.6, verbose = T, iter=100000))
   op$par$time=a[1]+a[4]
   op$par$maxcount=maxcount
@@ -512,7 +516,7 @@ decay_params=decay_params[,.(med=median(value)),keyby=c("idx","variable","maxcou
 setkey(decay_params, idx)
 decay_params[,dist:=rep(counts[id1==1,pos2-pos1],each=decay_params[idx==1,.N])]
 decay_params=dcast(decay_params, ...~variable, value.var="med")
-ggplot(decay_params)+scale_y_log10()+scale_x_log10()+
+ggplot(decay_params)+scale_y_log10()+scale_x_log10()+ #[maxcount%in%c("exact","0","1")]
   geom_line(aes(abs(dist), exp(log_decay), colour=maxcount))+
   geom_line(data=counts[,.(decay=exp(true_log_decay)),by=distance],aes(distance,decay),colour="black")+
   #labs(title="Rao HICall chr20 300k stretch: diagonal decay", x="distance", y="decay")
