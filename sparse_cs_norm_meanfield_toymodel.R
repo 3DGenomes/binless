@@ -10,7 +10,7 @@ library(scam)
 library(Hmisc)
 library(foreach)
 library(doParallel)
-registerDoParallel()
+registerDoParallel(cores=30)
 
 setwd("/home/yannick/simulations/spline_stan")
 
@@ -214,10 +214,10 @@ generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4
   #build biases
   biases[,true_log_nu:=sin(pos/1000)+(pos-genome_size/2)/genome_size]
   biases[,true_log_nu:=true_log_nu-mean(true_log_nu)]
-  ggplot(biases,aes(pos,true_log_nu))+geom_point()+geom_line()
+  #ggplot(biases,aes(pos,true_log_nu))+geom_point()+geom_line()
   biases[,true_log_delta:=-(pos-genome_size/2)/genome_size+sin(pos/2100)]
   biases[,true_log_delta:=true_log_delta-mean(true_log_delta)]
-  ggplot(biases,aes(pos,true_log_delta))+geom_point()+geom_line()
+  #ggplot(biases,aes(pos,true_log_delta))+geom_point()+geom_line()
   biases[,true_log_mean_RJ:=eRJ+true_log_nu]
   biases[,true_log_mean_DL:=eDE+true_log_nu+true_log_delta]
   biases[,true_log_mean_DR:=eDE+true_log_nu-true_log_delta]
@@ -238,7 +238,7 @@ generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4
   counts[,distance:=pos2-pos1]
   counts[,true_log_decay:=5*dnorm(log(distance), mean=log(min(distance)), sd=log(max(distance))/10)-0.2*log(distance)]
   counts[,true_log_decay:=true_log_decay-mean(true_log_decay)]
-  ggplot(dset$counts)+geom_point(aes(distance,exp(true_log_decay)))+scale_x_log10()+scale_y_log10()
+  #ggplot(counts)+geom_point(aes(distance,exp(true_log_decay)))+scale_x_log10()+scale_y_log10()
   counts[,base_count:=eC+true_log_decay+true_log_nu1+true_log_nu2]
   counts[,true_log_mean_cclose:=base_count-true_log_delta1+true_log_delta2]
   counts[,true_log_mean_cfar:=base_count+true_log_delta1-true_log_delta2]
@@ -249,8 +249,8 @@ generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4
   counts[,contact.far:=rnbinom(.N, mu=exp(true_log_mean_cfar), size=alpha)]
   counts[,contact.up:=rnbinom(.N, mu=exp(true_log_mean_cup), size=alpha)]
   counts[,contact.down:=rnbinom(.N, mu=exp(true_log_mean_cdown), size=alpha)]
-  ggplot(dset$counts)+geom_point(aes(distance,contact.close/exp(true_log_mean_cclose-true_log_decay)), alpha=0.1)+
-    geom_line(aes(distance,exp(true_log_decay)))+scale_x_log10()+scale_y_log10()
+  #ggplot(dset$counts)+geom_point(aes(distance,contact.close/exp(true_log_mean_cclose-true_log_decay)), alpha=0.1)+
+  #  geom_line(aes(distance,exp(true_log_decay)))+scale_x_log10()+scale_y_log10()
   #statistics
   dset_statistics(biases,counts)
   return(list(biases=biases, counts=counts))
@@ -391,9 +391,9 @@ ggplot(biases)+geom_point(aes(true_log_mean_DR,log_mean_DR))+stat_function(fun=i
 
 
 ### effect of mean field approximation
-biases=fread("data/rao_HICall_chr20_35000000-36000000_biases.dat")[id<1000] #1000
+biases=fread("data/rao_HICall_chr20_35000000-36000000_biases.dat")[id<600]
 setkey(biases,id)
-counts=fread("data/rao_HICall_chr20_35000000-36000000_counts.dat")[id1<1000&id2<1000]
+counts=fread("data/rao_HICall_chr20_35000000-36000000_counts.dat")[id1<600&id2<600]
 counts=fill_zeros(biases,counts)
 
 biases=fread("data/rao_HIC035_chr20_35000000-36000000_biases.dat") #212
@@ -412,14 +412,14 @@ dset=generate_fake_dataset(num_rsites=100, genome_size = 100000, eC = -2, eRJ = 
 counts=dset$counts
 biases=dset$biases
 dset_statistics(biases, counts)
-meanfield=bin_for_mean_field(biases, counts, distance_bins_per_decade = 100)
+meanfield=bin_for_mean_field(biases, counts, distance_bins_per_decade = 10)
 smfit = stan_model(file = "sparse_cs_norm_fit_meanfield.stan")
 smpred = stan_model(file = "sparse_cs_norm_predict.stan")
-ops = foreach (maxcount=c(-1,0,1,2,3,4,6,10,1e18)) %:% foreach (repetition=1:10) %dopar% {
+ops = foreach (maxcount=c(-1,0,1,2,3,4,6,1e18)) %:% foreach (repetition=1:10) %dopar% {
   message("***** ",maxcount)
   #fit
-  a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, bf_per_kb=10,
-                                             bf_per_decade=5, verbose = T, iter=100000))
+  a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, bf_per_kb=1,
+                                             bf_per_decade=5, verbose = T, iter=10))
   op$par$time=a[1]+a[4]
   if (maxcount == -1) {
     op$par$maxcount="exact"
@@ -435,28 +435,33 @@ ops = foreach (maxcount=c(-1,0,1,2,3,4,6,10,1e18)) %:% foreach (repetition=1:10)
   op#ops[[paste0("op_",maxcount,"_",repetition)]]=op
 }
 ops = unlist(ops, recursive=F)
+ops=ops[!sapply(ops, is.null)] 
 names(ops) <- seq(length(ops))
-#save(ops, file = "data/rao_HICall_chr20_300k_mf.RData")
-#load("data/caulo_mf_3-4M.RData")
+save(ops, file = "data/caulo_mf_3-3.2M.RData")
+#load("data/caulo_mf_3-3.2M.RData")
 
 #precision and accuracy on single-valued params
 single_params = data.table(
   sapply(c("eC","eRJ","eDE","lambda_nu","lambda_delta","lambda_diag","alpha","deviance_proportion_explained",
-           "repetition","maxcount","time"),
+           "repetition","time"),
        function(y){sapply(names(ops), function(x){ops[[x]]$par[[y]]})}))
-single_params[,maxcount:=as.character(maxcount)]
-single_params[maxcount=="-1",maxcount:="exact"]
+single_params[,maxcount:=sapply(names(ops), function(x){ops[[x]]$par$maxcount})]
 single_params[,maxcount:=ordered(maxcount,levels=unique(maxcount))]
-ggplot(melt(single_params,id.vars=c("maxcount","repetition")))+geom_boxplot(aes(maxcount,value,colour=(maxcount=="exact")))+
-  facet_wrap(~variable, scales="free_y")+guides(colour=F)+
+#single_params=single_params[eC<30&eRJ<6&eDE<7.5&lambda_delta<200] #caulo
+#[maxcount!="meanfield"&eDE<20]
+ggplot(melt(single_params[maxcount!="meanfield"],id.vars=c("maxcount","repetition")))+
+  geom_boxplot(aes(maxcount,value,colour=(maxcount=="exact")))+
+  facet_wrap(~variable, scales="free_y",shrink=T)+guides(colour=F)+
+  #labs(title="Toy dataset, 40% zeros", x="mean field threshold", y=NULL)
+  #labs(title="Caulobacter: 200k stretch, 40% zeros", x="mean field threshold", y=NULL)
   labs(title="Rao HICall chr20 300k stretch, 90% zeros", x="mean field threshold", y=NULL)
 ggsave(filename = "images/rao_HICall_chr20_300k_mf_singleparams.png", width=10, height=7.5)
+ggsave(filename = "images/caulo_3-3.2M_mf_singleparams.png", width=10, height=7.5)
+ggsave(filename = "images/toy_high_mf_singleparams_lambda_decoupled_alpha_double_dbins_10_bfkb_1.png", width=10, height=7.5)
 
 #precision on vector-valued params
 all_params = data.table(
   sapply(names(ops[["1"]]$par), function(y){lapply(names(ops), function(x){ops[[x]]$par[[y]]})}))
-all_params[,maxcount:=as.character(maxcount)]
-all_params[maxcount=="-1",maxcount:="exact"]
 all_params[,maxcount:=ordered(maxcount,levels=unique(maxcount))]
 all_params[,repetition:=as.integer(repetition)]
 mult_params=melt(all_params[,.(maxcount,repetition,log_nu,log_delta,beta_diag)], id.vars=c("maxcount","repetition"))
@@ -464,9 +469,14 @@ mult_params=mult_params[,.(idx=c(1:length(unlist(value))),value=unlist(value)),b
                          ,.(std=sd(value)),by=c("maxcount","idx","variable")]
 ggplot(mult_params)+
   geom_boxplot(aes(maxcount,std,colour=(maxcount=="exact")))+facet_wrap(~variable)+
-  guides(colour=F)+scale_y_log10()+labs(title="Rao HICall chr20 300k stretch, 90% zeros: precision", x="mean field threshold",
-                                        y="standard deviation across repeats, for each coefficient")
+  guides(colour=F)+scale_y_log10()+
+  #labs(title="Toy dataset, 40% zeros",
+  #labs(title="Caulobacter 200k stretch, 40% zeros: precision",
+  labs(title="Rao HICall chr20 300k stretch, 90% zeros: precision",
+        x="mean field threshold", y="standard deviation across repeats, for each coefficient")
 ggsave(filename = "images/rao_HICall_chr20_300k_mf_multiparams_precision.png", width=10, height=7.5)
+ggsave(filename = "images/caulo_3-3.2M_mf_multiparams_precision.png", width=10, height=7.5)
+ggsave(filename = "images/toy_high_mf_multiparams_precision.png", width=10, height=7.5)
 
 #accuracy on vector-valued params
 ref_params=melt(all_params[maxcount=="exact",.(repetition,log_nu,log_delta,beta_diag)], id.vars="repetition")
@@ -477,18 +487,24 @@ mult_params=mult_params[,.(idx=c(1:length(unlist(value))),value=unlist(value)),b
 setkey(mult_params, idx, variable)
 mult_params=ref_params[mult_params][,.(prec=dist(rbind(value,med))),by=c("maxcount","idx","variable")]
 ggplot(mult_params)+
-  geom_boxplot(aes(maxcount,prec,colour=(maxcount=="exact")))+facet_wrap(~variable)+
-  guides(colour=F)+labs(title="Rao HICall chr20 300k stretch, 90% zeros: accuracy", x="mean field threshold",
-                                        y="distance from median of exact calculation")+ylim(0,5)
+  geom_boxplot(aes(maxcount,prec,colour=(maxcount=="exact")))+facet_wrap(~variable)+guides(colour=F)+
+  #labs(title="Toy dataset, 40% zeros",
+  #labs(title="Caulobacter 200k stretch, 40% zeros: accuracy",
+  labs(title="Rao HICall chr20 300k stretch, 90% zeros: accuracy",
+       x="mean field threshold", y="distance from median of exact calculation")+coord_cartesian(ylim=c(0,10))
 ggsave(filename = "images/rao_HICall_chr20_300k_mf_multiparams_accuracy.png", width=10, height=7.5)
+ggsave(filename = "images/caulo_3-3.2M_mf_multiparams_accuracy.png", width=10, height=7.5)
+ggsave(filename = "images/toy_high_mf_multiparams_accuracy.png", width=10, height=7.5)
 
 #plot nu
-#pbegin=35100000 
-#pend=35200000 
+pbegin=35100000 
+pend=35200000 
 #pbegin=3166716
 #pend=3266716
-pbegin=0
-pend=20000
+#pbegin=3110583
+#pend=3210583
+#pbegin=0
+#pend=20000
 mean_params=melt(all_params[,.(maxcount,repetition,log_nu,log_delta,eRJ,eDE)], id.vars=c("maxcount","repetition"))
 mean_params=mean_params[,.(idx=c(1:length(unlist(value))),value=unlist(value)),by=c("variable","maxcount","repetition")][
   ,.(med=median(value)),keyby=c("maxcount","variable","idx")]
@@ -498,21 +514,27 @@ ggplot(biases[pos>=pbegin&pos<=pend])+scale_y_log10()+coord_cartesian(ylim=c(0.1
   geom_point(aes(pos, dangling.R/exp(mean_params[variable=='eDE'&maxcount=="exact",med])),colour="pink")+
   geom_point(aes(pos, rejoined/exp(mean_params[variable=='eRJ'&maxcount=="exact",med])),colour="red")+
   geom_line(data=biases[mean_params[variable=='log_nu']][pos>=pbegin&pos<=pend],aes(pos, exp(med), colour=maxcount))+
-  geom_line(aes(pos, exp(true_log_nu)), colour="black")+
-  #labs(title="Rao HICall chr20 300k stretch: 100k example for nu", x="genomic position", y="biases")
-  labs(title="Caulobacter: 100k example for nu", x="genomic position", y="biases")
-#ggsave(filename = "images/rao_HICall_chr20_300k_mf_nu_example.png", width=10, height=7.5)
-ggsave(filename = "images/caulo_3-4M_mf_nu_example.png", width=10, height=7.5)
+  scale_colour_brewer(palette="YlOrRd")+
+  #geom_line(aes(pos, exp(true_log_nu)), colour="black")+
+  #labs(title="Toy dataset, 40% zeros", x="genomic position", y="biases")
+  labs(title="Rao HICall chr20 300k stretch: 100k example for nu", x="genomic position", y="biases")
+  #labs(title="Caulobacter: 100k example for nu", x="genomic position", y="biases")
+ggsave(filename = "images/rao_HICall_chr20_300k_mf_nu_example.png", width=10, height=7.5)
+ggsave(filename = "images/caulo_3-3.2M_mf_nu_example.png", width=10, height=7.5)
+ggsave(filename = "images/toy_high_mf_nu_example.png", width=10, height=7.5)
 
 #plot delta
 ggplot(biases[pos>=pbegin&pos<=pend])+scale_y_log10()+
   geom_point(aes(pos, dangling.L/exp(mean_params[variable=='eDE'&maxcount=="exact",med])),colour="orange")+
   geom_line(data=dcast(biases[mean_params], ...~variable, value.var="med")[pos>=pbegin&pos<=pend],
             aes(pos, exp(log_nu+log_delta), colour=maxcount))+
-  #labs(title="Rao HICall chr20 300k stretch: 100k example for delta", x="genomic position", y="biases")
-  labs(title="Caulobacter: 100k example for delta", x="genomic position", y="biases")
-#ggsave(filename = "images/rao_HICall_chr20_300k_mf_delta_example.png", width=10, height=7.5)
-ggsave(filename = "images/caulo_3-4M_mf_delta_example.png", width=10, height=7.5)
+  scale_colour_brewer(palette="YlOrRd")+
+  #labs(title="Toy dataset, 40% zeros", x="genomic position", y="biases")
+  labs(title="Rao HICall chr20 300k stretch: 100k example for delta", x="genomic position", y="biases")
+  #labs(title="Caulobacter: 100k example for delta", x="genomic position", y="biases")
+ggsave(filename = "images/rao_HICall_chr20_300k_mf_delta_example.png", width=10, height=7.5)
+ggsave(filename = "images/caulo_3-3.2M_mf_delta_example.png", width=10, height=7.5)
+ggsave(filename = "images/toy_high_mf_delta_example.png", width=10, height=7.5)
 
 #plot decay
 decay_params = cbind(
@@ -529,13 +551,14 @@ setkey(decay_params, idx)
 decay_params[,dist:=rep(counts[id1==1,pos2-pos1],each=decay_params[idx==1,.N])]
 decay_params=dcast(decay_params, ...~variable, value.var="med")
 ggplot(decay_params)+scale_y_log10()+scale_x_log10()+ #[maxcount%in%c("exact","0","1")]
+  scale_colour_brewer(palette="YlOrRd")+
   geom_line(aes(abs(dist), exp(log_decay), colour=maxcount))+
-  geom_line(data=counts[,.(decay=exp(true_log_decay)),by=distance],aes(distance,decay),colour="black")+
-  #labs(title="Rao HICall chr20 300k stretch: diagonal decay", x="distance", y="decay")
+  #geom_line(data=counts[,.(decay=exp(true_log_decay)),by=distance],aes(distance,decay),colour="black")+
+  labs(title="Rao HICall chr20 300k stretch: diagonal decay", x="distance", y="decay")
   #labs(title="Caulobacter: 100k example for decay", x="genomic position", y="biases")
-  labs(title="Toy dataset, high coverage, 40% zeros: decay", x="genomic position", y="biases")
-#ggsave(filename = "images/rao_HICall_chr20_300k_mf_decay.png", width=10, height=7.5)
-ggsave(filename = "images/toy_high_mf_decay_twoalphas_100.png", width=10, height=7.5)
+  #labs(title="Toy dataset, high coverage, 40% zeros: decay", x="genomic position", y="biases")
+ggsave(filename = "images/rao_HICall_chr20_300k_mf_decay.png", width=10, height=7.5)
+ggsave(filename = "images/caulo_3-3.2M_mf_decay.png", width=10, height=7.5)
 #
 
 
