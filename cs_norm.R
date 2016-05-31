@@ -201,9 +201,8 @@ stan_matrix_to_datatable = function(opt, x) {
   vals[,x:=x]
   melt(data.table(vals), id.vars="x")
 }
-
 optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, bf_per_kb=1, bf_per_decade=5,
-                                  iter=10000, verbose=T, mincount=-1) {
+                                  iter=10000, verbose=T, mincount=-1, ...) {
   cclose=counts[contact.close>maxcount,.(id1,id2,distance,count=contact.close)][count>mincount]
   cfar=counts[contact.far>maxcount,.(id1,id2,distance,count=contact.far)][count>mincount]
   cup=counts[contact.up>maxcount,.(id1,id2,distance,count=contact.up)][count>mincount]
@@ -239,8 +238,54 @@ optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, bf
   message("Left counts : ", mf$Nkl[,.N], " (", data$Nkl_levels, " levels)")
   message("Right counts: ", mf$Nkr[,.N], " (", data$Nkr_levels, " levels)")
   message("Decay counts: ", mf$Nkd[,.N], " (", data$Nkd_levels, " levels)")
-  optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose)
+  optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, ...)
 }
+
+
+vb_all_meanfield = function(model, biases, counts, meanfield, maxcount, bf_per_kb=1, bf_per_decade=5,
+                                  iter=10000, mincount=-1, ...) {
+  cclose=counts[contact.close>maxcount,.(id1,id2,distance,count=contact.close)][count>mincount]
+  cfar=counts[contact.far>maxcount,.(id1,id2,distance,count=contact.far)][count>mincount]
+  cup=counts[contact.up>maxcount,.(id1,id2,distance,count=contact.up)][count>mincount]
+  cdown=counts[contact.down>maxcount,.(id1,id2,distance,count=contact.down)][count>mincount]
+  mf=list()
+  mf$Nkl=meanfield$Nkl[count<=maxcount]
+  mf$Nkr=meanfield$Nkr[count<=maxcount]
+  mf$Nkd=meanfield$Nkd[count<=maxcount]
+  Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
+  Kdiag=round(counts[,(log10(max(pos2-pos1))-log10(min(pos2-pos1)))*bf_per_decade])
+  data = list( Krow=Krow, S=biases[,.N],
+               cutsites=biases[,pos], rejoined=biases[,rejoined],
+               danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+               Kdiag=Kdiag,
+               Nclose=cclose[,.N], counts_close=cclose[,count], index_close=t(data.matrix(cclose[,.(id1,id2)])), dist_close=cclose[,distance],
+               Nfar=cfar[,.N],     counts_far=cfar[,count],     index_far=t(data.matrix(cfar[,.(id1,id2)])), dist_far=cfar[,distance],
+               Nup=cup[,.N],       counts_up=cup[,count],       index_up=t(data.matrix(cup[,.(id1,id2)])), dist_up=cup[,distance],
+               Ndown=cdown[,.N],   counts_down=cdown[,count],   index_down=t(data.matrix(cdown[,.(id1,id2)])), dist_down=cdown[,distance],
+               Nl=mf$Nkl[,.N], Nkl_count=mf$Nkl[,count], Nkl_cidx=mf$Nkl[,id], Nkl_N=mf$Nkl[,N], Nkl_levels=mf$Nkl[,sum(diff(N)!=0)+1],
+               Nr=mf$Nkr[,.N], Nkr_count=mf$Nkr[,count], Nkr_cidx=mf$Nkr[,id], Nkr_N=mf$Nkr[,N], Nkr_levels=mf$Nkr[,sum(diff(N)!=0)+1],
+               Nd=mf$Nkd[,.N], Nkd_count=mf$Nkd[,count], Nkd_d=mf$Nkd[,mdist], Nkd_N=mf$Nkd[,N], Nkd_levels=mf$Nkd[,sum(diff(N)!=0)+1])
+  if (data$Nl==0) data$Nkl_levels=0
+  if (data$Nr==0) data$Nkr_levels=0
+  if (data$Nd==0) data$Nkd_levels=0
+  message("Mean field optimization")
+  message("Krow        : ", Krow)
+  message("Kdiag       : ", Kdiag)
+  message("Biases      : ", biases[,.N])
+  message("Close counts: ", cclose[,.N])
+  message("Far counts  : ", cfar[,.N])
+  message("Up counts   : ", cup[,.N])
+  message("Down counts : ", cdown[,.N])
+  message("Left counts : ", mf$Nkl[,.N], " (", data$Nkl_levels, " levels)")
+  message("Right counts: ", mf$Nkr[,.N], " (", data$Nkr_levels, " levels)")
+  message("Decay counts: ", mf$Nkd[,.N], " (", data$Nkd_levels, " levels)")
+  op=vb(model, data=data, iter=iter, ...)
+  list(par=sapply(op@model_pars, function(x){as.numeric(get_posterior_mean(op, x))}))
+}
+
+
+
+
 
 predict_full = function(model, biases, counts, opt, verbose=T) {
   #need to ensure that counts span exactly the same distance range as during fitting
@@ -462,18 +507,61 @@ counts=fread(paste0("data/",prefix,"_counts.dat"))
 #save(meanfield, file = paste0("data/",prefix,"_meanfield_100.RData"))
 load(paste0("data/",prefix,"_meanfield_100.RData"))
 
+#restrict to 100 consecutive rsites
+beginrange=150
+endrange=170
+biases=biases[beginrange:endrange]
+biases[,id:=id-beginrange+1]
+prefix=biases[,paste0("caulo_NcoI_",min(pos),"-",max(pos))]
+counts=counts[id1>=beginrange&id1<=endrange&id2>=beginrange&id2<=endrange]
+counts[,c("id1","id2"):=list(id1-beginrange+1,id2-beginrange+1)]
+meanfield$Nkl=meanfield$Nkl[id>=beginrange&id<=endrange][,.(id=id-beginrange+1,count,N)]
+meanfield$Nkr=meanfield$Nkr[id>=beginrange&id<=endrange][,.(id=id-beginrange+1,count,N)]
+
 #### optimization wihout prior guesses
 smfit = stan_model(file = "cs_norm_fit.stan")
 smpred = stan_model(file = "cs_norm_predict.stan")
 maxcount=4
 a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, bf_per_kb=1,
-                                         bf_per_decade=5, verbose = T, iter=100000))
-op$par$time=a[1]+a[4]
-op$par$maxcount=maxcount
-op.pred <- predict_full(smpred, biases, counts, op, verbose = T)
+                                         bf_per_decade=5, verbose = T, iter=100000, tol_rel_grad=1e3, tol_rel_obj=1e3))
+op.slice <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, bf_per_kb=1,
+                                           bf_per_decade=5, verbose = T, iter=100000, tol_rel_grad=1e3, tol_rel_obj=1e3)
+a=data.table(logmean.redo=op$par$log_mean_cclose,
+             logmean.slice=op.slice$par$log_mean_cclose)
+ggplot(a)+geom_point(aes(logmean.redo,logmean.slice))
+
+a=melt(data.table(lognu.short1=op.short1$par$eC+op.short1$par$log_nu,
+                  lognu.short2=op.short1$par$eC+op.short2$par$log_nu,
+                  lognu.long1=op.long1$par$eC+op.long1$par$log_nu,
+                  lognu.long2=op.long2$par$eC+op.long2$par$log_nu,
+                  bias=150:170), id.vars="bias")
+ggplot(a)+geom_line(aes(bias,value,colour=variable))
 
 
-save(op, file=paste0("data/",prefix,"_op_maxcount_4.RData"))
+b=system.time(op <- vb_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, bf_per_kb=1,
+                                           bf_per_decade=5, iter=100000, tol_rel_obj=1e3, algorithm="fullrank"))
+op.slice <- vb_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, bf_per_kb=1,
+                                     bf_per_decade=5, iter=100000, tol_rel_obj=1e3, algorithm="fullrank")
+
+
+#op$par$time=a[1]+a[4]
+#op$par$maxcount=maxcount
+#op.pred <- predict_full(smpred, biases, counts, op, verbose = T)
+
+a=melt(data.table(lognu.redo=op$par$eC+op$par$log_nu,
+                  lognu.slice=op.slice$par$eC+op.slice$par$log_nu,
+                  lognu.full=op.full$par$eC+op.full$par$log_nu[140:160],bias=140:160), id.vars="bias")
+ggplot(a)+geom_line(aes(bias,value,colour=variable))
+
+b=melt(data.table(lognu.redo=op$par$log_nu,
+                  lognu.slice=op.slice$par$log_nu,
+                  bias=140:160), id.vars="bias")
+b[,sum(value),by=variable]
+ggplot(b)+geom_line(aes(bias,value,colour=variable))
+
+
+
+#save(op, file=paste0("data/",prefix,"_op_maxcount_",maxcount,".RData"))
 
 meanfield=bin_for_mean_field(biases, counts, distance_bins_per_decade = 10)
 smfit = stan_model(file = "sparse_cs_norm_fit_meanfield.stan")
