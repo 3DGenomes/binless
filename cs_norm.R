@@ -203,11 +203,11 @@ stan_matrix_to_datatable = function(opt, x) {
 }
 
 optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, bf_per_kb=1, bf_per_decade=5,
-                                  iter=10000, verbose=T, mincount=-1, ...) {
-  cclose=counts[contact.close>maxcount,.(id1,id2,distance,count=contact.close)][count>mincount]
-  cfar=counts[contact.far>maxcount,.(id1,id2,distance,count=contact.far)][count>mincount]
-  cup=counts[contact.up>maxcount,.(id1,id2,distance,count=contact.up)][count>mincount]
-  cdown=counts[contact.down>maxcount,.(id1,id2,distance,count=contact.down)][count>mincount]
+                                  iter=10000, verbose=T, init=0, ...) {
+  cclose=counts[contact.close>maxcount,.(id1,id2,distance,count=contact.close)]
+  cfar=counts[contact.far>maxcount,.(id1,id2,distance,count=contact.far)]
+  cup=counts[contact.up>maxcount,.(id1,id2,distance,count=contact.up)]
+  cdown=counts[contact.down>maxcount,.(id1,id2,distance,count=contact.down)]
   mf=list()
   mf$Nkl=meanfield$Nkl[count<=maxcount]
   mf$Nkr=meanfield$Nkr[count<=maxcount]
@@ -239,7 +239,7 @@ optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, bf
   message("Left counts : ", mf$Nkl[,.N], " (", data$Nkl_levels, " levels)")
   message("Right counts: ", mf$Nkr[,.N], " (", data$Nkr_levels, " levels)")
   message("Decay counts: ", mf$Nkd[,.N], " (", data$Nkd_levels, " levels)")
-  optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, ...)
+  optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 
 predict_full = function(model, biases, counts, opt, verbose=T) {
