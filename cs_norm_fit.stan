@@ -65,12 +65,12 @@ functions {
     return sums;
   }
   
-  matrix bspline(vector x, int K, int q) {
+  matrix bspline(vector x, int K, int q, real xmin, real xmax) {
     real dx; //interval length
     row_vector[K] t; //knot locations (except last)
     //
-    dx <- 1.01*(max(x)-min(x))/(K-q); //make it slightly larger
-    t <- min(x) - dx*0.01 + dx * range(-q,K-q-1)';
+    dx <- 1.01*(xmax-xmin)/(K-q); //make it slightly larger
+    t <- xmin - dx*0.01 + dx * range(-q,K-q-1)';
     return bspl_gen(x, dx, t, q);
   }
 
@@ -130,26 +130,29 @@ data {
   int rejoined[S];
   int danglingL[S];
   int danglingR[S];
+  //distance bounds
+  real<lower=0> dmin;
+  real<lower=dmin> dmax;
   //counts : explicit
   int<lower=0> Nclose; //number of close counts modelled explicitly
   int<lower=0> counts_close[Nclose]; //value of the count
   int<lower=0> index_close[2,Nclose]; //indices of rsite pairs
-  vector<lower=0>[Nclose] dist_close; //genomic distance between rsites
+  vector<lower=dmin,upper=dmax>[Nclose] dist_close; //genomic distance between rsites
   //
   int<lower=0> Nfar; //number of far counts modelled explicitly
   int<lower=0> counts_far[Nfar]; //value of the count
   int<lower=0> index_far[2,Nfar]; //indices of rsite pairs
-  vector<lower=0>[Nfar] dist_far; //genomic distance between rsites
+  vector<lower=dmin,upper=dmax>[Nfar] dist_far; //genomic distance between rsites
   //
   int<lower=0> Nup; //number of upstream counts modelled explicitly
   int<lower=0> counts_up[Nup]; //value of the count
   int<lower=0> index_up[2,Nup]; //indices of rsite pairs
-  vector<lower=0>[Nup] dist_up; //genomic distance between rsites
+  vector<lower=dmin,upper=dmax>[Nup] dist_up; //genomic distance between rsites
   //
   int<lower=0> Ndown; //number of downstream counts modelled explicitly
   int<lower=0> counts_down[Ndown]; //value of the count
   int<lower=0> index_down[2,Ndown]; //indices of rsite pairs
-  vector<lower=0>[Ndown] dist_down; //genomic distance between rsites
+  vector<lower=dmin,upper=dmax>[Ndown] dist_down; //genomic distance between rsites
   //
   //counts : mean field
   int<lower=0> Nl; //number of data points for left side of rsites
@@ -166,7 +169,7 @@ data {
   #
   int<lower=0> Nd; //number of data points for mean field on decay
   int<lower=0> Nkd_count[Nd]; //value of the count
-  vector[Nd] Nkd_d; //geometric mean distance in bin k
+  vector<lower=dmin,upper=dmax>[Nd] Nkd_d; //geometric mean distance in bin k
   int<lower=0> Nkd_N[Nd]; //Nkd(c), i.e. how many contacts have count c in decay bin k
   int<lower=0> Nkd_levels; //number of levels of N
 }
@@ -236,14 +239,13 @@ transformed data {
   
   //diagonal SCAM spline, dense, exact and mean field model
   {
-    //can't do abs() on a vector so be inventive
     vector[Nclose+Nfar+Nup+Ndown] tmp;
     row_vector[Kdiag] tmp2;
     tmp[:Nclose] <- dist_close;
     tmp[(Nclose+1):(Nclose+Nfar)] <- dist_far;
     tmp[(Nclose+Nfar+1):(Nclose+Nfar+Nup)] <- dist_up;
     tmp[(Nclose+Nfar+Nup+1):] <- dist_down;
-    Xdiag <- bspline(append_row(log(tmp), log(Nkd_d)), Kdiag, splinedegree());
+    Xdiag <- bspline(append_row(log(tmp), log(Nkd_d)), Kdiag, splinedegree(), log(dmin), log(dmax));
     //projector for diagonal (SCAM)
     tmp2 <- rep_row_vector(1,Nup+Ndown+Nclose+Nfar+Nd) * Xdiag;
     pdiag <- -tmp2[2:] / (tmp2 * rep_vector(1,Kdiag)); //should it be weighted along MF?

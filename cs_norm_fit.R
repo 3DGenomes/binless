@@ -16,6 +16,8 @@ setwd("/home/yannick/simulations/cs_norm")
 
 optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, bf_per_kb=1, bf_per_decade=5,
                                   iter=10000, verbose=T, init=0, ...) {
+  dmax=max(counts[,max(distance)],meanfield$Nkd[,max(mdist)])+0.01
+  dmin=min(counts[,min(distance)],meanfield$Nkd[,min(mdist)])-0.01
   cclose=counts[contact.close>maxcount,.(id1,id2,distance,count=contact.close)]
   cfar=counts[contact.far>maxcount,.(id1,id2,distance,count=contact.far)]
   cup=counts[contact.up>maxcount,.(id1,id2,distance,count=contact.up)]
@@ -29,7 +31,7 @@ optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, bf
   data = list( Krow=Krow, S=biases[,.N],
                cutsites=biases[,pos], rejoined=biases[,rejoined],
                danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-               Kdiag=Kdiag,
+               dmin=dmin, dmax=dmax, Kdiag=Kdiag,
                Nclose=cclose[,.N], counts_close=cclose[,count], index_close=t(data.matrix(cclose[,.(id1,id2)])), dist_close=cclose[,distance],
                Nfar=cfar[,.N],     counts_far=cfar[,count],     index_far=t(data.matrix(cfar[,.(id1,id2)])), dist_far=cfar[,distance],
                Nup=cup[,.N],       counts_up=cup[,count],       index_up=t(data.matrix(cup[,.(id1,id2)])), dist_up=cup[,distance],
@@ -74,7 +76,7 @@ load(paste0("data/",prefix,"_meanfield_100.RData"))
 
 #### optimization wihout prior guesses
 smfit = stan_model(file = "cs_norm_fit.stan")
-smpred = stan_model(file = "cs_norm_predict.stan")
+#smpred = stan_model(file = "cs_norm_predict.stan")
 maxcount=4
 a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, bf_per_kb=1,
                                          bf_per_decade=5, verbose = T, iter=100000)) #, tol_rel_grad=1e3, tol_rel_obj=1e3
