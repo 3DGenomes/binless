@@ -56,11 +56,17 @@ functions {
   
   int nnz(int N) {return N*(splinedegree()+1);} //nonzero count for design matrix
   
-  row_vector column_sums(int K, vector Xw, int[] Xv) {
+  //implement w^T * X  i.e. left multiply
+  row_vector vector_times_csr_matrix(int K, vector w, vector Xw, int[] Xv, int[] Xu) {
+    int N;
     row_vector[K] sums;
+    N <- rows(w);
+    if (size(Xu) != N+1) reject("Xu is not of size ", N+1);
     sums <- rep_row_vector(0,K);
-    for (i in 1:rows(Xw)) {
-      sums[Xv[i]] <- sums[Xv[i]] + Xw[i];
+    for (i in 1:N) {
+      for (j in Xu[i]:(Xu[i+1]-1)) {
+        sums[Xv[j]] <- sums[Xv[j]] + Xw[j]*w[i];
+      }
     }
     return sums;
   }
@@ -178,19 +184,21 @@ transformed data {
   vector[nnz(S)] Xrow_w;
   int Xrow_v[nnz(S)];
   int Xrow_u[S+1];
-  vector[Krow] prow;
+  vector[S] row_weights;
+  row_vector[Krow] prow;
   //diagonal SCAM spline, dense, exact and mean field
   matrix[Nclose+Nfar+Nup+Ndown+Nd,Kdiag] Xdiag;
-  row_vector[Kdiag-1] pdiag;
+  row_vector[Kdiag] pdiag;
+  vector[Nclose+Nfar+Nup+Ndown+Nd] diag_weights;
   //indices of changes for N
   int Nkl_Nidx[Nkl_levels+1];
   int Nkr_Nidx[Nkr_levels+1];
   int Nkd_Nidx[Nkd_levels+1];
-  
+
   ////bias spline, sparse (nu and delta have the same design)
   //BEGIN sparse calculation
   //cannot write function that modifies its arguments so we put it here
-  //input: vector[Nup+Ndown+Nclose+Nfar] cutsites, int Krow, int splinedegree()
+  //input: vector[S] cutsites, int Krow, int splinedegree()
   //output: vector[nnz(S)] Xrow_w, int Xrow_v[nnz(S)], int Xrow_u[S+1]
   {
     real dx; //interval length
@@ -234,21 +242,46 @@ transformed data {
   //END sparse calculation
 
   //projector for biases (GAM)
-  prow <- column_sums(Krow, Xrow_w, Xrow_v)';
-  prow <- prow / sqrt(dot_self(prow));
+  {
+    row_weights <- rep_vector(3, S); //dangling L/R + rejoined
+    for (i in 1:Nclose) {
+      row_weights[index_close[1,i]] <- row_weights[index_close[1,i]] + 1;
+      row_weights[index_close[2,i]] <- row_weights[index_close[2,i]] + 1;
+    }
+    for (i in 1:Nfar) {
+      row_weights[index_far[1,i]] <- row_weights[index_far[1,i]] + 1;
+      row_weights[index_far[2,i]] <- row_weights[index_far[2,i]] + 1;
+    }
+    for (i in 1:Nup) {
+      row_weights[index_up[1,i]] <- row_weights[index_up[1,i]] + 1;
+      row_weights[index_up[2,i]] <- row_weights[index_up[2,i]] + 1;
+    }
+    for (i in 1:Ndown) {
+      row_weights[index_down[1,i]] <- row_weights[index_down[1,i]] + 1;
+      row_weights[index_down[2,i]] <- row_weights[index_down[2,i]] + 1;
+    }
+    for (i in 1:Nl) row_weights[Nkl_cidx[i]] <- row_weights[Nkl_cidx[i]] + Nkl_N[i];
+    for (i in 1:Nr) row_weights[Nkr_cidx[i]] <- row_weights[Nkr_cidx[i]] + Nkr_N[i];
+    //
+    row_weights <- row_weights/mean(row_weights);
+    prow <- vector_times_csr_matrix(Krow, row_weights, Xrow_w, Xrow_v, Xrow_u);
+    prow <- prow / (prow * rep_vector(1,Krow));
+  }
   
   //diagonal SCAM spline, dense, exact and mean field model
   {
     vector[Nclose+Nfar+Nup+Ndown] tmp;
-    row_vector[Kdiag] tmp2;
     tmp[:Nclose] <- dist_close;
     tmp[(Nclose+1):(Nclose+Nfar)] <- dist_far;
     tmp[(Nclose+Nfar+1):(Nclose+Nfar+Nup)] <- dist_up;
     tmp[(Nclose+Nfar+Nup+1):] <- dist_down;
     Xdiag <- bspline(append_row(log(tmp), log(Nkd_d)), Kdiag, splinedegree(), log(dmin), log(dmax));
     //projector for diagonal (SCAM)
-    tmp2 <- rep_row_vector(1,Nup+Ndown+Nclose+Nfar+Nd) * Xdiag;
-    pdiag <- -tmp2[2:] / (tmp2 * rep_vector(1,Kdiag)); //should it be weighted along MF?
+    diag_weights[1:(Nclose+Nfar+Nup+Ndown)] <- rep_vector(1, Nclose+Nfar+Nup+Ndown);
+    diag_weights[(Nclose+Nfar+Nup+Ndown+1):] <- to_vector(Nkd_N);
+    diag_weights <- diag_weights/mean(diag_weights);
+    pdiag <- diag_weights' * Xdiag;
+    pdiag <- pdiag / (pdiag * rep_vector(1,Kdiag));
   }
   
   //indices of changes for N
@@ -287,6 +320,7 @@ transformed parameters {
   vector[Nup] log_decay_up;
   vector[Ndown] log_decay_down;
   vector[Nd] log_decay_mf;
+  vector[Kdiag] beta_diag_centered;
   vector[Kdiag-2] beta_diag_diff;
   //means
   vector[S] log_mean_DL;
@@ -304,34 +338,33 @@ transformed parameters {
   
   //nu
   {
-    vector[Krow] beta_nu_centered;
     vector[Krow] beta_nu_aug;
-    beta_nu_aug[1] <- sum(beta_nu);
+    vector[Krow] beta_nu_centered;
+    beta_nu_aug[1] <- 0;
     beta_nu_aug[2:] <- beta_nu;
-    beta_nu_centered <- beta_nu_aug - (beta_nu_aug' * prow) * prow;
+    beta_nu_centered <- beta_nu_aug - (prow * beta_nu_aug) * rep_vector(1,Krow);
     log_nu <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_nu_centered);
-    beta_nu_diff <- beta_nu_aug[:(Krow-2)]-2*beta_nu_aug[2:(Krow-1)]+beta_nu_aug[3:];
+    beta_nu_diff <- beta_nu_centered[:(Krow-2)]-2*beta_nu_centered[2:(Krow-1)]+beta_nu_centered[3:];
   }
   //delta
   {
-    vector[Krow] beta_delta_centered;
     vector[Krow] beta_delta_aug;
-    beta_delta_aug[1] <- sum(beta_delta);
+    vector[Krow] beta_delta_centered;
+    beta_delta_aug[1] <- 0;
     beta_delta_aug[2:] <- beta_delta;
-    beta_delta_centered <- beta_delta_aug - (beta_delta_aug' * prow) * prow;
+    beta_delta_centered <- beta_delta_aug - (prow * beta_delta_aug) * rep_vector(1,Krow);
     log_delta <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
-    beta_delta_diff <- beta_delta_aug[:(Krow-2)]-2*beta_delta_aug[2:(Krow-1)]+beta_delta_aug[3:];
+    beta_delta_diff <- beta_delta_centered[:(Krow-2)]-2*beta_delta_centered[2:(Krow-1)]+beta_delta_centered[3:];
   }
   //decay
   {
+    vector[Kdiag] beta_diag_aug;
     vector[Nclose+Nfar+Nup+Ndown+Nd] log_decay;
-    vector[Kdiag] beta_diag_centered;
     real epsilon;
-    real val;
-    epsilon <- -1; //+1 for increasing, -1 for decreasing spline
-    val <- epsilon*pdiag*beta_diag;
-    beta_diag_centered[1] <- val;
-    beta_diag_centered[2:] <- val+epsilon*beta_diag;
+    epsilon <- -1; //decreasing spline
+    beta_diag_aug[1] <- 0;
+    beta_diag_aug[2:] <- beta_diag;
+    beta_diag_centered <- epsilon * (beta_diag_aug - (pdiag * beta_diag_aug) * rep_vector(1, Kdiag));
     log_decay <- Xdiag * beta_diag_centered;
     log_decay_close <- log_decay[:Nclose];
     log_decay_far <- log_decay[(Nclose+1):(Nclose+Nfar)];
@@ -406,6 +439,9 @@ model {
   beta_diag_diff ~ normal(0, 1./lambda_diag);
 }
 generated quantities {
+  vector[S] rw;
+  vector[Nclose+Nfar+Nup+Ndown+Nd] dw;
+  #
   real deviance;
   real deviance_null;
   real deviance_proportion_explained;
@@ -425,6 +461,9 @@ generated quantities {
   real count_deviance_mf;
   real count_deviance_mf_null;
   real count_deviance_mf_proportion_explained;
+  #weights
+  rw <- row_weights;
+  dw <- diag_weights;
   #deviances
   count_deviance_mf <- neg_binomial_2_log_deviance(Nkl_count, log_mean_left, alpha, to_vector(Nkl_N)) +
                        neg_binomial_2_log_deviance(Nkr_count, log_mean_right, alpha, to_vector(Nkr_N)) +
