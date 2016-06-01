@@ -65,35 +65,6 @@ functions {
     t <- xmin - dx*0.01 + dx * range(-q,K-q-1)';
     return bspl_gen(x, dx, t, q);
   }
-
-  real neg_binomial_2_log_deviance(int[] y, vector log_mu, real alpha, vector weights) {
-    vector[size(y)] y_vec;
-    vector[size(y)] y_mod;
-    vector[size(y)] mu;
-    vector[size(y)] wt;
-    //
-    y_vec <- to_vector(y);
-    //
-    if (rows(log_mu) != size(y)) {
-      if (rows(log_mu) != 1) reject("size of log_mu (", rows(log_mu),
-                                     ") must be either 1 or the size of y (",size(y),")");
-      mu <- rep_vector(exp(log_mu[1]), size(y));
-    } else {
-      mu <- exp(log_mu);
-    }
-    //
-    if (rows(weights) != size(y)) {
-      if (rows(weights) != 1) reject("size of weights (", rows(weights),
-                                     ") must be either 1 or the size of y (",size(y),")");
-      wt <- rep_vector(weights[1], size(y));
-    } else {
-      wt <- weights;
-    }
-    //
-    for (i in 1:size(y)) if (y[i]>0) {y_mod[i] <- y[i];} else {y_mod[i] <-1;}
-    return 2*sum( ( (y_vec+alpha) .* log( (mu+alpha) ./ (y_vec+alpha) )
-                    + y_vec .* log(y_mod ./ mu) ) .* wt );
-  }
 }
 ////////////////////////////////////////////////////////////////
 data {
@@ -131,7 +102,6 @@ data {
   vector[S] log_nu; //take nu and delta directly to avoid base reconstruction
   vector[S] log_delta; 
   vector[Kdiag] beta_diag_centered; //need to build spline base
-  real<lower=0> alpha;
 }
 parameters {}
 model {}
