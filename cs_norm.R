@@ -215,7 +215,7 @@ optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, bf
   mf$Nkr=meanfield$Nkr[count<=maxcount]
   mf$Nkd=meanfield$Nkd[count<=maxcount]
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
-  Kdiag=round(counts[,(log10(max(pos2-pos1))-log10(min(pos2-pos1)))*bf_per_decade])
+  Kdiag=round(counts[,(log10(dmax)-log10(dmin))*bf_per_decade])
   data = list( Krow=Krow, S=biases[,.N],
                cutsites=biases[,pos], rejoined=biases[,rejoined],
                danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
@@ -244,9 +244,37 @@ optimize_all_meanfield = function(model, biases, counts, meanfield, maxcount, bf
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 
+predict_all_meanfield = function(model, biases, counts, meanfield, opt, bf_per_decade=5, verbose=T) {
+  dmax=max(counts[,max(distance)],meanfield$Nkd[,max(mdist)])+0.01
+  dmin=min(counts[,min(distance)],meanfield$Nkd[,min(mdist)])-0.01
+  cclose=counts[,.(id1,id2,distance,count=contact.close)]
+  cfar=counts[,.(id1,id2,distance,count=contact.far)]
+  cup=counts[,.(id1,id2,distance,count=contact.up)]
+  cdown=counts[,.(id1,id2,distance,count=contact.down)]
+  Kdiag=round(counts[,(log10(dmax)-log10(dmin))*bf_per_decade])
+  data = list( Kdiag=Kdiag, S=biases[,.N], cutsites=biases[,pos], dmin=dmin, dmax=dmax,
+               Nclose=cclose[,.N], counts_close=cclose[,count], index_close=t(data.matrix(cclose[,.(id1,id2)])), dist_close=cclose[,distance],
+               Nfar=cfar[,.N],     counts_far=cfar[,count],     index_far=t(data.matrix(cfar[,.(id1,id2)])), dist_far=cfar[,distance],
+               Nup=cup[,.N],       counts_up=cup[,count],       index_up=t(data.matrix(cup[,.(id1,id2)])), dist_up=cup[,distance],
+               Ndown=cdown[,.N],   counts_down=cdown[,count],   index_down=t(data.matrix(cdown[,.(id1,id2)])), dist_down=cdown[,distance],
+               eC=opt$par$eC, log_nu=opt$par$log_nu, log_delta=opt$par$log_delta,
+               beta_diag_centered=opt$par$beta_diag_centered, alpha=opt$par$alpha)
+  message("Mean field prediction")
+  message("Kdiag       : ", Kdiag)
+  message("Close counts: ", cclose[,.N])
+  message("Far counts  : ", cfar[,.N])
+  message("Up counts   : ", cup[,.N])
+  message("Down counts : ", cdown[,.N])
+  optimizing(model, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)
+}
+
+
 predict_full = function(model, biases, counts, opt, verbose=T) {
   #need to ensure that counts span exactly the same distance range as during fitting
-  data = list( Kdiag=length(op$par$beta_diag)+1, S=biases[,.N], cutsites=biases[,pos], N=counts[,.N],
+  dmax=max(counts[,max(distance)],meanfield$Nkd[,max(mdist)])+0.01
+  dmin=min(counts[,min(distance)],meanfield$Nkd[,min(mdist)])-0.01
+  data = list( Kdiag=length(op$par$beta_diag)+1, S=biases[,.N], cutsites=biases[,pos],
+               dmin=dmin, dmax=dmax, N=counts[,.N],
                counts=t(data.matrix(counts[,.(contact.close,contact.far,contact.up,contact.down)])),
                cidx=t(data.matrix(counts[,.(id1,id2)])),
                eC=opt$par$eC, log_nu=opt$par$log_nu, log_delta=opt$par$log_delta,
@@ -464,13 +492,42 @@ counts=fread(paste0("data/",prefix,"_counts.dat"))
 #save(meanfield, file = paste0("data/",prefix,"_meanfield_100.RData"))
 load(paste0("data/",prefix,"_meanfield_100.RData"))
 
+
+#restrict to 100 consecutive rsites
+beginrange=150
+endrange=170
+biases=biases[beginrange:endrange]
+biases[,id:=id-beginrange+1]
+prefix=biases[,paste0("caulo_NcoI_",min(pos),"-",max(pos))]
+counts=counts[id1>=beginrange&id1<=endrange&id2>=beginrange&id2<=endrange]
+counts[,c("id1","id2"):=list(id1-beginrange+1,id2-beginrange+1)]
+meanfield$Nkl=meanfield$Nkl[id>=beginrange&id<=endrange][,.(id=id-beginrange+1,count,N)]
+meanfield$Nkr=meanfield$Nkr[id>=beginrange&id<=endrange][,.(id=id-beginrange+1,count,N)]
+
+
+
 #### optimization wihout prior guesses
 smfit = stan_model(file = "cs_norm_fit.stan")
 smpred = stan_model(file = "cs_norm_predict.stan")
-maxcount=4
+maxcount=-1
 a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, bf_per_kb=1,
-                                         bf_per_decade=5, verbose = T, iter=10, tol_rel_grad=1e3, tol_rel_obj=1e3))
+                                         bf_per_decade=5, verbose = T, iter=100000)) #, tol_rel_grad=1e3, tol_rel_obj=1e3
 #save(op, file=paste0("data/",prefix,"_op_maxcount_",maxcount,".RData"))
+op.pred=predict_all_meanfield(smpred, biases, counts, meanfield, op, verbose=T)
+
+ggplot(data.table(x=biases[,pos], y=op$par$log_nu))+geom_point(aes(x,y))
+ggplot(data.table(x=biases[,pos], y=op$par$rw))+geom_point(aes(x,y))
+ggplot(data.table(x=counts[contact.close>maxcount,distance], y=op$par$log_decay_close))+geom_point(aes(x,y))+scale_x_log10()
+ggplot(data.table(x=meanfield$Nkd[count<=maxcount,mdist], y=op$par$log_decay_mf))+geom_point(aes(x,y))+scale_x_log10()
+ggplot(data.table(x=meanfield$Nkd[count<=maxcount,mdist], y=tail(op$par$dw,length(op$par$log_decay_mf))))+geom_point(aes(x,y))
+op$par$dw %*% c(op$par$log_decay_close, op$par$log_decay_far, op$par$log_decay_up, op$par$log_decay_down, op$par$log_decay_mf)
+
+a=data.table(orig=op$par$log_decay_close,
+             regen=op.pred$par$log_decay_close[counts[,contact.close>maxcount]])
+ggplot(a)+geom_point(aes(orig,regen))+stat_function(fun=identity)
+a=data.table(orig=op$par$log_mean_cclose,
+             regen=op.pred$par$log_mean_cclose[counts[,contact.close>maxcount]])
+ggplot(a)+geom_point(aes(orig,regen))+stat_function(fun=identity)
 
 
 
