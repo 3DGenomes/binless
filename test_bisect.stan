@@ -1,7 +1,7 @@
 functions {
   //find the index in x such as x[i]<=z and x[i+1]>z
   //startpos is a suggested starting position for i
-  real bisect(real z, int startpos, vector x) {
+  int bisect(real z, int startpos, vector x) {
     int pos;
     int left;
     int right;
@@ -39,6 +39,6 @@ data {
 parameters {}
 model {}
 generated quantities {
-  real x;
+  int x;
   x <- bisect(query, initial, values);
 }
