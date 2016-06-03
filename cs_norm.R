@@ -307,20 +307,6 @@ get_binned_matrices = function(model, biases, counts, meanfield, opt, resolution
                bbins1=biases[!is.na(bin1),as.integer(bin1)], bbins2=biases[!is.na(bin2),as.integer(bin2)])
   binned=optimizing(model, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)
   return(binned)
-  #write begins/ends
-  bin1.begin=sub[,bin1]
-  bin1.end=sub[,bin1]
-  bin2.begin=sub[,bin2]
-  bin2.end=sub[,bin2]
-  levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[[,]")[2][[1]]
-  levels(bin1.end) <- tstrsplit(as.character(levels(bin1.end)), "[[,)]")[2][[1]]
-  levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[[,]")[2][[1]]
-  levels(bin2.end) <- tstrsplit(as.character(levels(bin2.end)), "[[,)]")[2][[1]]
-  sub[,begin1:=as.integer(as.character(bin1.begin))]
-  sub[,end1:=as.integer(as.character(bin1.end))]
-  sub[,begin2:=as.integer(as.character(bin2.begin))]
-  sub[,end2:=as.integer(as.character(bin2.end))]
-  return(sub)
 }
 
 #get_binned_matrices(smbin, biases, counts, meanfield, op, resolution=1000)
@@ -582,3 +568,4 @@ ggplot(data.table(melt(op$binned$observed)))+geom_raster(aes(Var1,Var2,fill=log(
 ggplot(data.table(melt(op$binned$expected)))+geom_raster(aes(Var1,Var2,fill=log(value)))
 ggplot(data.table(melt(op$binned$observed/op$binned$expected)))+geom_raster(aes(Var1,Var2,fill=log(value)))
 ggplot(data.table(melt(log(op$binned$observed/op$binned$expected))))+geom_histogram(aes(value))
+ggplot(data.table(melt(op$binned$ncounts)))+geom_raster(aes(Var1,Var2,fill=log(value)))

@@ -134,8 +134,9 @@ generated quantities {
   vector[npoints] log_dist;
   vector[npoints] log_decay;
   //matrices
-  matrix[B1,B2] observed;
-  matrix[B1,B2] expected;
+  matrix[B1,B2] observed; //summed counts per bin
+  matrix[B1,B2] expected; //posterior mean of negative binomial per bin
+  matrix[B1,B2] ncounts; //number of possible counts in bin
   
   //decay
   {
@@ -149,7 +150,8 @@ generated quantities {
   observed <- rep_matrix(0,B1,B2);
   for (i in 1:N) observed[cbins1[i],cbins2[i]] <- observed[cbins1[i],cbins2[i]] + counts[i];
   
-  //expected
+  //expected and ncrossings
+  ncounts <- rep_matrix(0,B1,B2);
   expected <- rep_matrix(0,B1,B2);
   for (i in 1:S1) {
     real pos1;
@@ -160,6 +162,7 @@ generated quantities {
       real pos2;
       pos2 <- cutsites2[j];
       if (pos2 > pos1) {
+        ncounts[bbins1[i],bbins2[j]] <- ncounts[bbins1[i],bbins2[j]]+1;
         k <- bisect(log(pos2-pos1), k, log_dist);
         expected[bbins1[i],bbins2[j]] <- expected[bbins1[i],bbins2[j]] +
             exp(eC + log_nu1[i] + log_nu2[j] + log_decay[k])*2*cosh(log_delta1[i])*2*cosh(log_delta2[j]);
