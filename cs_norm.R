@@ -270,47 +270,62 @@ predict_all_meanfield = function(model, biases, counts, meanfield, opt, bf_per_d
 
 get_binned_matrices = function(model, biases, counts, meanfield, opt, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL, bf_per_decade=5, verbose=T) {
   stopifnot(counts[distance!=pos2-pos1,.N]==0) #need to implement circular genomes
-  #bin existing counts and biases
-  if (is.null(b1)) b1=biases[,min(pos)]-1
-  if (is.null(b2)) b2=biases[,min(pos)]-1
-  if (is.null(e1)) e1=biases[,max(pos)]+1
-  if (is.null(e2)) e2=biases[,max(pos)]+1
-  bins1=seq(b1,e1+resolution,resolution)
-  bins2=seq(b2,e2+resolution,resolution)
-  counts[,c("bin1","bin2"):=list(cut(pos1, bins1, ordered_result=T, right=F, include.lowest=T),
-                                 cut(pos2, bins2, ordered_result=T, right=F, include.lowest=T))]
-  biases[,log_nu:=opt$par$log_nu]
-  biases[,log_delta:=opt$par$log_delta]
-  biases[,c("bin1","bin2"):=list(cut(pos, bins1, ordered_result=T, right=F, include.lowest=T),
-                                 cut(pos, bins2, ordered_result=T, right=F, include.lowest=T))]
-  #run computation of mean
+  csub=copy(counts) #need to implement taking only needed part of matrix, and reporting log_nu and log_delta appropriately
+  bsub=copy(biases)
   dmax=max(counts[,max(distance)],meanfield$Nkd[,max(mdist)])+0.01
   dmin=min(counts[,min(distance)],meanfield$Nkd[,min(mdist)])-0.01
-  cclose=counts[,.(id1,id2,bin1,bin2,distance,count=contact.close)]
-  cfar=counts[,.(id1,id2,bin1,bin2,distance,count=contact.far)]
-  cup=counts[,.(id1,id2,bin1,bin2,distance,count=contact.up)]
-  cdown=counts[,.(id1,id2,bin1,bin2,distance,count=contact.down)]
-  allcounts=rbind(cclose,cfar,cup,cdown)[!(is.na(bin1)|is.na(bin2)|count==0)]
-  Kdiag=round(counts[,(log10(dmax)-log10(dmin))*bf_per_decade])
+  Kdiag=round(csub[,(log10(dmax)-log10(dmin))*bf_per_decade])
   npoints=100*Kdiag #evaluate spline with 100 equidistant points per basis function
+  #bin existing counts and biases
+  if (is.null(b1)) b1=bsub[,min(pos)]-1
+  if (is.null(b2)) b2=bsub[,min(pos)]-1
+  if (is.null(e1)) e1=bsub[,max(pos)]+1
+  if (is.null(e2)) e2=bsub[,max(pos)]+1
+  bins1=seq(b1,e1+resolution,resolution)
+  bins2=seq(b2,e2+resolution,resolution)
+  csub[,c("bin1","bin2"):=list(cut(pos1, bins1, ordered_result=T, right=F, include.lowest=T),
+                                 cut(pos2, bins2, ordered_result=T, right=F, include.lowest=T))]
+  bsub[,log_nu:=opt$par$log_nu]
+  bsub[,log_delta:=opt$par$log_delta]
+  bsub[,c("bin1","bin2"):=list(cut(pos, bins1, ordered_result=T, right=F, include.lowest=T),
+                                 cut(pos, bins2, ordered_result=T, right=F, include.lowest=T))]
+  bsub[,c("ibin1","ibin2"):=list(as.integer(bin1),as.integer(bin2))]
+  #run computation of mean
+  cclose=csub[,.(id1,id2,bin1,bin2,distance,count=contact.close)]
+  cfar=csub[,.(id1,id2,bin1,bin2,distance,count=contact.far)]
+  cup=csub[,.(id1,id2,bin1,bin2,distance,count=contact.up)]
+  cdown=csub[,.(id1,id2,bin1,bin2,distance,count=contact.down)]
+  csub=rbind(cclose,cfar,cup,cdown)[!(is.na(bin1)|is.na(bin2)|count==0)]
   data = list( Kdiag=Kdiag, 
-               S1=biases[!is.na(bin1),.N], S2=biases[!is.na(bin2),.N], 
-               cutsites1=biases[!is.na(bin1),pos], cutsites2=biases[!is.na(bin2),pos],
+               S1=bsub[!is.na(bin1),.N], S2=bsub[!is.na(bin2),.N], 
+               cutsites1=bsub[!is.na(bin1),pos], cutsites2=bsub[!is.na(bin2),pos],
                dmin=dmin, dmax=dmax, npoints=npoints,
-               N=allcounts[,.N],   counts=allcounts[,count],
+               N=csub[,.N],   counts=csub[,count],
                eC=opt$par$eC,
-               log_nu1=biases[!is.na(bin1),log_nu], log_nu2=biases[!is.na(bin2),log_nu],
-               log_delta1=biases[!is.na(bin1),log_delta], log_delta2=biases[!is.na(bin2),log_delta],
+               log_nu1=bsub[!is.na(bin1),log_nu], log_nu2=bsub[!is.na(bin2),log_nu],
+               log_delta1=bsub[!is.na(bin1),log_delta], log_delta2=bsub[!is.na(bin2),log_delta],
                beta_diag_centered=opt$par$beta_diag_centered,
-               B1=allcounts[,nlevels(bin1)], B2=allcounts[,nlevels(bin2)],
-               cbins1=allcounts[,as.integer(bin1)], cbins2=allcounts[,as.integer(bin2)],
-               bbins1=biases[!is.na(bin1),as.integer(bin1)], bbins2=biases[!is.na(bin2),as.integer(bin2)])
+               B1=csub[,nlevels(bin1)], B2=csub[,nlevels(bin2)],
+               cbins1=csub[,as.integer(bin1)], cbins2=csub[,as.integer(bin2)],
+               bbins1=bsub[!is.na(bin1),ibin1], bbins2=bsub[!is.na(bin2),ibin2])
   binned=optimizing(model, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)
-  return(binned)
+  #format output
+  so = data.table(melt(binned$par$observed))
+  setnames(so,"value","observed")
+  so[,expected:=melt(binned$par$expected)$value]
+  so[,ncounts:=melt(binned$par$ncounts)$value]
+  so=so[ncounts>0]
+  setkey(so,Var1)
+  so=bsub[,.(bin1=bin1[1]),keyby=ibin1][so]
+  setkey(so,Var2)
+  so=bsub[,.(bin2=bin2[1]),keyby=ibin2][so]
+  so[,c("ibin1","ibin2"):=list(NULL,NULL)]
+  return(list(distance=binned$par$log_dist, decay=binned$par$log_decay, mat=so))
 }
 
-#get_binned_matrices(smbin, biases, counts, meanfield, op, resolution=1000)
-
+get_dispersions = function(model, opt) {
+  
+}
 
 bin_for_mean_field = function(biases, counts, distance_bins_per_decade=100, circularize=-1) {
   stopifnot(counts[id1>=id2,.N]==0)
@@ -556,12 +571,14 @@ counts[,distance:=abs(pos2-pos1)]
 smfit = stan_model(file = "cs_norm_fit.stan")
 smpred = stan_model(file = "cs_norm_predict.stan")
 smbin = stan_model("cs_norm_predict_binned.stan")
+smdisp = stan_model("cs_norm_binned_dispersions.stan")
 maxcount=-1
 a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, bf_per_kb=1,
                                            bf_per_decade=5, verbose = T, iter=100000)) #, tol_rel_grad=1e3, tol_rel_obj=1e3
 #save(op, file=paste0("data/",prefix,"_op_maxcount_",maxcount,".RData"))
 op$pred=predict_all_meanfield(smpred, biases, counts, meanfield, op, verbose=T)$par
-op$binned=get_binned_matrices(smbin, biases, counts, meanfield, op, resolution=10000)$par
+op$binned=get_binned_matrices(smbin, biases, counts, meanfield, op, resolution=10000)
+op$disp=get_dispersions(smdisp, op)$par
 
 ggplot(data.table(dist=exp(op$binned$log_dist), decay=exp(op$binned$log_decay)))+geom_point(aes(dist,decay))+scale_x_log10()+scale_y_log10()
 ggplot(data.table(melt(op$binned$observed)))+geom_raster(aes(Var1,Var2,fill=log(value)))
