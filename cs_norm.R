@@ -258,7 +258,7 @@ predict_all_meanfield = function(model, biases, counts, meanfield, opt, bf_per_d
                Nup=cup[,.N],       counts_up=cup[,count],       index_up=t(data.matrix(cup[,.(id1,id2)])), dist_up=cup[,distance],
                Ndown=cdown[,.N],   counts_down=cdown[,count],   index_down=t(data.matrix(cdown[,.(id1,id2)])), dist_down=cdown[,distance],
                eC=opt$par$eC, log_nu=opt$par$log_nu, log_delta=opt$par$log_delta,
-               beta_diag_centered=opt$par$beta_diag_centered, alpha=opt$par$alpha)
+               beta_diag_centered=opt$par$beta_diag_centered)
   message("Mean field prediction")
   message("Kdiag       : ", Kdiag)
   message("Close counts: ", cclose[,.N])
@@ -268,57 +268,45 @@ predict_all_meanfield = function(model, biases, counts, meanfield, opt, bf_per_d
   optimizing(model, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)
 }
 
-
-predict_full = function(model, biases, counts, opt, verbose=T) {
-  #need to ensure that counts span exactly the same distance range as during fitting
-  dmax=max(counts[,max(distance)],meanfield$Nkd[,max(mdist)])+0.01
-  dmin=min(counts[,min(distance)],meanfield$Nkd[,min(mdist)])-0.01
-  data = list( Kdiag=length(op$par$beta_diag)+1, S=biases[,.N], cutsites=biases[,pos],
-               dmin=dmin, dmax=dmax, N=counts[,.N],
-               counts=t(data.matrix(counts[,.(contact.close,contact.far,contact.up,contact.down)])),
-               cidx=t(data.matrix(counts[,.(id1,id2)])),
-               eC=opt$par$eC, log_nu=opt$par$log_nu, log_delta=opt$par$log_delta,
-               beta_diag=opt$par$beta_diag, alpha=opt$par$alpha)
-  optimizing(model, data = data, as_vector=F, hessian=F, iter=1, verbose=verbose)
-}
-
-
-bin_counts = function(counts, biases, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL, normalized=T) {
-  if (is.null(b1)) b1=counts[,min(pos1)]-1
-  if (is.null(b2)) b2=counts[,min(pos2)]-1
-  if (is.null(e1)) e1=counts[,max(pos1)]+1
-  if (is.null(e2)) e2=counts[,max(pos2)]+1
+get_binned_matrices = function(model, biases, counts, meanfield, opt, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL, bf_per_decade=5, verbose=T) {
+  stopifnot(counts[distance!=pos2-pos1,.N]==0) #need to implement circular genomes
+  #bin existing counts and biases
+  if (is.null(b1)) b1=biases[,min(pos)]-1
+  if (is.null(b2)) b2=biases[,min(pos)]-1
+  if (is.null(e1)) e1=biases[,max(pos)]+1
+  if (is.null(e2)) e2=biases[,max(pos)]+1
   bins1=seq(b1,e1+resolution,resolution)
   bins2=seq(b2,e2+resolution,resolution)
-  #
-  counts.wrapped=rbindlist(list(counts[,.(pos1,pos2,contact.close,log_decay,log_mean_cclose)],
-                                counts[,.(pos1,pos2,contact.far,log_decay,log_mean_cfar)],
-                                counts[,.(pos1,pos2,contact.up,log_decay,log_mean_cup)],
-                                counts[,.(pos1,pos2,contact.down,log_decay,log_mean_cdown)]))
-  setnames(counts.wrapped, c("pos1","pos2","count","log_decay","log_mean"))
-  if (normalized==T) {
-    sub = counts.wrapped[,.(pos1,pos2,bin1=cut2(pos1, bins1, oneval=F, onlycuts=T, digits=10, minmax=F),
-                            bin2=cut2(pos2,bins2, oneval=F, onlycuts=T, digits=10, minmax=F),
-                            weight=exp(log_mean-log_decay))
-                         ][,.(N=sum(weight, na.rm = T)),by=c("bin1","bin2")]
-  } else {
-    sub = counts.wrapped[,.(pos1,pos2,bin1=cut2(pos1, bins1, oneval=F, onlycuts=T, digits=10, minmax=F),
-                            bin2=cut2(pos2,bins2, oneval=F, onlycuts=T, digits=10, minmax=F),
-                            weight=count)
-                         ][,.(N=sum(weight, na.rm = T)),by=c("bin1","bin2")]
-  }
-  #remove NAs in case a zoom was performed
-  sub=sub[complete.cases(sub)]
-  #divide by number of rsites in each bin
-  if (normalized==T) {
-    ns1 = biases[,.(bin1=cut2(pos, bins1, oneval=F, onlycuts=F, digits=10))][,.(nsites1=.N),keyby=bin1]
-    setkey(sub, bin1)
-    sub=ns1[sub]
-    ns2 = biases[,.(bin2=cut2(pos, bins2, oneval=F, onlycuts=F, digits=10))][,.(nsites2=.N),keyby=bin2]
-    setkey(sub, bin2)
-    sub=ns2[sub]
-    sub[,N:=N/(nsites1*nsites2)]
-  }
+  counts[,c("bin1","bin2"):=list(cut(pos1, bins1, ordered_result=T, right=F, include.lowest=T),
+                                 cut(pos2, bins2, ordered_result=T, right=F, include.lowest=T))]
+  biases[,log_nu:=opt$par$log_nu]
+  biases[,log_delta:=opt$par$log_delta]
+  biases[,c("bin1","bin2"):=list(cut(pos, bins1, ordered_result=T, right=F, include.lowest=T),
+                                 cut(pos, bins2, ordered_result=T, right=F, include.lowest=T))]
+  #run computation of mean
+  dmax=max(counts[,max(distance)],meanfield$Nkd[,max(mdist)])+0.01
+  dmin=min(counts[,min(distance)],meanfield$Nkd[,min(mdist)])-0.01
+  cclose=counts[,.(id1,id2,bin1,bin2,distance,count=contact.close)]
+  cfar=counts[,.(id1,id2,bin1,bin2,distance,count=contact.far)]
+  cup=counts[,.(id1,id2,bin1,bin2,distance,count=contact.up)]
+  cdown=counts[,.(id1,id2,bin1,bin2,distance,count=contact.down)]
+  allcounts=rbind(cclose,cfar,cup,cdown)[!(is.na(bin1)|is.na(bin2)|count==0)]
+  Kdiag=round(counts[,(log10(dmax)-log10(dmin))*bf_per_decade])
+  npoints=100*Kdiag #evaluate spline with 100 equidistant points per basis function
+  data = list( Kdiag=Kdiag, 
+               S1=biases[!is.na(bin1),.N], S2=biases[!is.na(bin2),.N], 
+               cutsites1=biases[!is.na(bin1),pos], cutsites2=biases[!is.na(bin2),pos],
+               dmin=dmin, dmax=dmax, npoints=npoints,
+               N=allcounts[,.N],   counts=allcounts[,count],
+               eC=opt$par$eC,
+               log_nu1=biases[!is.na(bin1),log_nu], log_nu2=biases[!is.na(bin2),log_nu],
+               log_delta1=biases[!is.na(bin1),log_delta], log_delta2=biases[!is.na(bin2),log_delta],
+               beta_diag_centered=opt$par$beta_diag_centered,
+               B1=allcounts[,nlevels(bin1)], B2=allcounts[,nlevels(bin2)],
+               cbins1=allcounts[,as.integer(bin1)], cbins2=allcounts[,as.integer(bin2)],
+               bbins1=biases[!is.na(bin1),as.integer(bin1)], bbins2=biases[!is.na(bin2),as.integer(bin2)])
+  binned=optimizing(model, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)
+  return(binned)
   #write begins/ends
   bin1.begin=sub[,bin1]
   bin1.end=sub[,bin1]
@@ -334,6 +322,9 @@ bin_counts = function(counts, biases, resolution, b1=NULL, b2=NULL, e1=NULL, e2=
   sub[,end2:=as.integer(as.character(bin2.end))]
   return(sub)
 }
+
+#get_binned_matrices(smbin, biases, counts, meanfield, op, resolution=1000)
+
 
 bin_for_mean_field = function(biases, counts, distance_bins_per_decade=100, circularize=-1) {
   stopifnot(counts[id1>=id2,.N]==0)
@@ -424,6 +415,73 @@ dset_statistics = function(biases,counts){
   message("   C. down   : ", counts[contact.down==0,.N]/counts[,.N]*100)
 }
 
+generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4, eDE=.8, alpha=10) {
+  #place rsites
+  biases=data.table(id=seq(num_rsites),
+                    pos=cumsum(rmultinom(n=1, size=genome_size, prob=rep(1,num_rsites+1)))[1:num_rsites])
+  setkey(biases,id)
+  #build biases
+  biases[,true_log_nu:=sin(pos/1000)+(pos-genome_size/2)/genome_size]
+  biases[,true_log_nu:=true_log_nu-mean(true_log_nu)]
+  #ggplot(biases,aes(pos,true_log_nu))+geom_point()+geom_line()
+  biases[,true_log_delta:=-(pos-genome_size/2)/genome_size+sin(pos/2100)]
+  biases[,true_log_delta:=true_log_delta-mean(true_log_delta)]
+  #ggplot(biases,aes(pos,true_log_delta))+geom_point()+geom_line()
+  biases[,true_log_mean_RJ:=eRJ+true_log_nu]
+  biases[,true_log_mean_DL:=eDE+true_log_nu+true_log_delta]
+  biases[,true_log_mean_DR:=eDE+true_log_nu-true_log_delta]
+  #draw dangling/rejoined
+  biases[,dangling.L:=rnbinom(.N, mu=exp(true_log_mean_DL), size=alpha)]
+  biases[,dangling.R:=rnbinom(.N, mu=exp(true_log_mean_DR), size=alpha)]
+  biases[,rejoined:=rnbinom(.N, mu=exp(true_log_mean_RJ), size=alpha)]
+  #report rsites in counts
+  counts=CJ(biases[,paste(id,pos,true_log_nu,true_log_delta)],biases[,paste(id,pos,true_log_nu,true_log_delta)])
+  counts[,c("id1","pos1","true_log_nu1","true_log_delta1"):=tstrsplit(V1, " ")]
+  counts[,c("id2","pos2","true_log_nu2","true_log_delta2"):=tstrsplit(V2, " ")]
+  counts[,c("id1","id2","pos1","pos2","V1","V2"):=list(as.integer(id1),as.integer(id2),as.integer(pos1),as.integer(pos2),NULL,NULL)]
+  counts[,c("true_log_nu1","true_log_nu2","true_log_delta1","true_log_delta2"):=list(
+    as.numeric(true_log_nu1), as.numeric(true_log_nu2), as.numeric(true_log_delta1), as.numeric(true_log_delta2))]
+  counts=counts[pos1<pos2]
+  setkey(counts, id1, id2)
+  #build decay
+  counts[,distance:=pos2-pos1]
+  counts[,true_log_decay:=5*dnorm(log(distance), mean=log(min(distance)), sd=log(max(distance))/10)-0.2*log(distance)]
+  counts[,true_log_decay:=true_log_decay-mean(true_log_decay)]
+  #ggplot(counts)+geom_point(aes(distance,exp(true_log_decay)))+scale_x_log10()+scale_y_log10()
+  counts[,base_count:=eC+true_log_decay+true_log_nu1+true_log_nu2]
+  counts[,true_log_mean_cclose:=base_count-true_log_delta1+true_log_delta2]
+  counts[,true_log_mean_cfar:=base_count+true_log_delta1-true_log_delta2]
+  counts[,true_log_mean_cup:=base_count+true_log_delta1+true_log_delta2]
+  counts[,true_log_mean_cdown:=base_count-true_log_delta1-true_log_delta2]
+  #draw counts
+  counts[,contact.close:=rnbinom(.N, mu=exp(true_log_mean_cclose), size=alpha)]
+  counts[,contact.far:=rnbinom(.N, mu=exp(true_log_mean_cfar), size=alpha)]
+  counts[,contact.up:=rnbinom(.N, mu=exp(true_log_mean_cup), size=alpha)]
+  counts[,contact.down:=rnbinom(.N, mu=exp(true_log_mean_cdown), size=alpha)]
+  #ggplot(dset$counts)+geom_point(aes(distance,contact.close/exp(true_log_mean_cclose-true_log_decay)), alpha=0.1)+
+  #  geom_line(aes(distance,exp(true_log_decay)))+scale_x_log10()+scale_y_log10()
+  #statistics
+  dset_statistics(biases,counts)
+  return(list(biases=biases, counts=counts))
+}
+
+fill_zeros = function(biases,counts) {
+  newcounts=CJ(biases[,paste(id,pos)],biases[,paste(id,pos)])
+  newcounts[,c("id1","pos1"):=tstrsplit(V1, " ")]
+  newcounts[,c("id2","pos2"):=tstrsplit(V2, " ")]
+  newcounts[,c("id1","id2","pos1","pos2","V1","V2"):=list(as.integer(id1),as.integer(id2),as.integer(pos1),as.integer(pos2),NULL,NULL)]
+  newcounts=newcounts[pos1<pos2]
+  setkey(newcounts, id1, id2, pos1, pos2)
+  setkey(counts, id1, id2, pos1, pos2)
+  newcounts=counts[newcounts]
+  newcounts[is.na(contact.close),contact.close:=0]
+  newcounts[is.na(contact.far),contact.far:=0]
+  newcounts[is.na(contact.up),contact.up:=0]
+  newcounts[is.na(contact.down),contact.down:=0]
+  return(newcounts)
+}
+
+
 todo = function(){
   gammaQuery=function(mu,theta,count){
     alpha1=theta
@@ -509,26 +567,48 @@ meanfield$Nkr=meanfield$Nkr[id>=beginrange&id<=endrange][,.(id=id-beginrange+1,c
 #### optimization wihout prior guesses
 smfit = stan_model(file = "cs_norm_fit.stan")
 smpred = stan_model(file = "cs_norm_predict.stan")
+smbin = stan_model("cs_norm_predict_binned.stan")
 maxcount=-1
 a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, bf_per_kb=1,
-                                         bf_per_decade=5, verbose = T, iter=100000)) #, tol_rel_grad=1e3, tol_rel_obj=1e3
+                                           bf_per_decade=5, verbose = T, iter=100000)) #, tol_rel_grad=1e3, tol_rel_obj=1e3
 #save(op, file=paste0("data/",prefix,"_op_maxcount_",maxcount,".RData"))
-op.pred=predict_all_meanfield(smpred, biases, counts, meanfield, op, verbose=T)
+op$pred=predict_all_meanfield(smpred, biases, counts, meanfield, op, verbose=T)$par
+counts[,c("log_mean_cclose","log_mean_cfar","log_mean_cup","log_mean_cdown"):=list(op$pred$log_mean_cclose, op$pred$log_mean_cfar, op$pred$log_mean_cup, op$pred$log_mean_cdown)]
+counts[,log_decay:=op$pred$log_decay_close]
+ggplot(counts)+geom_point(aes(distance,log_decay),colour="red")+geom_point(aes(distance, true_log_decay),colour="blue")+scale_x_log10()
+ggplot(counts)+geom_point(aes(true_log_mean_cup,log_mean_cup),colour="red")
+ggplot(counts)+geom_point(aes(true_log_mean_cdown,log_mean_cdown),colour="red")
 
-ggplot(data.table(x=biases[,pos], y=op$par$log_nu))+geom_point(aes(x,y))
-ggplot(data.table(x=biases[,pos], y=op$par$rw))+geom_point(aes(x,y))
-ggplot(data.table(x=counts[contact.close>maxcount,distance], y=op$par$log_decay_close))+geom_point(aes(x,y))+scale_x_log10()
-ggplot(data.table(x=meanfield$Nkd[count<=maxcount,mdist], y=op$par$log_decay_mf))+geom_point(aes(x,y))+scale_x_log10()
-ggplot(data.table(x=meanfield$Nkd[count<=maxcount,mdist], y=tail(op$par$dw,length(op$par$log_decay_mf))))+geom_point(aes(x,y))
-op$par$dw %*% c(op$par$log_decay_close, op$par$log_decay_far, op$par$log_decay_up, op$par$log_decay_down, op$par$log_decay_mf)
+op$binned=get_binned_matrices(smbin, biases, counts, meanfield, op, resolution=1000)$par
 
-a=data.table(orig=op$par$log_decay_close,
-             regen=op.pred$par$log_decay_close[counts[,contact.close>maxcount]])
-ggplot(a)+geom_point(aes(orig,regen))+stat_function(fun=identity)
-a=data.table(orig=op$par$log_mean_cclose,
-             regen=op.pred$par$log_mean_cclose[counts[,contact.close>maxcount]])
-ggplot(a)+geom_point(aes(orig,regen))+stat_function(fun=identity)
+ggplot(data.table(dist=exp(op$binned$log_dist), decay=exp(op$binned$log_decay)))+geom_point(aes(dist,decay))+scale_x_log10()+scale_y_log10()
+ggplot(data.table(melt(op$binned$observed)))+geom_raster(aes(Var1,Var2,fill=log(value)))
+ggplot(data.table(melt(op$binned$expected)))+geom_raster(aes(Var1,Var2,fill=log(value)))
+ggplot(data.table(melt(op$binned$observed/op$binned$expected)))+geom_raster(aes(Var1,Var2,fill=log(value)))
+ggplot(data.table(melt(log(op$binned$observed/op$binned$expected))))+geom_histogram(aes(value))
 
+#stan vs dt
+to = counts[,.(observed=sum(contact.down+contact.up+contact.close+contact.far),
+               expected=sum(exp(log_mean_cup)+exp(log_mean_cdown)+exp(log_mean_cfar)+exp(log_mean_cclose)),
+               true=sum(exp(true_log_mean_cup)+exp(true_log_mean_cdown)+exp(true_log_mean_cfar)+exp(true_log_mean_cclose))),
+            keyby=c("bin1","bin2")][biases[,CJ(bin1,bin2,unique=T)]]
+to[is.na(observed),observed:=0]
+to[is.na(expected),expected:=0]
+to[is.na(true),true:=0]
+to[,c("Var1","Var2"):=list(as.integer(bin1),as.integer(bin2))]
+setkey(to,Var1,Var2)
+so1 = data.table(melt(op$binned$observed))
+setkey(so1,Var1,Var2)
+setnames(so1,"value","observed")
+so2 = data.table(melt(op$binned$expected))
+setkey(so2,Var1,Var2)
+setnames(so2,"value","expected")
+to=merge(to,merge(so1,so2,all=T),all=T,suffixes = c(".dt",".stan"))
+to[observed.dt!=observed.stan]
+ggplot(to)+geom_point(aes(expected.dt,true))+scale_x_log10()+scale_y_log10()
+ggplot(to)+geom_point(aes(expected.dt,expected.stan))+scale_x_log10()+scale_y_log10()
+ggplot(to)+geom_point(aes(true,expected.stan))+scale_x_log10()+scale_y_log10()
+ggplot(to[Var1==1])+geom_point(aes(Var2,expected.stan),colour="red")#+geom_point(aes(Var2,expected.dt),colour="blue")
 
 
 #visualize binned matrices
