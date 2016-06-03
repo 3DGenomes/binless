@@ -1,5 +1,5 @@
 ////
-// Cut-site normalization model: predict mean for each provided count
+// Cut-site normalization model: predict mean for binned matrices
 ////
 functions {
   ///////////
@@ -42,21 +42,6 @@ functions {
   
   int splinedegree() {return 3;} //set 3 for cubic spline
   
-   //implement w^T * X  i.e. left multiply
-  row_vector vector_times_csr_matrix(int K, vector w, vector Xw, int[] Xv, int[] Xu) {
-    int N;
-    row_vector[K] sums;
-    N <- rows(w);
-    if (size(Xu) != N+1) reject("Xu is not of size ", N+1);
-    sums <- rep_row_vector(0,K);
-    for (i in 1:N) {
-      for (j in Xu[i]:(Xu[i+1]-1)) {
-        sums[Xv[j]] <- sums[Xv[j]] + Xw[j]*w[i];
-      }
-    }
-    return sums;
-  }
-
   matrix bspline(vector x, int K, int q, real xmin, real xmax) {
     real dx; //interval length
     row_vector[K] t; //knot locations (except last)
@@ -104,7 +89,7 @@ data {
   //biases
   int<lower=1> S1; //number of cut sites
   int<lower=1> S2;
-  vector<lower=0>[S1] cutsites1; //cut site locations, need to be sorted
+  vector<lower=0>[S1] cutsites1; //cut site locations, better be sorted
   vector<lower=0>[S2] cutsites2;
   //distance bounds
   real<lower=0> dmin;
@@ -162,7 +147,7 @@ generated quantities {
       real pos2;
       pos2 <- cutsites2[j];
       if (pos2 > pos1) {
-        ncounts[bbins1[i],bbins2[j]] <- ncounts[bbins1[i],bbins2[j]]+1;
+        ncounts[bbins1[i],bbins2[j]] <- ncounts[bbins1[i],bbins2[j]]+4; //1 for each count type
         k <- bisect(log(pos2-pos1), k, log_dist);
         expected[bbins1[i],bbins2[j]] <- expected[bbins1[i],bbins2[j]] +
             exp(eC + log_nu1[i] + log_nu2[j] + log_decay[k])*2*cosh(log_delta1[i])*2*cosh(log_delta2[j]);
