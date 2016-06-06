@@ -440,22 +440,26 @@ get_binned_matrices = function(model, biases, counts, meanfield, opt, resolution
   bins2=seq(b2,e2+resolution,resolution)
   csub[,c("bin1","bin2"):=list(cut(pos1, bins1, ordered_result=T, right=F, include.lowest=T),
                                  cut(pos2, bins2, ordered_result=T, right=F, include.lowest=T))]
+  csub[,log_mean_cup:=opt$par$log_mean_cup]
+  csub[,log_mean_cdown:=opt$par$log_mean_cdown]
+  csub[,log_mean_cclose:=opt$par$log_mean_cclose]
+  csub[,log_mean_cfar:=opt$par$log_mean_cfar]
   bsub[,log_nu:=opt$par$log_nu]
   bsub[,log_delta:=opt$par$log_delta]
   bsub[,c("bin1","bin2"):=list(cut(pos, bins1, ordered_result=T, right=F, include.lowest=T),
                                  cut(pos, bins2, ordered_result=T, right=F, include.lowest=T))]
   bsub[,c("ibin1","ibin2"):=list(as.integer(bin1),as.integer(bin2))]
   #run computation of mean
-  cclose=csub[,.(id1,id2,bin1,bin2,distance,count=contact.close)]
-  cfar=csub[,.(id1,id2,bin1,bin2,distance,count=contact.far)]
-  cup=csub[,.(id1,id2,bin1,bin2,distance,count=contact.up)]
-  cdown=csub[,.(id1,id2,bin1,bin2,distance,count=contact.down)]
+  cclose=csub[,.(id1,id2,bin1,bin2,distance,count=contact.close,logmean=log_mean_cclose)]
+  cfar=csub[,.(id1,id2,bin1,bin2,distance,count=contact.far,logmean=log_mean_cfar)]
+  cup=csub[,.(id1,id2,bin1,bin2,distance,count=contact.up,logmean=log_mean_cup)]
+  cdown=csub[,.(id1,id2,bin1,bin2,distance,count=contact.down,logmean=log_mean_cdown)]
   csub=rbind(cclose,cfar,cup,cdown)[!(is.na(bin1)|is.na(bin2)|count==0)]
   data = list( Kdiag=Kdiag, 
                S1=bsub[!is.na(bin1),.N], S2=bsub[!is.na(bin2),.N], 
                cutsites1=bsub[!is.na(bin1),pos], cutsites2=bsub[!is.na(bin2),pos],
                dmin=dmin, dmax=dmax, npoints=npoints,
-               N=csub[,.N],   counts=csub[,count],
+               N=csub[,.N],   counts=csub[,count], cdist=csub[,distance], cmean=csub[,exp(logmean)],
                eC=opt$par$eC,
                log_nu1=bsub[!is.na(bin1),log_nu], log_nu2=bsub[!is.na(bin2),log_nu],
                log_delta1=bsub[!is.na(bin1),log_delta], log_delta2=bsub[!is.na(bin2),log_delta],
@@ -469,6 +473,7 @@ get_binned_matrices = function(model, biases, counts, meanfield, opt, resolution
   setnames(so,"value","observed")
   so[,expected:=melt(binned$par$expected)$value]
   so[,ncounts:=melt(binned$par$ncounts)$value]
+  so[,normalized:=melt(binned$par$normalized)$value]
   so=so[ncounts>0]
   setkey(so,Var1)
   so=bsub[,.(bin1=bin1[1]),keyby=ibin1][so]
@@ -507,6 +512,19 @@ detect_interactions = function(binned, dispersions, threshold=0.95, ncores=1){
   mat[,c("alpha2","beta2"):=list(alpha1+observed,beta1+1)]
   mat[,prob.observed.gt.expected:=compute_gamma_overlap(alpha1,beta1,alpha2,beta2,ncores=ncores)]
   mat[,is.interaction:=prob.observed.gt.expected>threshold | 1-prob.observed.gt.expected>threshold]
+  #write begins/ends
+  bin1.begin=mat[,bin1]
+  bin1.end=mat[,bin1]
+  bin2.begin=mat[,bin2]
+  bin2.end=mat[,bin2]
+  levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[[,]")[2][[1]]
+  levels(bin1.end) <- tstrsplit(as.character(levels(bin1.end)), "[[,)]")[2][[1]]
+  levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[[,]")[2][[1]]
+  levels(bin2.end) <- tstrsplit(as.character(levels(bin2.end)), "[[,)]")[2][[1]]
+  mat[,begin1:=as.integer(as.character(bin1.begin))]
+  mat[,end1:=as.integer(as.character(bin1.end))]
+  mat[,begin2:=as.integer(as.character(bin2.begin))]
+  mat[,end2:=as.integer(as.character(bin2.end))]
   return(mat)
 }
 
@@ -642,7 +660,7 @@ a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, max
                                            bf_per_decade=5, verbose = T, iter=100000)) #, tol_rel_grad=1e3, tol_rel_obj=1e3
 #save(op, file=paste0("data/",prefix,"_op_maxcount_",maxcount,".RData"))
 op$pred=predict_all_meanfield(smpred, biases, counts, meanfield, op, verbose=T)$par
-op$binned=get_binned_matrices(smbin, biases, counts, meanfield, op, resolution=10000)
+op$binned=get_binned_matrices(smbin, biases, counts, meanfield, op, resolution=5000)
 op$disp=get_dispersions(smdisp, op$binned$mat)$par
 mat=detect_interactions(op$binned$mat, op$disp$dispersion, ncores=3) #interaction detection using binned dispersion estimates
 mat2=detect_interactions(op$binned$mat, op$par$alpha*op$binned$mat[,ncounts], ncores=1) #interaction detection using original dispersion estimate
@@ -650,11 +668,14 @@ mat2=detect_interactions(op$binned$mat, op$par$alpha*op$binned$mat[,ncounts], nc
 
 #plot observed / expected matrices and histograms
 ggplot(data.table(dist=op$binned$dist, decay=op$binned$decay))+geom_point(aes(dist,decay))+scale_x_log10()+scale_y_log10()
-ggplot(mat)+geom_raster(aes(bin1,bin2,fill=log(ncounts)))
-ggplot(mat)+geom_raster(aes(bin1,bin2,fill=log(observed)))
-ggplot(mat)+geom_raster(aes(bin1,bin2,fill=log(expected)))
-ggplot(mat)+geom_raster(aes(bin1,bin2,fill=lFC))
-ggplot(mat)+geom_raster(aes(bin1,bin2,fill=is.interaction))
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=log(ncounts)))
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=log(observed)))
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=log(expected)))
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=log(normalized)))
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=lFC))
+#ggplot(mat)+geom_raster(aes(begin1,begin2,fill=prob.observed.gt.expected>0.95))
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=is.interaction))
+ggplot(mat2)+geom_raster(aes(begin1,begin2,fill=is.interaction))
 ggplot(mat)+geom_histogram(aes(lFC))
 
 

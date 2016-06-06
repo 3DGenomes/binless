@@ -97,6 +97,8 @@ data {
   //counts
   int<lower=0> N; //number of nonzero counts to bin
   int<lower=1> counts[N]; //value of the count
+  vector<lower=0>[N] cdist; //distance of that count  (used for normalized matrix only)
+  vector<lower=0>[N] cmean; //posterior mean of the count  (used for normalized matrix only)
   //estimated parameters
   real eC;  //exposure for counts
   vector[S1] log_nu1; //take nu and delta directly to avoid base reconstruction
@@ -119,9 +121,10 @@ generated quantities {
   vector[npoints] log_dist;
   vector[npoints] log_decay;
   //matrices
+  matrix[B1,B2] ncounts; //number of possible counts in bin
   matrix[B1,B2] observed; //summed counts per bin
   matrix[B1,B2] expected; //posterior mean of negative binomial per bin
-  matrix[B1,B2] ncounts; //number of possible counts in bin
+  matrix[B1,B2] normalized; // observed * decay / (expected * ncounts)
   
   //decay
   {
@@ -131,11 +134,21 @@ generated quantities {
     log_decay <- Xdiag * beta_diag_centered;
   }
 
-  //observed
+  //observed and normalized
   observed <- rep_matrix(0,B1,B2);
-  for (i in 1:N) observed[cbins1[i],cbins2[i]] <- observed[cbins1[i],cbins2[i]] + counts[i];
+  normalized <- rep_matrix(0,B1,B2);
+  for (i in 1:N) { //do not vectorize to avoid aliasing issues
+    int b1;
+    int b2;
+    int k;
+    b1<-cbins1[i];
+    b2<-cbins2[i];
+    observed[b1,b2] <- observed[b1,b2] + counts[i];
+    k <- bisect(log(cdist[i]), npoints/2, log_dist);
+    normalized[b1,b2] <- normalized[b1,b2] + counts[i]/cmean[i]*exp(log_decay[k]);
+  }
   
-  //expected and ncrossings
+  //expected and ncounts
   ncounts <- rep_matrix(0,B1,B2);
   expected <- rep_matrix(0,B1,B2);
   for (i in 1:S1) {
@@ -147,11 +160,16 @@ generated quantities {
       real pos2;
       pos2 <- cutsites2[j];
       if (pos2 > pos1) {
-        ncounts[bbins1[i],bbins2[j]] <- ncounts[bbins1[i],bbins2[j]]+4; //1 for each count type
+        int b1;
+        int b2;
+        b1<-bbins1[i];
+        b2<-bbins2[j];
+        ncounts[b1,b2] <- ncounts[b1,b2]+4; //1 for each count type
         k <- bisect(log(pos2-pos1), k, log_dist);
-        expected[bbins1[i],bbins2[j]] <- expected[bbins1[i],bbins2[j]] +
+        expected[b1,b2] <- expected[b1,b2] +
             exp(eC + log_nu1[i] + log_nu2[j] + log_decay[k])*2*cosh(log_delta1[i])*2*cosh(log_delta2[j]);
       }
     }
   }
+  normalized <- normalized ./ ncounts;
 }
