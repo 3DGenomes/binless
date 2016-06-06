@@ -350,7 +350,6 @@ fill_zeros = function(biases,counts) {
   return(newcounts)
 }
 
-
 stan_matrix_to_datatable = function(opt, x) {
   vals=data.table(opt)
   vals[,x:=x]
@@ -586,8 +585,6 @@ thresholds_estimator = function(observed, expected, dispersion, threshold=0.95, 
   return(list(p1,p2,p3))
 }
 
-
-
 read_and_prepare = function(infile, outprefix, skip=0L, both=T, distance_bins_per_decade=100, circularize=-1) {
   message("*** READ")
   data=read_tsv(infile, skip=skip)
@@ -610,14 +607,20 @@ read_and_prepare = function(infile, outprefix, skip=0L, both=T, distance_bins_pe
   return(cs_data)
 }
 
+
+
+
 #read_and_prepare("/scratch/rao/mapped/HICall_both_filled_map_chr1.tsv", "data/rao_HICall_chr1_all", skip="SRR")
 
-read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate1_reads_int.tsv",
-                 "data/caulo_BglIIr1_all", skip="SRR", circularize=4042929)
-read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate2_reads_int.tsv",
-                 "data/caulo_BglIIr2_all", skip="SRR", circularize=4042929)
-read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_NcoI_reads_int.tsv",
-                 "data/caulo_NcoI_all", skip="SRR", circularize=4042929)
+#read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate1_reads_int.tsv",
+#                 "data/caulo_BglIIr1_all", skip="SRR", circularize=4042929)
+#read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate2_reads_int.tsv",
+#                 "data/caulo_BglIIr2_all", skip="SRR", circularize=4042929)
+#read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_NcoI_reads_int.tsv",
+#                 "data/caulo_NcoI_all", skip="SRR", circularize=4042929)
+
+#read_and_prepare("/scratch/ralph/HiC/3_Mapped/Bcell_Sox2_10Mb_both_filled_map.tsv", "data/ralph_Bcell_Sox2", skip="HWI")
+#read_and_prepare("/scratch/ralph/HiC/3_Mapped/EScell_Sox2_10Mb_both_filled_map.tsv", "data/ralph_EScell_Sox2", skip="HWI")
 
 dset=generate_fake_dataset(num_rsites=100, genome_size = 100000, eC = 0, eRJ = 5, eDE = 7)
 counts=dset$counts
@@ -625,8 +628,8 @@ biases=dset$biases
 dset_statistics(biases,counts)
 meanfield=bin_for_mean_field(biases, counts, distance_bins_per_decade = 100)
 
-
-prefix="caulo_NcoI_all"
+#prefix="caulo_NcoI_all"
+prefix="ralph_Bcell_Sox2"
 biases=fread(paste0("data/",prefix,"_biases.dat"))
 setkey(biases,id)
 counts=fread(paste0("data/",prefix,"_counts.dat"))
@@ -634,8 +637,19 @@ counts=fread(paste0("data/",prefix,"_counts.dat"))
 #save(meanfield, file = paste0("data/",prefix,"_meanfield_100.RData"))
 load(paste0("data/",prefix,"_meanfield_100.RData"))
 
+#ralph: restrict to 30500000,32500000
+biases=biases[pos>=30500000&pos<=30600000]
+#biases=biases[pos>=30500000&pos<=32500000]
+beginrange=biases[1,id]
+endrange=biases[.N,id]
+biases[,id:=id-beginrange+1]
+prefix=biases[,paste0(prefix,"_",min(pos),"-",max(pos))]
+counts=counts[id1>=beginrange&id1<=endrange&id2>=beginrange&id2<=endrange]
+counts[,c("id1","id2"):=list(id1-beginrange+1,id2-beginrange+1)]
+meanfield$Nkl=meanfield$Nkl[id>=beginrange&id<=endrange][,.(id=id-beginrange+1,count,N)]
+meanfield$Nkr=meanfield$Nkr[id>=beginrange&id<=endrange][,.(id=id-beginrange+1,count,N)]
 
-#restrict to 100 consecutive rsites
+#caulo/toy: restrict to 100 consecutive rsites
 beginrange=1
 endrange=200
 biases=biases[beginrange:endrange]
@@ -648,7 +662,12 @@ meanfield$Nkr=meanfield$Nkr[id>=beginrange&id<=endrange][,.(id=id-beginrange+1,c
 
 
 counts=fill_zeros(biases,counts)
-counts[,distance:=abs(pos2-pos1)]
+counts[,distance:=abs(pos2-pos1)] #not filled
+write.table(biases, file = paste0(prefix,"_biases.dat"), quote=F, row.names = F)
+write.table(counts, file = paste0(prefix,"_counts.dat"), quote=F, row.names = F)
+save(meanfield, file = paste0(prefix, "_meanfield_100.RData"))
+
+
 
 #### optimization wihout prior guesses
 smfit = stan_model(file = "cs_norm_fit.stan")
@@ -658,12 +677,13 @@ smdisp = stan_model("cs_norm_binned_dispersions.stan")
 maxcount=-1
 a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, bf_per_kb=1,
                                            bf_per_decade=5, verbose = T, iter=100000)) #, tol_rel_grad=1e3, tol_rel_obj=1e3
-#save(op, file=paste0("data/",prefix,"_op_maxcount_",maxcount,".RData"))
 op$pred=predict_all_meanfield(smpred, biases, counts, meanfield, op, verbose=T)$par
 op$binned=get_binned_matrices(smbin, biases, counts, meanfield, op, resolution=5000)
 op$disp=get_dispersions(smdisp, op$binned$mat)$par
-mat=detect_interactions(op$binned$mat, op$disp$dispersion, ncores=3) #interaction detection using binned dispersion estimates
+op$mat=detect_interactions(op$binned$mat, op$disp$dispersion, ncores=3) #interaction detection using binned dispersion estimates
+mat=op$mat
 mat2=detect_interactions(op$binned$mat, op$par$alpha*op$binned$mat[,ncounts], ncores=1) #interaction detection using original dispersion estimate
+save(op, file=paste0("data/",prefix,"_op_maxcount_",maxcount,".RData"))
 
 
 #plot observed / expected matrices and histograms
