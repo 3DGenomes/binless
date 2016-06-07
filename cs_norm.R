@@ -10,6 +10,7 @@ library(scam)
 library(Hmisc)
 library(foreach)
 library(doParallel)
+library(MASS)
 
 setwd("/home/yannick/simulations/cs_norm")
 
@@ -422,7 +423,7 @@ predict_all_meanfield = function(model, biases, counts, meanfield, opt, bf_per_d
   optimizing(model, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)
 }
 
-get_binned_matrices = function(model, biases, counts, meanfield, opt, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL, bf_per_decade=5, verbose=T) {
+get_binned_matrices = function(model, biases, counts, meanfield, opt, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL, bf_per_decade=5, verbose=F) {
   stopifnot(counts[distance!=pos2-pos1,.N]==0) #need to implement circular genomes
   csub=copy(counts) #need to implement taking only needed part of matrix, and reporting log_nu and log_delta appropriately
   bsub=copy(biases)
@@ -483,7 +484,7 @@ get_binned_matrices = function(model, biases, counts, meanfield, opt, resolution
   return(list(distance=exp(binned$par$log_dist), decay=exp(binned$par$log_decay), mat=so))
 }
 
-get_dispersions = function(model, binned, iter=10000) {
+get_dispersions = function(model, binned, iter=10000, verbose=T) {
   data=list(B=binned[,.N],observed=binned[,observed],expected=binned[,expected],ncounts=binned[,ncounts])
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)
 }
@@ -628,8 +629,8 @@ biases=dset$biases
 dset_statistics(biases,counts)
 meanfield=bin_for_mean_field(biases, counts, distance_bins_per_decade = 100)
 
-#prefix="caulo_NcoI_all"
-prefix="ralph_Bcell_Sox2"
+prefix="caulo_NcoI_all"
+#prefix="ralph_Bcell_Sox2"
 biases=fread(paste0("data/",prefix,"_biases.dat"))
 setkey(biases,id)
 counts=fread(paste0("data/",prefix,"_counts.dat"))
@@ -652,6 +653,12 @@ meanfield$Nkr=meanfield$Nkr[id>=beginrange&id<=endrange][,.(id=id-beginrange+1,c
 #caulo/toy: restrict to 100 consecutive rsites
 beginrange=1
 endrange=200
+beginrange=1
+endrange=80
+beginrange=22
+endrange=96
+beginrange=49
+endrange=119
 biases=biases[beginrange:endrange]
 biases[,id:=id-beginrange+1]
 prefix=biases[,paste0("caulo_NcoI_",min(pos),"-",max(pos))]
@@ -678,9 +685,9 @@ maxcount=-1
 a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=maxcount, bf_per_kb=1,
                                            bf_per_decade=5, verbose = T, iter=100000)) #, tol_rel_grad=1e3, tol_rel_obj=1e3
 op$pred=predict_all_meanfield(smpred, biases, counts, meanfield, op, verbose=T)$par
-op$binned=get_binned_matrices(smbin, biases, counts, meanfield, op, resolution=5000)
+op$binned=get_binned_matrices(smbin, biases, counts, meanfield, op, resolution=10000)
 op$disp=get_dispersions(smdisp, op$binned$mat)$par
-op$mat=detect_interactions(op$binned$mat, op$disp$dispersion, ncores=3) #interaction detection using binned dispersion estimates
+op$mat=detect_interactions(op$binned$mat, op$disp$dispersion, ncores=30) #interaction detection using binned dispersion estimates
 mat=op$mat
 mat2=detect_interactions(op$binned$mat, op$par$alpha*op$binned$mat[,ncounts], ncores=1) #interaction detection using original dispersion estimate
 save(op, file=paste0("data/",prefix,"_op_maxcount_",maxcount,".RData"))
@@ -691,8 +698,9 @@ ggplot(data.table(dist=op$binned$dist, decay=op$binned$decay))+geom_point(aes(di
 ggplot(mat)+geom_raster(aes(begin1,begin2,fill=log(ncounts)))
 ggplot(mat)+geom_raster(aes(begin1,begin2,fill=log(observed)))
 ggplot(mat)+geom_raster(aes(begin1,begin2,fill=log(expected)))
-ggplot(mat)+geom_raster(aes(begin1,begin2,fill=log(normalized)))
-ggplot(mat)+geom_raster(aes(begin1,begin2,fill=lFC))
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=log(normalized)))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=mat[is.interaction==T])
+ggplot(mat2)+geom_raster(aes(begin1,begin2,fill=log(normalized)))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=mat[is.interaction==T])
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=lFC))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=mat[is.interaction==T])
 #ggplot(mat)+geom_raster(aes(begin1,begin2,fill=prob.observed.gt.expected>0.95))
 ggplot(mat)+geom_raster(aes(begin1,begin2,fill=is.interaction))
 ggplot(mat2)+geom_raster(aes(begin1,begin2,fill=is.interaction))
@@ -715,3 +723,63 @@ ggplot(data.table(x=c(132,133)),aes(x))+
   stat_function(fun=function(x){dgamma(x,7089277,rate=53575)},colour="red")
 
 a=thresholds_estimator(114,132,100000)
+
+#### effect of fitting parts of a matrix
+load("data/caulo_NcoI_3189-363550_op_maxcount_-1.RData")
+opall=op
+load("data/caulo_NcoI_3189-147895_op_maxcount_-1.RData")
+opfirst=op
+load("data/caulo_NcoI_52281-194220_op_maxcount_-1.RData")
+opsecond=op
+load("data/caulo_NcoI_100417-249556_op_maxcount_-1.RData")
+opthird=op
+
+ggplot()+geom_raster(data=opfirst$mat,aes(begin1,begin2,fill=log(normalized)))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=opfirst$mat[is.interaction==T])+
+  geom_raster(data=opsecond$mat,aes(begin2,begin1,fill=log(normalized)))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opsecond$mat[is.interaction==T])
+#
+ggplot(opall$mat)+geom_raster(aes(begin1,begin2,fill=log(normalized)))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=opall$mat[is.interaction==T])
+#
+ggplot()+geom_raster(data=opfirst$mat,aes(begin1,begin2,fill=log(normalized)))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=opfirst$mat[is.interaction==T])+
+  geom_raster(data=opall$mat,aes(begin2,begin1,fill=log(normalized)))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opall$mat[is.interaction==T])
+#
+ggplot()+geom_raster(data=opsecond$mat,aes(begin1,begin2,fill=log(normalized)))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=opsecond$mat[is.interaction==T])+
+  geom_raster(data=opall$mat,aes(begin2,begin1,fill=log(normalized)))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opall$mat[is.interaction==T])
+#
+ggplot()+geom_raster(data=opthird$mat,aes(begin1,begin2,fill=log(normalized)))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=opthird$mat[is.interaction==T])+
+  geom_raster(data=opall$mat,aes(begin2,begin1,fill=log(normalized)))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opall$mat[is.interaction==T])
+ggsave("images/caulo_NcoI_3189-363550_op_all_vs_third.png", width=10, height=7.5)
+#
+biases[1:200,log_nu_all:=opall$par$log_nu]
+biases[1:80,log_nu_first:=opfirst$par$log_nu]
+biases[22:96,log_nu_second:=opsecond$par$log_nu]
+ggplot(biases[1:100])+geom_point(aes(pos,log_nu_all,colour="all"))+geom_point(aes(pos,log_nu_first,colour="first"))+geom_point(aes(pos,log_nu_second,colour="second"))
+ggplot(biases[1:100])+geom_point(aes(pos,abs(log_nu_first-log_nu_all),colour="first"))+geom_point(aes(pos,abs(log_nu_second-log_nu_all),colour="second"))
+ggplot(biases[1:100])+geom_point(aes(pos,abs(1-exp(log_nu_first-log_nu_all)),colour="first"))+geom_point(aes(pos,abs(1-exp(log_nu_second-log_nu_all)),colour="second"))
+biases[1:200,log_delta_all:=opall$par$log_delta]
+biases[1:80,log_delta_first:=opfirst$par$log_delta]
+biases[22:96,log_delta_second:=opsecond$par$log_delta]
+ggplot(biases[1:100])+geom_point(aes(pos,log_delta_all,colour="all"))+geom_point(aes(pos,log_delta_first,colour="first"))+geom_point(aes(pos,log_delta_second,colour="second"))
+ggplot(biases[1:100])+geom_point(aes(pos,abs(log_delta_first-log_delta_all),colour="first"))+geom_point(aes(pos,abs(log_delta_second-log_delta_all),colour="second"))
+ggplot(biases[1:100])+geom_point(aes(pos,abs(1-exp(log_delta_first-log_delta_all)),colour="first"))+geom_point(aes(pos,abs(1-exp(log_delta_second-log_delta_all)),colour="second"))
+ggplot()+scale_x_log10()+scale_y_log10()+
+  geom_line(data=data.table(x=opall$binned$distance,y=opall$binned$decay),aes(x,y,colour="all"))+
+  geom_line(data=data.table(x=opfirst$binned$distance,y=opfirst$binned$decay),aes(x,y,colour="first"))+
+  geom_line(data=data.table(x=opsecond$binned$distance,y=opsecond$binned$decay),aes(x,y,colour="second"))
+
+#### effect of mean field
+load("data/caulo_NcoI_3189-363550_op_maxcount_-1.RData")
+opall=op
+load("data/caulo_NcoI_3189-363550_op_maxcount_0.RData")
+opmf0=op
+load("data/caulo_NcoI_3189-363550_op_maxcount_1.RData")
+opmf1=op
+load("data/caulo_NcoI_3189-363550_op_maxcount_4.RData")
+opmf4=op
+
+ggplot()+geom_raster(data=opmf0$mat,aes(begin1,begin2,fill=log(normalized)))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=opmf0$mat[is.interaction==T])+
+  geom_raster(data=opall$mat,aes(begin2,begin1,fill=log(normalized)))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opall$mat[is.interaction==T])
+ggplot()+geom_raster(data=opmf1$mat,aes(begin1,begin2,fill=log(normalized)))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=opmf1$mat[is.interaction==T])+
+  geom_raster(data=opall$mat,aes(begin2,begin1,fill=log(normalized)))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opall$mat[is.interaction==T])
+ggplot()+geom_raster(data=opmf4$mat,aes(begin1,begin2,fill=log(normalized)))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=opmf4$mat[is.interaction==T])+
+  geom_raster(data=opall$mat,aes(begin2,begin1,fill=log(normalized)))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opall$mat[is.interaction==T])
+ggsave("images/caulo_NcoI_3189-363550_op_maxcount_-1_vs_4.png", width=10, height=7.5)
