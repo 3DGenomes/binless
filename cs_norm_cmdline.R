@@ -158,7 +158,7 @@ get_binned_matrices = function(model, biases, counts, meanfield, opt, resolution
   return(list(distance=exp(binned$par$log_dist), decay=exp(binned$par$log_decay), mat=so))
 }
 
-get_dispersions = function(model, binned, iter=10000) {
+get_dispersions = function(model, binned, iter=10000, verbose=T) {
   data=list(B=binned[,.N],observed=binned[,observed],expected=binned[,expected],ncounts=binned[,ncounts])
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)
 }
@@ -309,7 +309,7 @@ a=system.time(op <- optimize_all_meanfield(smfit, biases, counts, meanfield, max
 op$pred=predict_all_meanfield(smpred, biases, counts, meanfield, op, verbose=T)$par
 op$binned=get_binned_matrices(smbin, biases, counts, meanfield, op, resolution=1000)
 op$disp=get_dispersions(smdisp, op$binned$mat)$par
-op$mat=detect_interactions(op$binned$mat, op$disp$dispersion, ncores=3) #interaction detection using binned dispersion estimates
+op$mat=detect_interactions(op$binned$mat, op$disp$dispersion, ncores=30) #interaction detection using binned dispersion estimates
 save(op, file=paste0("data/",prefix,"_op_maxcount_",maxcount,".RData"))
 
 
