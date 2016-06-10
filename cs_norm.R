@@ -1094,17 +1094,18 @@ square.size=150000
 oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=1,
                          bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=100000, ncpus=30, homogenize=F)
 oppar=postprocess(biases, counts, meanfield, oppar, resolution=30000, ncores=30, predict.all.means=F)
+oppar$ice=iterative_normalization(oppar$mat, niterations=1, resolution=30000, return.binned=T)
 save(oppar, file = paste0("data/caulo_NcoI_",biases[,min(pos)],"-",biases[,max(pos)],"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k.RData"))
 
 setkey(oppar$mat, begin1,begin2)
 ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(normalized)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(normalized)))+
-  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")
-ggsave(filename = paste0("data/caulo_NcoI_",biases[,min(pos)],"-",biases[,max(pos)],"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_normalized.png"), width=10, height=7.5)
+  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+
+  theme(legend.position = "none") 
+ggsave(filename = paste0("images/caulo_NcoI_",biases[,min(pos)],"-",biases[,max(pos)],"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_normalized.png"), width=10, height=7.5)
 ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=lFC))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=lFC))+
-  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")
-ggsave(filename = paste0("data/caulo_NcoI_",biases[,min(pos)],"-",biases[,max(pos)],"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_mat.png"), width=10, height=7.5)
-ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(observed)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(observed)))+scale_fill_gradient(low="white", high="black")
-ggsave(filename = paste0("data/caulo_NcoI_",biases[,min(pos)],"-",biases[,max(pos)],"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_observed.png"), width=10, height=7.5)
-oppar$ice=iterative_normalization(oppar$mat, niterations=1, resolution=30000, return.binned=T)
-ggplot()+geom_raster(data=oppar$ice, aes(begin1,begin2,fill=log(N)))+geom_raster(data=oppar$ice, aes(begin2,begin1,fill=log(N)))+scale_fill_gradient(low="white", high="black")
-ggsave(filename = paste0("data/caulo_NcoI_",biases[,min(pos)],"-",biases[,max(pos)],"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_ICE.png"), width=10, height=7.5)
+  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+theme(legend.position = "none") 
+ggsave(filename = paste0("images/caulo_NcoI_",biases[,min(pos)],"-",biases[,max(pos)],"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_mat.png"), width=10, height=7.5)
+ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(observed)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(observed)))+scale_fill_gradient(low="white", high="black")+theme(legend.position = "none") 
+ggsave(filename = paste0("images/caulo_NcoI_",biases[,min(pos)],"-",biases[,max(pos)],"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_observed.png"), width=10, height=7.5)
+ggplot()+geom_raster(data=oppar$ice, aes(begin1,begin2,fill=log(N)))+geom_raster(data=oppar$ice, aes(begin2,begin1,fill=log(N)))+scale_fill_gradient(low="white", high="black")+  theme(legend.position = "none") 
+ggsave(filename = paste0("images/caulo_NcoI_",biases[,min(pos)],"-",biases[,max(pos)],"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_ICE.png"), width=10, height=7.5)+  theme(legend.position = "none") 
