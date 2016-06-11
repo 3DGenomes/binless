@@ -920,8 +920,8 @@ biases=dset$biases
 dset_statistics(biases,counts)
 meanfield=bin_for_mean_field(biases, counts, distance_bins_per_decade = 100)
 
-prefix="caulo_NcoI_all"
-#prefix="ralph_Bcell_Sox2"
+#prefix="caulo_NcoI_all"
+prefix="ralph_Bcell_Sox2"
 biases=fread(paste0("data/",prefix,"_biases.dat"))
 setkey(biases,id)
 counts=fread(paste0("data/",prefix,"_counts.dat"))
@@ -931,8 +931,8 @@ load(paste0("data/",prefix,"_meanfield_100.RData"))
 
 #ralph: restrict to 30500000,32500000
 #biases=biases[pos<=30600714]
-#biases=biases[pos>=30500000&pos<=32500000]
-biases=biases[pos>=30500000&pos<=30600000]
+biases=biases[pos>=30500000&pos<=32500000]
+#biases=biases[pos>=30500000&pos<=30600000]
 beginrange=biases[1,id]
 endrange=biases[.N,id]
 biases[,id:=id-beginrange+1]
