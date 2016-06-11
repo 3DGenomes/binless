@@ -434,7 +434,7 @@ get_binned_matrices = function(model, biases, counts, meanfield, opt, resolution
   bins1=seq(b1,e1+resolution,resolution)
   bins2=seq(b2,e2+resolution,resolution)
   csub[,c("bin1","bin2"):=list(cut(pos1, bins1, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
-                                 cut(pos2, bins2, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
+                               cut(pos2, bins2, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
   csub[,log_mean_cup:=opt$pred$log_mean_cup]
   csub[,log_mean_cdown:=opt$pred$log_mean_cdown]
   csub[,log_mean_cclose:=opt$pred$log_mean_cclose]
@@ -442,7 +442,7 @@ get_binned_matrices = function(model, biases, counts, meanfield, opt, resolution
   bsub[,log_nu:=opt$par$log_nu]
   bsub[,log_delta:=opt$par$log_delta]
   bsub[,c("bin1","bin2"):=list(cut(pos, bins1, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
-                                 cut(pos, bins2, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
+                               cut(pos, bins2, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
   bsub[,c("ibin1","ibin2"):=list(as.integer(bin1),as.integer(bin2))]
   #run computation of mean
   cclose=csub[,.(id1,id2,bin1,bin2,distance,count=contact.close,logmean=log_mean_cclose)]
@@ -664,23 +664,22 @@ optimize_decay_params = function(model, dt, counts, dmin, dmax, bf_per_decade=5,
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 
-run_split_parallel_squares = function(biases, square.size, coverage) {
+run_split_parallel_squares = function(biases, square.size, coverage, diag.only=F) {
   minpos=biases[,min(pos)]
   maxpos=biases[,max(pos)+1]
   true.square.size=(maxpos-minpos)/round((maxpos-minpos)/square.size)
   begins=seq(minpos,maxpos-true.square.size,by=true.square.size/coverage)
-  squares=CJ(begins,begins)[V2>=V1]
+  if (diag.only==T) {
+    squares=SJ(begins,begins)
+  } else {
+    squares=CJ(begins,begins)[V2>=V1]
+  }
   setnames(squares, c("begin1","begin2"))
   squares[,c("end1","end2"):=list(begin1+true.square.size,begin2+true.square.size)]
   diagsquares=squares[begin1==begin2]
   #ggplot(diagsquares)+geom_rect(aes(xmin=begin1,xmax=end1,ymin=begin2,ymax=end2),alpha=0.1)+stat_function(fun=identity)
   #ggplot(squares)+geom_rect(aes(xmin=begin1,xmax=end1,ymin=begin2,ymax=end2,fill=factor((begin2-begin1)/true.square.size)),alpha=0.1)+stat_function(fun=identity)
   #ggplot(squares)+geom_rect(aes(xmin=begin2-end1,xmax=end2-begin1,ymin=sqid,ymax=sqid+1),alpha=0.1)+scale_x_log10()
-  message("Run in parallel")
-  message("   square size: ",true.square.size)
-  message("   coverage: ",coverage)
-  message("   ",squares[,.N], " squares")
-  message("   ",diagsquares[,.N], " on the diagonal")
   return(list(squares=squares,diagsquares=diagsquares,true.square.size=true.square.size))
 }
 
@@ -713,14 +712,22 @@ optimize_eC = function(model, biases, counts, retlist, dmin, dmax, bf_per_decade
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)
 }
 
-run_split_parallel = function(counts, biases, square.size=100000, coverage=4, bf_per_kb=1,
+run_split_parallel = function(counts, biases, square.size=100000, coverage=4, coverage.extradiag=1, bf_per_kb=1,
                               bf_per_decade=5, distance_bins_per_decade=100, verbose = F, iter=100000, ncpus=30, homogenize=F) {
   ### build squares
   message("*** build squares")
-  retval.squares = run_split_parallel_squares(biases, square.size, coverage)
-  squares=retval.squares$squares
+  retval.squares = run_split_parallel_squares(biases, square.size, coverage, diag.only=T)
   diagsquares=retval.squares$diagsquares
   true.square.size=retval.squares$true.square.size
+  retval.squares = run_split_parallel_squares(biases, square.size, coverage.extradiag, diag.only=F)
+  stopifnot(true.square.size==retval.squares$true.square.size)
+  squares=retval.squares$squares
+  message("Run in parallel")
+  message("   square size: ",true.square.size)
+  message("   diagonal coverage: ",coverage)
+  message("   extradiagonal coverage: ",coverage.extradiag)
+  message("   ",squares[,.N], " squares")
+  message("   ",diagsquares[,.N], " on the diagonal")
   ### fit genomic biases using squares close to diagonal
   message("*** fit genomic biases")
   registerDoParallel(cores=ncpus)
@@ -733,9 +740,9 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, bf
   info=ops.bias[,.SD[1],by=square.begin,.SDcols=c("lambda_nu","lambda_delta","nsites","alpha")]
   #ggplot(info)+geom_line(aes(square.begin,lambda_nu))+scale_y_log10()+geom_hline(yintercept=info[,exp(median(log(lambda_nu)))])
   means=ops.bias[,.(log_mean_RJ=weighted.mean(log_mean_RJ, weight),
-             log_mean_DL=weighted.mean(log_mean_DL, weight),
-             log_mean_DR=weighted.mean(log_mean_DR, weight),
-             ncounts=.N), keyby=c("id","pos")]
+                    log_mean_DL=weighted.mean(log_mean_DL, weight),
+                    log_mean_DR=weighted.mean(log_mean_DR, weight),
+                    ncounts=.N), keyby=c("id","pos")]
   if (homogenize==T) {
     message("*** homogenize genomic biases")
     smfitgen=stan_model("cs_norm_fit_genomic_params.stan")
@@ -794,11 +801,11 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, bf
     ret=extracted$counts[,.(id1=id1+extracted$beginrange1-1,id2=id2+extracted$beginrange2-1,
                             pos1,pos2,distance,weight=(border-abs(distance-center))**2)]
     ret[,c("square.begin1","square.begin2","log_decay_close","log_decay_far","log_decay_up","log_decay_down"):=list(
-           squares[i,begin1], squares[i,begin2],
-           op$par$eC+op$par$log_decay_close+nu1off-delta1off+nu2off+delta2off,
-           op$par$eC+op$par$log_decay_far  +nu1off+delta1off+nu2off-delta2off,
-           op$par$eC+op$par$log_decay_up   +nu1off+delta1off+nu2off+delta2off,
-           op$par$eC+op$par$log_decay_down +nu1off-delta1off+nu2off-delta2off)]
+      squares[i,begin1], squares[i,begin2],
+      op$par$eC+op$par$log_decay_close+nu1off-delta1off+nu2off+delta2off,
+      op$par$eC+op$par$log_decay_far  +nu1off+delta1off+nu2off-delta2off,
+      op$par$eC+op$par$log_decay_up   +nu1off+delta1off+nu2off+delta2off,
+      op$par$eC+op$par$log_decay_down +nu1off-delta1off+nu2off-delta2off)]
     ret
   }
   ### reconstruct count estimates: log_decay and beta_diag_centered
@@ -816,15 +823,15 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, bf
   #  dmin=biases.aug[,min(pmin(pos,circularize-pos+1))]
   #  dbins=10**seq(0,log10(dmax-dmin)+stepsz,stepsz)
   #} else {
-    dbins=10**seq(0,biases.aug[,log10(max(pos)-min(pos))]+stepsz,stepsz)
+  dbins=10**seq(0,biases.aug[,log10(max(pos)-min(pos))]+stepsz,stepsz)
   #}
   ops.count[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=5)]
   #ggplot(ops.count)+geom_line(aes(distance,log_decay_far,group=cat,colour=bdist))+guides(colour=F)+facet_grid(.~dbin)
   test=ops.count[,.(log_decay_close=weighted.mean(log_decay_close, weight),
-             log_decay_far=weighted.mean(log_decay_far, weight),
-             log_decay_up=weighted.mean(log_decay_up, weight),
-             log_decay_down=weighted.mean(log_decay_down, weight),
-             ncounts=.N), keyby=bdist] #could only take one decay, and even weights since eC is estimated later
+                    log_decay_far=weighted.mean(log_decay_far, weight),
+                    log_decay_up=weighted.mean(log_decay_up, weight),
+                    log_decay_down=weighted.mean(log_decay_down, weight),
+                    ncounts=.N), keyby=bdist] #could only take one decay, and even weights since eC is estimated later
   bin.begin=test[,bdist]
   bin.end=test[,bdist]
   levels(bin.begin) <- tstrsplit(as.character(levels(bin.begin)), "[[,]")[2][[1]]
@@ -882,8 +889,8 @@ biases=dset$biases
 dset_statistics(biases,counts)
 meanfield=bin_for_mean_field(biases, counts, distance_bins_per_decade = 100)
 
-prefix="caulo_NcoI_all"
-#prefix="ralph_Bcell_Sox2"
+#prefix="caulo_NcoI_all"
+prefix="ralph_Bcell_Sox2"
 biases=fread(paste0("data/",prefix,"_biases.dat"))
 setkey(biases,id)
 counts=fread(paste0("data/",prefix,"_counts.dat"))
@@ -892,8 +899,9 @@ counts=fread(paste0("data/",prefix,"_counts.dat"))
 load(paste0("data/",prefix,"_meanfield_100.RData"))
 
 #ralph: restrict to 30500000,32500000
-biases=biases[pos>=30500000&pos<=30600000]
+#biases=biases[pos<=30600714]
 #biases=biases[pos>=30500000&pos<=32500000]
+biases=biases[pos>=30500000&pos<=30600000]
 beginrange=biases[1,id]
 endrange=biases[.N,id]
 biases[,id:=id-beginrange+1]
@@ -1041,44 +1049,48 @@ ggsave("images/caulo_NcoI_3189-363550_op_maxcount_-1_vs_4.png", width=10, height
 
 
 ### effect of parallelization
-#opall <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=-1, bf_per_kb=1,
-#                                bf_per_decade=5, verbose = T, iter=100000)
-#opall=postprocess(biases, counts, meanfield, opall, resolution=10000, ncores=30)
+smfit = stan_model(file = "cs_norm_fit.stan")
+opall <- optimize_all_meanfield(smfit, biases, counts, meanfield, maxcount=-1, bf_per_kb=1,
+                                bf_per_decade=5, verbose = T, iter=100000)
+opall=postprocess(biases, counts, meanfield, opall, resolution=10000, ncores=30)
+save(opall, file = paste0("data/",prefix,"_op_maxcount_-1_redo.RData"))
 
+load(paste0("data/",prefix,"_op_maxcount_-1.RData"), verbose=T)
 
 coverage=4
-square.size=100000
-oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=1,
-                      bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=100000, ncpus=30, homogenize=F)
+square.size=30000
+oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=0.25,
+                         bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=100000, ncpus=30, homogenize=F)
 oppar=postprocess(biases, counts, meanfield, oppar, resolution=10000, ncores=30)
-save(oppar, file = paste0("data/caulo_NcoI_3189-363550_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k.RData"))
+#save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb10.RData"))
 
-load("data/caulo_NcoI_3189-363550_op_maxcount_-1.RData")
+load("data/",prefix,"_op_maxcount_-1.RData")
 opserial=op
-load("data/caulo_NcoI_3189-363550_op_maxcount_-1_parallel_inhomogeneous_cov10X_sq150k.RData")
+load(paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k.RData"))
 
 #lFC histogram and matrices
 ggplot(rbind(opserial$mat[,.(bin1,bin2,dset="serial",lFC)],oppar$mat[,.(bin1,bin2,dset="parallel",lFC)]))+geom_histogram(aes(lFC,fill=dset),position="dodge")
-ggsave(filename=paste0("images/caulo_NcoI_3189-363550_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_hist.png"), width=10, height=7.5)
+ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_hist.png"), width=10, height=7.5)
 ggplot()+geom_raster(data=oppar$mat,aes(begin1,begin2,fill=lFC))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+
   geom_raster(data=opserial$mat,aes(begin2,begin1,fill=lFC))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opserial$mat[is.interaction==T])
-ggsave(filename=paste0("images/caulo_NcoI_3189-363550_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_mat.png"), width=10, height=7.5)
+ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_mat.png"), width=10, height=7.5)
 #normalized matrix
 ggplot()+geom_raster(data=oppar$mat,aes(begin1,begin2,fill=log(normalized)))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+
   geom_raster(data=opserial$mat,aes(begin2,begin1,fill=log(normalized)))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opserial$mat[is.interaction==T])
-ggsave(filename=paste0("images/caulo_NcoI_3189-363550_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_normalized.png"), width=10, height=7.5)
+ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_normalized.png"), width=10, height=7.5)
 #genomic biases
+#ggplot(melt(data.table(id=biases[,pos],serial=exp(opserial$par$eRJ+opserial$par$log_nu),parallel=exp(oppar$par$eRJ+oppar$par$log_nu)),id.vars="id",variable.name="nu"))+geom_line(aes(id,value,colour=nu))+geom_point(data=biases,aes(pos,rejoined))
 ggplot(melt(data.table(id=biases[,pos],serial=opserial$par$log_nu,parallel=oppar$par$log_nu),id.vars="id",variable.name="nu"))+geom_line(aes(id,value,colour=nu))
-ggsave(filename=paste0("images/caulo_NcoI_3189-363550_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_nu.png"), width=10, height=7.5)
+ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_nu.png"), width=10, height=7.5)
 ggplot(melt(data.table(id=biases[,pos],serial=opserial$par$log_delta,parallel=oppar$par$log_delta),id.vars="id",variable.name="delta"))+geom_line(aes(id,value,colour=delta))
-ggsave(filename=paste0("images/caulo_NcoI_3189-363550_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_delta.png"), width=10, height=7.5)
+ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_delta.png"), width=10, height=7.5)
 ggplot(rbind(data.table(bias="nu",serial=opserial$par$log_nu,parallel=oppar$par$log_nu),data.table(bias="delta",serial=opserial$par$log_delta,parallel=oppar$par$log_delta)))+
   geom_point(aes(serial,parallel))+facet_grid(.~bias)+stat_function(fun=identity)
-ggsave(filename=paste0("images/caulo_NcoI_3189-363550_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_nu_delta.png"), width=10, height=7.5)
+ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_nu_delta.png"), width=10, height=7.5)
 #diagonal biases
-ggplot(melt(data.table(dist=counts[,distance],serial=opserial$pred$log_decay_close,par=oppar$pred$log_decay_far, key="dist"),id.vars="dist"))+
+ggplot(melt(data.table(dist=counts[,distance],serial=opserial$pred$log_decay_close,parallel=oppar$pred$log_decay_far, key="dist"),id.vars="dist"))+
   geom_line(aes(dist,value,colour=variable))+scale_x_log10()
-ggsave(filename=paste0("images/caulo_NcoI_3189-363550_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_decay.png"), width=10, height=7.5)
+ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_decay.png"), width=10, height=7.5)
 c(opserial$mat[,mean(lFC)], oppar$mat[,mean(lFC)])
 c(opserial$par$eRJ,oppar$par$eRJ)
 c(opserial$par$eDE,oppar$par$eDE)
@@ -1088,24 +1100,25 @@ c(opserial$disp$alpha,oppar$disp$alpha)
 
 
 
-### effect of parallelization
+### single run plots
 coverage=4
-square.size=150000
+square.size=20000
 oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=1,
                          bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=100000, ncpus=30, homogenize=F)
-oppar=postprocess(biases, counts, meanfield, oppar, resolution=30000, ncores=30, predict.all.means=F)
-oppar$ice=iterative_normalization(oppar$mat, niterations=1, resolution=30000, return.binned=T)
-save(oppar, file = paste0("data/caulo_NcoI_",biases[,min(pos)],"-",biases[,max(pos)],"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k.RData"))
+oppar=postprocess(biases, counts, meanfield, oppar, resolution=10000, ncores=30, predict.all.means=T)
+oppar$ice=iterative_normalization(oppar$mat, niterations=1, resolution=10000, return.binned=T)
+save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k.RData"))
 
 setkey(oppar$mat, begin1,begin2)
 ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(normalized)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(normalized)))+
   geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+
   theme(legend.position = "none") 
-ggsave(filename = paste0("images/caulo_NcoI_",biases[,min(pos)],"-",biases[,max(pos)],"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_normalized.png"), width=10, height=7.5)
+ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_normalized.png"), width=10, height=7.5)
 ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=lFC))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=lFC))+
   geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+theme(legend.position = "none") 
-ggsave(filename = paste0("images/caulo_NcoI_",biases[,min(pos)],"-",biases[,max(pos)],"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_mat.png"), width=10, height=7.5)
+ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_mat.png"), width=10, height=7.5)
 ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(observed)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(observed)))+scale_fill_gradient(low="white", high="black")+theme(legend.position = "none") 
-ggsave(filename = paste0("images/caulo_NcoI_",biases[,min(pos)],"-",biases[,max(pos)],"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_observed.png"), width=10, height=7.5)
+ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_observed.png"), width=10, height=7.5)
 ggplot()+geom_raster(data=oppar$ice, aes(begin1,begin2,fill=log(N)))+geom_raster(data=oppar$ice, aes(begin2,begin1,fill=log(N)))+scale_fill_gradient(low="white", high="black")+  theme(legend.position = "none") 
-ggsave(filename = paste0("images/caulo_NcoI_",biases[,min(pos)],"-",biases[,max(pos)],"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_ICE.png"), width=10, height=7.5)+  theme(legend.position = "none") 
+ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_ICE.png"), width=10, height=7.5)+  theme(legend.position = "none") 
+
