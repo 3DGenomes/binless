@@ -683,18 +683,69 @@ run_split_parallel_squares = function(biases, square.size, coverage, diag.only=F
   return(list(squares=squares,diagsquares=diagsquares,true.square.size=true.square.size))
 }
 
-run_split_parallel_biases = function(smfit, counts, biases, meanfield, begin, end, bf_per_kb, bf_per_decade, verbose, iter) {
+run_split_parallel_biases = function(smfit, counts, biases, meanfield, begin, end, bf_per_kb, bf_per_decade, verbose, iter, outprefix=NULL) {
   #extract relevant portion of data
   extracted = get_cs_subset(counts, biases, begin1=begin, end1=end, fill.zeros=T)
   #run fit
-  op <- optimize_all_meanfield(smfit, extracted$biases1, extracted$counts, meanfield, maxcount=-1, bf_per_kb = bf_per_kb,
-                               bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)
+  a=system.time(output <- capture.output(op <- optimize_all_meanfield(smfit, extracted$biases1, extracted$counts,
+                        meanfield, maxcount=-1, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)))
+  op$runtime=a[1]+a[4]
+  op$output=output
+  if (!is.null(outprefix)) {
+    save(op, file=paste0(outprefix, "_biases_op_",begin,".RData"))
+  }
   #report data
   center=(end-begin)/2
   ret=extracted$biases1[,.(id=id+extracted$beginrange1-1,pos,weight=(center-abs(pos-center))**2)]
   ret[,c("log_mean_DL", "log_mean_DR", "log_mean_RJ"):=list(op$par$log_mean_DL, op$par$log_mean_DR, op$par$log_mean_RJ)]
   ret[,square.begin:=begin]
   ret[,c("lambda_delta","lambda_nu","nsites","alpha"):=list(op$par$lambda_delta,op$par$lambda_nu,extracted$biases1[,.N],op$par$alpha)]
+  if (!is.null(outprefix)) {
+    save(ret, file=paste0(outprefix, "_biases_ret_",begin,".RData"))
+  }
+  return(list(ret=ret, out=tail(op$output,1), runtime=op$runtime))
+}
+
+run_split_parallel_counts = function(model, counts, biases.aug, begin1, end1, begin2, end2, dmin, dmax,
+                                     bf_per_decade=5, verbose=T, iter=100000, outprefix=NULL) {
+  #extract relevant portion of data
+  extracted = get_cs_subset(counts, biases.aug, begin1=begin1, end1=end1,
+                            begin2=begin2, end2=end2, fill.zeros=T)
+  #run fit
+  a=system.time(output <- capture.output(op <- optimize_extradiag(model, extracted$biases1, extracted$biases2, extracted$counts,
+                                                        dmin, dmax, bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)))
+  op$runtime=a[1]+a[4]
+  op$output=output
+  if (!is.null(outprefix)) {
+    save(op, file=paste0(outprefix, "_counts_op_",begin1,"_",begin2,".RData"))
+  }
+  #report data
+  setkey(extracted$biases1, id, pos)
+  setkey(extracted$counts, id1, pos1)
+  extracted$counts[,c("log_nu1","log_delta1"):=extracted$biases1[extracted$counts,.(log_nu,log_delta)]]
+  nu1off=mean(extracted$counts[,log_nu1])
+  delta1off=mean(extracted$counts[,log_delta1])
+  setkey(extracted$biases2, id, pos)
+  setkey(extracted$counts, id2, pos2)
+  extracted$counts[,c("log_nu2","log_delta2"):=extracted$biases2[extracted$counts,.(log_nu,log_delta)]]
+  nu2off=mean(extracted$counts[,log_nu2])
+  delta2off=mean(extracted$counts[,log_delta2])
+  center=extracted$counts[,min(distance)+max(distance)]/2
+  border=extracted$counts[,max(distance)-min(distance)]/2+1
+  #
+  setkey(extracted$counts, id1,id2,pos1,pos2,distance)
+  ret=extracted$counts[,.(id1=id1+extracted$beginrange1-1,id2=id2+extracted$beginrange2-1,
+                          pos1,pos2,distance,weight=(border-abs(distance-center))**2)]
+  ret[,c("square.begin1","square.begin2","log_decay_close","log_decay_far","log_decay_up","log_decay_down"):=list(
+    begin1, begin2,
+    op$par$eC+op$par$log_decay_close+nu1off-delta1off+nu2off+delta2off,
+    op$par$eC+op$par$log_decay_far  +nu1off+delta1off+nu2off-delta2off,
+    op$par$eC+op$par$log_decay_up   +nu1off+delta1off+nu2off+delta2off,
+    op$par$eC+op$par$log_decay_down +nu1off-delta1off+nu2off-delta2off)]
+  if (!is.null(outprefix)) {
+    save(ret, file=paste0(outprefix, "_counts_ret_",begin1,"_",begin2,".RData"))
+  }
+  return(list(ret=ret, out=tail(op$output,1), runtime=op$runtime))
 }
 
 optimize_eC = function(model, biases, counts, retlist, dmin, dmax, bf_per_decade=5, verbose=T, iter=1000) {
@@ -712,8 +763,8 @@ optimize_eC = function(model, biases, counts, retlist, dmin, dmax, bf_per_decade
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)
 }
 
-run_split_parallel = function(counts, biases, square.size=100000, coverage=4, coverage.extradiag=1, bf_per_kb=1,
-                              bf_per_decade=5, distance_bins_per_decade=100, verbose = F, iter=100000, ncpus=30, homogenize=F) {
+run_split_parallel = function(counts, biases, square.size=100000, coverage=4, coverage.extradiag=1, bf_per_kb=1, bf_per_decade=5,
+                              distance_bins_per_decade=100, verbose = F, iter=100000, ncpus=30, homogenize=F, outprefix=NULL) {
   ### build squares
   message("*** build squares")
   retval.squares = run_split_parallel_squares(biases, square.size, coverage, diag.only=T)
@@ -732,14 +783,19 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   message("*** fit genomic biases")
   registerDoParallel(cores=ncpus)
   smfit = stan_model(file = "cs_norm_fit.stan")
-  ops.bias = foreach (begin=diagsquares[,begin1], end=diagsquares[,end1], .packages=c("data.table","rstan"), .combine=rbind) %dopar% 
+  output.binder = function(x) {
+    a=sapply(names(x[[1]]), function(i) sapply(x, "[[", i,simplify=F))
+    list(par=rbindlist(a[,1]), out=as.character(a[,2]), runtime=as.numeric(a[,3]))
+  }
+  ops.bias = foreach (begin=diagsquares[,begin1], end=diagsquares[,end1], .packages=c("data.table","rstan")) %dopar% 
     run_split_parallel_biases(smfit, counts, biases, meanfield, begin, end, bf_per_kb = bf_per_kb,
-                              bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)
+                              bf_per_decade = bf_per_decade, verbose = verbose, iter = iter, outprefix=outprefix)
+  ops.bias = output.binder(ops.bias)
   ### reconstruct bias estimates: eRJ eDE log_nu and log_delta
   message("*** reconstruct genomic biases")
-  info=ops.bias[,.SD[1],by=square.begin,.SDcols=c("lambda_nu","lambda_delta","nsites","alpha")]
+  info=ops.bias$par[,.SD[1],by=square.begin,.SDcols=c("lambda_nu","lambda_delta","nsites","alpha")]
   #ggplot(info)+geom_line(aes(square.begin,lambda_nu))+scale_y_log10()+geom_hline(yintercept=info[,exp(median(log(lambda_nu)))])
-  means=ops.bias[,.(log_mean_RJ=weighted.mean(log_mean_RJ, weight),
+  means=ops.bias$par[,.(log_mean_RJ=weighted.mean(log_mean_RJ, weight),
                     log_mean_DL=weighted.mean(log_mean_DL, weight),
                     log_mean_DR=weighted.mean(log_mean_DR, weight),
                     ncounts=.N), keyby=c("id","pos")]
@@ -759,7 +815,7 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
     biases.aug[,log_delta:=retlist$log_delta]
   } else {
     setkey(biases, id, pos)
-    retlist=list(eRJ=ops.bias[,mean(log_mean_RJ)], eDE=ops.bias[,mean(log_mean_DL+log_mean_DR)/2])
+    retlist=list(eRJ=ops.bias$par[,mean(log_mean_RJ)], eDE=ops.bias$par[,mean(log_mean_DL+log_mean_DR)/2])
     biases.aug=means[biases]
     stopifnot(!any(is.na(biases.aug)))
     biases.aug[,log_nu:=log_mean_RJ-retlist$eRJ]
@@ -767,6 +823,8 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
     retlist$log_nu=biases.aug[,log_nu]
     retlist$log_delta=biases.aug[,log_delta]
   }
+  retlist$out.bias=ops.bias$out
+  retlist$runtime.bias=ops.bias$runtime
   #ggplot()+geom_line(data=data.table(x=biases.aug[,pos],y=opall$par$log_delta),aes(x,y,colour="ref"))+
   #  geom_line(data=data.table(x=biases.aug[,pos],y=bias.params$log_delta), aes(x,y,colour="split"))
   #
@@ -776,38 +834,11 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   dmax=max(counts[,max(distance)],meanfield$Nkd[,max(mdist)])+0.01
   dmin=min(counts[,min(distance)],meanfield$Nkd[,min(mdist)])-0.01
   registerDoParallel(cores=ncpus)
-  ops.count = foreach (i=1:squares[,.N], .packages=c("data.table","rstan"), .combine="rbind") %dopar% {
-    #extract relevant portion of data
-    extracted = get_cs_subset(counts, biases.aug, begin1=squares[i,begin1], end1=squares[i,end1],
-                              begin2=squares[i,begin2], end2=squares[i,end2], fill.zeros=T)
-    #run fit
-    a=system.time(op <- optimize_extradiag(smfitex, extracted$biases1, extracted$biases2, extracted$counts, dmin, dmax,
-                                           bf_per_decade = bf_per_decade, verbose = verbose, iter = iter))
-    #report data
-    setkey(extracted$biases1, id, pos)
-    setkey(extracted$counts, id1, pos1)
-    extracted$counts[,c("log_nu1","log_delta1"):=extracted$biases1[extracted$counts,.(log_nu,log_delta)]]
-    nu1off=mean(extracted$counts[,log_nu1])
-    delta1off=mean(extracted$counts[,log_delta1])
-    setkey(extracted$biases2, id, pos)
-    setkey(extracted$counts, id2, pos2)
-    extracted$counts[,c("log_nu2","log_delta2"):=extracted$biases2[extracted$counts,.(log_nu,log_delta)]]
-    nu2off=mean(extracted$counts[,log_nu2])
-    delta2off=mean(extracted$counts[,log_delta2])
-    center=extracted$counts[,min(distance)+max(distance)]/2
-    border=extracted$counts[,max(distance)-min(distance)]/2+1
-    #
-    setkey(extracted$counts, id1,id2,pos1,pos2,distance)
-    ret=extracted$counts[,.(id1=id1+extracted$beginrange1-1,id2=id2+extracted$beginrange2-1,
-                            pos1,pos2,distance,weight=(border-abs(distance-center))**2)]
-    ret[,c("square.begin1","square.begin2","log_decay_close","log_decay_far","log_decay_up","log_decay_down"):=list(
-      squares[i,begin1], squares[i,begin2],
-      op$par$eC+op$par$log_decay_close+nu1off-delta1off+nu2off+delta2off,
-      op$par$eC+op$par$log_decay_far  +nu1off+delta1off+nu2off-delta2off,
-      op$par$eC+op$par$log_decay_up   +nu1off+delta1off+nu2off+delta2off,
-      op$par$eC+op$par$log_decay_down +nu1off-delta1off+nu2off-delta2off)]
-    ret
-  }
+  ops.count = foreach (begin1=squares[,begin1], end1=squares[,end1], begin2=squares[,begin2], end2=squares[,end2],
+                       .packages=c("data.table","rstan")) %dopar% 
+    run_split_parallel_counts(smfitex, counts, biases.aug, begin1, end1, begin2, end2, dmin, dmax,
+                              bf_per_decade = bf_per_decade, verbose = verbose, iter = iter, outprefix=outprefix)
+  ops.count=output.binder(ops.count)
   ### reconstruct count estimates: log_decay and beta_diag_centered
   message("*** reconstruct diagonal decay")
   #qplot(ops.count[,id],binwidth=1)
@@ -825,9 +856,9 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   #} else {
   dbins=10**seq(0,biases.aug[,log10(max(pos)-min(pos))]+stepsz,stepsz)
   #}
-  ops.count[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=5)]
+  ops.count$par[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=5)]
   #ggplot(ops.count)+geom_line(aes(distance,log_decay_far,group=cat,colour=bdist))+guides(colour=F)+facet_grid(.~dbin)
-  test=ops.count[,.(log_decay_close=weighted.mean(log_decay_close, weight),
+  test=ops.count$par[,.(log_decay_close=weighted.mean(log_decay_close, weight),
                     log_decay_far=weighted.mean(log_decay_far, weight),
                     log_decay_up=weighted.mean(log_decay_up, weight),
                     log_decay_down=weighted.mean(log_decay_down, weight),
@@ -849,7 +880,7 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   retlist$eC=op$par$eC
   retlist$alpha=op$par$alpha
   #ggplot(melt(test, id.vars=c("bdist","begin","end")))+geom_point(aes(bdist,value,colour=variable))
-  return(list(par=retlist))
+  return(list(par=retlist, out.bias=ops.bias$out, out.count=ops.count$out, runtime.count=ops.count$runtime, runtime.bias=ops.bias$runtime))
 }
 
 postprocess = function(biases, counts, meanfield, op, resolution=10000, ncores=30, predict.all.means=T) {
@@ -889,8 +920,8 @@ biases=dset$biases
 dset_statistics(biases,counts)
 meanfield=bin_for_mean_field(biases, counts, distance_bins_per_decade = 100)
 
-#prefix="caulo_NcoI_all"
-prefix="ralph_Bcell_Sox2"
+prefix="caulo_NcoI_all"
+#prefix="ralph_Bcell_Sox2"
 biases=fread(paste0("data/",prefix,"_biases.dat"))
 setkey(biases,id)
 counts=fread(paste0("data/",prefix,"_counts.dat"))
@@ -1059,7 +1090,7 @@ load(paste0("data/",prefix,"_op_maxcount_-1.RData"), verbose=T)
 
 coverage=4
 square.size=30000
-oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=0.25,
+oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=1,
                          bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=100000, ncpus=30, homogenize=F)
 oppar=postprocess(biases, counts, meanfield, oppar, resolution=10000, ncores=30)
 #save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb10.RData"))
