@@ -86,6 +86,7 @@ data {
   //spline parameters
   int Kdiag; //number of functions in spline base for diagonal decay
   int npoints; //number of points to compute
+  int circularize; //if >0 assume genome is circular and has this size
   //biases
   int<lower=1> S1; //number of cut sites
   int<lower=1> S2;
@@ -113,6 +114,13 @@ data {
   int<lower=1,upper=B2> bbins2[S2];
   int<lower=1,upper=B1> cbins1[N]; //in which bin the counts fall
   int<lower=1,upper=B2> cbins2[N];
+}
+transformed data {
+  if (circularize>0) {
+    if (max(cutsites2)-min(cutsites1) > circularize) {
+      reject("circular genome size smaller than maximum distance between cutsites!");
+    }
+  }
 }
 parameters {}
 model {}
@@ -165,7 +173,15 @@ generated quantities {
         b1<-bbins1[i];
         b2<-bbins2[j];
         ncounts[b1,b2] <- ncounts[b1,b2]+4; //1 for each count type
-        k <- bisect(log(pos2-pos1), k, log_dist);
+        if (circularize>0) {
+          if (pos2-pos1>circularize/2) {
+            k <- bisect(log(circularize+1-(pos2-pos1)), k, log_dist);
+          } else {
+            k <- bisect(log(pos2-pos1), k, log_dist);
+          }
+        } else {
+          k <- bisect(log(pos2-pos1), k, log_dist);
+        }
         expected[b1,b2] <- expected[b1,b2] +
             exp(eC + log_nu1[i] + log_nu2[j] + log_decay[k])*2*cosh(log_delta1[i])*2*cosh(log_delta2[j]);
       }

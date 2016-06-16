@@ -95,6 +95,29 @@ categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0,4), dangling
   return(sub)
 }
 
+
+bin_counts = function(counts, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL) {
+  if (is.null(b1)) b1=counts[,min(pos1)]-1
+  if (is.null(b2)) b2=counts[,min(pos2)]-1
+  if (is.null(e1)) e1=counts[,max(pos1)]-1
+  if (is.null(e2)) e2=counts[,max(pos2)]-1
+  bins1=seq(b1,counts[,max(pos1)]+resolution,resolution)
+  bins2=seq(b2,counts[,max(pos2)]+resolution,resolution)
+  mcounts=melt(counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
+               variable.name = "category", value.name = "count")[count>0]
+  #
+  sub = mcounts[,.(pos1,pos2,bin1=cut2(pos1, bins1, oneval=F, onlycuts=T, digits=10),
+                   bin2=cut2(pos2, bins2, oneval=F, onlycuts=T, digits=10), category, count)
+                ][,.(N=sum(count)),by=c("bin1","bin2")]
+  #
+  sub[,begin1:=do.call(as.integer, tstrsplit(as.character(bin1), "[[,]")[2])]
+  sub[,end1:=do.call(as.integer, tstrsplit(as.character(bin1), "[],)]")[2])]
+  sub[,begin2:=do.call(as.integer, tstrsplit(as.character(bin2), "[[,]")[2])]
+  sub[,end2:=do.call(as.integer, tstrsplit(as.character(bin2), "[],)]")[2])]
+  #
+  return(sub)
+}
+
 iterative_normalization = function(bdata, niterations=100, resolution=1000000, return.binned=F) {
   binned = bdata[bin1<bin2,.(bin1,bin2,N=observed)]
   binned = rbind(binned, binned[,.(bin1=bin2,bin2=bin1,N)])
@@ -144,14 +167,16 @@ prepare_for_sparse_cs_norm = function(data, both=T, circularize=-1) {
   enrich=rsites[,.(re.pos,re.closest=re.pos)][enrich,,roll="nearest"]
   enrich[category=="rejoined",c("re.closest1","re.closest2"):=list(re.closest,re.closest)]
   enrich[,c("re.pos","re.closest"):=list(NULL,NULL)]
+  enrich=enrich[,.(N=sum(N)),by=c("re.closest1","re.closest2","category")]
   #
   #get rsites that a) have counts on them and b) have at least one dangling/rejoined end.
-  message("RSites list")
-  rsites.count=enrich[category %in% c("contact.close", "contact.down", "contact.far", "contact.up"),
-                      unique(c(re.closest1,re.closest2))]
-  rsites.bias=enrich[category %in% c("dangling.L", "dangling.R", "rejoined"),
-                     unique(c(re.closest1,re.closest2))]
-  rsites=data.table(re.pos=intersect(rsites.count, rsites.bias))
+  #message("RSites list")
+  #rsites.count=enrich[category %in% c("contact.close", "contact.down", "contact.far", "contact.up"),
+  #                    unique(c(re.closest1,re.closest2))]
+  #rsites.bias=enrich[category %in% c("dangling.L", "dangling.R", "rejoined"),
+  #                   unique(c(re.closest1,re.closest2))]
+  #rsites=data.table(re.pos=intersect(rsites.count, rsites.bias))
+  rsites = data.table(re.pos=enrich[,unique(c(re.closest1,re.closest2))])
   setkey(rsites, re.pos)
   rsites[,id:=.I]
   #
@@ -164,8 +189,9 @@ prepare_for_sparse_cs_norm = function(data, both=T, circularize=-1) {
   X=dcast.data.table(enrich[id1 == id2 & category %in% c("dangling.L", "dangling.R", "rejoined"),
                             .(id=id1, pos=re.closest1, category, N)],
                      ...~category, value.var="N", fun.aggregate = sum)
-  stopifnot(all(X[,id==.I])) #IDs must start at one and have no gaps, for current stan implementation
+  X=rbind(X,rsites[id%nin%X[,id],.(id,pos=re.pos,dangling.L=0,dangling.R=0,rejoined=0)])
   setkey(X,id)
+  stopifnot(all(X[,id==.I])) #IDs must start at one and have no gaps, for current stan implementation
   #
   message("Produce count list")
   Y=dcast.data.table(enrich[id1 != id2 
@@ -219,13 +245,12 @@ bin_for_mean_field = function(biases, counts, distance_bins_per_decade=100, circ
   #make distance bins and their factor
   stepsz=1/distance_bins_per_decade
   if (circularize>0) {
-    dmax=biases[,max(pmin(pos,circularize-pos+1))]
-    dmin=biases[,min(pmin(pos,circularize-pos+1))]
-    dbins=10**seq(0,log10(dmax-dmin)+stepsz,stepsz)
+    stopifnot(circularize>=biases[,max(pos)-min(pos)])
+    stopifnot(circularize/2>=mcounts[,max(distance)])
+    dbins=10**seq(0,log10(circularize/2)+stepsz,stepsz)
   } else {
     dbins=10**seq(0,biases[,log10(max(pos)-min(pos))]+stepsz,stepsz)
   }
-  mcounts[,distance:=abs(pos1-pos2)]
   mcounts[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=5)]
   #Count positive counts in these bins
   Nkd = mcounts[,.N,keyby=c("bdist","count")]
@@ -233,6 +258,7 @@ bin_for_mean_field = function(biases, counts, distance_bins_per_decade=100, circ
   #Count the number of crossings per distance bin
   positions=biases[,pos]
   npos=length(positions)
+  stopifnot(circularize<=0) #need to fix following line
   ncrossings <- rowSums(sapply(1:(npos-1), #this loop is still 5x faster in python
                                function(i){hist(positions[(i+1):npos]-positions[i],breaks=dbins,plot=F,
                                                 right=F, include.lowest=T)$counts}
@@ -418,8 +444,8 @@ predict_all_meanfield = function(model, biases, counts, meanfield, opt, bf_per_d
   optimizing(model, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)
 }
 
-get_binned_matrices = function(model, biases, counts, meanfield, opt, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL, bf_per_decade=5, verbose=F) {
-  stopifnot(counts[distance!=pos2-pos1,.N]==0) #need to implement circular genomes
+get_binned_matrices = function(model, biases, counts, meanfield, opt, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL,
+                               bf_per_decade=5, verbose=F, circularize=-1L) {
   csub=copy(counts) #need to implement taking only needed part of matrix, and reporting log_nu and log_delta appropriately
   bsub=copy(biases)
   dmax=max(counts[,max(distance)],meanfield$Nkd[,max(mdist)])+0.01
@@ -450,10 +476,10 @@ get_binned_matrices = function(model, biases, counts, meanfield, opt, resolution
   cup=csub[,.(id1,id2,bin1,bin2,distance,count=contact.up,logmean=log_mean_cup)]
   cdown=csub[,.(id1,id2,bin1,bin2,distance,count=contact.down,logmean=log_mean_cdown)]
   csub=rbind(cclose,cfar,cup,cdown)[!(is.na(bin1)|is.na(bin2)|count==0)]
-  data = list( Kdiag=Kdiag, 
+  data = list( Kdiag=Kdiag, npoints=npoints, circularize=circularize,
                S1=bsub[!is.na(bin1),.N], S2=bsub[!is.na(bin2),.N], 
                cutsites1=bsub[!is.na(bin1),pos], cutsites2=bsub[!is.na(bin2),pos],
-               dmin=dmin, dmax=dmax, npoints=npoints,
+               dmin=dmin, dmax=dmax,
                N=csub[,.N],   counts=csub[,count], cdist=csub[,distance], cmean=csub[,exp(logmean)],
                eC=opt$par$eC,
                log_nu1=bsub[!is.na(bin1),log_nu], log_nu2=bsub[!is.na(bin2),log_nu],
@@ -495,17 +521,35 @@ compute_gamma_overlap = function(alpha1,beta1,alpha2,beta2, bounds=5, ncores=1) 
     sd2=sqrt(a2)/b2
     xmin = max(0,min(mu1-bounds*sd1,mu2-bounds*sd2))
     xmax = max(mu1+bounds*sd1,mu2+bounds*sd2)
-    a=integrate(function(x){exp(dgamma(x,a2,rate=b2,log=T)+pgamma(x,a1,rate=b1,log.p=T))},xmin,xmax)
-    if (a$abs.error<=0) {NA} else {a$value}
+    a=integrate(function(x){exp(dgamma(x,a2,rate=b2,log=T)+pgamma(x,a1,rate=b1,log.p=T))},xmin,xmax, stop.on.error=F)
+    if (a$abs.error<=0 | a$message != "OK") {NA} else {a$value}
   }
 }
 
-detect_interactions = function(binned, dispersions, threshold=0.95, ncores=1){
+#compute p(normal2>normal1) = \int_{-infty}^{+infty} dx p_normal2(x) \int_{-infty}^{x} dy p_normal1(y)
+compute_normal_overlap = function(mu1,sd1,mu2,sd2, bounds=5, ncores=1) {
+  registerDoParallel(cores=ncores)
+  foreach (m1=mu1, s1=sd1, m2=mu2, s2=sd2, .packages="stats", .combine=c) %dopar% {
+    #infinite integral does not work very well so truncate outer integral
+    xmin = min(m1-bounds*s1,m2-bounds*s2)
+    xmax = max(m1+bounds*s1,m2+bounds*s2)
+    a=integrate(function(x){exp(dnorm(x,mean=(m2-m1)/s1,sd=s2/s1,log=T)+pnorm(x,mean=0,sd=1,log.p=T))},(xmin-m1)/s1,(xmax-m1)/s1)
+    if (a$abs.error<=0 | a$message != "OK") {NA} else {a$value}
+  }
+}
+
+detect_interactions = function(binned, dispersions, threshold=0.95, ncores=1, normal.approx=100){
   #report gamma parameters
   mat=copy(binned)
   mat[,c("alpha1","beta1"):=list(dispersions,dispersions/expected)]
   mat[,c("alpha2","beta2"):=list(alpha1+observed,beta1+1)]
-  mat[,prob.observed.gt.expected:=compute_gamma_overlap(alpha1,beta1,alpha2,beta2,ncores=ncores)]
+  mat[alpha1<normal.approx,c("prob.observed.gt.expected","detection.type"):=list(compute_gamma_overlap(alpha1,beta1,alpha2,beta2,ncores=ncores),"gamma")]
+  mat[,c("mean1","sd1"):=list(expected,expected/sqrt(dispersions))]
+  mat[,c("mean2","sd2"):=list(alpha2/beta2, sqrt(alpha2)/beta2)]
+  mat[alpha1>=normal.approx,c("prob.observed.gt.expected","detection.type"):=list(compute_normal_overlap(mean1,sd1, mean2, sd2, ncores=ncores),"normal")]
+  mat[,prob.observed.gt.expected:=as.numeric(prob.observed.gt.expected)]
+  mat[is.na(prob.observed.gt.expected)&observed>=expected,c("prob.observed.gt.expected","detection.type"):=list(ppois(observed,expected,lower.tail=F),"poisson")]
+  mat[is.na(prob.observed.gt.expected)&observed<expected,c("prob.observed.gt.expected","detection.type"):=list(ppois(observed,expected,lower.tail=T),"poisson")]
   mat[,is.interaction:=prob.observed.gt.expected>threshold | 1-prob.observed.gt.expected>threshold]
   #write begins/ends
   bin1.begin=mat[,bin1]
@@ -581,16 +625,16 @@ thresholds_estimator = function(observed, expected, dispersion, threshold=0.95, 
   return(list(p1,p2,p3))
 }
 
-read_and_prepare = function(infile, outprefix, skip=0L, both=T, distance_bins_per_decade=100, circularize=-1) {
+read_and_prepare = function(infile, outprefix, skip=0L, both=T, distance_bins_per_decade=100, circularize=-1, dangling.L = c(0,4), dangling.R = c(3,-1)) {
   message("*** READ")
   data=read_tsv(infile, skip=skip)
   message("*** CATEGORIZE")
-  data = categorize_by_new_type(data)
+  data = categorize_by_new_type(data, dangling.L = dangling.L, dangling.R = dangling.R)
   message("*** BIASES AND COUNTS")
   cs_data = prepare_for_sparse_cs_norm(data, both=both, circularize=circularize)
   dset_statistics(cs_data$biases,cs_data$counts)
   message("*** MEANFIELD")
-  cs_data$meanfield=bin_for_mean_field(cs_data$biases, cs_data$counts, distance_bins_per_decade=distance_bins_per_decade)
+  cs_data$meanfield=bin_for_mean_field(cs_data$biases, cs_data$counts, distance_bins_per_decade=distance_bins_per_decade, circularize=circularize)
   message("*** WRITE")
   write.table(cs_data$biases, file = paste0(outprefix,"_biases.dat"), quote=F, row.names = F)
   write.table(cs_data$counts, file = paste0(outprefix,"_counts.dat"), quote=F, row.names = F)
@@ -603,8 +647,7 @@ read_and_prepare = function(infile, outprefix, skip=0L, both=T, distance_bins_pe
   return(cs_data)
 }
 
-get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, fill.zeros=T) {
-  stopifnot(counts[distance!=pos2-pos1,.N]==0)
+get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, fill.zeros=T, circularize=-1) {
   stopifnot(end1>=begin1)
   if (is.null(begin2)) begin2=begin1
   if (is.null(end2)) end2=end1
@@ -625,7 +668,11 @@ get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, f
   #fill zeros
   if (fill.zeros==T) {
     counts.local=fill_zeros(counts=counts.local,biases=biases.1,biases2=biases.2)
-    counts.local[,distance:=abs(pos2-pos1)] #not filled
+    if (circularize>0) {
+      counts.local[,distance:=pmin(abs(pos2-pos1), circularize+1-abs(pos2-pos1))]
+    } else {
+      counts.local[,distance:=abs(pos2-pos1)]
+    }
   }
   return(list(counts=counts.local,biases1=biases.1,biases2=biases.2,
               beginrange1=beginrange1, endrange1=endrange1, beginrange2=beginrange2, endrange2=endrange2))
@@ -683,12 +730,12 @@ run_split_parallel_squares = function(biases, square.size, coverage, diag.only=F
   return(list(squares=squares,diagsquares=diagsquares,true.square.size=true.square.size))
 }
 
-run_split_parallel_biases = function(smfit, counts, biases, meanfield, begin, end, bf_per_kb, bf_per_decade, verbose, iter, outprefix=NULL) {
+run_split_parallel_biases = function(smfit, counts, biases, meanfield, begin, end, bf_per_kb, bf_per_decade, verbose, iter, outprefix=NULL, circularize=-1) {
   #extract relevant portion of data
-  extracted = get_cs_subset(counts, biases, begin1=begin, end1=end, fill.zeros=T)
+  extracted = get_cs_subset(counts, biases, begin1=begin, end1=end, fill.zeros=T, circularize=circularize)
   #run fit
   a=system.time(output <- capture.output(op <- optimize_all_meanfield(smfit, extracted$biases1, extracted$counts,
-                        meanfield, maxcount=-1, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)))
+                                                                      meanfield, maxcount=-1, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)))
   op$runtime=a[1]+a[4]
   op$output=output
   if (!is.null(outprefix)) {
@@ -707,13 +754,13 @@ run_split_parallel_biases = function(smfit, counts, biases, meanfield, begin, en
 }
 
 run_split_parallel_counts = function(model, counts, biases.aug, begin1, end1, begin2, end2, dmin, dmax,
-                                     bf_per_decade=5, verbose=T, iter=100000, outprefix=NULL) {
+                                     bf_per_decade=5, verbose=T, iter=100000, outprefix=NULL, circularize=-1L) {
   #extract relevant portion of data
   extracted = get_cs_subset(counts, biases.aug, begin1=begin1, end1=end1,
-                            begin2=begin2, end2=end2, fill.zeros=T)
+                            begin2=begin2, end2=end2, fill.zeros=T, circularize=circularize)
   #run fit
   a=system.time(output <- capture.output(op <- optimize_extradiag(model, extracted$biases1, extracted$biases2, extracted$counts,
-                                                        dmin, dmax, bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)))
+                                                                  dmin, dmax, bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)))
   op$runtime=a[1]+a[4]
   op$output=output
   if (!is.null(outprefix)) {
@@ -763,8 +810,12 @@ optimize_eC = function(model, biases, counts, retlist, dmin, dmax, bf_per_decade
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)
 }
 
+
+
+
 run_split_parallel = function(counts, biases, square.size=100000, coverage=4, coverage.extradiag=1, bf_per_kb=1, bf_per_decade=5,
-                              distance_bins_per_decade=100, verbose = F, iter=100000, ncpus=30, homogenize=F, outprefix=NULL) {
+                              distance_bins_per_decade=100, verbose = F, iter=100000, ncpus=30, homogenize=F, outprefix=NULL, circularize=-1L,
+                              ops.bias=NULL, ops.count=NULL) {
   ### build squares
   message("*** build squares")
   retval.squares = run_split_parallel_squares(biases, square.size, coverage, diag.only=T)
@@ -787,18 +838,21 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
     a=sapply(names(x[[1]]), function(i) sapply(x, "[[", i,simplify=F))
     list(par=rbindlist(a[,1]), out=as.character(a[,2]), runtime=as.numeric(a[,3]))
   }
-  ops.bias = foreach (begin=diagsquares[,begin1], end=diagsquares[,end1], .packages=c("data.table","rstan")) %dopar% 
-    run_split_parallel_biases(smfit, counts, biases, meanfield, begin, end, bf_per_kb = bf_per_kb,
-                              bf_per_decade = bf_per_decade, verbose = verbose, iter = iter, outprefix=outprefix)
-  ops.bias = output.binder(ops.bias)
+  if (is.null(ops.bias)) {
+    ops.bias = foreach (begin=diagsquares[,begin1], end=diagsquares[,end1], .packages=c("data.table","rstan")) %dopar% 
+      run_split_parallel_biases(smfit, counts, biases, meanfield, begin, end, bf_per_kb = bf_per_kb,
+                                bf_per_decade = bf_per_decade, verbose = verbose, iter = iter, outprefix=outprefix, circularize=circularize)
+    ops.bias = output.binder(ops.bias)
+    if (!is.null(outprefix)) {save(ops.bias, file=paste0(outprefix, "_ops_bias.RData"))}
+  }
   ### reconstruct bias estimates: eRJ eDE log_nu and log_delta
   message("*** reconstruct genomic biases")
   info=ops.bias$par[,.SD[1],by=square.begin,.SDcols=c("lambda_nu","lambda_delta","nsites","alpha")]
   #ggplot(info)+geom_line(aes(square.begin,lambda_nu))+scale_y_log10()+geom_hline(yintercept=info[,exp(median(log(lambda_nu)))])
   means=ops.bias$par[,.(log_mean_RJ=weighted.mean(log_mean_RJ, weight),
-                    log_mean_DL=weighted.mean(log_mean_DL, weight),
-                    log_mean_DR=weighted.mean(log_mean_DR, weight),
-                    ncounts=.N), keyby=c("id","pos")]
+                        log_mean_DL=weighted.mean(log_mean_DL, weight),
+                        log_mean_DR=weighted.mean(log_mean_DR, weight),
+                        ncounts=.N), keyby=c("id","pos")]
   if (homogenize==T) {
     message("*** homogenize genomic biases")
     smfitgen=stan_model("cs_norm_fit_genomic_params.stan")
@@ -825,8 +879,7 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   }
   retlist$out.bias=ops.bias$out
   retlist$runtime.bias=ops.bias$runtime
-  #ggplot()+geom_line(data=data.table(x=biases.aug[,pos],y=opall$par$log_delta),aes(x,y,colour="ref"))+
-  #  geom_line(data=data.table(x=biases.aug[,pos],y=bias.params$log_delta), aes(x,y,colour="split"))
+  #ggplot()+geom_line(data=data.table(x=biases.aug[,pos],y=retlist$log_nu),aes(x,y))
   #
   ### fit remaining data
   message("*** fit diagonal decay")
@@ -834,11 +887,14 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   dmax=max(counts[,max(distance)],meanfield$Nkd[,max(mdist)])+0.01
   dmin=min(counts[,min(distance)],meanfield$Nkd[,min(mdist)])-0.01
   registerDoParallel(cores=ncpus)
-  ops.count = foreach (begin1=squares[,begin1], end1=squares[,end1], begin2=squares[,begin2], end2=squares[,end2],
+  if (is.null(ops.count)) {
+    ops.count = foreach (begin1=squares[,begin1], end1=squares[,end1], begin2=squares[,begin2], end2=squares[,end2],
                        .packages=c("data.table","rstan")) %dopar% 
-    run_split_parallel_counts(smfitex, counts, biases.aug, begin1, end1, begin2, end2, dmin, dmax,
-                              bf_per_decade = bf_per_decade, verbose = verbose, iter = iter, outprefix=outprefix)
-  ops.count=output.binder(ops.count)
+      run_split_parallel_counts(smfitex, counts, biases.aug, begin1, end1, begin2, end2, dmin, dmax,
+                              bf_per_decade = bf_per_decade, verbose = verbose, iter = iter, outprefix=outprefix, circularize=circularize)
+    ops.count=output.binder(ops.count)
+    if (!is.null(outprefix)) {save(ops.count, file=paste0(outprefix, "_ops_count.RData"))}
+  }
   ### reconstruct count estimates: log_decay and beta_diag_centered
   message("*** reconstruct diagonal decay")
   #qplot(ops.count[,id],binwidth=1)
@@ -859,10 +915,10 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   ops.count$par[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=5)]
   #ggplot(ops.count)+geom_line(aes(distance,log_decay_far,group=cat,colour=bdist))+guides(colour=F)+facet_grid(.~dbin)
   test=ops.count$par[,.(log_decay_close=weighted.mean(log_decay_close, weight),
-                    log_decay_far=weighted.mean(log_decay_far, weight),
-                    log_decay_up=weighted.mean(log_decay_up, weight),
-                    log_decay_down=weighted.mean(log_decay_down, weight),
-                    ncounts=.N), keyby=bdist] #could only take one decay, and even weights since eC is estimated later
+                        log_decay_far=weighted.mean(log_decay_far, weight),
+                        log_decay_up=weighted.mean(log_decay_up, weight),
+                        log_decay_down=weighted.mean(log_decay_down, weight),
+                        ncounts=.N), keyby=bdist] #could only take one decay, and even weights since eC is estimated later
   bin.begin=test[,bdist]
   bin.end=test[,bdist]
   levels(bin.begin) <- tstrsplit(as.character(levels(bin.begin)), "[[,]")[2][[1]]
@@ -879,11 +935,12 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   op=optimize_eC(smfiteC, biases, counts[sample(.N,min(.N,100000))], retlist, dmin, dmax, bf_per_decade=bf_per_decade, verbose=verbose)
   retlist$eC=op$par$eC
   retlist$alpha=op$par$alpha
+  #ggplot(test)+geom_point(aes(bdist, log_decay))
   #ggplot(melt(test, id.vars=c("bdist","begin","end")))+geom_point(aes(bdist,value,colour=variable))
   return(list(par=retlist, out.bias=ops.bias$out, out.count=ops.count$out, runtime.count=ops.count$runtime, runtime.bias=ops.bias$runtime))
 }
 
-postprocess = function(biases, counts, meanfield, op, resolution=10000, ncores=30, predict.all.means=T) {
+postprocess = function(biases, counts, meanfield, op, resolution=10000, ncores=30, predict.all.means=T, circularize=-1L) {
   smpred = stan_model(file = "cs_norm_predict.stan")
   smbin = stan_model("cs_norm_predict_binned.stan")
   smdisp = stan_model("cs_norm_binned_dispersions.stan")
@@ -893,7 +950,7 @@ postprocess = function(biases, counts, meanfield, op, resolution=10000, ncores=3
     op$pred=predict_all_meanfield(smpred, biases, counts, meanfield, op, verbose=T)$par
   }
   message("*** buid binned matrices")
-  op$binned=get_binned_matrices(smbin, biases, counts, meanfield, op, resolution=resolution)
+  op$binned=get_binned_matrices(smbin, biases, counts, meanfield, op, resolution=resolution, circularize=circularize)
   message("*** estimate dispersions")
   op$disp=get_dispersions(smdisp, op$binned$mat)$par
   message("*** detect interactions")
@@ -901,6 +958,12 @@ postprocess = function(biases, counts, meanfield, op, resolution=10000, ncores=3
   return(op)
 }
 
+
+#read_and_prepare("/scratch/ledily/mapped/HindIII_T0_both_filled_map_chr6.tsv", "data/ledily_T0_HindIII_chr6", skip="SRR", dangling.L = c(0,4,5), dangling.R = c(3,-1,-2))
+#read_and_prepare("/scratch/ledily/mapped/HindIII_T60_both_filled_map_chr6.tsv", "data/ledily_T60_HindIII_chr6", skip="SRR", dangling.L = c(0,4,5), dangling.R = c(3,-1,-2))
+
+#read_and_prepare("/scratch/ledily/mapped/NcoI_T0_both_filled_map_chr6.tsv", "data/ledily_T0_NcoI_chr6", skip="SRR", dangling.L = c(0,4,5), dangling.R = c(3,-1,-2))
+#read_and_prepare("/scratch/ledily/mapped/NcoI_T60_both_filled_map_chr6.tsv", "data/ledily_T60_NcoI_chr6", skip="SRR", dangling.L = c(0,4,5), dangling.R = c(3,-1,-2))
 
 #read_and_prepare("/scratch/rao/mapped/HICall_both_filled_map_chr1.tsv", "data/rao_HICall_chr1_all", skip="SRR")
 
@@ -918,10 +981,12 @@ dset=generate_fake_dataset(num_rsites=100, genome_size = 100000, eC = 0, eRJ = 5
 counts=dset$counts
 biases=dset$biases
 dset_statistics(biases,counts)
-meanfield=bin_for_mean_field(biases, counts, distance_bins_per_decade = 100)
+meanfield=bin_for_mean_field(biases, counts, distance_bins_per_decade = 100)#, circularize = 4042929)
+#meanfield$Nkd[mdist>=4042929/2,mdist:=4042929/2]
 
-#prefix="caulo_NcoI_all"
-prefix="ralph_Bcell_Sox2"
+#prefix="ledily_T60_HindIII_chr6"
+prefix="caulo_NcoI_all"
+#prefix="ralph_Bcell_Sox2"
 biases=fread(paste0("data/",prefix,"_biases.dat"))
 setkey(biases,id)
 counts=fread(paste0("data/",prefix,"_counts.dat"))
@@ -929,9 +994,13 @@ counts=fread(paste0("data/",prefix,"_counts.dat"))
 #save(meanfield, file = paste0("data/",prefix,"_meanfield_100.RData"))
 load(paste0("data/",prefix,"_meanfield_100.RData"))
 
+#ledily:  tad 821 151000000-153000000
+biases=biases[pos>=151000000&pos<=153000000]
+#biases=biases[pos>=150000000&pos<=154000000]
+
 #ralph: restrict to 30500000,32500000
 #biases=biases[pos<=30600714]
-biases=biases[pos>=30500000&pos<=32500000]
+#biases=biases[pos>=30500000&pos<=32500000]
 #biases=biases[pos>=30500000&pos<=30600000]
 beginrange=biases[1,id]
 endrange=biases[.N,id]
@@ -943,6 +1012,11 @@ meanfield$Nkl=meanfield$Nkl[id>=beginrange&id<=endrange][,.(id=id-beginrange+1,c
 meanfield$Nkr=meanfield$Nkr[id>=beginrange&id<=endrange][,.(id=id-beginrange+1,count,N)]
 
 #caulo/toy: restrict to 100 consecutive rsites
+biases=biases[pos>=1000000&pos<=3000000]
+beginrange=biases[1,id]
+endrange=biases[.N,id]
+beginrange=1
+endrange=biases[pos<4042929/2][,.N]
 beginrange=1
 endrange=975
 beginrange=1
@@ -964,9 +1038,11 @@ meanfield$Nkr=meanfield$Nkr[id>=beginrange&id<=endrange][,.(id=id-beginrange+1,c
 
 counts=fill_zeros(counts,biases)
 counts[,distance:=abs(pos2-pos1)] #not filled
-write.table(biases, file = paste0(prefix,"_biases.dat"), quote=F, row.names = F)
-write.table(counts, file = paste0(prefix,"_counts.dat"), quote=F, row.names = F)
-save(meanfield, file = paste0(prefix, "_meanfield_100.RData"))
+write.table(biases, file = paste0("data/",prefix,"_biases.dat"), quote=F, row.names = F)
+write.table(counts, file = paste0("data/",prefix,"_counts.dat"), quote=F, row.names = F)
+save(meanfield, file = paste0("data/",prefix, "_meanfield_100.RData"))
+
+counts[,distance:=pmin(abs(pos2-pos1),4042929-abs(pos2-pos1)+1)] #not filled
 
 
 
@@ -1089,7 +1165,7 @@ save(opall, file = paste0("data/",prefix,"_op_maxcount_-1_redo.RData"))
 load(paste0("data/",prefix,"_op_maxcount_-1.RData"), verbose=T)
 
 coverage=4
-square.size=30000
+square.size=150000
 oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=1,
                          bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=100000, ncpus=30, homogenize=F)
 oppar=postprocess(biases, counts, meanfield, oppar, resolution=10000, ncores=30)
@@ -1133,23 +1209,153 @@ c(opserial$disp$alpha,oppar$disp$alpha)
 
 ### single run plots
 coverage=4
-square.size=20000
-oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=1,
+square.size=150000
+bf_per_kb=0.2
+oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
                          bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=100000, ncpus=30, homogenize=F)
-oppar=postprocess(biases, counts, meanfield, oppar, resolution=10000, ncores=30, predict.all.means=T)
-oppar$ice=iterative_normalization(oppar$mat, niterations=1, resolution=10000, return.binned=T)
-save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k.RData"))
+oppar=postprocess(biases, counts, meanfield, oppar, resolution=50000, ncores=30, predict.all.means=F)
+oppar$ice=iterative_normalization(oppar$mat, niterations=1, resolution=50000, return.binned=T)
+save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,".RData"))
 
+load("data/caulo_NcoI_3189-2020271_op_maxcount_-1_parallel_inhomogeneous_cov4X_sq150k_bfpkb01.RData")
+load("data/caulo_BglIIr1_1-2009521_op_maxcount_-1_parallel_inhomogeneous_cov4X_sq150k_bfpkb01.RData")
+load("data/caulo_BglIIr2_15389-2009521_op_maxcount_-1_parallel_inhomogeneous_cov4X_sq150k_bfpkb01.RData")
+
+#prefix="ledily_T0_NcoI_chr6_150000151-153992077"
+#prefix="ledily_T0_NcoI_chr6_151001273-152989574"
+#prefix="ledily_T0_HindIII_chr6_150004969-153999619"
+#prefix="ledily_T0_HindIII_chr6_151000912-152997061"
+#prefix="ledily_T60_NcoI_chr6_150000151-153992077"
+#prefix="ledily_T60_NcoI_chr6_151001273-152989574"
+#prefix="ledily_T60_HindIII_chr6_150004969-153999619"
+#prefix="ledily_T60_HindIII_chr6_151000912-152997061"
+#prefix="caulo_BglIIr1_1-2009521"
+#prefix="caulo_BglIIr2_15389-2009521"
+#prefix="caulo_NcoI_3189-2020271"
+#prefix="caulo_NcoI_all"
+#prefix="caulo_NcoI_1004680-2998140"
+
+biases=fread(paste0("data/",prefix,"_biases.dat"))
+counts=fread(paste0("data/",prefix,"_counts.dat"))
+load(paste0("data/",prefix,"_meanfield_100.RData"))
+load(paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,".RData"))
 setkey(oppar$mat, begin1,begin2)
+#matrix and detected interactions
 ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(normalized)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(normalized)))+
-  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+
-  theme(legend.position = "none") 
-ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_normalized.png"), width=10, height=7.5)
+  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+
+  theme(legend.position = "none")
+ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_normalized.png"), width=10, height=9)
+#lFC
 ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=lFC))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=lFC))+
-  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+theme(legend.position = "none") 
-ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_mat.png"), width=10, height=7.5)
+  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+theme(legend.position = "none") 
+ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_lFC_mat.png"), width=10, height=9)
+#raw
 ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(observed)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(observed)))+scale_fill_gradient(low="white", high="black")+theme(legend.position = "none") 
-ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_observed.png"), width=10, height=7.5)
+ggsave(filename = paste0("images/",prefix,"_observed.png"), width=10, height=9)
+#ice
 ggplot()+geom_raster(data=oppar$ice, aes(begin1,begin2,fill=log(N)))+geom_raster(data=oppar$ice, aes(begin2,begin1,fill=log(N)))+scale_fill_gradient(low="white", high="black")+  theme(legend.position = "none") 
-ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_ICE.png"), width=10, height=7.5)+  theme(legend.position = "none") 
+ggsave(filename = paste0("images/",prefix,"_ICE.png"), width=10, height=9)+  theme(legend.position = "none") 
+#ice vs raw
+ggplot()+geom_raster(data=oppar$ice, aes(begin1,begin2,fill=log(N)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(observed)))+scale_fill_gradient(low="white", high="black")+  theme(legend.position = "none") 
+ggsave(filename = paste0("images/",prefix,"_ICE_vs_observed.png"), width=10, height=9)+  theme(legend.position = "none") 
+#cs vs ice
+ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(normalized)))+geom_raster(data=oppar$ice, aes(begin2,begin1,fill=log(N)))+
+  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+
+  theme(legend.position = "none") 
+#observed vs expected
+ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(expected)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(observed)))+
+  #geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=oppar$mat[is.interaction==T])+
+  scale_fill_gradient(low="white", high="black")+
+  theme(legend.position = "none") 
+#nu
+ggplot(melt(data.table(id=biases[,pos],parallel=oppar$par$log_nu),id.vars="id",variable.name="nu"))+geom_line(aes(id,value,colour=nu))
+#decay
+ggplot(data.table(dist=oppar$binned$distance,decay=oppar$binned$decay)[dist>1e3])+geom_line(aes(dist,decay))+scale_x_log10()+scale_y_log10()
+#decay and normalized counts
+#oppar$mat[,distance:=pmin(begin2-begin1,4042929+1-(begin2-begin1))]
+#setkey(oppar$mat,distance)
+#ggplot(data.table(dist=oppar$binned$distance,decay=oppar$binned$decay)[dist>1e3])+geom_line(aes(dist,decay),colour="red")+scale_x_log10()+scale_y_log10()+
+#  geom_point(data=oppar$mat,aes(distance,normalized),alpha=0.01)
+ggplot(data.table(normalized=counts[,contact.close]*exp(oppar$pred$log_decay_close-oppar$pred$log_mean_cclose),distance=counts[,distance],
+                  decay=exp(oppar$pred$log_decay_close))[distance>1000][sample(.N,min(.N,100000))])+
+  geom_point(aes(distance,normalized),alpha=0.01)+
+  geom_line(aes(distance,decay),colour="red")+scale_x_log10()+scale_y_log10()
+ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_decay_with_counts.png"), width=10, height=9)
+#lfC hist
+ggplot(oppar$mat)+geom_histogram(aes(lFC))
+ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_lFC_hist.png"), width=10, height=9)
+#detected interactions and 95% CI for posterior
+oppar$mat[,upper:=qgamma(0.975,shape=alpha1,rate=beta1)]
+oppar$mat[,lower:=qgamma(0.025,shape=alpha1,rate=beta1)]
+oppar$mat[,CI:=upper-lower]
+ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(normalized)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(CI*normalized/observed)))+
+  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+
+  theme(legend.position = "none")#+scale_colour_brewer(type="div",palette="RdBu")
+ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_normalized_with_error.png"), width=10, height=9)
 
+
+
+### reload intermediate files of long run
+#plot bias runs
+ops=sapply(X=Sys.glob("ralph_*biases_op_*.RData"), FUN=function(x){ a=load(x); return(get(a[1]))}, USE.NAMES=T, simplify=F)
+failures=data.table(failed=sapply(ops, function(x){length(grep("failed", tail(x$output,1)))>0}),
+                    runtime=sapply(ops, function(x){x$runtime}),
+                    sqsizes=tstrsplit(names(ops),"_")[[7]],
+                    dispersion=sapply(ops, function(x){x$par$alpha}),
+                    deviance=sapply(ops, function(x){x$par$deviance_proportion_explained}))
+failures[,sqsizes:=as.numeric(sapply(sqsizes, function(x){substr(x,1,nchar(x)-6)}))]
+ggplot(failures)+geom_point(aes(sqsizes, runtime, colour=failed))
+ggplot(failures)+geom_point(aes(sqsizes, deviance, colour=failed))
+ggplot(failures)+geom_point(aes(sqsizes, dispersion, colour=failed))+scale_y_log10()
+
+
+#plot counts runs
+ops=sapply(X=Sys.glob("tmp/ralph_*counts_op_*.RData"), FUN=function(x){ a=load(x); return(get(a[1]))}, USE.NAMES=T, simplify=F)
+failures=data.table(failed=sapply(ops, function(x){length(grep("failed", tail(x$output,1)))>0}),
+                    runtime=sapply(ops, function(x){x$runtime}),
+                    sqsizes=tstrsplit(names(ops),"_")[[7]],
+                    deviance=sapply(ops, function(x){x$par$deviance_proportion_explained}))
+failures[,sqsizes:=as.numeric(sapply(sqsizes, function(x){substr(x,1,nchar(x)-6)}))]
+failures[,idx:=.I]
+ggplot(failures)+geom_point(aes(idx, runtime, colour=failed))
+ggplot(failures)+geom_point(aes(idx, deviance, colour=failed))
+
+ops.bias=sapply(X=Sys.glob(paste0("tmp/",prefix,"_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_biases_ret_*.RData")), FUN=function(x){ a=load(x); return(list(ret=get(a[1]), out="blah", runtime=-1))}, USE.NAMES=T, simplify=F)
+ops.bias = output.binder(ops.bias)
+save(ops.bias, file=paste0("tmp/",prefix,"_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_ops_bias.RData"))
+
+ops.count=sapply(X=Sys.glob(paste0("tmp/",prefix,"_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_counts_ret_*.RData")), FUN=function(x){ a=load(x); return(list(ret=get(a[1]), out="blah", runtime=-1))}, USE.NAMES=T, simplify=F)
+ops.count = output.binder(ops.count)
+save(ops.count, file=paste0("tmp/",prefix,"_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_ops_count.RData"))
+
+oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
+                         bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=100000, ncpus=30, homogenize=F, ops.count=ops.count, ops.bias=ops.bias)
+oppar=postprocess(biases, counts, meanfield, oppar, resolution=50000, ncores=30, predict.all.means=T)
+oppar$ice=iterative_normalization(oppar$mat, niterations=1, resolution=50000, return.binned=T)
+save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,".RData"))
+
+
+
+a=fread("~/simulations/caulobacter/data/GSM1120448_Laublab_NcoI_HiC_NA1000_swarmer_cell_untreated_overlap_after_HiCNorm_fullgen.count")
+setnames(a,c("bin1","bin2","lgfcount"))
+bins=data.table(begin=seq(1,4045000+10000,10000))
+bins[,name:=paste0("bin",.I-1)]
+setkey(bins,name)
+setkey(a,bin1)
+a=bins[a]
+setnames(a,c("begin", "name"), c("begin1","bin1"))
+setkey(a,bin2)
+a=bins[a]
+setnames(a,c("begin", "name"), c("begin2","bin2"))
+#newbins=seq(1,4045000+20000,20000)
+#a[,nb1:=cut2(begin1,newbins)]
+#a[,nb2:=cut2(begin2,newbins)]
+#a=a[,.(min(begin1),min(begin2),lgfcount=sum(lgfcount)),by=c("nb1","nb2")]
+#a[,c("ign","begin1","ign2"):=tstrsplit(nb1,'[[,]')]
+#a[,c("ign","begin2","ign2"):=tstrsplit(nb2,'[[,]')]
+#a[,c("begin1","begin2"):=list(as.numeric(begin1),as.numeric(begin2))]
+#ggplot(a[begin1<=2003200&begin2<=2003200])+geom_raster(aes(begin1,begin2,fill=log(lgfcount)))+geom_raster(aes(begin2,begin1,fill=log(lgfcount)))+
+#  scale_fill_gradient(low="white", high="black")+theme(legend.position = "none")
+ggplot(a)+geom_raster(aes(begin1,begin2,fill=log(lgfcount)))+geom_raster(aes(begin2,begin1,fill=log(lgfcount)))+
+  scale_fill_gradient(low="white", high="black")+theme(legend.position = "none")
+ggsave(filename = paste0("images/",prefix,"_HiCNorm.png"), width=10, height=9)+  theme(legend.position = "none") 
