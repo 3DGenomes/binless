@@ -78,34 +78,21 @@ functions {
 }
 ////////////////////////////////////////////////////////////////
 data {
-  //spline parameters
-  int Kdiag; //number of functions in spline base for diagonal decay
-  //biases
+  //genomic biases
   int<lower=1> S1; //number of cut sites on x and y axes
   int<lower=1> S2;
-  //distance bounds
+  //decay bias
+  int Kdiag; //number of functions in spline base for diagonal decay
   real<lower=0> dmin;
   real<lower=dmin> dmax;
   //counts : explicit
-  int<lower=0> Nclose; //number of close counts modelled explicitly
-  int<lower=0> counts_close[Nclose]; //value of the count
-  int<lower=0> index_close[2,Nclose]; //indices of rsite pairs
-  vector<lower=dmin,upper=dmax>[Nclose] dist_close; //genomic distance between rsites
-  //
-  int<lower=0> Nfar; //number of far counts modelled explicitly
-  int<lower=0> counts_far[Nfar]; //value of the count
-  int<lower=0> index_far[2,Nfar]; //indices of rsite pairs
-  vector<lower=dmin,upper=dmax>[Nfar] dist_far; //genomic distance between rsites
-  //
-  int<lower=0> Nup; //number of upstream counts modelled explicitly
-  int<lower=0> counts_up[Nup]; //value of the count
-  int<lower=0> index_up[2,Nup]; //indices of rsite pairs
-  vector<lower=dmin,upper=dmax>[Nup] dist_up; //genomic distance between rsites
-  //
-  int<lower=0> Ndown; //number of downstream counts modelled explicitly
-  int<lower=0> counts_down[Ndown]; //value of the count
-  int<lower=0> index_down[2,Ndown]; //indices of rsite pairs
-  vector<lower=dmin,upper=dmax>[Ndown] dist_down; //genomic distance between rsites
+  int<lower=0> N; //number of counts
+  int<lower=1> cidx[2,N]; //indices of rsite pairs
+  vector<lower=dmin,upper=dmax>[N] dist; //genomic distance between rsites
+  int<lower=0> counts_close[N]; //value of the count
+  int<lower=0> counts_far[N];
+  int<lower=0> counts_up[N];
+  int<lower=0> counts_down[N];
   //fitted parameters
   vector[S1] log_nu1; // log(nu)
   vector[S2] log_nu2;
@@ -114,21 +101,16 @@ data {
 }
 transformed data {
   //diagonal SCAM spline, dense, exact
-  matrix[Nclose+Nfar+Nup+Ndown,Kdiag] Xdiag;
+  matrix[N,Kdiag] Xdiag;
   row_vector[Kdiag] pdiag;
-  vector[Nclose+Nfar+Nup+Ndown] diag_weights;
-  
+  vector[N] diag_weights;
+  if (max(cidx[1])>S1) {reject("first index larger than rsites");}
+  if (max(cidx[2])>S2) {reject("second index larger than rsites");}
   //diagonal SCAM spline, dense, exact
   {
-    vector[Nclose+Nfar+Nup+Ndown] tmp;
-    tmp[:Nclose] <- dist_close;
-    tmp[(Nclose+1):(Nclose+Nfar)] <- dist_far;
-    tmp[(Nclose+Nfar+1):(Nclose+Nfar+Nup)] <- dist_up;
-    tmp[(Nclose+Nfar+Nup+1):] <- dist_down;
-    Xdiag <- bspline(log(tmp), Kdiag, splinedegree(), log(dmin), log(dmax));
+    Xdiag <- bspline(log(dist), Kdiag, splinedegree(), log(dmin), log(dmax));
     //projector for diagonal (SCAM)
-    diag_weights <- rep_vector(1, Nclose+Nfar+Nup+Ndown);
-    diag_weights <- diag_weights/mean(diag_weights);
+    diag_weights <- rep_vector(1, N);
     pdiag <- diag_weights' * Xdiag;
     pdiag <- pdiag / (pdiag * rep_vector(1,Kdiag));
   }
@@ -144,42 +126,34 @@ parameters {
 }
 transformed parameters {
   //diag
-  vector[Nclose] log_decay_close;
-  vector[Nfar] log_decay_far;
-  vector[Nup] log_decay_up;
-  vector[Ndown] log_decay_down;
+  vector[N] log_decay;
   vector[Kdiag] beta_diag_centered;
   vector[Kdiag-2] beta_diag_diff;
   //
-  vector[Nclose] log_mean_cclose;
-  vector[Nfar] log_mean_cfar;
-  vector[Nup] log_mean_cup;
-  vector[Ndown] log_mean_cdown;
+  vector[N] log_mean_cclose;
+  vector[N] log_mean_cfar;
+  vector[N] log_mean_cup;
+  vector[N] log_mean_cdown;
   
   //decay
   {
     vector[Kdiag] beta_diag_aug;
-    vector[Nclose+Nfar+Nup+Ndown] log_decay;
     real epsilon;
     epsilon <- -1; //decreasing spline
     beta_diag_aug[1] <- 0;
     beta_diag_aug[2:] <- beta_diag;
     beta_diag_centered <- epsilon * (beta_diag_aug - (pdiag * beta_diag_aug) * rep_vector(1, Kdiag));
     log_decay <- Xdiag * beta_diag_centered;
-    log_decay_close <- log_decay[:Nclose];
-    log_decay_far <- log_decay[(Nclose+1):(Nclose+Nfar)];
-    log_decay_up <- log_decay[(Nclose+Nfar+1):(Nclose+Nfar+Nup)];
-    log_decay_down <- log_decay[(Nclose+Nfar+Nup+1):];
     beta_diag_diff <- beta_diag_centered[:(Kdiag-2)]-2*beta_diag_centered[2:(Kdiag-1)]+beta_diag_centered[3:];
   }
 
   //means
   {
     //exact counts  
-    log_mean_cclose <- eC + log_decay_close + (log_nu1 - log_delta1)[index_close[1]] + (log_nu2 + log_delta2)[index_close[2]];
-    log_mean_cfar   <- eC + log_decay_far   + (log_nu1 + log_delta1)[index_far[1]]   + (log_nu2 - log_delta2)[index_far[2]];
-    log_mean_cup    <- eC + log_decay_up    + (log_nu1 + log_delta1)[index_up[1]]    + (log_nu2 + log_delta2)[index_up[2]];
-    log_mean_cdown  <- eC + log_decay_down  + (log_nu1 - log_delta1)[index_down[1]]  + (log_nu2 - log_delta2)[index_down[2]];
+    log_mean_cclose <- eC + log_decay + (log_nu1 - log_delta1)[cidx[1]] + (log_nu2 + log_delta2)[cidx[2]];
+    log_mean_cfar   <- eC + log_decay + (log_nu1 + log_delta1)[cidx[1]] + (log_nu2 - log_delta2)[cidx[2]];
+    log_mean_cup    <- eC + log_decay + (log_nu1 + log_delta1)[cidx[1]] + (log_nu2 + log_delta2)[cidx[2]];
+    log_mean_cdown  <- eC + log_decay + (log_nu1 - log_delta1)[cidx[1]] + (log_nu2 - log_delta2)[cidx[2]];
   }
 }
 model {

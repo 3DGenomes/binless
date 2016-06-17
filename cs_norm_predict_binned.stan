@@ -132,7 +132,7 @@ generated quantities {
   matrix[B1,B2] ncounts; //number of possible counts in bin
   matrix[B1,B2] observed; //summed counts per bin
   matrix[B1,B2] expected; //posterior mean of negative binomial per bin
-  matrix[B1,B2] normalized; // observed * decay / (expected * ncounts)
+  matrix[B1,B2] normalized; // (sum_i observed_i * decay_i / expected_i) * ncounts
   
   //decay
   {
