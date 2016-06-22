@@ -1,8 +1,12 @@
 Package: csnorm
 Type: Package
-Title: What the Package Does (Title Case)
+Title: csnorm: Cut-Site Normalization And Interaction Detection For 3C-like Data
 Version: 0.1.0
-Authors@R: person("First", "Last", email = "first.last@example.com", role = c("aut", "cre"))
-Description: More about what it does (maybe more than one line)
-License: What license is it under?
-LazyData: TRUE
+Authors@R: person("Yannick", "Spill", email = "yannick.spill@cnag.crg.eu", role = c("aut", "cre"))
+Description: Provides resolution-independent normalization of 3C-like data, and permits interaction detection.
+License: TODO
+Depends: R (>= 3.0.2), Rcpp (>= 0.11.0)
+Imports: data.table (>= 1.9.6), parallel, rstan (>= 2.9.0-3), Hmisc, foreach, doParallel, MASS, matrixStats
+Suggests: ggplot2
+LinkingTo: StanHeaders (>= 2.8.0), rstan (>= 2.8.1), BH (>= 1.58.0), Rcpp (>= 0.11.0), RcppEigen
+RcppModules:  stan_fit4cs_norm_fit_mod 

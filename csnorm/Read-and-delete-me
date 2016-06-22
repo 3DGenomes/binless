@@ -1,0 +1,16 @@
+* Edit the help file skeletons in 'man', possibly combining help files for multiple functions.
+* Edit the exports in 'NAMESPACE', and add necessary imports.
+* Put any C/C++/Fortran code in 'src'.
+* If you have compiled code, add a useDynLib() directive to 'NAMESPACE'.
+* Run R CMD build to build the package tarball.
+* Run R CMD check to check the package tarball.
+
+Read "Writing R Extensions" for more information.
+
+ Stan specific notes:
+If you add any additional .stan files to the exec/ directory, 
+be sure to add an entry in the RcppModules: line of DESCRIPTION.
+You can put into inst/chunks/common_functions.txt any function that is needed by any .stan file, 
+in which case any .stan file can have #include 'common_functions.txt' in its functions block.
+The precompiled stanmodel objects will appear in a named list called 'stanmodels'.
+The 'cleanup' and 'cleanup.win' scripts in the root of the directory must be made executable.
