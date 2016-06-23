@@ -2,77 +2,7 @@
 // Cut-site normalization model: only fit diagonal decay and eC, given nu and delta
 ////
 functions {
-  ///////////
-  //BEGIN internal use
-  //
-  #include "range.stan"
-  //
-  matrix bspl_gen(vector x, real dx, row_vector t, int q) {
-    int N;
-    int K;
-    K <- cols(t);
-    N <- rows(x);
-    {
-      int r[K];
-      matrix[N, K] T;
-      matrix[N, K] X;
-      matrix[N, K] P;
-      matrix[N, K] B;
-      for (i in 2:K) r[i-1] <- i;
-      r[K] <- 1;
-      T <- rep_matrix(t, N);
-      X <- rep_matrix(x, K);
-      P <- (X - T) / dx;
-      for (i in 1:N)
-        for (j in 1:K)
-          B[i,j] <- (T[i,j] <= X[i,j]) && (X[i,j] < T[i,j]+dx);
-      for (k in 1:q)
-        B <- ( P .* B + (k+1-P) .* B[,r]) / k;
-      return B;
-    }
-  }
-  //END internal use
-  ///////////
-  
-  int splinedegree() {return 3;} //set 3 for cubic spline
-  
-  matrix bspline(vector x, int K, int q, real xmin, real xmax) {
-    real dx; //interval length
-    row_vector[K] t; //knot locations (except last)
-    //
-    dx <- 1.01*(xmax-xmin)/(K-q); //make it slightly larger
-    t <- xmin - dx*0.01 + dx * range(-q,K-q-1)';
-    return bspl_gen(x, dx, t, q);
-  }
-
-  real neg_binomial_2_log_deviance(int[] y, vector log_mu, real alpha, vector weights) {
-    vector[size(y)] y_vec;
-    vector[size(y)] y_mod;
-    vector[size(y)] mu;
-    vector[size(y)] wt;
-    //
-    y_vec <- to_vector(y);
-    //
-    if (rows(log_mu) != size(y)) {
-      if (rows(log_mu) != 1) reject("size of log_mu (", rows(log_mu),
-                                     ") must be either 1 or the size of y (",size(y),")");
-      mu <- rep_vector(exp(log_mu[1]), size(y));
-    } else {
-      mu <- exp(log_mu);
-    }
-    //
-    if (rows(weights) != size(y)) {
-      if (rows(weights) != 1) reject("size of weights (", rows(weights),
-                                     ") must be either 1 or the size of y (",size(y),")");
-      wt <- rep_vector(weights[1], size(y));
-    } else {
-      wt <- weights;
-    }
-    //
-    for (i in 1:size(y)) if (y[i]>0) {y_mod[i] <- y[i];} else {y_mod[i] <-1;}
-    return 2*sum( ( (y_vec+alpha) .* log( (mu+alpha) ./ (y_vec+alpha) )
-                    + y_vec .* log(y_mod ./ mu) ) .* wt );
-  }
+  #include "common_funtions.stan"
 }
 ////////////////////////////////////////////////////////////////
 data {

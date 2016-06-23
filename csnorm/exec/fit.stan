@@ -2,12 +2,7 @@
 // Cut-site normalization model: fit available data, partial mean-field approximation
 ////
 functions {
-  ///////////
-  //BEGIN internal use
-  //
   #include "common_functions.stan"
-  //
-  
 }
 ////////////////////////////////////////////////////////////////
 data {

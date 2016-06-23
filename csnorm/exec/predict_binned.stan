@@ -2,52 +2,7 @@
 // Cut-site normalization model: predict mean for binned matrices
 ////
 functions {
-  ///////////
-  //BEGIN internal use
-  //
-  #include "range.stan"
-  //
-  //Compute cumulative histogram of x at left cut points q
-  //i.e. index of first x value that falls in bins defined by cutpoints defined in q
-  //assumes x is ordered.
-  //x[hist[i]] is the first value in x that is >= q[i]
-  matrix bspl_gen(vector x, real dx, row_vector t, int q) {
-    int N;
-    int K;
-    K <- cols(t);
-    N <- rows(x);
-    {
-      int r[K];
-      matrix[N, K] T;
-      matrix[N, K] X;
-      matrix[N, K] P;
-      matrix[N, K] B;
-      for (i in 2:K) r[i-1] <- i;
-      r[K] <- 1;
-      T <- rep_matrix(t, N);
-      X <- rep_matrix(x, K);
-      P <- (X - T) / dx;
-      for (i in 1:N)
-        for (j in 1:K)
-          B[i,j] <- (T[i,j] <= X[i,j]) && (X[i,j] < T[i,j]+dx);
-      for (k in 1:q)
-        B <- ( P .* B + (k+1-P) .* B[,r]) / k;
-      return B;
-    }
-  }
-  //END internal use
-  ///////////
-  
-  int splinedegree() {return 3;} //set 3 for cubic spline
-  
-  matrix bspline(vector x, int K, int q, real xmin, real xmax) {
-    real dx; //interval length
-    row_vector[K] t; //knot locations (except last)
-    //
-    dx <- 1.01*(xmax-xmin)/(K-q); //make it slightly larger
-    t <- xmin - dx*0.01 + dx * range(-q,K-q-1)';
-    return bspl_gen(x, dx, t, q);
-  }
+  #include "common_functions.stan"
 }
 ////////////////////////////////////////////////////////////////
 data {

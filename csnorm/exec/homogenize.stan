@@ -3,59 +3,7 @@
 //                               at constant stiffness
 ////
 functions {
-  ///////////
-  //BEGIN internal use
-  //
-  #include "range.stan"
-  //
-  //Compute cumulative histogram of x at left cut points q
-  //i.e. index of first x value that falls in bins defined by cutpoints defined in q
-  //assumes x is ordered.
-  //x[hist[i]] is the first value in x that is >= q[i]
-  int[] cumulative_hist(vector x, row_vector q) {
-    int indices[cols(q)];
-    int ix;
-    int N;
-    ix <- 1;
-    N <- rows(x);
-    for (iq in 1:cols(q)) {
-      while (ix < N && x[ix] < q[iq]) ix <- ix + 1;
-      indices[iq] <- ix;
-    }
-    return indices;
-  }
-  matrix bspl_gen(vector x, real dx, row_vector t, int q) {
-    int N;
-    int K;
-    K <- cols(t);
-    N <- rows(x);
-    {
-      int r[K];
-      matrix[N, K] T;
-      matrix[N, K] X;
-      matrix[N, K] P;
-      matrix[N, K] B;
-      for (i in 2:K) r[i-1] <- i;
-      r[K] <- 1;
-      T <- rep_matrix(t, N);
-      X <- rep_matrix(x, K);
-      P <- (X - T) / dx;
-      for (i in 1:N)
-        for (j in 1:K)
-          B[i,j] <- (T[i,j] <= X[i,j]) && (X[i,j] < T[i,j]+dx);
-      for (k in 1:q)
-        B <- ( P .* B + (k+1-P) .* B[,r]) / k;
-      return B;
-    }
-  }
-  //END internal use
-  ///////////
-  
-  int splinedegree() {return 3;} //set 3 for cubic spline
-  
-  int nnz(int N) {return N*(splinedegree()+1);} //nonzero count for design matrix
-  
-  
+  #include "common_functions.stan"
 }
 ////////////////////////////////////////////////////////////////
 data {
