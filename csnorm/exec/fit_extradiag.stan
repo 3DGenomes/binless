@@ -2,7 +2,7 @@
 // Cut-site normalization model: only fit diagonal decay and eC, given nu and delta
 ////
 functions {
-  #include "common_funtions.stan"
+  #include "common_functions.stan"
 }
 ////////////////////////////////////////////////////////////////
 data {
@@ -28,20 +28,12 @@ data {
   vector[S2] log_delta2;
 }
 transformed data {
-  //diagonal SCAM spline, dense, exact
   matrix[N,Kdiag] Xdiag;
   row_vector[Kdiag] pdiag;
-  vector[N] diag_weights;
   if (max(cidx[1])>S1) {reject("first index larger than rsites");}
   if (max(cidx[2])>S2) {reject("second index larger than rsites");}
   //diagonal SCAM spline, dense, exact
-  {
-    Xdiag <- bspline(log(dist), Kdiag, splinedegree(), log(dmin), log(dmax));
-    //projector for diagonal (SCAM)
-    diag_weights <- rep_vector(1, N);
-    pdiag <- diag_weights' * Xdiag;
-    pdiag <- pdiag / (pdiag * rep_vector(1,Kdiag));
-  }
+  #include "scam_spline_construction.stan"
 }
 parameters {
   //exposures

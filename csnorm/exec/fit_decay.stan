@@ -21,16 +21,8 @@ transformed data {
   //diagonal SCAM spline, dense, exact
   matrix[N,Kdiag] Xdiag;
   row_vector[Kdiag] pdiag;
-  vector[N] diag_weights;
   
-  //diagonal SCAM spline, dense, exact
-  {
-    Xdiag <- bspline(log(dist), Kdiag, splinedegree(), log(dmin), log(dmax));
-    //projector for diagonal (SCAM)
-    diag_weights <- ncounts/mean(ncounts);
-    pdiag <- diag_weights' * Xdiag;
-    pdiag <- pdiag / (pdiag * rep_vector(1,Kdiag));
-  }
+  #include "scam_spline_construction.stan"
 }
 parameters {
   //exposures
