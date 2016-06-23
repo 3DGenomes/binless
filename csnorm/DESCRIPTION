@@ -6,7 +6,6 @@ Authors@R: person("Yannick", "Spill", email = "yannick.spill@cnag.crg.eu", role 
 Description: Provides resolution-independent normalization of 3C-like data, and permits interaction detection.
 License: TODO
 Depends: R (>= 3.0.2), Rcpp (>= 0.11.0)
-Imports: data.table (>= 1.9.6), parallel, rstan (>= 2.9.0-3), Hmisc, foreach, doParallel, MASS, matrixStats
-Suggests: ggplot2
+Imports: data.table (>= 1.9.6), parallel, rstan (>= 2.9.0-3), Hmisc, foreach, doParallel, MASS, matrixStats, ggplot2
 LinkingTo: StanHeaders (>= 2.8.0), rstan (>= 2.8.1), BH (>= 1.58.0), Rcpp (>= 0.11.0), RcppEigen
 RcppModules:  stan_fit4cs_norm_fit_mod 
