@@ -1,0 +1,6 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+csnorm/src/Modules.o
+csnorm/src/csnorm.so
