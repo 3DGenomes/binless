@@ -378,7 +378,7 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   dmax=counts[,max(distance)]+0.01
   dmin=counts[,min(distance)]-0.01
   registerDoParallel(cores=ncpus)
-  smfit = stan_model(file = "cs_norm_fit.stan")
+  smfit = stan_model(file = "fit.stan")
   output.binder = function(x) {
     a=sapply(names(x[[1]]), function(i) sapply(x, "[[", i,simplify=F))
     list(par=rbindlist(a[,1]), out=as.character(a[,2]), runtime=as.numeric(a[,3]))
@@ -400,7 +400,7 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
                         ncounts=.N), keyby=c("id","pos")]
   if (homogenize==T) {
     message("*** homogenize genomic biases")
-    smfitgen=stan_model("cs_norm_fit_genomic_params.stan")
+    smfitgen=stan_model("homogenize.stan")
     op=run_split_parallel_biases_homogenize(smfitgen, means, lambda_nu=info[,exp(mean(log(lambda_nu)))], lambda_delta=info[,exp(mean(log(lambda_delta)))],
                                             bf_per_kb=bf_per_kb, iter=iter, verbose=verbose)
     #ggplot(means)+geom_line(aes(pos,log_mean_RJ,colour="ori"))+
@@ -428,7 +428,7 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   #
   ### fit remaining data
   message("*** fit diagonal decay")
-  smfitex=stan_model("cs_norm_fit_extradiag.stan")
+  smfitex=stan_model("fit_extradiag.stan")
   registerDoParallel(cores=ncpus)
   if (is.null(ops.count)) {
     ops.count = foreach (begin1=squares[,begin1], end1=squares[,end1], begin2=squares[,begin2], end2=squares[,end2],
@@ -469,13 +469,13 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   levels(bin.end) <- tstrsplit(as.character(levels(bin.end)), "[],)]")[2][[1]]
   test[,begin:=as.integer(as.character(bin.begin))]
   test[,end:=as.integer(as.character(bin.end))]
-  smfitdec=stan_model("cs_norm_fit_decay_params.stan")
+  smfitdec=stan_model("fit_decay.stan")
   op=run_split_parallel_counts_decay(smfitdec, test, counts, dmin, dmax, bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)
   test[,log_decay:=op$par$log_decay+op$par$eC]
   retlist$beta_diag_centered=op$par$beta_diag_centered
   ### reconstruct count estimates: eC
   message("*** reconstruct count exposure")
-  smfiteC=stan_model("cs_norm_fit_eC.stan")
+  smfiteC=stan_model("fit_eC.stan")
   op=run_split_parallel_counts_eC(smfiteC, biases, counts[sample(.N,min(.N,100000))], retlist, dmin, dmax, bf_per_decade=bf_per_decade, verbose=verbose)
   retlist$eC=op$par$eC
   retlist$alpha=op$par$alpha

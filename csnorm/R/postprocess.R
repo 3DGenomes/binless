@@ -321,9 +321,9 @@ thresholds_estimator = function(observed, expected, dispersion, threshold=0.95, 
 #'
 #' @examples
 postprocess = function(biases, counts, op, resolution=10000, ncores=30, predict.all.means=T, circularize=-1L) {
-  smpred = stan_model(file = "cs_norm_predict.stan")
-  smbin = stan_model("cs_norm_predict_binned.stan")
-  smdisp = stan_model("cs_norm_binned_dispersions.stan")
+  smpred = stan_model(file = "predict_all.stan")
+  smbin = stan_model("predict_binned.stan")
+  smdisp = stan_model("dispersions.stan")
   ### run remaining steps
   if (predict.all.means==T) {
     message("*** predict all means")
