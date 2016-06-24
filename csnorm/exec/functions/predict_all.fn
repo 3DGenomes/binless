@@ -1,5 +1,0 @@
-  vector range(int imin, int imax) {
-  matrix bspl_gen(vector x, real dx, row_vector t, int q) {
-  int splinedegree() {return 3;} //set 3 for cubic spline
-  row_vector vector_times_csr_matrix(int K, vector w, vector Xw, int[] Xv, int[] Xu) {
-  matrix bspline(vector x, int K, int q, real xmin, real xmax) {

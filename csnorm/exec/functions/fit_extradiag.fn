@@ -1,5 +1,0 @@
-  vector range(int imin, int imax) {
-  matrix bspl_gen(vector x, real dx, row_vector t, int q) {
-  int splinedegree() {return 3;} //set 3 for cubic spline
-  matrix bspline(vector x, int K, int q, real xmin, real xmax) {
-  real neg_binomial_2_log_deviance(int[] y, vector log_mu, real alpha, vector weights) {

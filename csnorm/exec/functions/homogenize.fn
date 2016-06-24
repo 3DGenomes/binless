@@ -1,6 +1,0 @@
-  vector range(int imin, int imax) {
-  int[] cumulative_hist(vector x, row_vector q) {
-  matrix bspl_gen(vector x, real dx, row_vector t, int q) {
-  int splinedegree() {return 3;} //set 3 for cubic spline
-  int nnz(int N) {return N*(splinedegree()+1);} //nonzero count for design matrix
-  row_vector column_sums(int K, vector Xw, int[] Xv) {
