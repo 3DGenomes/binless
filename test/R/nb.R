@@ -1,5 +1,6 @@
 #' test stan
 #'
+#' @useDynLib test, .registration = TRUE
 #' @param obs a vector of integers 
 #'
 #' @return the stan fit
@@ -7,5 +8,5 @@
 #'
 #' @examples
 a=function(obs) {
-  optimize(stanmodels$nb, data=list(N=length(obs),observed=obs))
+  optimizing(stanmodels$nb, data=list(N=length(obs),observed=obs))
 }
