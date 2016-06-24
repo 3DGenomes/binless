@@ -313,6 +313,16 @@ diagnose_counts = function(outprefix, coverage.extradiag=1, square.size=150000) 
 #' for the diagonal decay. Finally, the count exposure is recomputed for the 
 #' final estimates of nu, delta and decay.
 #' 
+#' @useDynLib csnorm, .registration = TRUE
+#' @import rstan
+#' @import data.table
+#' @import Hmisc
+#' @import doParallel
+#' @import foreach
+#' @import MASS
+#' @import matrixStats
+#' @import ggplot2
+#'
 #' @param counts, biases data.tables as returned by 
 #'   \code{\link{prepare_for_sparse_cs_norm}}
 #' @param square.size positive integer. Size of the subset of data (in base 
