@@ -5,9 +5,8 @@
 #'
 #' @return the stan fit
 #' @export
-#' @import rstan
 #'
 #' @examples
-a=function(obs) {
-  optimizing(stanmodels$nb, data=list(N=length(obs),observed=obs))
+b=function(obs) {
+  optimizing(stanmodels$gauss, data=list(N=length(obs),observed=obs))
 }

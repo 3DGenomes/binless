@@ -14,6 +14,6 @@ Imports:
     rstan (>= 2.8.1)
 LinkingTo: StanHeaders (>= 2.8.0), rstan (>= 2.8.1), BH (>= 1.58.0), Rcpp (>=
     0.11.0), RcppEigen
-RcppModules: stan_fit4nb_mod
+RcppModules: stan_fit4nb_mod, stan_fit4gauss_mod
 RoxygenNote: 5.0.1
 NeedsCompilation: yes
