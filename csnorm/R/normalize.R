@@ -1,6 +1,6 @@
 #' Convert a sparse counts data.table to a dense one by adding rows with zero counts
 #'
-#' @param counts, biases data.tables as returned by \code{\link{prepare_for_sparse_cs_norm}}
+#' @param counts,biases data.tables as returned by \code{\link{prepare_for_sparse_cs_norm}}
 #' @param biases2 data.table of biases for id2 column of counts. If NULL (default), use that of biases
 #'
 #' @return a counts data.table with zeros filled according to cut sites provided in biases (and biases2 if available)
@@ -28,9 +28,9 @@ fill_zeros = function(counts,biases,biases2=NULL) {
 
 #' Get subset of counts and biases data.table
 #'
-#' @param counts, biases as returned by \code{\link{prepare_for_sparse_cs_norm}}
-#' @param begin1, end1 integers. Genomic location of begin/end of subset to take 
-#' @param begin2, end2 integers. If provided, take extradiagonal section 
+#' @param counts,biases as returned by \code{\link{prepare_for_sparse_cs_norm}}
+#' @param begin1,end1 integers. Genomic location of begin/end of subset to take 
+#' @param begin2,end2 integers. If provided, take extradiagonal section 
 #' @param fill.zeros whether to return a dense matrix (default TRUE)
 #' @param integer. Set this to the size of the chromosome if it is
 #'   circular, otherwise leave as-is (default is -1)
@@ -313,17 +313,7 @@ diagnose_counts = function(outprefix, coverage.extradiag=1, square.size=150000) 
 #' for the diagonal decay. Finally, the count exposure is recomputed for the 
 #' final estimates of nu, delta and decay.
 #' 
-#' @useDynLib csnorm, .registration = TRUE
-#' @import rstan
-#' @import data.table
-#' @import Hmisc
-#' @import doParallel
-#' @import foreach
-#' @import MASS
-#' @import matrixStats
-#' @import ggplot2
-#'
-#' @param counts, biases data.tables as returned by 
+#' @param counts,biases data.tables as returned by 
 #'   \code{\link{prepare_for_sparse_cs_norm}}
 #' @param square.size positive integer. Size of the subset of data (in base 
 #'   pairs) to normalize independently. If too large, optimization fails to 
@@ -354,14 +344,17 @@ diagnose_counts = function(outprefix, coverage.extradiag=1, square.size=150000) 
 #'   output files. Diagnostics only.
 #' @param circularize integer. Set this to the size of the chromosome if it is 
 #'   circular, otherwise leave as-is (default is -1)
-#' @param ops.bias, ops.count if not NULL, skip the genomic (resp. decay) bias
+#' @param ops.bias,ops.count if not NULL, skip the genomic (resp. decay) bias
 #'   estimation step, and use these intermediate data tables instead.
 #'   
-#' @return A list containing: par: the optimized parameters. out.bias: the last
-#'   line of the stan output for the bias estimation. runtime.bias: the runtimes
-#'   of these optimizations. out.count: the last line of the stan output for the
-#'   decay estimation. runtime.count: the runtimes of these
-#'   optimizations.
+#' @return A list containing:
+#' \enumerate{
+#' \item par: the optimized parameters
+#' \item out.bias: the last line of the stan output for the bias estimation
+#' \item runtime.bias: the runtimes of these optimizations
+#' \item out.count: the last line of the stan output for the decay estimation
+#' \item runtime.count: the runtimes of these optimizations
+#' }
 #' @export
 #' 
 #' @examples

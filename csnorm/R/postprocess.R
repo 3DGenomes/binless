@@ -2,7 +2,7 @@
 #'
 #' @param counts data.table as returned by \code{\link{prepare_for_sparse_cs_norm}}
 #' @param resolution positive integer.
-#' @param b1, b2, e1, e2 Begins and ends of the portion of the data to bin. If NULL replace by min/max value. 
+#' @param b1,b2,e1,e2 Begins and ends of the portion of the data to bin. If NULL replace by min/max value. 
 #'
 #' @return a data.table representing the binned data
 #' @export
@@ -64,7 +64,7 @@ iterative_normalization = function(bdata, niterations=100) {
 #' Predict expected values for each count given optimized model parameters
 #'
 #' @param model the stan model
-#' @param biases, counts as returned by \code{\link{prepare_for_sparse_cs_norm}} or a subset of it
+#' @param biases,counts as returned by \code{\link{prepare_for_sparse_cs_norm}} or a subset of it
 #' @param opt the optimized parameters, as returned by \code{\link{run_split_parallel}} 
 #' @param bf_per_decade same as that used in \code{\link{run_split_parallel}}
 #' @param verbose 
@@ -162,7 +162,7 @@ get_dispersions = function(model, binned, iter=10000, verbose=T) {
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)
 }
 
-#' compute \f$p(\Gamma_2>\Gamma_1) = \int_{0}^{+\infty} dx p_{\Gamma_2}(x) \int_{0}^{x} dy p_{\Gamma_1}(y)\f$
+#' compute \eqn{p(\Gamma_2>\Gamma_1) = \int_{0}^{+\infty} dx p_{\Gamma_2}(x) \int_{0}^{x} dy p_{\Gamma_1}(y)}
 #' @keywords internal
 #' 
 compute_gamma_overlap = function(alpha1,beta1,alpha2,beta2, bounds=5, ncores=1) {
@@ -180,7 +180,7 @@ compute_gamma_overlap = function(alpha1,beta1,alpha2,beta2, bounds=5, ncores=1) 
   }
 }
 
-#' compute \f$p(\mathcal{N}_2>\mathcal{N}_1) = \int_{-infty}^{+infty} dx p_{\mathcal{N}_2}(x) \int_{-infty}^{x} dy p_{\mathcal{N}_1}(y)\f$
+#' compute \eqn{p(\mathcal{N}_2>\mathcal{N}_1) = \int_{-infty}^{+infty} dx p_{\mathcal{N}_2}(x) \int_{-infty}^{x} dy p_{\mathcal{N}_1}(y)}
 #' @keywords internal
 #' 
 compute_normal_overlap = function(mu1,sd1,mu2,sd2, bounds=5, ncores=1) {
@@ -240,7 +240,7 @@ detect_interactions = function(binned, dispersions, threshold=0.95, ncores=1, no
 #' 
 #' For illustration purposes. Has a border effect at high counts that can be safely ignored.
 #'
-#' @param observed, expected, dispersion, threshold floats used to generate the plots 
+#' @param observed,expected,dispersion,threshold floats used to generate the plots 
 #' @param counts.range scan counts in that range
 #' @param disp.range scan dispersion in that range
 #' @param compute whether to compute the values that meet the threshold or not. This step can fail if the ranges are set badly.

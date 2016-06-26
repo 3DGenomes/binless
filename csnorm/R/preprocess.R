@@ -1,7 +1,7 @@
 #' Read TADBit tsv file and return (paired-end) reads as data.table
 #'
 #' @param fname The filename
-#' @param nrows, skip see \code{\link[data.table]{data.table}}
+#' @param nrows,skip see \code{\link[data.table]{data.table}}
 #'
 #' @return a data.table
 #' @export
@@ -58,8 +58,8 @@ read_tsv = function(fname, nrows=-1L, skip=0L) {
 #' Get subset of reads
 #'
 #' @param data 
-#' @param b1, e1 begin / end of read range you want
-#' @param b2, e2 (optional) if provided, give extradiagonal portion 
+#' @param b1,e1 begin / end of read range you want
+#' @param b2,e2 (optional) if provided, give extradiagonal portion 
 #'
 #' @return data.table
 #' @keywords internal
@@ -82,7 +82,7 @@ get_subset = function(data, b1, e1, b2=NULL, e2=NULL) {
 #' @param sub reads data.table to cateogorize
 #' @param maxlen positive integer.  Maximum admissible size of sonication 
 #'   fragment. Fragments above this threshold will be categorized as "other".
-#' @param dangling.L, dangling.R vectors of integers. Offset from cut site for
+#' @param dangling.L,dangling.R vectors of integers. Offset from cut site for
 #'   reads to be considered dangling ends (Left or Right respectively)
 #'   
 #' @return The same data.table, with an additional "category"column
@@ -195,7 +195,7 @@ prepare_for_sparse_cs_norm = function(data, both=F, circularize=-1) {
 
 #' Print general statistics on the output of \code{\link{prepare_for_sparse_cs_norm}}
 #'
-#' @param biases, counts 
+#' @param biases,counts 
 #'
 #' @export
 dset_statistics = function(biases,counts){
@@ -229,7 +229,7 @@ dset_statistics = function(biases,counts){
 #'
 #' @param num_rsites Number of restriction sites
 #' @param genome_size Size of the genome
-#' @param eC, eRJ, eDE Exposure for counts, rejoined and dangling ends
+#' @param eC,eRJ,eDE Exposure for counts, rejoined and dangling ends
 #' @param alpha Dispersion
 #'
 #' @return a list of biases and counts, similar to \code{\link{prepare_for_sparse_cs_norm}}
