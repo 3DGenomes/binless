@@ -1,3 +1,6 @@
+#' @include csnorm.R
+NULL
+
 #' Convert a sparse counts data.table to a dense one by adding rows with zero counts
 #'
 #' @param counts,biases data.tables as returned by \code{\link{prepare_for_sparse_cs_norm}}

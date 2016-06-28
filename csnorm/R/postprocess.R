@@ -1,3 +1,6 @@
+#' @include csnorm.R
+NULL
+
 #' Bin a counts data.table into a matrix of a given resolution
 #'
 #' @param counts data.table as returned by \code{\link{prepare_for_sparse_cs_norm}}
