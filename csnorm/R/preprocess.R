@@ -294,16 +294,26 @@ generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4
 #' See \code{\link{read_tsv}}, \code{\link{categorize_by_new_type}} and
 #' \code{\link{prepare_for_sparse_cs_norm}} for further detail and arguments. 
 #' 
+#' @param infile character. Path to TadBit .tsv file
 #' @param outprefix character. Prefix to output intermediate files.
+#' @param condition character. WT, KO etc.
+#' @param replicate character. Replicate number
+#' @param name character. A name for the experiment. By default, it is condition and replicate
+#' @param enzyme character. HindIII, DpnII etc. For now, it is NULL and cannot be changed
+#' @param experiment character. Hi-C Capture-C etc. For now it is Hi-C and cannot be changed
 #' @inheritParams read_tsv
 #' @inheritParams categorize_by_new_type
 #' @inheritParams prepare_for_sparse_cs_norm
-#'   
+#'
 #' @return A list containing biases and counts, see \code{\link{prepare_for_sparse_cs_norm}}
 #' @export
 #' 
 #' @examples
-read_and_prepare = function(infile, outprefix, skip=0L, both=T, distance_bins_per_decade=100, circularize=-1, dangling.L = c(0,4), dangling.R = c(3,-1)) {
+read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = NULL, experiment = "Hi-C",
+                            name = paste(condition, replicate), skip = 0L, distance_bins_per_decade = 100,
+                            circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1)) {
+  match.arg(enzyme)
+  match.arg(experiment)
   message("*** READ")
   data=read_tsv(infile, skip=skip)
   message("*** CATEGORIZE")
@@ -312,12 +322,9 @@ read_and_prepare = function(infile, outprefix, skip=0L, both=T, distance_bins_pe
   cs_data = prepare_for_sparse_cs_norm(data, both=both, circularize=circularize)
   dset_statistics(cs_data$biases,cs_data$counts)
   message("*** WRITE")
-  write.table(cs_data$biases, file = paste0(outprefix,"_biases.dat"), quote=F, row.names = F)
-  write.table(cs_data$counts, file = paste0(outprefix,"_counts.dat"), quote=F, row.names = F)
-  if (both==T) {
-    both=cs_data$both
-    save(both, file = paste0(outprefix,"_both.RData"))
-  }
-  return(cs_data)
+  cs = CSdataset(filename=infile, name=name, replicate=replicate, condition=condition, enzyme=enzyme, experiment=experiment,
+                 data=data, biases=cs_data$biases, counts=cs_data$counts)
+  save(cs, file=paste0(outprefix,"_cs.RData"))
+  return(cs)
 }
 
