@@ -74,7 +74,7 @@ iterative_normalization = function(bdata, niterations=100) {
 #' @export
 #'
 #' @examples
-csnorm_predict_all = function(model, biases, counts, opt, bf_per_decade=5, verbose=T) {
+csnorm_predict_all = function(biases, counts, opt, bf_per_decade=5, verbose=T) {
   cclose=counts[,.(id1,id2,distance,count=contact.close)]
   cfar=counts[,.(id1,id2,distance,count=contact.far)]
   cup=counts[,.(id1,id2,distance,count=contact.up)]
@@ -87,14 +87,14 @@ csnorm_predict_all = function(model, biases, counts, opt, bf_per_decade=5, verbo
                Ndown=cdown[,.N],   counts_down=cdown[,count],   index_down=t(data.matrix(cdown[,.(id1,id2)])), dist_down=cdown[,distance],
                eC=opt$par$eC, log_nu=opt$par$log_nu, log_delta=opt$par$log_delta,
                beta_diag_centered=opt$par$beta_diag_centered)
-  optimizing(model, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)
+  optimizing(stanmodels$predict_all, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)
 }
 
 #' Bin observed and expected counts at a given resolution
 #' @keywords internal
 #' @export
 #' 
-csnorm_predict_binned = function(model, biases, counts, opt, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL,
+csnorm_predict_binned = function(biases, counts, opt, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL,
                                bf_per_decade=5, verbose=F, circularize=-1L) {
   csub=copy(counts) #need to implement taking only needed part of matrix, and reporting log_nu and log_delta appropriately
   bsub=copy(biases)
@@ -136,7 +136,7 @@ csnorm_predict_binned = function(model, biases, counts, opt, resolution, b1=NULL
                B1=csub[,nlevels(bin1)], B2=csub[,nlevels(bin2)],
                cbins1=csub[,as.integer(bin1)], cbins2=csub[,as.integer(bin2)],
                bbins1=bsub[!is.na(bin1),ibin1], bbins2=bsub[!is.na(bin2),ibin2])
-  binned=optimizing(model, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)
+  binned=optimizing(stanmodels$predict_binned, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)
   #format output
   so = data.table(melt(binned$par$observed))
   setnames(so,"value","observed")
@@ -157,9 +157,9 @@ csnorm_predict_binned = function(model, biases, counts, opt, resolution, b1=NULL
 #' @keywords internal
 #' @export
 #' 
-get_dispersions = function(model, binned, iter=10000, verbose=T) {
+get_dispersions = function(binned, iter=10000, verbose=T) {
   data=list(B=binned[,.N],observed=binned[,observed],expected=binned[,expected],ncounts=binned[,ncounts])
-  optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)
+  optimizing(stanmodels$dispersions, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)
 }
 
 #' compute \eqn{p(\Gamma_2>\Gamma_1) = \int_{0}^{+\infty} dx p_{\Gamma_2}(x) \int_{0}^{x} dy p_{\Gamma_1}(y)}
@@ -321,18 +321,15 @@ thresholds_estimator = function(observed, expected, dispersion, threshold=0.95, 
 #'
 #' @examples
 postprocess = function(biases, counts, op, resolution=10000, ncores=30, predict.all.means=T, circularize=-1L) {
-  smpred = stan_model(file = "predict_all.stan")
-  smbin = stan_model("predict_binned.stan")
-  smdisp = stan_model("dispersions.stan")
   ### run remaining steps
   if (predict.all.means==T) {
     message("*** predict all means")
-    op$pred=csnorm_predict_all(smpred, biases, counts, op, verbose=T)$par
+    op$pred=csnorm_predict_all(biases, counts, op, verbose=T)$par
   }
   message("*** buid binned matrices")
-  op$binned=csnorm_predict_binned(smbin, biases, counts, op, resolution=resolution, circularize=circularize)
+  op$binned=csnorm_predict_binned(biases, counts, op, resolution=resolution, circularize=circularize)
   message("*** estimate dispersions")
-  op$disp=get_dispersions(smdisp, op$binned$mat)$par
+  op$disp=get_dispersions(op$binned$mat)$par
   message("*** detect interactions")
   op$mat=detect_interactions(op$binned$mat, op$disp$dispersion, ncores=ncores) #interaction detection using binned dispersion estimates
   return(op)

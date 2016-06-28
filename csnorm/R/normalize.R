@@ -131,11 +131,11 @@ run_split_parallel_squares = function(biases, square.size, coverage, diag.only=F
 #' Genomic bias estimation part of parallel run
 #' @keywords internal
 #' 
-run_split_parallel_biases = function(smfit, counts, biases, begin, end, dmin, dmax, bf_per_kb, bf_per_decade, verbose, iter, outprefix=NULL, circularize=-1) {
+run_split_parallel_biases = function(counts, biases, begin, end, dmin, dmax, bf_per_kb, bf_per_decade, verbose, iter, outprefix=NULL, circularize=-1) {
   #extract relevant portion of data
   extracted = get_cs_subset(counts, biases, begin1=begin, end1=end, fill.zeros=T, circularize=circularize)
   #run fit
-  a=system.time(output <- capture.output(op <- csnorm_fit(smfit, extracted$biases1, extracted$counts, dmin, dmax,
+  a=system.time(output <- capture.output(op <- csnorm_fit(stanmodels$fit, extracted$biases1, extracted$counts, dmin, dmax,
                                                           bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)))
   op$runtime=a[1]+a[4]
   op$output=output
@@ -157,24 +157,24 @@ run_split_parallel_biases = function(smfit, counts, biases, begin, end, dmin, dm
 #' Homogenize biases estimated on multiple fits
 #' @keywords internal
 #' 
-run_split_parallel_biases_homogenize = function(model, dt, lambda_nu, lambda_delta, bf_per_kb=1, iter=10000, verbose=T, init=0, ...) {
+run_split_parallel_biases_homogenize = function(dt, lambda_nu, lambda_delta, bf_per_kb=1, iter=10000, verbose=T, init=0, ...) {
   Krow=round(dt[,(max(pos)-min(pos))/1000*bf_per_kb])
   data = list( Krow=Krow, S=dt[,.N], cutsites=dt[,pos],
                log_mean_RJ=dt[,log_mean_RJ], log_mean_DL=dt[,log_mean_DL], log_mean_DR=dt[,log_mean_DR],
                lambda_nu=lambda_nu, lambda_delta=lambda_delta)
-  optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
+  optimizing(stanmodels$homogenize, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 
 #' Decay bias estimation part of parallel run
 #' @keywords internal
 #' 
-run_split_parallel_counts = function(model, counts, biases.aug, begin1, end1, begin2, end2, dmin, dmax,
+run_split_parallel_counts = function(counts, biases.aug, begin1, end1, begin2, end2, dmin, dmax,
                                      bf_per_decade=5, verbose=T, iter=100000, outprefix=NULL, circularize=-1L) {
   #extract relevant portion of data
   extracted = get_cs_subset(counts, biases.aug, begin1=begin1, end1=end1,
                             begin2=begin2, end2=end2, fill.zeros=T, circularize=circularize)
   #run fit
-  a=system.time(output <- capture.output(op <- csnorm_fit_extradiag(model, extracted$biases1, extracted$biases2, extracted$counts,
+  a=system.time(output <- capture.output(op <- csnorm_fit_extradiag(stanmodels$fit_extradiag, extracted$biases1, extracted$biases2, extracted$counts,
                                                                     dmin, dmax, bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)))
   op$runtime=a[1]+a[4]
   op$output=output
@@ -213,20 +213,20 @@ run_split_parallel_counts = function(model, counts, biases.aug, begin1, end1, be
 #' Merge together parallel runs and estimate a single diagonal decay
 #' @keywords internal
 #' 
-run_split_parallel_counts_decay = function(model, dt, counts, dmin, dmax, bf_per_decade=5, iter=10000, verbose=T, init=0, ...) {
+run_split_parallel_counts_decay = function(dt, counts, dmin, dmax, bf_per_decade=5, iter=10000, verbose=T, init=0, ...) {
   dist=dt[,(begin+end)/2]
   fij=dt[,(log_decay_close+log_decay_far+log_decay_up+log_decay_down)/4]
   ncounts=dt[,ncounts]
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   data = list( Kdiag=Kdiag, dmin=dmin, dmax=dmax,
                N=length(dist), dist=dist, fij=fij, ncounts=ncounts)
-  optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
+  optimizing(stanmodels$fit_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 
 #' Get a proper count exposure for all estimated biases
 #' @keywords internal
 #' 
-run_split_parallel_counts_eC = function(model, biases, counts, retlist, dmin, dmax, bf_per_decade=5, verbose=T, iter=1000) {
+run_split_parallel_counts_eC = function(biases, counts, retlist, dmin, dmax, bf_per_decade=5, verbose=T, iter=1000) {
   cclose=counts[,.(id1,id2,distance,count=contact.close)]
   cfar=counts[,.(id1,id2,distance,count=contact.far)]
   cup=counts[,.(id1,id2,distance,count=contact.up)]
@@ -238,7 +238,7 @@ run_split_parallel_counts_eC = function(model, biases, counts, retlist, dmin, dm
                Nup=cup[,.N],       counts_up=cup[,count],       index_up=t(data.matrix(cup[,.(id1,id2)])), dist_up=cup[,distance],
                Ndown=cdown[,.N],   counts_down=cdown[,count],   index_down=t(data.matrix(cdown[,.(id1,id2)])), dist_down=cdown[,distance],
                log_nu=retlist$log_nu, log_delta=retlist$log_delta, beta_diag_centered=retlist$beta_diag_centered)
-  optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)
+  optimizing(stanmodels$fit_eC, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)
 }
 
 
@@ -381,14 +381,13 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   dmax=counts[,max(distance)]+0.01
   dmin=counts[,min(distance)]-0.01
   registerDoParallel(cores=ncpus)
-  smfit = stan_model(file = "fit.stan")
   output.binder = function(x) {
     a=sapply(names(x[[1]]), function(i) sapply(x, "[[", i,simplify=F))
     list(par=rbindlist(a[,1]), out=as.character(a[,2]), runtime=as.numeric(a[,3]))
   }
   if (is.null(ops.bias)) {
     ops.bias = foreach (begin=diagsquares[,begin1], end=diagsquares[,end1], .packages=c("data.table","rstan")) %dopar% 
-      run_split_parallel_biases(smfit, counts, biases, begin, end, dmin, dmax, bf_per_kb = bf_per_kb,
+      run_split_parallel_biases(counts, biases, begin, end, dmin, dmax, bf_per_kb = bf_per_kb,
                                 bf_per_decade = bf_per_decade, verbose = verbose, iter = iter, outprefix=outprefix, circularize=circularize)
     ops.bias = output.binder(ops.bias)
     if (!is.null(outprefix)) {save(ops.bias, file=paste0(outprefix, "_ops_bias.RData"))}
@@ -403,7 +402,6 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
                         ncounts=.N), keyby=c("id","pos")]
   if (homogenize==T) {
     message("*** homogenize genomic biases")
-    smfitgen=stan_model("homogenize.stan")
     op=run_split_parallel_biases_homogenize(smfitgen, means, lambda_nu=info[,exp(mean(log(lambda_nu)))], lambda_delta=info[,exp(mean(log(lambda_delta)))],
                                             bf_per_kb=bf_per_kb, iter=iter, verbose=verbose)
     #ggplot(means)+geom_line(aes(pos,log_mean_RJ,colour="ori"))+
@@ -431,12 +429,11 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   #
   ### fit remaining data
   message("*** fit diagonal decay")
-  smfitex=stan_model("fit_extradiag.stan")
   registerDoParallel(cores=ncpus)
   if (is.null(ops.count)) {
     ops.count = foreach (begin1=squares[,begin1], end1=squares[,end1], begin2=squares[,begin2], end2=squares[,end2],
                          .packages=c("data.table","rstan")) %dopar% 
-      run_split_parallel_counts(smfitex, counts, biases.aug, begin1, end1, begin2, end2, dmin, dmax,
+      run_split_parallel_counts(counts, biases.aug, begin1, end1, begin2, end2, dmin, dmax,
                                 bf_per_decade = bf_per_decade, verbose = verbose, iter = iter, outprefix=outprefix, circularize=circularize)
     ops.count=output.binder(ops.count)
     if (!is.null(outprefix)) {save(ops.count, file=paste0(outprefix, "_ops_count.RData"))}
@@ -472,14 +469,12 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   levels(bin.end) <- tstrsplit(as.character(levels(bin.end)), "[],)]")[2][[1]]
   test[,begin:=as.integer(as.character(bin.begin))]
   test[,end:=as.integer(as.character(bin.end))]
-  smfitdec=stan_model("fit_decay.stan")
-  op=run_split_parallel_counts_decay(smfitdec, test, counts, dmin, dmax, bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)
+  op=run_split_parallel_counts_decay(test, counts, dmin, dmax, bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)
   test[,log_decay:=op$par$log_decay+op$par$eC]
   retlist$beta_diag_centered=op$par$beta_diag_centered
   ### reconstruct count estimates: eC
   message("*** reconstruct count exposure")
-  smfiteC=stan_model("fit_eC.stan")
-  op=run_split_parallel_counts_eC(smfiteC, biases, counts[sample(.N,min(.N,100000))], retlist, dmin, dmax, bf_per_decade=bf_per_decade, verbose=verbose)
+  op=run_split_parallel_counts_eC(biases, counts[sample(.N,min(.N,100000))], retlist, dmin, dmax, bf_per_decade=bf_per_decade, verbose=verbose)
   retlist$eC=op$par$eC
   retlist$alpha=op$par$alpha
   #ggplot(test)+geom_point(aes(bdist, log_decay))
