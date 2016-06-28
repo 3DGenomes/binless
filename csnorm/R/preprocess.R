@@ -1,3 +1,6 @@
+#' @include csnorm.R
+NULL
+
 #' Read TADBit tsv file and return (paired-end) reads as data.table
 #'
 #' @param fname The filename
@@ -287,19 +290,18 @@ generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4
 }
 
 #' Wrapper function for the whole preprocessing
-#'
-#' @param infile 
-#' @param outprefix 
-#' @param skip 
-#' @param both 
-#' @param distance_bins_per_decade 
-#' @param circularize 
-#' @param dangling.L 
-#' @param dangling.R 
-#'
-#' @return
+#' 
+#' See \code{\link{read_tsv}}, \code{\link{categorize_by_new_type}} and
+#' \code{\link{prepare_for_sparse_cs_norm}} for further detail and arguments. 
+#' 
+#' @param outprefix character. Prefix to output intermediate files.
+#' @inheritParams read_tsv
+#' @inheritParams categorize_by_new_type
+#' @inheritParams prepare_for_sparse_cs_norm
+#'   
+#' @return A list containing biases and counts, see \code{\link{prepare_for_sparse_cs_norm}}
 #' @export
-#'
+#' 
 #' @examples
 read_and_prepare = function(infile, outprefix, skip=0L, both=T, distance_bins_per_decade=100, circularize=-1, dangling.L = c(0,4), dangling.R = c(3,-1)) {
   message("*** READ")
