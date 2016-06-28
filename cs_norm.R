@@ -1,4 +1,5 @@
 library(ggplot2)
+library(data.table)
 library(csnorm)
 
 setwd("/home/yannick/simulations/cs_norm")
@@ -28,7 +29,8 @@ biases=dset$biases
 dset_statistics(biases,counts)
 
 #prefix="ledily_T60_HindIII_chr6"
-prefix="caulo_NcoI_all"
+#prefix="caulo_NcoI_all"
+prefix="caulo_NcoI_1004680-2998140"
 #prefix="ralph_Bcell_Sox2"
 biases=fread(paste0("data/",prefix,"_biases.dat"))
 setkey(biases,id)
@@ -81,7 +83,7 @@ counts[,distance:=pmin(abs(pos2-pos1),4042929-abs(pos2-pos1)+1)] #not filled
 
 
 ### effect of parallelization
-opall <- csnorm_fit(smfit, biases, counts, bf_per_kb=1,
+opall <- csnorm_fit(biases, counts, bf_per_kb=1,
                                 bf_per_decade=5, verbose = T, iter=100000)
 opall=postprocess(biases, counts, opall, resolution=10000, ncores=30)
 #save(opall, file = paste0("data/",prefix,"_op_maxcount_-1_redo.RData"))
@@ -90,7 +92,7 @@ load(paste0("data/",prefix,"_op_maxcount_-1.RData"), verbose=T)
 coverage=4
 square.size=150000
 oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=1,
-                         bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=100000, ncpus=30, homogenize=F)
+                         bf_per_decade=5, distance_bins_per_decade=100, verbose = F, iter=100000, ncpus=30, homogenize=F)
 oppar=postprocess(biases, counts, oppar, resolution=10000, ncores=30)
 #save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb10.RData"))
 
@@ -133,15 +135,15 @@ c(opserial$disp$alpha,oppar$disp$alpha)
 ### single run plots
 coverage=4
 square.size=150000
-bf_per_kb=1
+bf_per_kb=0.25
 circularize=4042929
 oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
-                         bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=10000, ncpus=30,
+                         bf_per_decade=5, distance_bins_per_decade=100, verbose = F, iter=10000, ncpus=30,
                          homogenize=F, outprefix="tmp/test", circularize=circularize)
 #oppar=run_split_parallel_recovery(counts, biases, outprefix, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
 #                         bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=10000, ncpus=30, homogenize=F, circularize=circularize)
-oppar=postprocess(biases, counts, oppar, resolution=10000, ncores=30, circularize=circularize, predict.all.means=F)
-oppar$ice=iterative_normalization(oppar$mat, niterations=1, resolution=10000, return.binned=T)
+oppar=postprocess(biases, counts, oppar, resolution=10000, ncores=30, circularize=circularize, predict.all.means=T)
+oppar$ice=iterative_normalization(oppar$mat, niterations=1)
 save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,".RData"))
 
 load("data/caulo_NcoI_3189-2020271_op_maxcount_-1_parallel_inhomogeneous_cov4X_sq150k_bfpkb01.RData")
@@ -185,7 +187,7 @@ ggsave(filename = paste0("images/",prefix,"_ICE.png"), width=10, height=9)+  the
 ggplot()+geom_raster(data=oppar$ice, aes(begin1,begin2,fill=log(N)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(observed)))+scale_fill_gradient(low="white", high="black")+  theme(legend.position = "none") 
 ggsave(filename = paste0("images/",prefix,"_ICE_vs_observed.png"), width=10, height=9)+  theme(legend.position = "none") 
 #cs vs ice
-ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(normalized)))+geom_raster(data=oppar$ice, aes(begin2,begin1,fill=log(N)))+
+ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(1238*normalized)))+geom_raster(data=oppar$ice, aes(begin2,begin1,fill=log(N)))+
   geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+
   theme(legend.position = "none") 
 #observed vs expected
