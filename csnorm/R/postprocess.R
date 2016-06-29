@@ -333,9 +333,13 @@ postprocess = function(cs, resolution=10000, ncores=1, predict.all.means=T, verb
   disp=get_dispersions(binned$mat)
   message("*** detect interactions")
   mat=detect_interactions(binned$mat, disp$dispersion, ncores=ncores) #interaction detection using binned dispersion estimates
-  binned$mat=mat
-  binned$alpha=disp$alpha
-  cs@binned=list(unlist(cs@binned),binned)
+  csb=new("CSbinned", resolution=resolution,
+                      range=c(b1=binned$b1, e1=binned$e1, b2=binned$b2, e2=binned$e2),
+                      decay=data.table(distance=binned$distance, decay=binned$decay),
+                      alpha=disp$alpha,
+                      mat=mat, raw=mat[,.(bin1,begin1,end1,bin2,begin2,end2,observed)],
+                      ice=data.table(), ice.iterations=-1)
+  cs@binned[length(cs@binned)+1]=csb
   return(cs)
 }
 

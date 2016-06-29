@@ -82,6 +82,39 @@ setMethod("show",signature="CSdata",definition=function(object) {
   if (object@data[,.N]>0) show(object@data[,.N,keyby=category])
 })
 
+#' Class to hold binned matrices at a given resolution
+#'
+#' @slot resolution numeric. Matrix resolution, in bases
+#' @slot range numeric. A named vector of begins and ends of the matrix, in bases
+#' @slot decay data.table. A table reporting the diagonal decay as fitted by CSnorm
+#' @slot alpha numeric. The dispersion for that resolution
+#' @slot raw data.table. The raw matrix at that resolution
+#' @slot mat data.table. The cut-site-normalized matrix at that resolution
+#' @slot ice data.table. The iteratively corrected matrix at that resolution
+#' @slot ice.iterations numeric. The number of iterations used for ICE
+#'
+#' @return
+#' @export
+#'
+#' @examples
+setClass("CSbinned",
+         slots = list(resolution="numeric",
+                      range="numeric",
+                      decay="data.table",
+                      alpha="numeric",
+                      raw="data.table",
+                      mat="data.table",
+                      ice="data.table",
+                      ice.iterations="numeric"))
+
+setMethod("show",signature="CSbinned",definition=function(object) {
+  cat("   At ", object@resolution/1000, " kb resolution: ", sep="")
+  if (object@mat[,.N]>0) cat("CS ")
+  if (object@ice[,.N]>0) cat("ICE(", object@ice.iterations, ") ")
+  if (object@raw[,.N]>0) cat("RAW ")
+  cat("\n")
+})
+
 #' Class to hold cut-site normalization data
 #'
 #' @slot experiments data.table. Essential information for each experiment
@@ -125,4 +158,16 @@ setMethod("show",signature="CSnorm",definition=function(object) {
   cat(" Reads density excl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
   nreads=nreads+object@biases[,sum(dangling.L+dangling.R+rejoined)]
   cat(" Reads density incl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
+  if (length(object@par)==0) {
+    cat(" Dataset not yet normalized\n")
+  } else {
+    cat(" Normalized dataset\n")
+    nbinned=length(object@binned)
+    if (nbinned==0) {
+      cat(" No binned matrix available")
+    } else {
+      cat(" ", nbinned, " binned matrices available\n", sep="")
+      lapply(object@binned, show)
+    }
+  }
 })
