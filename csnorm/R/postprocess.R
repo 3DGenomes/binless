@@ -66,10 +66,7 @@ iterative_normalization = function(bdata, niterations=100) {
 
 #' Predict expected values for each count given optimized model parameters
 #'
-#' @param model the stan model
-#' @param biases,counts as returned by \code{\link{prepare_for_sparse_cs_norm}} or a subset of it
-#' @param opt the optimized parameters, as returned by \code{\link{run_split_parallel}} 
-#' @param bf_per_decade same as that used in \code{\link{run_split_parallel}}
+#' @param cs CSnorm object
 #' @param verbose 
 #'
 #' @return a stan optimization output with the predictions.
@@ -77,19 +74,22 @@ iterative_normalization = function(bdata, niterations=100) {
 #' @export
 #'
 #' @examples
-csnorm_predict_all = function(biases, counts, opt, bf_per_decade=5, verbose=T) {
+csnorm_predict_all = function(cs, verbose=T) {
+  counts=cs@counts
+  biases=cs@biases
+  par=cs@par
   cclose=counts[,.(id1,id2,distance,count=contact.close)]
   cfar=counts[,.(id1,id2,distance,count=contact.far)]
   cup=counts[,.(id1,id2,distance,count=contact.up)]
   cdown=counts[,.(id1,id2,distance,count=contact.down)]
-  Kdiag=round((log10(opt$dmax)-log10(opt$dmin))*bf_per_decade)
-  data = list( Kdiag=Kdiag, S=biases[,.N], cutsites=biases[,pos], dmin=opt$dmin, dmax=opt$dmax,
+  Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
+  data = list( Kdiag=Kdiag, S=biases[,.N], cutsites=biases[,pos], dmin=cs@settings$dmin, dmax=cs@settings$dmax,
                Nclose=cclose[,.N], counts_close=cclose[,count], index_close=t(data.matrix(cclose[,.(id1,id2)])), dist_close=cclose[,distance],
                Nfar=cfar[,.N],     counts_far=cfar[,count],     index_far=t(data.matrix(cfar[,.(id1,id2)])), dist_far=cfar[,distance],
                Nup=cup[,.N],       counts_up=cup[,count],       index_up=t(data.matrix(cup[,.(id1,id2)])), dist_up=cup[,distance],
                Ndown=cdown[,.N],   counts_down=cdown[,count],   index_down=t(data.matrix(cdown[,.(id1,id2)])), dist_down=cdown[,distance],
-               eC=opt$par$eC, log_nu=opt$par$log_nu, log_delta=opt$par$log_delta,
-               beta_diag_centered=opt$par$beta_diag_centered)
+               eC=par$eC, log_nu=par$log_nu, log_delta=par$log_delta,
+               beta_diag_centered=par$beta_diag_centered)
   optimizing(stanmodels$predict_all, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)$par
 }
 
@@ -97,11 +97,10 @@ csnorm_predict_all = function(biases, counts, opt, bf_per_decade=5, verbose=T) {
 #' @keywords internal
 #' @export
 #' 
-csnorm_predict_binned = function(biases, counts, opt, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL,
-                               bf_per_decade=5, verbose=F, circularize=-1L) {
-  csub=copy(counts) #need to implement taking only needed part of matrix, and reporting log_nu and log_delta appropriately
-  bsub=copy(biases)
-  Kdiag=round((log10(opt$dmax)-log10(opt$dmin))*bf_per_decade)
+csnorm_predict_binned = function(cs, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL, verbose=F) {
+  csub=copy(cs@counts) #need to implement taking only needed part of matrix, and reporting log_nu and log_delta appropriately
+  bsub=copy(cs@biases)
+  Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
   npoints=100*Kdiag #evaluate spline with 100 equidistant points per basis function
   #bin existing counts and biases
   if (is.null(b1)) b1=bsub[,min(pos)]-1
@@ -112,12 +111,12 @@ csnorm_predict_binned = function(biases, counts, opt, resolution, b1=NULL, b2=NU
   bins2=seq(b2,e2+resolution,resolution)
   csub[,c("bin1","bin2"):=list(cut(pos1, bins1, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
                                cut(pos2, bins2, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
-  csub[,log_mean_cup:=opt$pred$log_mean_cup]
-  csub[,log_mean_cdown:=opt$pred$log_mean_cdown]
-  csub[,log_mean_cclose:=opt$pred$log_mean_cclose]
-  csub[,log_mean_cfar:=opt$pred$log_mean_cfar]
-  bsub[,log_nu:=opt$par$log_nu]
-  bsub[,log_delta:=opt$par$log_delta]
+  csub[,log_mean_cup:=cs@pred$log_mean_cup]
+  csub[,log_mean_cdown:=cs@pred$log_mean_cdown]
+  csub[,log_mean_cclose:=cs@pred$log_mean_cclose]
+  csub[,log_mean_cfar:=cs@pred$log_mean_cfar]
+  bsub[,log_nu:=cs@par$log_nu]
+  bsub[,log_delta:=cs@par$log_delta]
   bsub[,c("bin1","bin2"):=list(cut(pos, bins1, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
                                cut(pos, bins2, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
   bsub[,c("ibin1","ibin2"):=list(as.integer(bin1),as.integer(bin2))]
@@ -127,15 +126,15 @@ csnorm_predict_binned = function(biases, counts, opt, resolution, b1=NULL, b2=NU
   cup=csub[,.(id1,id2,bin1,bin2,distance,count=contact.up,logmean=log_mean_cup)]
   cdown=csub[,.(id1,id2,bin1,bin2,distance,count=contact.down,logmean=log_mean_cdown)]
   csub=rbind(cclose,cfar,cup,cdown)[!(is.na(bin1)|is.na(bin2)|count==0)]
-  data = list( Kdiag=Kdiag, npoints=npoints, circularize=circularize,
+  data = list( Kdiag=Kdiag, npoints=npoints, circularize=cs@settings$circularize,
                S1=bsub[!is.na(bin1),.N], S2=bsub[!is.na(bin2),.N], 
                cutsites1=bsub[!is.na(bin1),pos], cutsites2=bsub[!is.na(bin2),pos],
-               dmin=opt$dmin, dmax=opt$dmax,
+               dmin=cs@settings$dmin, dmax=cs@settings$dmax,
                N=csub[,.N],   counts=csub[,count], cdist=csub[,distance], cmean=csub[,exp(logmean)],
-               eC=opt$par$eC,
+               eC=cs@par$eC,
                log_nu1=bsub[!is.na(bin1),log_nu], log_nu2=bsub[!is.na(bin2),log_nu],
                log_delta1=bsub[!is.na(bin1),log_delta], log_delta2=bsub[!is.na(bin2),log_delta],
-               beta_diag_centered=opt$par$beta_diag_centered,
+               beta_diag_centered=cs@par$beta_diag_centered,
                B1=csub[,nlevels(bin1)], B2=csub[,nlevels(bin2)],
                cbins1=csub[,as.integer(bin1)], cbins2=csub[,as.integer(bin2)],
                bbins1=bsub[!is.na(bin1),ibin1], bbins2=bsub[!is.na(bin2),ibin2])
@@ -153,7 +152,8 @@ csnorm_predict_binned = function(biases, counts, opt, resolution, b1=NULL, b2=NU
   so=bsub[,.(bin2=bin2[1]),keyby=ibin2][so]
   so[,c("ibin1","ibin2"):=list(NULL,NULL)]
   so[,lFC:=log2(observed/expected)]
-  return(list(distance=exp(binned$par$log_dist), decay=exp(binned$par$log_decay), mat=so))
+  return(list(resolution=resolution, b1=b1, e1=e1, b2=b2, e2=e2,
+              distance=exp(binned$par$log_dist), decay=exp(binned$par$log_decay), mat=so))
 }
 
 #' Predict dispersions for a binned matrix
@@ -311,30 +311,31 @@ thresholds_estimator = function(observed, expected, dispersion, threshold=0.95, 
 
 #' Wrapper for the postprocessing steps
 #'
-#' @param biases 
-#' @param counts 
-#' @param op 
-#' @param resolution 
-#' @param ncores 
-#' @param predict.all.means 
-#' @param circularize 
+#' @param cs CSnorm object.
+#' @param resolution positive integer. The requested matrix resolution.
+#' @param ncores number of CPUs to use.
+#' @param predict.all.means boolean. Whether to predict all means. Does not need to be done twice.
+#' @param verbose boolean.
 #'
 #' @return
 #' @export
 #'
 #' @examples
-postprocess = function(biases, counts, op, resolution=10000, ncores=30, predict.all.means=T, circularize=-1L) {
+postprocess = function(cs, resolution=10000, ncores=1, predict.all.means=T, verbose=F) {
   ### run remaining steps
   if (predict.all.means==T) {
     message("*** predict all means")
-    op$pred=csnorm_predict_all(biases, counts, op, verbose=T)
+    cs@pred=csnorm_predict_all(cs, verbose=verbose)
   }
   message("*** buid binned matrices")
-  op$binned=csnorm_predict_binned(biases, counts, op, resolution=resolution, circularize=circularize)
+  binned=csnorm_predict_binned(cs, resolution=resolution)
   message("*** estimate dispersions")
-  op$disp=get_dispersions(op$binned$mat)
+  disp=get_dispersions(binned$mat)
   message("*** detect interactions")
-  op$mat=detect_interactions(op$binned$mat, op$disp$dispersion, ncores=ncores) #interaction detection using binned dispersion estimates
-  return(op)
+  mat=detect_interactions(binned$mat, disp$dispersion, ncores=ncores) #interaction detection using binned dispersion estimates
+  binned$mat=mat
+  binned$alpha=disp$alpha
+  cs@binned=list(unlist(cs@binned),binned)
+  return(cs)
 }
 

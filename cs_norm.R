@@ -140,13 +140,12 @@ c(opserial$disp$alpha,oppar$disp$alpha)
 coverage=4
 square.size=150000
 bf_per_kb=0.25
-circularize=4042929
-oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
+cs=run_split_parallel(cs, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
                          bf_per_decade=5, distance_bins_per_decade=100, verbose = F, iter=10000, ncpus=30,
-                         homogenize=F, outprefix="tmp/test", circularize=circularize)
+                         homogenize=F, outprefix="tmp/test")
 #oppar=run_split_parallel_recovery(counts, biases, outprefix, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
 #                         bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=10000, ncpus=30, homogenize=F, circularize=circularize)
-oppar=postprocess(biases, counts, oppar, resolution=10000, ncores=30, circularize=circularize, predict.all.means=T)
+cs=postprocess(cs, resolution=10000, ncores=30, predict.all.means=F, verbose=F)
 oppar$ice=iterative_normalization(oppar$mat, niterations=1)
 save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,".RData"))
 
