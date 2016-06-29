@@ -109,6 +109,47 @@ csnorm_fit_extradiag = function(model, biases1, biases2, counts, dmin, dmax, bf_
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 
+#' Predict expected values for each count given optimized model parameters
+#'
+#' @param cs CSnorm object
+#' @param verbose
+#' @param ncores
+#'
+#' @return a stan optimization output with the predictions.
+#' @keywords internal
+#' @export
+#'
+#' @examples
+csnorm_predict_all = function(cs, verbose=T, ncores=1) {
+  biases=cs@biases
+  par=cs@par
+  dmin=cs@settings$dmin
+  dmax=cs@settings$dmax
+  Kdiag=round((log10(dmax)-log10(dmin))*cs@settings$bf_per_decade)
+  registerDoParallel(cores=ncores)
+  ncounts=cs@counts[,.N]
+  stepsize=ncores*10
+  output.binder = function(x) {
+    a=sapply(names(x[[1]]), function(i) sapply(x, "[[", i,simplify=F))
+    list(par=rbindlist(a[,1]), out=as.character(a[,2]), runtime=as.numeric(a[,3]))
+  }
+  foreach (i=seq(1,ncounts+stepsize,stepsize), .packages=c("data.table","rstan"), .combine="rbind") %dopar% {
+    counts=cs@counts[i:min(.N,i+stepsize-1)]
+    cclose=counts[,.(id1,id2,distance,count=contact.close)]
+    cfar=counts[,.(id1,id2,distance,count=contact.far)]
+    cup=counts[,.(id1,id2,distance,count=contact.up)]
+    cdown=counts[,.(id1,id2,distance,count=contact.down)]
+    data = list( Kdiag=Kdiag, S=biases[,.N], cutsites=biases[,pos], dmin=dmin, dmax=dmax,
+                 Nclose=cclose[,.N], counts_close=cclose[,count], index_close=t(data.matrix(cclose[,.(id1,id2)])), dist_close=cclose[,distance],
+                 Nfar=cfar[,.N],     counts_far=cfar[,count],     index_far=t(data.matrix(cfar[,.(id1,id2)])), dist_far=cfar[,distance],
+                 Nup=cup[,.N],       counts_up=cup[,count],       index_up=t(data.matrix(cup[,.(id1,id2)])), dist_up=cup[,distance],
+                 Ndown=cdown[,.N],   counts_down=cdown[,count],   index_down=t(data.matrix(cdown[,.(id1,id2)])), dist_down=cdown[,distance],
+                 eC=par$eC, log_nu=par$log_nu, log_delta=par$log_delta,
+                 beta_diag_centered=par$beta_diag_centered)
+    as.data.table(optimizing(stanmodels$predict_all, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)$par)
+  }
+}
+
 #' Split a chromosome into subsets for parallelization
 #' @keywords internal
 #'
@@ -250,7 +291,7 @@ run_split_parallel_counts_eC = function(biases, counts, retlist, dmin, dmax, bf_
 #' @export
 #' 
 run_split_parallel_recovery = function(counts, biases, outprefix, square.size=100000, coverage=4, coverage.extradiag=1, bf_per_kb=1, bf_per_decade=5,
-                                       distance_bins_per_decade=100, verbose = F, iter=100000, ncpus=30, homogenize=F, circularize=-1L) {
+                                       distance_bins_per_decade=100, verbose = F, iter=100000, ncores=30, homogenize=F, circularize=-1L) {
   output.binder = function(x) {
     a=sapply(names(x[[1]]), function(i) sapply(x, "[[", i,simplify=F))
     list(par=rbindlist(a[,1]), out=as.character(a[,2]), runtime=as.numeric(a[,3]))
@@ -260,7 +301,7 @@ run_split_parallel_recovery = function(counts, biases, outprefix, square.size=10
   ops.count=sapply(X=Sys.glob(paste0(outprefix,"_counts_ret_*.RData")), FUN=function(x){ a=load(x); return(list(ret=get(a[1]), out="blah", runtime=-1))}, USE.NAMES=T, simplify=F)
   ops.count = output.binder(ops.count)
   run_split_parallel(counts, biases, square.size, coverage, coverage.extradiag, bf_per_kb, bf_per_decade,
-                     distance_bins_per_decade, verbose, iter, ncpus, homogenize, outprefix, circularize,
+                     distance_bins_per_decade, verbose, iter, ncores, homogenize, outprefix, circularize,
                      ops.bias, ops.count)
 }
 
@@ -339,7 +380,7 @@ diagnose_counts = function(outprefix, coverage.extradiag=1, square.size=150000) 
 #' @param verbose boolean. Show output of different steps.
 #' @param iter positive integer. Number of optimization steps for each stan
 #'   model call.
-#' @param ncpus positive integer. Number of CPUs to parallelize on.
+#' @param ncores positive integer. Number of cores to parallelize on.
 #' @param homogenize boolean. Should the biases be homogenized for stiffness?
 #'   Default is FALSE
 #' @param outprefix character. If not NULL, prefix used to write intermediate
@@ -361,7 +402,7 @@ diagnose_counts = function(outprefix, coverage.extradiag=1, square.size=150000) 
 #' 
 #' @examples
 run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, coverage.extradiag=1, bf_per_kb=1, bf_per_decade=5,
-                              distance_bins_per_decade=100, verbose = F, iter=100000, ncpus=30, homogenize=F, outprefix=NULL,
+                              distance_bins_per_decade=100, verbose = F, iter=100000, ncores=30, homogenize=F, outprefix=NULL,
                               ops.bias=NULL, ops.count=NULL) {
   stopifnot(!(cs@settings$circularize==-1 && cs@counts[,max(distance)]<cs@biases[,max(pos)-min(pos)]))
   cs@settings = c(cs@settings, list(square.size=square.size, coverage=coverage, coverage.extradiag=coverage.extradiag,
@@ -386,7 +427,7 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
   message("*** fit genomic biases")
   dmax=cs@counts[,max(distance)]+0.01
   dmin=cs@counts[,min(distance)]-0.01
-  registerDoParallel(cores=ncpus)
+  registerDoParallel(cores=ncores)
   output.binder = function(x) {
     a=sapply(names(x[[1]]), function(i) sapply(x, "[[", i,simplify=F))
     list(par=rbindlist(a[,1]), out=as.character(a[,2]), runtime=as.numeric(a[,3]))
@@ -436,7 +477,7 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
   #
   ### fit remaining data
   message("*** fit diagonal decay")
-  registerDoParallel(cores=ncpus)
+  registerDoParallel(cores=ncores)
   if (is.null(ops.count)) {
     ops.count = foreach (begin1=squares[,begin1], end1=squares[,end1], begin2=squares[,begin2], end2=squares[,end2],
                          .packages=c("data.table","rstan")) %dopar% 
@@ -487,6 +528,9 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
   retlist$alpha=op$par$alpha
   #ggplot(test)+geom_point(aes(bdist, log_decay))
   #ggplot(melt(test, id.vars=c("bdist","begin","end")))+geom_point(aes(bdist,value,colour=variable))
+  message("*** predict all means")
+  cs@pred=csnorm_predict_all(cs, verbose=verbose, ncores=ncores)
+  message("*** done")
   cs@settings$dmin=dmin
   cs@settings$dmax=dmax
   cs@par=retlist

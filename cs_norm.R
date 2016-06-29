@@ -96,7 +96,7 @@ load(paste0("data/",prefix,"_op_maxcount_-1.RData"), verbose=T)
 coverage=4
 square.size=150000
 oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=1,
-                         bf_per_decade=5, distance_bins_per_decade=100, verbose = F, iter=100000, ncpus=30, homogenize=F)
+                         bf_per_decade=5, distance_bins_per_decade=100, verbose = F, iter=100000, ncores=30, homogenize=F)
 oppar=postprocess(biases, counts, oppar, resolution=10000, ncores=30)
 #save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb10.RData"))
 
@@ -141,11 +141,11 @@ coverage=4
 square.size=150000
 bf_per_kb=0.25
 cs=run_split_parallel(cs, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
-                         bf_per_decade=5, distance_bins_per_decade=100, verbose = F, iter=10000, ncpus=30,
+                         bf_per_decade=5, distance_bins_per_decade=100, verbose = F, iter=10000, ncores=30,
                          homogenize=F, outprefix="tmp/test")
 #oppar=run_split_parallel_recovery(counts, biases, outprefix, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
-#                         bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=10000, ncpus=30, homogenize=F, circularize=circularize)
-cs=postprocess(cs, resolution=10000, ncores=30, predict.all.means=F, verbose=F)
+#                         bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=10000, ncores=30, homogenize=F, circularize=circularize)
+cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
 oppar$ice=iterative_normalization(oppar$mat, niterations=1)
 save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,".RData"))
 
@@ -260,7 +260,7 @@ ops.count = output.binder(ops.count)
 save(ops.count, file=paste0("tmp/",prefix,"_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_ops_count.RData"))
 
 oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
-                         bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=100000, ncpus=30, homogenize=F, ops.count=ops.count, ops.bias=ops.bias)
+                         bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=100000, ncores=30, homogenize=F, ops.count=ops.count, ops.bias=ops.bias)
 oppar=postprocess(biases, counts, oppar, resolution=50000, ncores=30, predict.all.means=T)
 oppar$ice=iterative_normalization(oppar$mat, niterations=1, resolution=50000, return.binned=T)
 save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,".RData"))
