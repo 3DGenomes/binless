@@ -39,12 +39,7 @@ NULL
 
 #' Class to hold a single experiment
 #'
-#' @slot filename character. The input tadbit tsv file
-#' @slot name character. A name for the experiment
-#' @slot replicate character. Replicate number
-#' @slot condition character. WT, KO etc.
-#' @slot enzyme character. HindIII, DpnII etc.
-#' @slot experiment character. Hi-C Capture-C etc.
+#' @slot info list. Information on this experiment
 #' @slot data data.table. The reads data for that experiment
 #' @slot biases data.table. The cut-site information for that experiment
 #' @slot counts data.table. The reads data for that experiment
@@ -53,13 +48,8 @@ NULL
 #' @export
 #'
 #' @examples
-setClass("CSDataset",
-          slots = list(filename="character",
-                       name="character",
-                       replicate="character",
-                       condition="character",
-                       enzyme="character",
-                       experiment="character",
+setClass("CSdata",
+          slots = list(info="list",
                        data="data.table",
                        biases="data.table",
                        counts="data.table"))
@@ -79,7 +69,7 @@ setClass("CSDataset",
 #' @export
 #'
 #' @examples
-setClass("CSNorm",
+setClass("CSnorm",
          slots = list(experiments="data.table",
                       design="data.table",
                       biases="data.table",
