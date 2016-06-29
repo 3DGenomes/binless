@@ -86,57 +86,8 @@ write.table(counts, file = paste0("data/",prefix,"_counts.dat"), quote=F, row.na
 counts[,distance:=pmin(abs(pos2-pos1),4042929-abs(pos2-pos1)+1)] #not filled
 
 
-### effect of parallelization
-opall <- csnorm_fit(biases, counts, bf_per_kb=1,
-                                bf_per_decade=5, verbose = T, iter=100000)
-opall=postprocess(biases, counts, opall, resolution=10000, ncores=30)
-#save(opall, file = paste0("data/",prefix,"_op_maxcount_-1_redo.RData"))
-load(paste0("data/",prefix,"_op_maxcount_-1.RData"), verbose=T)
-
-coverage=4
-square.size=150000
-oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=1,
-                         bf_per_decade=5, distance_bins_per_decade=100, verbose = F, iter=100000, ncores=30, homogenize=F)
-oppar=postprocess(biases, counts, oppar, resolution=10000, ncores=30)
-#save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb10.RData"))
-
-load("data/",prefix,"_op_maxcount_-1.RData")
-opserial=op
-load(paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k.RData"))
-
-#lFC histogram and matrices
-ggplot(rbind(opserial$mat[,.(bin1,bin2,dset="serial",lFC)],oppar$mat[,.(bin1,bin2,dset="parallel",lFC)]))+geom_histogram(aes(lFC,fill=dset),position="dodge")
-ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_hist.png"), width=10, height=7.5)
-ggplot()+geom_raster(data=oppar$mat,aes(begin1,begin2,fill=lFC))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+
-  geom_raster(data=opserial$mat,aes(begin2,begin1,fill=lFC))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opserial$mat[is.interaction==T])
-ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_mat.png"), width=10, height=7.5)
-#normalized matrix
-ggplot()+geom_raster(data=oppar$mat,aes(begin1,begin2,fill=log(normalized)))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+
-  geom_raster(data=opserial$mat,aes(begin2,begin1,fill=log(normalized)))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opserial$mat[is.interaction==T])
-ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_normalized.png"), width=10, height=7.5)
-#genomic biases
-#ggplot(melt(data.table(id=biases[,pos],serial=exp(opserial$par$eRJ+opserial$par$log_nu),parallel=exp(oppar$par$eRJ+oppar$par$log_nu)),id.vars="id",variable.name="nu"))+geom_line(aes(id,value,colour=nu))+geom_point(data=biases,aes(pos,rejoined))
-ggplot(melt(data.table(id=biases[,pos],serial=opserial$par$log_nu,parallel=oppar$par$log_nu),id.vars="id",variable.name="nu"))+geom_line(aes(id,value,colour=nu))
-ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_nu.png"), width=10, height=7.5)
-ggplot(melt(data.table(id=biases[,pos],serial=opserial$par$log_delta,parallel=oppar$par$log_delta),id.vars="id",variable.name="delta"))+geom_line(aes(id,value,colour=delta))
-ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_delta.png"), width=10, height=7.5)
-ggplot(rbind(data.table(bias="nu",serial=opserial$par$log_nu,parallel=oppar$par$log_nu),data.table(bias="delta",serial=opserial$par$log_delta,parallel=oppar$par$log_delta)))+
-  geom_point(aes(serial,parallel))+facet_grid(.~bias)+stat_function(fun=identity)
-ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_nu_delta.png"), width=10, height=7.5)
-#diagonal biases
-ggplot(melt(data.table(dist=counts[,distance],serial=opserial$pred$log_decay_close,parallel=oppar$pred$log_decay_far, key="dist"),id.vars="dist"))+
-  geom_line(aes(dist,value,colour=variable))+scale_x_log10()
-ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_decay.png"), width=10, height=7.5)
-c(opserial$mat[,mean(lFC)], oppar$mat[,mean(lFC)])
-c(opserial$par$eRJ,oppar$par$eRJ)
-c(opserial$par$eDE,oppar$par$eDE)
-c(opserial$par$eC,oppar$par$eC)
-c(opserial$disp$alpha,oppar$disp$alpha)
 
 
-
-
-### single run plots
 coverage=4
 square.size=150000
 bf_per_kb=0.25
@@ -146,7 +97,7 @@ cs=run_split_parallel(cs, square.size=square.size, coverage=coverage, bf_per_kb=
 #oppar=run_split_parallel_recovery(counts, biases, outprefix, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
 #                         bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=10000, ncores=30, homogenize=F, circularize=circularize)
 cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
-oppar$ice=iterative_normalization(oppar$mat, niterations=1)
+cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
 save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,".RData"))
 
 load("data/caulo_NcoI_3189-2020271_op_maxcount_-1_parallel_inhomogeneous_cov4X_sq150k_bfpkb01.RData")
@@ -171,6 +122,9 @@ biases=fread(paste0("data/",prefix,"_biases.dat"))
 counts=fread(paste0("data/",prefix,"_counts.dat"))
 load(paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,".RData"))
 setkey(oppar$mat, begin1,begin2)
+
+
+### single run plots
 #matrix and detected interactions
 ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(normalized)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(normalized)))+
   geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+
@@ -225,6 +179,38 @@ ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(normalized)))+ge
 ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_normalized_with_error.png"), width=10, height=9)
 
 
+### double run plots
+#lFC histogram and matrices
+ggplot(rbind(opserial$mat[,.(bin1,bin2,dset="serial",lFC)],oppar$mat[,.(bin1,bin2,dset="parallel",lFC)]))+geom_histogram(aes(lFC,fill=dset),position="dodge")
+ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_hist.png"), width=10, height=7.5)
+ggplot()+geom_raster(data=oppar$mat,aes(begin1,begin2,fill=lFC))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+
+  geom_raster(data=opserial$mat,aes(begin2,begin1,fill=lFC))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opserial$mat[is.interaction==T])
+ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_mat.png"), width=10, height=7.5)
+#normalized matrix
+ggplot()+geom_raster(data=oppar$mat,aes(begin1,begin2,fill=log(normalized)))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+
+  geom_raster(data=opserial$mat,aes(begin2,begin1,fill=log(normalized)))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opserial$mat[is.interaction==T])
+ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_normalized.png"), width=10, height=7.5)
+#genomic biases
+#ggplot(melt(data.table(id=biases[,pos],serial=exp(opserial$par$eRJ+opserial$par$log_nu),parallel=exp(oppar$par$eRJ+oppar$par$log_nu)),id.vars="id",variable.name="nu"))+geom_line(aes(id,value,colour=nu))+geom_point(data=biases,aes(pos,rejoined))
+ggplot(melt(data.table(id=biases[,pos],serial=opserial$par$log_nu,parallel=oppar$par$log_nu),id.vars="id",variable.name="nu"))+geom_line(aes(id,value,colour=nu))
+ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_nu.png"), width=10, height=7.5)
+ggplot(melt(data.table(id=biases[,pos],serial=opserial$par$log_delta,parallel=oppar$par$log_delta),id.vars="id",variable.name="delta"))+geom_line(aes(id,value,colour=delta))
+ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_delta.png"), width=10, height=7.5)
+ggplot(rbind(data.table(bias="nu",serial=opserial$par$log_nu,parallel=oppar$par$log_nu),data.table(bias="delta",serial=opserial$par$log_delta,parallel=oppar$par$log_delta)))+
+  geom_point(aes(serial,parallel))+facet_grid(.~bias)+stat_function(fun=identity)
+ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_nu_delta.png"), width=10, height=7.5)
+#diagonal biases
+ggplot(melt(data.table(dist=counts[,distance],serial=opserial$pred$log_decay_close,parallel=oppar$pred$log_decay_far, key="dist"),id.vars="dist"))+
+  geom_line(aes(dist,value,colour=variable))+scale_x_log10()
+ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_decay.png"), width=10, height=7.5)
+c(opserial$mat[,mean(lFC)], oppar$mat[,mean(lFC)])
+c(opserial$par$eRJ,oppar$par$eRJ)
+c(opserial$par$eDE,oppar$par$eDE)
+c(opserial$par$eC,oppar$par$eC)
+c(opserial$disp$alpha,oppar$disp$alpha)
+
+
+
 
 ### reload intermediate files of long run
 #plot bias runs
@@ -258,12 +244,6 @@ save(ops.bias, file=paste0("tmp/",prefix,"_cov",coverage,"X_sq",round(square.siz
 ops.count=sapply(X=Sys.glob(paste0("tmp/",prefix,"_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_counts_ret_*.RData")), FUN=function(x){ a=load(x); return(list(ret=get(a[1]), out="blah", runtime=-1))}, USE.NAMES=T, simplify=F)
 ops.count = output.binder(ops.count)
 save(ops.count, file=paste0("tmp/",prefix,"_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_ops_count.RData"))
-
-oppar=run_split_parallel(counts, biases, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
-                         bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=100000, ncores=30, homogenize=F, ops.count=ops.count, ops.bias=ops.bias)
-oppar=postprocess(biases, counts, oppar, resolution=50000, ncores=30, predict.all.means=T)
-oppar$ice=iterative_normalization(oppar$mat, niterations=1, resolution=50000, return.binned=T)
-save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,".RData"))
 
 
 ### generate LGF matrix

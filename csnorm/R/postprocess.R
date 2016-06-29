@@ -35,14 +35,15 @@ bin_counts = function(counts, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL) {
 
 #' Apply the ICE algorithm to a binned matrix
 #'
-#' @param bdata binned data.table as returned by \code{\link{bin_counts}}
+#' @param csb a CSbinned object
 #' @param niterations positive integer. Number of iterations to perform
 #'
-#' @return the ICEd matrix
+#' @return a CSbinned object containing the ICEd matrix
 #' @export
 #'
 #' @examples
-iterative_normalization = function(bdata, niterations=100) {
+iterative_normalization = function(csb, niterations=100) {
+  bdata = csb@raw
   binned = bdata[bin1<bin2,.(bin1,bin2,N=observed)]
   binned = rbind(binned, binned[,.(bin1=bin2,bin2=bin1,N)])
   binned[,N.weighted:=N]
@@ -60,7 +61,9 @@ iterative_normalization = function(bdata, niterations=100) {
   binned[,end1:=do.call(as.integer, tstrsplit(as.character(bin1), "[],)]")[2])]
   binned[,begin2:=do.call(as.integer, tstrsplit(as.character(bin2), "[[,]")[2])]
   binned[,end2:=do.call(as.integer, tstrsplit(as.character(bin2), "[],)]")[2])]
-  return(binned[begin1<begin2])
+  csb@ice=binned[begin1<begin2]
+  csb@ice.iterations=niterations
+  return(csb)
 }
 
 #' Bin observed and expected counts at a given resolution

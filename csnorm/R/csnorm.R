@@ -110,7 +110,7 @@ setClass("CSbinned",
 setMethod("show",signature="CSbinned",definition=function(object) {
   cat("   At ", object@resolution/1000, " kb resolution: ", sep="")
   if (object@mat[,.N]>0) cat("CS ")
-  if (object@ice[,.N]>0) cat("ICE(", object@ice.iterations, ") ")
+  if (object@ice[,.N]>0) cat("ICE(", object@ice.iterations, ") ", sep="")
   if (object@raw[,.N]>0) cat("RAW ")
   cat("\n")
 })
