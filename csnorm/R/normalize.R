@@ -316,8 +316,7 @@ diagnose_counts = function(outprefix, coverage.extradiag=1, square.size=150000) 
 #' for the diagonal decay. Finally, the count exposure is recomputed for the 
 #' final estimates of nu, delta and decay.
 #' 
-#' @param counts,biases data.tables as returned by 
-#'   \code{\link{prepare_for_sparse_cs_norm}}
+#' @param cs CSnorm object as returned by \code{\link{merge_cs_norm_datasets}}
 #' @param square.size positive integer. Size of the subset of data (in base 
 #'   pairs) to normalize independently. If too large, optimization fails to 
 #'   converge and takes too long. If too small, estimates are heavily biased.
@@ -361,16 +360,20 @@ diagnose_counts = function(outprefix, coverage.extradiag=1, square.size=150000) 
 #' @export
 #' 
 #' @examples
-run_split_parallel = function(counts, biases, square.size=100000, coverage=4, coverage.extradiag=1, bf_per_kb=1, bf_per_decade=5,
-                              distance_bins_per_decade=100, verbose = F, iter=100000, ncpus=30, homogenize=F, outprefix=NULL, circularize=-1L,
+run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, coverage.extradiag=1, bf_per_kb=1, bf_per_decade=5,
+                              distance_bins_per_decade=100, verbose = F, iter=100000, ncpus=30, homogenize=F, outprefix=NULL,
                               ops.bias=NULL, ops.count=NULL) {
-  stopifnot(!(circularize==-1 && counts[,max(distance)]<biases[,max(pos)-min(pos)]))
+  stopifnot(!(cs@settings$circularize==-1 && cs@counts[,max(distance)]<cs@biases[,max(pos)-min(pos)]))
+  cs@settings = c(cs@settings, list(square.size=square.size, coverage=coverage, coverage.extradiag=coverage.extradiag,
+                                    bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, distance_bins_per_decade=distance_bins_per_decade,
+                                    iter=iter, homogenize=homogenize, outprefix=outprefix))
+  stopifnot(is.null(design))
   ### build squares
   message("*** build squares")
-  retval.squares = run_split_parallel_squares(biases, square.size, coverage, diag.only=T)
+  retval.squares = run_split_parallel_squares(cs@biases, square.size, coverage, diag.only=T)
   diagsquares=retval.squares$diagsquares
   true.square.size=retval.squares$true.square.size
-  retval.squares = run_split_parallel_squares(biases, square.size, coverage.extradiag, diag.only=F)
+  retval.squares = run_split_parallel_squares(cs@biases, square.size, coverage.extradiag, diag.only=F)
   stopifnot(true.square.size==retval.squares$true.square.size)
   squares=retval.squares$squares
   message("Run in parallel")
@@ -381,8 +384,8 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   message("   ",diagsquares[,.N], " on the diagonal")
   ### fit genomic biases using squares close to diagonal
   message("*** fit genomic biases")
-  dmax=counts[,max(distance)]+0.01
-  dmin=counts[,min(distance)]-0.01
+  dmax=cs@counts[,max(distance)]+0.01
+  dmin=cs@counts[,min(distance)]-0.01
   registerDoParallel(cores=ncpus)
   output.binder = function(x) {
     a=sapply(names(x[[1]]), function(i) sapply(x, "[[", i,simplify=F))
@@ -390,8 +393,9 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   }
   if (is.null(ops.bias)) {
     ops.bias = foreach (begin=diagsquares[,begin1], end=diagsquares[,end1], .packages=c("data.table","rstan")) %dopar% 
-      run_split_parallel_biases(counts, biases, begin, end, dmin, dmax, bf_per_kb = bf_per_kb,
-                                bf_per_decade = bf_per_decade, verbose = verbose, iter = iter, outprefix=outprefix, circularize=circularize)
+      run_split_parallel_biases(cs@counts, cs@biases, begin, end, dmin, dmax, bf_per_kb = bf_per_kb,
+                                bf_per_decade = bf_per_decade, verbose = verbose, iter = iter, outprefix=outprefix,
+                                circularize=cs@settings$circularize)
     ops.bias = output.binder(ops.bias)
     if (!is.null(outprefix)) {save(ops.bias, file=paste0(outprefix, "_ops_bias.RData"))}
   }
@@ -405,21 +409,21 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
                         ncounts=.N), keyby=c("id","pos")]
   if (homogenize==T) {
     message("*** homogenize genomic biases")
-    op=run_split_parallel_biases_homogenize(smfitgen, means, lambda_nu=info[,exp(mean(log(lambda_nu)))], lambda_delta=info[,exp(mean(log(lambda_delta)))],
+    op=run_split_parallel_biases_homogenize(means, lambda_nu=info[,exp(mean(log(lambda_nu)))], lambda_delta=info[,exp(mean(log(lambda_delta)))],
                                             bf_per_kb=bf_per_kb, iter=iter, verbose=verbose)
     #ggplot(means)+geom_line(aes(pos,log_mean_RJ,colour="ori"))+
     #  geom_line(data=data.table(pos=means[,pos],rj=op$par$log_nu+op$par$eRJ),aes(pos,rj,colour="avg"))
     #ggplot(means)+geom_line(aes(pos,log_mean_DL,colour="ori"))+
     #  geom_line(data=data.table(pos=means[,pos],rj=op$par$log_nu+op$par$eDE+op$par$log_delta),aes(pos,rj,colour="avg"))
     retlist=op$par[c("eRJ","eDE","log_nu","log_delta")]
-    setkey(biases, id, pos)
-    biases.aug=copy(biases)
+    setkey(cs@biases, id, pos)
+    biases.aug=copy(cs@biases)
     biases.aug[,log_nu:=retlist$log_nu]
     biases.aug[,log_delta:=retlist$log_delta]
   } else {
-    setkey(biases, id, pos)
+    setkey(cs@biases, id, pos)
     retlist=list(eRJ=ops.bias$par[,mean(log_mean_RJ)], eDE=ops.bias$par[,mean(log_mean_DL+log_mean_DR)/2])
-    biases.aug=means[biases]
+    biases.aug=means[cs@biases]
     stopifnot(!any(is.na(biases.aug)))
     biases.aug[,log_nu:=log_mean_RJ-retlist$eRJ]
     biases.aug[,log_delta:=(log_mean_DL-log_mean_DR)/2]
@@ -436,8 +440,9 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   if (is.null(ops.count)) {
     ops.count = foreach (begin1=squares[,begin1], end1=squares[,end1], begin2=squares[,begin2], end2=squares[,end2],
                          .packages=c("data.table","rstan")) %dopar% 
-      run_split_parallel_counts(counts, biases.aug, begin1, end1, begin2, end2, dmin, dmax,
-                                bf_per_decade = bf_per_decade, verbose = verbose, iter = iter, outprefix=outprefix, circularize=circularize)
+      run_split_parallel_counts(cs@counts, biases.aug, begin1, end1, begin2, end2, dmin, dmax,
+                                bf_per_decade = bf_per_decade, verbose = verbose, iter = iter, outprefix=outprefix,
+                                circularize=cs@settings$circularize)
     ops.count=output.binder(ops.count)
     if (!is.null(outprefix)) {save(ops.count, file=paste0(outprefix, "_ops_count.RData"))}
   }
@@ -477,10 +482,14 @@ run_split_parallel = function(counts, biases, square.size=100000, coverage=4, co
   retlist$beta_diag_centered=op$par$beta_diag_centered
   ### reconstruct count estimates: eC
   message("*** reconstruct count exposure")
-  op=run_split_parallel_counts_eC(biases, counts[sample(.N,min(.N,100000))], retlist, dmin, dmax, bf_per_decade=bf_per_decade, verbose=verbose)
+  op=run_split_parallel_counts_eC(cs@biases, cs@counts[sample(.N,min(.N,100000))], retlist, dmin, dmax, bf_per_decade=bf_per_decade, verbose=verbose)
   retlist$eC=op$par$eC
   retlist$alpha=op$par$alpha
   #ggplot(test)+geom_point(aes(bdist, log_decay))
   #ggplot(melt(test, id.vars=c("bdist","begin","end")))+geom_point(aes(bdist,value,colour=variable))
-  return(list(par=retlist, out.bias=ops.bias$out, out.count=ops.count$out, runtime.count=ops.count$runtime, runtime.bias=ops.bias$runtime, dmin=dmin, dmax=dmax))
+  cs@settings$dmin=dmin
+  cs@settings$dmax=dmax
+  cs@par=retlist
+  cs@diagnostics=list(out.bias=ops.bias$out, out.count=ops.count$out, runtime.count=ops.count$runtime, runtime.bias=ops.bias$runtime)
+  return(cs)
 }
