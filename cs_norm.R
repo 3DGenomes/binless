@@ -98,11 +98,11 @@ cs=run_split_parallel(cs, square.size=square.size, coverage=coverage, bf_per_kb=
 #                         bf_per_decade=5, distance_bins_per_decade=100, verbose = T, iter=10000, ncores=30, homogenize=F, circularize=circularize)
 cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
 cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,".RData"))
+#save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,".RData"))
 
-load("data/caulo_NcoI_3189-2020271_op_maxcount_-1_parallel_inhomogeneous_cov4X_sq150k_bfpkb01.RData")
-load("data/caulo_BglIIr1_1-2009521_op_maxcount_-1_parallel_inhomogeneous_cov4X_sq150k_bfpkb01.RData")
-load("data/caulo_BglIIr2_15389-2009521_op_maxcount_-1_parallel_inhomogeneous_cov4X_sq150k_bfpkb01.RData")
+#load("data/caulo_NcoI_3189-2020271_op_maxcount_-1_parallel_inhomogeneous_cov4X_sq150k_bfpkb01.RData")
+#load("data/caulo_BglIIr1_1-2009521_op_maxcount_-1_parallel_inhomogeneous_cov4X_sq150k_bfpkb01.RData")
+#load("data/caulo_BglIIr2_15389-2009521_op_maxcount_-1_parallel_inhomogeneous_cov4X_sq150k_bfpkb01.RData")
 
 #prefix="ledily_T0_NcoI_chr6_150000151-153992077"
 #prefix="ledily_T0_NcoI_chr6_151001273-152989574"
@@ -126,30 +126,31 @@ setkey(oppar$mat, begin1,begin2)
 
 ### single run plots
 #matrix and detected interactions
-ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(normalized)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(normalized)))+
-  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+
-  theme(legend.position = "none")
+ggplot()+geom_raster(data=get_cs_binned(cs,1,"CS"), aes(begin1,begin2,fill=log(normalized)))+
+  geom_raster(data=get_cs_binned(cs,1,"CS"), aes(begin2,begin1,fill=log(normalized)))+
+  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=get_cs_binned(cs,1,"CS")[is.interaction==T])+
+  scale_fill_gradient(low="white", high="black")+theme(legend.position = "none")
 ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_normalized.png"), width=10, height=9)
 #lFC
-ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=lFC))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=lFC))+
-  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+theme(legend.position = "none") 
+ggplot()+geom_raster(data=get_cs_binned(cs,1,"CS"), aes(begin1,begin2,fill=lFC))+geom_raster(data=get_cs_binned(cs,1,"CS"), aes(begin2,begin1,fill=lFC))+
+  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=get_cs_binned(cs,1,"CS")[is.interaction==T])+scale_fill_gradient(low="white", high="black")+theme(legend.position = "none") 
 ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_lFC_mat.png"), width=10, height=9)
 #raw
-ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(observed)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(observed)))+scale_fill_gradient(low="white", high="black")+theme(legend.position = "none") 
+ggplot()+geom_raster(data=get_cs_binned(cs,1,"CS"), aes(begin1,begin2,fill=log(observed)))+geom_raster(data=get_cs_binned(cs,1,"CS"), aes(begin2,begin1,fill=log(observed)))+scale_fill_gradient(low="white", high="black")+theme(legend.position = "none") 
 ggsave(filename = paste0("images/",prefix,"_observed.png"), width=10, height=9)
 #ice
-ggplot()+geom_raster(data=oppar$ice, aes(begin1,begin2,fill=log(N)))+geom_raster(data=oppar$ice, aes(begin2,begin1,fill=log(N)))+scale_fill_gradient(low="white", high="black")+  theme(legend.position = "none") 
+ggplot()+geom_raster(data=get_cs_binned(cs,1,"ICE"), aes(begin1,begin2,fill=log(N)))+geom_raster(data=get_cs_binned(cs,1,"ICE"), aes(begin2,begin1,fill=log(N)))+scale_fill_gradient(low="white", high="black")+  theme(legend.position = "none") 
 ggsave(filename = paste0("images/",prefix,"_ICE.png"), width=10, height=9)+  theme(legend.position = "none") 
 #ice vs raw
-ggplot()+geom_raster(data=oppar$ice, aes(begin1,begin2,fill=log(N)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(observed)))+scale_fill_gradient(low="white", high="black")+  theme(legend.position = "none") 
+ggplot()+geom_raster(data=get_cs_binned(cs,1,"ICE"), aes(begin1,begin2,fill=log(N)))+geom_raster(data=get_cs_binned(cs,1,"CS"), aes(begin2,begin1,fill=log(observed)))+scale_fill_gradient(low="white", high="black")+  theme(legend.position = "none") 
 ggsave(filename = paste0("images/",prefix,"_ICE_vs_observed.png"), width=10, height=9)+  theme(legend.position = "none") 
 #cs vs ice
-ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(1238*normalized)))+geom_raster(data=oppar$ice, aes(begin2,begin1,fill=log(N)))+
-  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=oppar$mat[is.interaction==T])+scale_fill_gradient(low="white", high="black")+
+ggplot()+geom_raster(data=get_cs_binned(cs,1,"CS"), aes(begin1,begin2,fill=log(1238*normalized)))+geom_raster(data=get_cs_binned(cs,1,"ICE"), aes(begin2,begin1,fill=log(N)))+
+  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=get_cs_binned(cs,1,"CS")[is.interaction==T])+scale_fill_gradient(low="white", high="black")+
   theme(legend.position = "none") 
 #observed vs expected
-ggplot()+geom_raster(data=oppar$mat, aes(begin1,begin2,fill=log(expected)))+geom_raster(data=oppar$mat, aes(begin2,begin1,fill=log(observed)))+
-  #geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=oppar$mat[is.interaction==T])+
+ggplot()+geom_raster(data=get_cs_binned(cs,1,"CS"), aes(begin1,begin2,fill=log(expected)))+geom_raster(data=get_cs_binned(cs,1,"CS"), aes(begin2,begin1,fill=log(observed)))+
+  #geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=get_cs_binned(cs,1,"CS")[is.interaction==T])+
   scale_fill_gradient(low="white", high="black")+
   theme(legend.position = "none") 
 #nu
@@ -167,7 +168,7 @@ ggplot(data.table(normalized=counts[,contact.close]*exp(oppar$pred$log_decay_clo
   geom_line(aes(distance,decay),colour="red")+scale_x_log10()+scale_y_log10()
 ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_decay_with_counts.png"), width=10, height=9)
 #lfC hist
-ggplot(oppar$mat)+geom_histogram(aes(lFC))
+ggplot(get_cs_binned(cs,1,"CS"))+geom_histogram(aes(lFC))
 ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,"_lFC_hist.png"), width=10, height=9)
 #detected interactions and 95% CI for posterior
 oppar$mat[,upper:=qgamma(0.975,shape=alpha1,rate=beta1)]
