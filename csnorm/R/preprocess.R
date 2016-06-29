@@ -289,6 +289,29 @@ generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4
   return(list(biases=biases, counts=counts))
 }
 
+#' Diagnostic plots to determine dangling.L, dangling.R and maxlen arguments
+#'
+#' @param infile A tadbit .tsv file
+#' @param skip see \code{\link[data.table]{fread}}
+#' @param nrows number of rows to read, default all.
+#' @param window how many bases to plot around cut site
+#' @param maxlen how many bases to plot off-diagonal
+#'
+#' @return Three plots, pleft and pright to determine dangling.L and dangling.R, and pdiag for maxlen
+#' @export
+#'
+#' @examples
+examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000) {
+  data=read_tsv(infile, skip=skip, nrows=nrows)
+  pleft=ggplot(data[abs(rbegin1-re.closest1)<=window])+geom_histogram(aes(rbegin1-re.closest1),binwidth=1)+
+    scale_x_continuous(breaks=-window:window)
+  pright=ggplot(data[abs(rbegin2-re.closest2)<=window])+geom_histogram(aes(rbegin2-re.closest2),binwidth=1)+
+    scale_x_continuous(breaks=-window:window)
+  pdiag=ggplot(data[abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0])+geom_histogram(aes(rbegin2-rbegin1),binwidth=10)
+  return(list(pleft=pleft,pright=pright,pdiag=pdiag))
+}
+
+
 #' Wrapper function for the whole preprocessing
 #' 
 #' See \code{\link{read_tsv}}, \code{\link{categorize_by_new_type}} and
@@ -304,27 +327,61 @@ generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4
 #' @inheritParams read_tsv
 #' @inheritParams categorize_by_new_type
 #' @inheritParams prepare_for_sparse_cs_norm
+#' @param save.data boolean. Whether to save a CSdata object that contains the raw data
 #'
-#' @return A list containing biases and counts, see \code{\link{prepare_for_sparse_cs_norm}}
+#' @return A CSdata object
 #' @export
 #' 
 #' @examples
-read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = NULL, experiment = "Hi-C",
-                            name = paste(condition, replicate), skip = 0L, distance_bins_per_decade = 100,
-                            circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1)) {
+read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "unspecified", experiment = "Hi-C",
+                            name = paste(condition, replicate), skip = 0L,
+                            circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1), maxlen = 600,
+                            save.data=T) {
   match.arg(enzyme)
   match.arg(experiment)
   message("*** READ")
   data=read_tsv(infile, skip=skip)
   message("*** CATEGORIZE")
-  data = categorize_by_new_type(data, dangling.L = dangling.L, dangling.R = dangling.R)
+  data = categorize_by_new_type(data, dangling.L = dangling.L, dangling.R = dangling.R, maxlen = maxlen)
   message("*** BIASES AND COUNTS")
-  cs_data = prepare_for_sparse_cs_norm(data, both=both, circularize=circularize)
+  cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=circularize)
   dset_statistics(cs_data$biases,cs_data$counts)
   message("*** WRITE")
-  cs = CSdataset(filename=infile, name=name, replicate=replicate, condition=condition, enzyme=enzyme, experiment=experiment,
-                 data=data, biases=cs_data$biases, counts=cs_data$counts)
+  cs = new("CSdata", info=list(name=name, condition=condition, replicate=replicate,
+                               enzyme=enzyme, experiment=experiment,
+                               dangling.L=deparse(dangling.L), dangling.R=deparse(dangling.R), maxlen=maxlen,
+                               filename=infile),
+                     settings=list(circularize=circularize),
+                     data=data, biases=cs_data$biases, counts=cs_data$counts)
   save(cs, file=paste0(outprefix,"_cs.RData"))
+  cs@data=data.table()
+  save(cs, file=paste0(outprefix,"_cs_nodata.RData"))
   return(cs)
 }
 
+#' Merge one or more CSdata objects into a CSnorm object
+#'
+#' @param datasets list of CSdata objects
+#'
+#' @return CSnorm object
+#' @export
+#'
+#' @examples
+merge_cs_norm_datasets = function(datasets) {
+  experiments = rbindlist(lapply(datasets, function(x) x@info))
+  setkey(experiments, name)
+  stopifnot(experiments[,.N]==experiments[,uniqueN(name)])
+  #
+  stopifnot(uniqueN(rbindlist(lapply(datasets, function(x) x@settings)))==1)
+  #
+  biases = lapply(datasets, function(x) x@biases)
+  names(biases) <- sapply(datasets, function(x) x@info$name)
+  counts = lapply(datasets, function(x) x@counts)
+  names(counts) <- sapply(datasets, function(x) x@info$name)
+  #
+  new("CSnorm", experiments=experiments,
+                design=data.table(),
+                settings=datasets[[1]]@settings,
+                biases=rbindlist(biases, use.names=T, idcol="name"),
+                counts=rbindlist(counts, use.names=T, idcol="name"))
+}

@@ -17,8 +17,12 @@ setwd("/home/yannick/simulations/cs_norm")
 #                 "data/caulo_BglIIr1_all", skip="SRR", circularize=4042929)
 #read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate2_reads_int.tsv",
 #                 "data/caulo_BglIIr2_all", skip="SRR", circularize=4042929)
-#read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_NcoI_reads_int.tsv",
-#                 "data/caulo_NcoI_all", skip="SRR", circularize=4042929)
+a=examine_dataset("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_NcoI_reads_int.tsv",
+                  skip="SRR",nrows=1000000)
+csd=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_NcoI_reads_int.tsv",
+                 "data/caulo_NcoI_all", "WT", "1", skip="SRR", circularize=4042929, dangling.L=c(0,3,5),
+                 dangling.R=c(3,0,-2), maxlen=600, save.data=F)
+cs=merge_cs_norm_datasets(list(csd))
 
 #read_and_prepare("/scratch/ralph/HiC/3_Mapped/Bcell_Sox2_10Mb_both_filled_map.tsv", "data/ralph_Bcell_Sox2", skip="HWI")
 #read_and_prepare("/scratch/ralph/HiC/3_Mapped/EScell_Sox2_10Mb_both_filled_map.tsv", "data/ralph_EScell_Sox2", skip="HWI")
