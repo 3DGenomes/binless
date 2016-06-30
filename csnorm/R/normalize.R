@@ -471,8 +471,6 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
     retlist$log_nu=biases.aug[,log_nu]
     retlist$log_delta=biases.aug[,log_delta]
   }
-  retlist$out.bias=ops.bias$out
-  retlist$runtime.bias=ops.bias$runtime
   #ggplot()+geom_line(data=data.table(x=biases.aug[,pos],y=retlist$log_nu),aes(x,y))
   #
   ### fit remaining data
