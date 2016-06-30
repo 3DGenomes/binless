@@ -27,6 +27,7 @@ RoxygenNote: 5.0.1
 NeedsCompilation: yes
 Collate:
     'csnorm.R'
+    'accessors.R'
     'normalize.R'
     'postprocess.R'
     'preprocess.R'

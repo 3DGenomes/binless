@@ -271,3 +271,5 @@ setnames(a,c("begin", "name"), c("begin2","bin2"))
 ggplot(a)+geom_raster(aes(begin1,begin2,fill=log(lgfcount)))+geom_raster(aes(begin2,begin1,fill=log(lgfcount)))+
   scale_fill_gradient(low="white", high="black")+theme(legend.position = "none")
 ggsave(filename = paste0("images/",prefix,"_HiCNorm.png"), width=10, height=9)+  theme(legend.position = "none") 
+
+
