@@ -176,3 +176,22 @@ pairs(data=data[delta<2], ~delta+log_delta+count.diffs+cdiff.std+count.sums+log_
 summary(rlm(log_delta~offset(cdiff.std),data=data))
 summary(rlm(log_delta~offset(log_delta_est),data=data))
 summary(rlm(log_delta~offset(log_delta_est2),data=data))
+
+sm=stan_model("guess_aggreg.stan")
+bf_per_kb=0.25
+sums=get_left_right_count_sums(positions, counts)
+op=optimizing(sm, data=list(Krow=round(cs@biases[,(max(pos)-min(pos))/1000*bf_per_kb]), S=cs@biases[,.N],
+                            cutsites=cs@biases[,pos], rejoined=cs@biases[,rejoined],
+                            danglingL=cs@biases[,dangling.L], danglingR=cs@biases[,dangling.R],
+                            counts_sum_left=sums[,L], counts_sum_right=sums[,R]),
+              as_vector=F, hessian=F, iter=10000, verbose=T, init=0)
+#
+data[,log_nu_stan:=op$par$log_nu]
+pairs(data=data[log_nu>-1.5&log_nu_stan<1], ~log_nu+log(csum.std)+log_nu_est2+log_nu_stan)
+summary(rlm(log_nu~offset(log_nu_est2),data=data))
+summary(rlm(log_nu~offset(log_nu_stan),data=data))
+#
+data[,log_delta_stan:=op$par$log_delta]
+pairs(data=data[delta<2], ~log_delta+cdiff.std+log_delta_est2+log_delta_stan)
+summary(rlm(log_nu~offset(log_delta_est2),data=data))
+summary(rlm(log_nu~offset(log_delta_stan),data=data))
