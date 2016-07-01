@@ -36,6 +36,25 @@ get_count_sums = function(positions, counts) {
   return(sums[,V1])
 }
 
+get_count_diffs = function(positions, counts) {
+  cs1=counts[,sum(-contact.close-contact.down+contact.far+contact.up),by=pos1][,.(pos=pos1,N=V1)]
+  cs2=counts[,sum(+contact.close-contact.down-contact.far+contact.up),by=pos2][,.(pos=pos2,N=V1)]
+  setkey(cs1,pos)
+  setkey(cs2,pos)
+  pos=data.table(pos=positions, key="pos")
+  sums=rbind(cs1,cs2)[,sum(N),keyby=pos][pos]
+  return(sums[,V1])
+}
+
+get_left_right_count_sums = function(positions, counts) {
+  cs1=counts[,.(R=sum(contact.close+contact.down),L=sum(contact.far+contact.up)),by=pos1][,.(pos=pos1,L,R)]
+  cs2=counts[,.(R=sum(contact.far+contact.down),L=sum(contact.close+contact.up)),by=pos2][,.(pos=pos2,L,R)]
+  pos=data.table(pos=positions, key="pos")
+  sums=rbind(cs1,cs2)[,.(L=sum(L),R=sum(R)),keyby=pos][pos]
+  return(sums)
+}
+
+
 get_nu_estimates = function(positions, counts) {
   S=length(positions)
   dt=data.table(pos=positions,sums=get_count_sums(positions, counts))
@@ -47,15 +66,29 @@ get_nu_estimates = function(positions, counts) {
 }
 
 
-get_count_diffs = function(positions, counts) {
-  cs1=counts[,sum(-contact.close-contact.down+contact.far+contact.up),by=pos1][,.(pos=pos1,N=V1)]
-  cs2=counts[,sum(+contact.close-contact.down-contact.far+contact.up),by=pos2][,.(pos=pos2,N=V1)]
-  setkey(cs1,pos)
-  setkey(cs2,pos)
-  pos=data.table(pos=positions, key="pos")
-  sums=rbind(cs1,cs2)[,sum(N),keyby=pos][pos]
-  return(sums[,V1])
+get_nu_delta_estimates = function(positions, counts) {
+  S=length(positions)
+  sums=get_left_right_count_sums(positions, counts)
+  sums[L==0,L:=1]
+  sums[R==0,R:=1]
+  sums[,c("log_delta","log_nu"):=list((log(L)-log(R))/2,(log(L)+log(R))/2)]
+  sums[,c("log_delta","log_nu"):=list(log_delta-sum(log_delta)/S,log_nu-sum(log_nu)/S)]
+  eC=sums[,mean(c(log(L/(2*S))-log_nu-log_delta,log(R/(2*S))-log_nu+log_delta))]
+  return(list(eC=eC, log_nu=sums[,log_nu], log_delta=sums[,log_delta]))
 }
+
+get_nu_delta_estimates2 = function(positions, counts) {
+  S=length(positions)
+  sums=get_left_right_count_sums(positions, counts)
+  sums[L==0,L:=1]
+  sums[R==0,R:=1]
+  sums[,c("log_delta","nu"):=list((L-R)/(L+R),(L+R)/2)]
+  sums[,nu:=nu/mean(nu)]
+  sums[,log_nu:=nu-1]
+  eC=sums[,mean(c(log(L/(2*S))-log_nu-log_delta,log(R/(2*S))-log_nu+log_delta))]
+  return(list(eC=eC, log_nu=sums[,log_nu], log_delta=sums[,log_delta]))
+}
+
 
 get_count_ratios = function(positions, counts) {
   cs1=counts[,sum(contact.far+contact.up)/sum(contact.close+contact.down),by=pos1][,.(pos=pos1,N=V1)]
@@ -129,9 +162,17 @@ summary(lm(log_nu~log(csum.std)+log(bsum.std)+0,data=data[bsum.std>0]))
 #delta vs count sums and diffs
 pairs(data=data, ~delta+log_delta+count.diffs+cdiff.std+count.sums)
 
-sm=stan_model("guess_aggreg.stan")
-op=optimizing(sm, data=list(N=cs@biases[,.N], counts_sum=data[,count.sums]), as_vector=F, hessian=F, init=0)
 
-data[,log_nu_est:=get_nu_estimates(pos,cs@counts)$log_nu]
-pairs(data=data, ~nu+log_nu+count.sums+csum.std+log(csum.std)+log_nu_est)
-summary(lm(log_nu~log_nu_est+0,data=data))
+data[,log_nu_est:=get_nu_delta_estimates(pos,cs@counts)$log_nu]
+data[,log_nu_est2:=get_nu_delta_estimates2(pos,cs@counts)$log_nu]
+pairs(data=data[log_nu>-1.5], ~nu+log_nu+count.sums+csum.std+log(csum.std)+log_nu_est+exp(log_nu_est)+log_nu_est2)
+summary(rlm(log_nu~offset(log(csum.std)),data=data))
+summary(rlm(log_nu~offset(log_nu_est),data=data))
+summary(rlm(log_nu~offset(log_nu_est2),data=data))
+
+data[,log_delta_est:=get_nu_delta_estimates(pos,cs@counts)$log_delta]
+data[,log_delta_est2:=get_nu_delta_estimates2(pos,cs@counts)$log_delta]
+pairs(data=data[delta<2], ~delta+log_delta+count.diffs+cdiff.std+count.sums+log_delta_est+exp(log_delta_est)+log_delta_est2)
+summary(rlm(log_delta~offset(cdiff.std),data=data))
+summary(rlm(log_delta~offset(log_delta_est),data=data))
+summary(rlm(log_delta~offset(log_delta_est2),data=data))
