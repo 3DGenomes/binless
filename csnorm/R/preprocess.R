@@ -353,7 +353,7 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "u
                                filename=infile),
                      settings=list(circularize=circularize),
                      data=data, biases=cs_data$biases, counts=cs_data$counts)
-  save(cs, file=paste0(outprefix,"_csdata_with_data.RData"))
+  if (save.data==T) save(cs, file=paste0(outprefix,"_csdata_with_data.RData"))
   cs@data=data.table()
   save(cs, file=paste0(outprefix,"_csdata.RData"))
   return(cs)
