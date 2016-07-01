@@ -79,7 +79,12 @@ setMethod("show",signature="CSdata",definition=function(object) {
   cat(" Reads density excl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
   nreads=nreads+object@biases[,sum(dangling.L+dangling.R+rejoined)]
   cat(" Reads density incl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
-  if (object@data[,.N]>0) show(object@data[,.N,keyby=category])
+  if (object@data[,.N]>0) {
+    cat("Original data has ",object@data[,.N], " reads categorized as follows", sep="")
+    show(object@data[,.N,keyby=category])
+  } else {
+    cat("Original data not stored in object")
+  }
 })
 
 #' Class to hold binned matrices at a given resolution
