@@ -182,14 +182,22 @@ ggsave(filename = paste0("images/",prefix,"_parallel_inhomogeneous_cov",coverage
 
 ### double run plots
 #lFC histogram and matrices
-ggplot(rbind(opserial$mat[,.(bin1,bin2,dset="serial",lFC)],oppar$mat[,.(bin1,bin2,dset="parallel",lFC)]))+geom_histogram(aes(lFC,fill=dset),position="dodge")
+ggplot(rbind(get_cs_binned(cs2,1,"CS")[,.(bin1,bin2,dset="serial",lFC)],get_cs_binned(cs,1,"CS")[,.(bin1,bin2,dset="parallel",lFC)]))+geom_histogram(aes(lFC,fill=dset),position="dodge")
 ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_hist.png"), width=10, height=7.5)
-ggplot()+geom_raster(data=oppar$mat,aes(begin1,begin2,fill=lFC))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+
-  geom_raster(data=opserial$mat,aes(begin2,begin1,fill=lFC))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opserial$mat[is.interaction==T])
+ggplot()+geom_raster(data=get_cs_binned(cs,1,"CS"),aes(begin1,begin2,fill=lFC))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=get_cs_binned(cs,1,"CS")[is.interaction==T])+
+  geom_raster(data=get_cs_binned(cs2,1,"CS"),aes(begin2,begin1,fill=lFC))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=get_cs_binned(cs2,1,"CS")[is.interaction==T])
 ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_lFC_mat.png"), width=10, height=7.5)
 #normalized matrix
-ggplot()+geom_raster(data=oppar$mat,aes(begin1,begin2,fill=log(normalized)))+geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected>0.5),data=oppar$mat[is.interaction==T])+
-  geom_raster(data=opserial$mat,aes(begin2,begin1,fill=log(normalized)))+geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected>0.5),data=opserial$mat[is.interaction==T])
+ggplot()+geom_raster(data=get_cs_binned(cs,1,"CS"), aes(begin1,begin2,fill=log(normalized)))+
+  geom_raster(data=get_cs_binned(cs2,1,"CS"), aes(begin2,begin1,fill=log(normalized)))+
+  scale_fill_gradient(low="white", high="black")+theme(legend.position = "none")
+#normalized matrix with interactions
+ggplot()+
+  geom_raster(data=get_cs_binned(cs,1,"CS"),aes(begin1,begin2,fill=log(normalized)))+
+  geom_raster(data=get_cs_binned(cs2,1,"CS"),aes(begin2,begin1,fill=log(normalized)))+
+  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=get_cs_binned(cs,1,"CS")[is.interaction==T])+
+  geom_point(aes(begin2,begin1,colour=prob.observed.gt.expected<0.5),data=get_cs_binned(cs2,1,"CS")[is.interaction==T])+
+  scale_fill_gradient(low="white", high="black")+theme(legend.position = "none")
 ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_normalized.png"), width=10, height=7.5)
 #genomic biases
 #ggplot(melt(data.table(id=biases[,pos],serial=exp(opserial$par$eRJ+opserial$par$log_nu),parallel=exp(oppar$par$eRJ+oppar$par$log_nu)),id.vars="id",variable.name="nu"))+geom_line(aes(id,value,colour=nu))+geom_point(data=biases,aes(pos,rejoined))
@@ -204,7 +212,7 @@ ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",
 ggplot(melt(data.table(dist=counts[,distance],serial=opserial$pred$log_decay_close,parallel=oppar$pred$log_decay_far, key="dist"),id.vars="dist"))+
   geom_line(aes(dist,value,colour=variable))+scale_x_log10()
 ggsave(filename=paste0("images/",prefix,"_serial_vs_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_decay.png"), width=10, height=7.5)
-c(opserial$mat[,mean(lFC)], oppar$mat[,mean(lFC)])
+c(get_cs_binned(cs2,1,"CS")[,mean(lFC)], get_cs_binned(cs,1,"CS")[,mean(lFC)])
 c(opserial$par$eRJ,oppar$par$eRJ)
 c(opserial$par$eDE,oppar$par$eDE)
 c(opserial$par$eC,oppar$par$eC)

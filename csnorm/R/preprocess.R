@@ -4,7 +4,7 @@ NULL
 #' Read TADBit tsv file and return (paired-end) reads as data.table
 #'
 #' @param fname The filename
-#' @param nrows,skip see \code{\link[data.table]{data.table}}
+#' @param nrows,skip see \code{\link[data.table]{fread}}
 #'
 #' @return a data.table
 #' @export
@@ -334,13 +334,13 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000) {
 #' 
 #' @examples
 read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "unspecified", experiment = "Hi-C",
-                            name = paste(condition, replicate), skip = 0L,
+                            name = paste(condition, replicate), skip = 0L, nrows = -1L,
                             circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1), maxlen = 600,
                             save.data=T) {
   match.arg(enzyme)
   match.arg(experiment)
   message("*** READ")
-  data=read_tsv(infile, skip=skip)
+  data=read_tsv(infile, skip=skip, nrows=nrows)
   message("*** CATEGORIZE")
   data = categorize_by_new_type(data, dangling.L = dangling.L, dangling.R = dangling.R, maxlen = maxlen)
   message("*** BIASES AND COUNTS")
