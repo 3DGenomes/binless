@@ -172,6 +172,32 @@ run_split_parallel_squares = function(biases, square.size, coverage, diag.only=F
   return(list(squares=squares,diagsquares=diagsquares,true.square.size=true.square.size))
 }
 
+#' Initial guess for normalization
+#' @keywords internal
+#' @export
+#' 
+run_split_parallel_initial_guess = function(counts, biases, bf_per_kb, dmin, dmax, bf_per_decade, verbose, iter) {
+  #compute column sums
+  cs1=counts[,.(R=sum(contact.close+contact.down),L=sum(contact.far+contact.up)),by=pos1][,.(pos=pos1,L,R)]
+  cs2=counts[,.(R=sum(contact.far+contact.down),L=sum(contact.close+contact.up)),by=pos2][,.(pos=pos2,L,R)]
+  pos=data.table(pos=positions, key="pos")
+  sums=rbind(cs1,cs2)[,.(L=sum(L),R=sum(R)),keyby=pos][pos]
+  #run optimization
+  Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
+  op=optimizing(stanmodels$guess, data=list(Krow=Krow, S=biases[,.N],
+                                            cutsites=biases[,pos], rejoined=biases[,rejoined],
+                                            danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+                                            counts_sum_left=sums[,L], counts_sum_right=sums[,R]),
+                as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)
+  #return initial guesses
+  Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
+  return(list(eRJ=op$par$eRJ, eDE=op$par$eDE, eC=op$par$eC,
+              alpha=op$par$alpha, beta_nu=op$par$beta_nu, beta_delta=op$par$beta_delta,
+              lambda_nu=op$par$lambda_nu, lambda_delta=op$par$lambda_delta,
+              log_nu=op$par$log_nu, log_delta=op$par$log_delta,
+              beta_diag=rep(0,Kdiag-1), lambda_diag=1))
+}
+
 #' Genomic bias estimation part of parallel run
 #' @keywords internal
 #' 
