@@ -460,8 +460,12 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
   message("   ",diagsquares[,.N], " on the diagonal")
   ### fit genomic biases using squares close to diagonal
   message("*** fit genomic biases")
-  dmax=cs@counts[,max(distance)]+0.01
-  dmin=cs@counts[,min(distance)]-0.01
+  dmin=0.99
+  if (cs@settings$circularize>0) {
+    dmax=cs@settings$circularize/2+0.01
+  } else {
+    dmax=cs@biases[,max(pos)-min(pos)]+0.01
+  }
   cs@settings$dmin=dmin
   cs@settings$dmax=dmax
   registerDoParallel(cores=ncores)
