@@ -453,6 +453,8 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
   message("*** fit genomic biases")
   dmax=cs@counts[,max(distance)]+0.01
   dmin=cs@counts[,min(distance)]-0.01
+  cs@settings$dmin=dmin
+  cs@settings$dmax=dmax
   registerDoParallel(cores=ncores)
   output.binder = function(x) {
     a=sapply(names(x[[1]]), function(i) sapply(x, "[[", i,simplify=F))
@@ -544,6 +546,7 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
   test[,end:=as.integer(as.character(bin.end))]
   op=run_split_parallel_counts_decay(test, counts, dmin, dmax, bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)
   test[,log_decay:=op$par$log_decay+op$par$eC]
+  retlist$decay:=test[,.(dist=(begin+end)/2,exp(log_decay))]
   retlist$beta_diag_centered=op$par$beta_diag_centered
   ### reconstruct count estimates: eC
   message("*** reconstruct count exposure")
@@ -555,8 +558,6 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
   message("*** predict all means")
   cs@pred=csnorm_predict_all(cs, verbose=verbose, ncores=ncores)
   message("*** done")
-  cs@settings$dmin=dmin
-  cs@settings$dmax=dmax
   cs@par=retlist
   cs@diagnostics=list(out.bias=ops.bias$out, out.count=ops.count$out, runtime.count=ops.count$runtime, runtime.bias=ops.bias$runtime)
   return(cs)
