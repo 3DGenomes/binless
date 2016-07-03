@@ -50,11 +50,11 @@ NULL
 #'
 #' @examples
 setClass("CSdata",
-          slots = list(info="list",
-                       settings="list",
-                       data="data.table",
-                       biases="data.table",
-                       counts="data.table"))
+         slots = list(info="list",
+                      settings="list",
+                      data="data.table",
+                      biases="data.table",
+                      counts="data.table"))
 
 setMethod("show",signature="CSdata",definition=function(object) {
   cat("A dataset for cut-site normalization\n")
@@ -80,7 +80,7 @@ setMethod("show",signature="CSdata",definition=function(object) {
   nreads=nreads+object@biases[,sum(dangling.L+dangling.R+rejoined)]
   cat(" Reads density incl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
   if (object@data[,.N]>0) {
-    cat("Original data has ",object@data[,.N], " reads categorized as follows", sep="")
+    cat("Original data has ",object@data[,.N], " reads categorized as follows\n", sep="")
     show(object@data[,.N,keyby=category])
   } else {
     cat("Original data not stored in object")
