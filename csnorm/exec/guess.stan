@@ -39,9 +39,6 @@ parameters {
   vector[Krow-1] beta_delta;
   //dispersion
   real<lower=0> alpha;
-  //length scales
-  real<lower=0> lambda_nu;
-  real<lower=0> lambda_delta;
 }
 transformed parameters {
   //nu
@@ -100,11 +97,4 @@ model {
   //counts
   counts_sum_left  ~ neg_binomial_2_log(log_mean_cleft, alpha);
   counts_sum_right ~ neg_binomial_2_log(log_mean_cright, alpha);
-  
-  //// Priors
-  //P-spline prior on the differences (K-2 params)
-  //warning on jacobian can be ignored
-  //see GAM, Wood (2006), section 4.8.2 (p.187)
-  beta_nu_diff ~ normal(0, 1./lambda_nu);
-  beta_delta_diff ~ normal(0, 1./lambda_delta);
 }
