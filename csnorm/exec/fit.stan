@@ -147,12 +147,17 @@ model {
   //P-spline prior on the differences (K-2 params)
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
-  beta_nu_diff ~ normal(0, 1/lambda_nu);
-  beta_delta_diff ~ normal(0, 1/lambda_delta);
-  beta_diag_diff ~ normal(0, 1/lambda_diag);
+  beta_nu_diff ~ normal(0, lambda_nu);
+  beta_delta_diff ~ normal(0, lambda_delta);
+  beta_diag_diff ~ normal(0, lambda_diag);
   //weak lasso on bias splines (non-bayesian)
-  beta_nu_diff ~ double_exponential(0,10/lambda_nu);
-  beta_delta_diff ~ double_exponential(0,10/lambda_delta);
+  beta_nu_diff ~ double_exponential(0,10*lambda_nu);
+  beta_delta_diff ~ double_exponential(0,10*lambda_delta);
+
+  //cauchy hyperprior
+  lambda_nu ~ cauchy(0,0.1);
+  lambda_delta ~ cauchy(0,0.1);
+  lambda_diag ~ cauchy(0,0.1);
 }
 generated quantities {
   real deviance;
