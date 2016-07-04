@@ -333,5 +333,7 @@ generate_genomic_biases = function(biases, beta_nu, beta_delta, bf_per_kb=1, poi
   op=optimizing(stanmodels$gen_genomic_biases, data=list(Krow=Krow, S=S, begin=begin, end=end,
                                                                     beta_nu=beta_nu, beta_delta=beta_delta),
                               as_vector=F, hessian=F, iter=1, verbose=F, init=0)
-  return(op$par)
+  dt=as.data.table(op$par)
+  setkey(dt, pos)
+  return(dt)
 }
