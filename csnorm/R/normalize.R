@@ -205,15 +205,10 @@ run_split_parallel_initial_guess = function(counts, biases, bf_per_kb, dmin, dma
 run_split_parallel_biases = function(counts, biases, begin, end, dmin, dmax, bf_per_kb, bf_per_decade, verbose, iter, outprefix=NULL, circularize=-1) {
   #extract relevant portion of data
   extracted = get_cs_subset(counts, biases, begin1=begin, end1=end, fill.zeros=T, circularize=circularize)
-  #initial values
-  init.a=system.time(init.output <- capture.output(init.op <- run_split_parallel_initial_guess(
-    counts=counts, biases=biases, bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax,
-    bf_per_decade=bf_per_decade, verbose=verbose, iter=iter)))
   #run fit
   a=system.time(output <- capture.output(op <- csnorm_fit(stanmodels$fit, extracted$biases1, extracted$counts, dmin, dmax,
-                                                          bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade,
-                                                          verbose = verbose, iter = iter, init=init)))
-  op$runtime=a[1]+a[4]+init.a[1]+init.a[4]
+                                                          bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, verbose = verbose, iter = iter)))
+  op$runtime=a[1]+a[4]
   op$output=output
   if (!is.null(outprefix)) {
     save(op, file=paste0(outprefix, "_biases_op_",begin,".RData"))
