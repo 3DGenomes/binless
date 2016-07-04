@@ -1,5 +1,9 @@
   // design matrix and projector for sparse cubic spline
   //needs declaration of the following
+  //int S
+  //int Krow
+  //vector[S] cutsites
+  //int splinedegree()
   //vector[nnz(S)] Xrow_w;
   //int Xrow_v[nnz(S)];
   //int Xrow_u[S+1];

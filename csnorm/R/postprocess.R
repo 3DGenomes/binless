@@ -310,3 +310,30 @@ postprocess = function(cs, resolution=10000, ncores=1, verbose=F) {
   cs@binned[length(cs@binned)+1]=csb
   return(cs)
 }
+
+
+#' Generate nu and delta genomic biases on evenly spaced points along the genome
+#'
+#' @param biases data.table.
+#' @param beta_nu,beta_delta vectors. spline parameters
+#' @param bf_per_kb number of basis functions per kb
+#' @param points_per_kb number of evaluation points per kb
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+generate_genomic_biases = function(biases, beta_nu, beta_delta, bf_per_kb=1, points_per_kb=100) {
+  begin=biases[,min(pos)]
+  end=biases[,max(pos)]
+  genome_sz=end-begin
+  Krow=round(bf_per_kb*genome_sz/1000)
+  S=round(points_per_kb*genome_sz/1000)
+  op=optimizing(stanmodels$gen_genomic_biases, data=list(Krow=Krow, S=S, begin=begin, end=end,
+                                                                    beta_nu=beta_nu, beta_delta=beta_delta),
+                              as_vector=F, hessian=F, iter=1, verbose=F, init=0)
+  dt=as.data.table(op$par)
+  setkey(dt, pos)
+  return(dt)
+}
