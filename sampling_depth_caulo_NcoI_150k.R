@@ -84,10 +84,14 @@ ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_normalized.png"),
 #nu and delta: plots and correlation
 nu = foreach (i=nreads,.combine=rbind) %do% {
   load(paste0("data/caulo_",prefix,"_sub",i,"k_csnorm_optimized.RData"))
-  data.table(pos=cs@biases[,pos],log_nu=cs@par$log_nu,log_delta=cs@par$log_delta,dset=i,key="pos")
+  csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=cs@par$beta_nu, beta_delta=cs@par$beta_delta,
+                                   bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 100)[
+                                     ,.(pos,log_nu,log_delta,dset=i)]
 }
 load(paste0("data/caulo_",prefix,"_csnorm_optimized.RData"))
-nuref=data.table(pos=cs@biases[,pos],log_nu_ref=cs@par$log_nu,log_delta_ref=cs@par$log_delta,key="pos")
+nuref=csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=cs@par$beta_nu, beta_delta=cs@par$beta_delta,
+                                       bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 100)[
+                                         ,.(pos,log_nu_ref=log_nu,log_delta_ref=log_delta)]
 nu=nuref[nu]
 nu[,dset:=ordered(dset,levels=nreads)]
 ggplot(nu[,.(dset,pos,nu=exp(log_nu),nuref=exp(log_nu_ref))])+
@@ -103,9 +107,14 @@ ggplot(rbind(nu[,.(var="log_nu",correlation=cor(log_nu_ref,log_nu)),by=dset],
   geom_point()+ylim(-0.02,1)
 ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_nu_delta_correlation.png"), width=10, height=7.5)
 #
-get_fpt=function(x){a=acf(x,plot=F,lag.max=100); a$lag[a$acf<=0][1]}
-ggplot(nu[,.(fpt=get_fpt(exp(log_nu+log_delta)),fptref=get_fpt(exp(log_nu_ref+log_delta_ref))),by=dset])+
-  geom_point(aes(dset,fpt))+geom_hline(aes(yintercept=fptref))+ylim(0,30)#+guides(y="first passage time")
+ggplot(rbind(nu[,.(var="log_nu",chisq=mean((log_nu_ref-log_nu)^2)),by=dset],
+             nu[,.(var="log_delta",chisq=mean((log_delta_ref-log_delta)^2)),by=dset]),aes(dset,chisq,colour=var))+geom_point()
+ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_nu_delta_chisq.png"), width=10, height=7.5)
+#
+get_fpt=function(x,y){a=acf(y,plot=F,lag.max=10000); l=a$lag[a$acf<=0][1]; x[l+1]-x[1]}
+fpts=nu[,.(fpt=get_fpt(pos,exp(log_nu+log_delta)),fptref=get_fpt(pos,exp(log_nu_ref+log_delta_ref))),by=dset]
+ggplot(fpts)+geom_point(aes(dset,fpt/1000))+geom_hline(aes(yintercept=fptref/1000))+
+  ylim(0,60)+ylab("first passage time of nu x delta (in kb)")
 ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_nu_delta_fpt.png"), width=10, height=7.5)
 
 #diagonal decay
