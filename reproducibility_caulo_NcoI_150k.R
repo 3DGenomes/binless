@@ -90,7 +90,6 @@ ggsave(filename=paste0("images/caulo_",prefix,"_reproducibility_nu.png"), width=
 #nu*delta
 ggplot(nu[,.(dset,pos,delta=exp(log_nu+log_delta))])+
   geom_line(aes(pos,delta),colour="black")+facet_wrap(~dset)+ylim(0,2)
-ggsave(filename=paste0("images/caulo_",prefix,"_reproducibility_delta.png"), width=10, height=7.5)
 #delta
 ggplot(nu[,.(dset,pos,delta=exp(log_delta))])+
   geom_line(aes(pos,delta),colour="black")+facet_wrap(~dset)+ylim(0,2)
