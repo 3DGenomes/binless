@@ -35,6 +35,8 @@ foreach (nreads=c(5,10,20,30,40,50,60,75,100,200,300,400)) %do% {
 registerDoParallel(cores=30)
 foreach (nreads=c(5,10,20,30,40,50,60,75,100,200,300,400)) %dopar% {
   load(paste0("data/caulo_NcoI_150k_sub",nreads,"k_csnorm.RData"))
+  cs@counts=fill_zeros(counts = cs@counts, biases = cs@biases)
+  cs@counts[,distance:=pmin(abs(pos2-pos1), cs@settings$circularize+1-abs(pos2-pos1))]
   bf_per_decade=5
   bf_per_kb=0.25
   dmin=1-0.01

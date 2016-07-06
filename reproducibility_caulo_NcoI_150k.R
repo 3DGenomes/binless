@@ -27,6 +27,8 @@ bf_per_kb=signif(10^(seq(-1,1,length.out = 9))*1/4,digits=2)
 registerDoParallel(cores=30)
 foreach (bpk=bf_per_kb) %dopar% {
   load(paste0("data/caulo_NcoI_150k_csnorm.RData"))
+  cs@counts=fill_zeros(counts = cs@counts, biases = cs@biases)
+  cs@counts[,distance:=pmin(abs(pos2-pos1), cs@settings$circularize+1-abs(pos2-pos1))]
   bf_per_decade=5
   dmin=1-0.01
   dmax=150000+0.01
