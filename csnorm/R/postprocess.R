@@ -70,7 +70,7 @@ iterative_normalization = function(csb, niterations=100) {
 #' @keywords internal
 #' @export
 #' 
-csnorm_predict_binned = function(cs, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL, verbose=F) {
+csnorm_predict_binned = function(cs, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL) {
   csub=copy(cs@counts) #need to implement taking only needed part of matrix, and reporting log_nu and log_delta appropriately
   bsub=copy(cs@biases)
   Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
@@ -111,7 +111,8 @@ csnorm_predict_binned = function(cs, resolution, b1=NULL, b2=NULL, e1=NULL, e2=N
                B1=csub[,nlevels(bin1)], B2=csub[,nlevels(bin2)],
                cbins1=csub[,as.integer(bin1)], cbins2=csub[,as.integer(bin2)],
                bbins1=bsub[!is.na(bin1),ibin1], bbins2=bsub[!is.na(bin2),ibin2])
-  binned=optimizing(stanmodels$predict_binned, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)
+  out <- capture.output(binned <- optimizing(stanmodels$predict_binned,
+                                             data=data, as_vector=F, hessian=F, iter=1, verbose=T, init=0))
   #format output
   so = data.table(melt(binned$par$observed))
   setnames(so,"value","observed")
@@ -133,9 +134,11 @@ csnorm_predict_binned = function(cs, resolution, b1=NULL, b2=NULL, e1=NULL, e2=N
 #' @keywords internal
 #' @export
 #' 
-get_dispersions = function(binned, iter=10000, verbose=T) {
+get_dispersions = function(binned, iter=10000) {
   data=list(B=binned[,.N],observed=binned[,observed],expected=binned[,expected],ncounts=binned[,ncounts])
-  optimizing(stanmodels$dispersions, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)$par
+  out <- capture.output(op <- optimizing(stanmodels$dispersions,
+                                         data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0)$par)
+  return(op)
 }
 
 #' compute \eqn{p(\Gamma_2>\Gamma_1) = \int_{0}^{+\infty} dx p_{\Gamma_2}(x) \int_{0}^{x} dy p_{\Gamma_1}(y)}
@@ -295,11 +298,11 @@ thresholds_estimator = function(observed, expected, dispersion, threshold=0.95, 
 #' @examples
 postprocess = function(cs, resolution=10000, ncores=1, verbose=F) {
   ### run remaining steps
-  message("*** buid binned matrices")
+  if (verbose==T) cat("*** buid binned matrices\n")
   binned=csnorm_predict_binned(cs, resolution=resolution)
-  message("*** estimate dispersions")
+  if (verbose==T) cat("*** estimate dispersions\n")
   disp=get_dispersions(binned$mat)
-  message("*** detect interactions")
+  if (verbose==T) cat("*** detect interactions\n")
   mat=detect_interactions(binned$mat, disp$dispersion, ncores=ncores) #interaction detection using binned dispersion estimates
   csb=new("CSbinned", resolution=resolution,
                       range=c(b1=binned$b1, e1=binned$e1, b2=binned$b2, e2=binned$e2),
