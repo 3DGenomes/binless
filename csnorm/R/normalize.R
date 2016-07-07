@@ -92,7 +92,7 @@ csnorm_fit = function(model, biases, counts, dmin, dmax, bf_per_kb=1, bf_per_dec
     message("Kdiag       : ", Kdiag)
     message("Biases      : ", biases[,.N])
     message("Counts      : ", 4*counts[,.N])
-    message("% zeros     : ", (counts[contact.close==0,.N]+counts[contact.far==0,.N]+counts[contact.up==0,.N]+counts[contact.down==0,.N])/counts[,.N]*100)
+    message("% zeros     : ", (counts[contact.close==0,.N]+counts[contact.far==0,.N]+counts[contact.up==0,.N]+counts[contact.down==0,.N])/counts[,4*.N]*100)
   }
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
