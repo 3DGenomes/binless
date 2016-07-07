@@ -97,4 +97,8 @@ model {
   //counts
   counts_sum_left  ~ neg_binomial_2_log(log_mean_cleft, alpha);
   counts_sum_right ~ neg_binomial_2_log(log_mean_cright, alpha);
+  
+  //// prior
+  log_nu ~ cauchy(0, 1); //give high probability to [0.5:2]
+  log_delta ~ cauchy(0,1);
 }
