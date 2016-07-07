@@ -154,11 +154,7 @@ model {
   beta_nu_diff ~ double_exponential(0,10*lambda_nu);
   beta_delta_diff ~ double_exponential(0,10*lambda_delta);
 
-  //cauchy hyperpriors for genomic biases
-  log_nu ~ cauchy(0,1);
-  log_delta ~ cauchy(0,1);
-
-  //half cauchy hyperpriors for lengthscales
+  //cauchy hyperprior
   lambda_nu ~ cauchy(0,0.1);
   lambda_delta ~ cauchy(0,0.1);
   lambda_diag ~ cauchy(0,0.1);
