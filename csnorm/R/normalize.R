@@ -211,6 +211,7 @@ run_split_parallel_biases = function(counts, biases, begin, end, dmin, dmax, bf_
                                                           iter = iter)))
   op$runtime=a[1]+a[4]
   op$output=output
+  op$mem=as.integer(object.size(extracted))
   if (!is.null(outprefix)) {
     save(op, file=paste0(outprefix, "_biases_op_",begin,".RData"))
   }
@@ -223,7 +224,7 @@ run_split_parallel_biases = function(counts, biases, begin, end, dmin, dmax, bf_
   if (!is.null(outprefix)) {
     save(ret, file=paste0(outprefix, "_biases_ret_",begin,".RData"))
   }
-  return(list(ret=ret, out=tail(op$output,1), runtime=op$runtime))
+  return(list(ret=ret, out=tail(op$output,1), runtime=op$runtime, mem=op$mem))
 }
 
 #' Homogenize biases estimated on multiple fits
@@ -253,6 +254,7 @@ run_split_parallel_counts = function(counts, biases.aug, begin1, end1, begin2, e
     dmin, dmax, bf_per_decade = bf_per_decade, verbose = T, iter = iter)))
   op$runtime=a[1]+a[4]
   op$output=output
+  op$mem=as.integer(object.size(extracted))
   if (!is.null(outprefix)) {
     save(op, file=paste0(outprefix, "_counts_op_",begin1,"_",begin2,".RData"))
   }
@@ -282,7 +284,7 @@ run_split_parallel_counts = function(counts, biases.aug, begin1, end1, begin2, e
   if (!is.null(outprefix)) {
     save(ret, file=paste0(outprefix, "_counts_ret_",begin1,"_",begin2,".RData"))
   }
-  return(list(ret=ret, out=tail(op$output,1), runtime=op$runtime))
+  return(list(ret=ret, out=tail(op$output,1), runtime=op$runtime, mem=op$mem))
 }
 
 #' Merge together parallel runs and estimate a single diagonal decay
@@ -483,7 +485,7 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
   registerDoParallel(cores=ncores)
   output.binder = function(x) {
     a=sapply(names(x[[1]]), function(i) sapply(x, "[[", i,simplify=F))
-    list(par=rbindlist(a[,1]), out=as.character(a[,2]), runtime=as.numeric(a[,3]))
+    list(par=rbindlist(a[,1]), out=as.character(a[,2]), runtime=as.numeric(a[,3]), mem=as.integer(a[,4]))
   }
   if (is.null(ops.bias)) {
     ops.bias = foreach (begin=diagsquares[,begin1], end=diagsquares[,end1], .packages=c("data.table","rstan")) %dopar% 
