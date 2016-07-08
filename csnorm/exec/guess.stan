@@ -16,6 +16,9 @@ data {
   //count sums
   int<lower=0> counts_sum_left[S];
   int<lower=0> counts_sum_right[S];
+  //stiffnesses
+  real<lower=0> lambda_nu;
+  real<lower=0> lambda_delta;
 }
 transformed data {
   //bias spline, sparse (nu and delta have the same design)
@@ -101,4 +104,8 @@ model {
   //// prior
   log_nu ~ cauchy(0, 1); //give high probability to [0.5:2]
   log_delta ~ cauchy(0,1);
+  beta_nu_diff ~ normal(0,lambda_nu);
+  beta_delta_diff ~ normal(0,lambda_delta);
+  beta_nu_diff ~ double_exponential(0,10*lambda_nu);
+  beta_delta_diff ~ double_exponential(0,10*lambda_delta);
 }

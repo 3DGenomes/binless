@@ -19,13 +19,14 @@ save(cs, file="data/caulo_NcoI_all10M_csnorm.RData")
 
 ### normalize different datasets
 
-load("data/caulo_NcoI_all5M_csnorm.RData")
+load("data/caulo_NcoI_all_csnorm.RData")
 
 coverage=4
 square.size=150000
 bf_per_kb=0.25
 cs=run_split_parallel(cs, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
-                      bf_per_decade=5, distance_bins_per_decade=100, verbose = F, iter=10000, ncores=30,
+                      bf_per_decade=5, distance_bins_per_decade=100, lambdas=c(0.01,1,100),
+                      verbose = F, iter=10000, ncores=30,
                       homogenize=F, outprefix="tmp/test")#, ops.count=ops.count, ops.bias=ops.bias)
 #cs=run_split_parallel_recovery(cs, "tmp/test", square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
 #                      bf_per_decade=5, distance_bins_per_decade=100, verbose = F, iter=10000, ncores=30,

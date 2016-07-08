@@ -177,7 +177,7 @@ run_split_parallel_squares = function(biases, square.size, coverage, diag.only=F
 #' @keywords internal
 #' @export
 #' 
-run_split_parallel_initial_guess = function(counts, biases, bf_per_kb, dmin, dmax, bf_per_decade, verbose, iter) {
+run_split_parallel_initial_guess = function(counts, biases, bf_per_kb, dmin, dmax, bf_per_decade, lambda, verbose, iter) {
   #compute column sums
   cs1=counts[,.(R=sum(contact.close+contact.down),L=sum(contact.far+contact.up)),by=pos1][,.(pos=pos1,L,R)]
   cs2=counts[,.(R=sum(contact.far+contact.down),L=sum(contact.close+contact.up)),by=pos2][,.(pos=pos2,L,R)]
@@ -188,36 +188,38 @@ run_split_parallel_initial_guess = function(counts, biases, bf_per_kb, dmin, dma
   op=optimizing(stanmodels$guess, data=list(Krow=Krow, S=biases[,.N],
                                             cutsites=biases[,pos], rejoined=biases[,rejoined],
                                             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-                                            counts_sum_left=sums[,L], counts_sum_right=sums[,R]),
+                                            counts_sum_left=sums[,L], counts_sum_right=sums[,R],
+                                            lambda_nu=lambda, lambda_delta=lambda),
                 as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)
   #return initial guesses
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   return(list(eRJ=op$par$eRJ, eDE=op$par$eDE, eC=op$par$eC,
               alpha=op$par$alpha, beta_nu=op$par$beta_nu, beta_delta=op$par$beta_delta,
               log_nu=op$par$log_nu, log_delta=op$par$log_delta,
-              lambda_nu=1, lambda_delta=1,
+              lambda_nu=lambda, lambda_delta=lambda,
               beta_diag=seq(0.1,1,length.out = Kdiag-1), lambda_diag=1))
 }
 
 #' Genomic bias estimation part of parallel run
 #' @keywords internal
 #' 
-run_split_parallel_biases = function(counts, biases, begin, end, dmin, dmax, bf_per_kb, bf_per_decade, iter, outprefix=NULL, circularize=-1) {
+run_split_parallel_biases = function(counts, biases, begin, end, dmin, dmax, bf_per_kb, bf_per_decade, lambda,
+                                     iter, outprefix=NULL, circularize=-1) {
   #extract relevant portion of data
   extracted = get_cs_subset(counts, biases, begin1=begin, end1=end, fill.zeros=T, circularize=circularize)
   #initial values
   init.a=system.time(init.output <- capture.output(init.op <- run_split_parallel_initial_guess(
-    counts=counts, biases=biases, bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax,
-    bf_per_decade=bf_per_decade, verbose=verbose, iter=iter)))
+    counts=extracted$counts, biases=extracted$biases1, bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax,
+    bf_per_decade=bf_per_decade, lambda=lambda, verbose=T, iter=iter)))
   #run fit
   a=system.time(output <- capture.output(op <- csnorm_fit(stanmodels$fit, extracted$biases1, extracted$counts, dmin, dmax,
                                                           bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade,
-                                                          verbose = T, iter = iter, init=init)))
+                                                          verbose = T, iter = iter, init=init.op)))
   op$runtime=a[1]+a[4]+init.a[1]+init.a[4]
   op$output=output
   op$mem=as.integer(object.size(extracted))
   if (!is.null(outprefix)) {
-    save(op, file=paste0(outprefix, "_biases_op_",begin,".RData"))
+    save(op, file=paste0(outprefix, "_biases_op_",begin,"_",lambda,".RData"))
   }
   #report data
   center=(end-begin)/2
@@ -226,9 +228,9 @@ run_split_parallel_biases = function(counts, biases, begin, end, dmin, dmax, bf_
   ret[,square.begin:=begin]
   ret[,c("lambda_delta","lambda_nu","nsites","alpha"):=list(op$par$lambda_delta,op$par$lambda_nu,extracted$biases1[,.N],op$par$alpha)]
   if (!is.null(outprefix)) {
-    save(ret, file=paste0(outprefix, "_biases_ret_",begin,".RData"))
+    save(ret, file=paste0(outprefix, "_biases_ret_",begin,"_",lambda,".RData"))
   }
-  return(list(ret=ret, out=tail(op$output,1), runtime=op$runtime, mem=op$mem))
+  return(list(ret=ret, out=tail(op$output,1), runtime=op$runtime, mem=op$mem, value=op$value))
 }
 
 #' Homogenize biases estimated on multiple fits
@@ -408,6 +410,9 @@ diagnose_counts = function(cs, outprefix, coverage.extradiag=1, square.size=1500
 #' for the diagonal decay. Finally, the count exposure is recomputed for the 
 #' final estimates of nu, delta and decay.
 #' 
+#' @section Note: This call will spawn parallel processes using foreach and
+#'   doParallel. The number of parallel processes is set by ncores.
+#'   
 #' @param cs CSnorm object as returned by \code{\link{merge_cs_norm_datasets}}
 #' @param square.size positive integer. Size of the subset of data (in base 
 #'   pairs) to normalize independently. If too large, optimization fails to 
@@ -426,35 +431,34 @@ diagnose_counts = function(cs, outprefix, coverage.extradiag=1, square.size=1500
 #'   should suffice.
 #' @param distance_bins_per_decade positive integer. How many bins per decade 
 #'   should be used to discretize and re-fit the diagonal decay. Default 
-#'   parameter should suffice. Must be much larger than bf_per_decade: ideally
+#'   parameter should suffice. Must be much larger than bf_per_decade: ideally 
 #'   in that bin any basis function should be approximately constant.
+#' @param lambdas vector of positive values. Length scales to try out as initial
+#'   conditions.
 #' @param verbose boolean. Show output of different steps.
-#' @param iter positive integer. Number of optimization steps for each stan
+#' @param iter positive integer. Number of optimization steps for each stan 
 #'   model call.
 #' @param ncores positive integer. Number of cores to parallelize on.
-#' @param homogenize boolean. Should the biases be homogenized for stiffness?
+#' @param homogenize boolean. Should the biases be homogenized for stiffness? 
 #'   Default is FALSE
-#' @param outprefix character. If not NULL, prefix used to write intermediate
+#' @param outprefix character. If not NULL, prefix used to write intermediate 
 #'   output files. Diagnostics only.
 #' @param circularize integer. Set this to the size of the chromosome if it is 
 #'   circular, otherwise leave as-is (default is -1)
-#' @param ops.bias,ops.count if not NULL, skip the genomic (resp. decay) bias
+#' @param ops.bias,ops.count if not NULL, skip the genomic (resp. decay) bias 
 #'   estimation step, and use these intermediate data tables instead.
 #'   
-#' @return A list containing:
-#' \enumerate{
-#' \item par: the optimized parameters
-#' \item out.bias: the last line of the stan output for the bias estimation
-#' \item runtime.bias: the runtimes of these optimizations
-#' \item out.count: the last line of the stan output for the decay estimation
-#' \item runtime.count: the runtimes of these optimizations
-#' }
+#' @return A list containing: \enumerate{ \item par: the optimized parameters 
+#'   \item out.bias: the last line of the stan output for the bias estimation 
+#'   \item runtime.bias: the runtimes of these optimizations \item out.count:
+#'   the last line of the stan output for the decay estimation \item
+#'   runtime.count: the runtimes of these optimizations }
 #' @export
 #' 
 #' @examples
 run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, coverage.extradiag=1, bf_per_kb=1, bf_per_decade=5,
-                              distance_bins_per_decade=100, verbose = F, iter=100000, ncores=30, homogenize=F, outprefix=NULL,
-                              ops.bias=NULL, ops.count=NULL) {
+                              distance_bins_per_decade=100, lambdas=c(0.01,1,100), verbose = F, iter=100000, ncores=30, homogenize=F,
+                              outprefix=NULL, ops.bias=NULL, ops.count=NULL) {
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]/2))
   cs@settings = c(cs@settings, list(square.size=square.size, coverage=coverage, coverage.extradiag=coverage.extradiag,
@@ -493,9 +497,10 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
     list(par=rbindlist(a[,1]), out=as.character(a[,2]), runtime=as.numeric(a[,3]), mem=as.integer(a[,4]))
   }
   if (is.null(ops.bias)) {
-    ops.bias = foreach (begin=diagsquares[,begin1], end=diagsquares[,end1], .packages=c("data.table","rstan")) %dopar% 
+    ops.bias = foreach (begin=diagsquares[,begin1], end=diagsquares[,end1], .packages=c("data.table","rstan","csnorm")) %:%
+      foreach (lambda=lambdas, .combine=function(x,y){if (x$value<y$value) {return(y)} else {return(x)}}) %dopar% 
       run_split_parallel_biases(cs@counts, cs@biases, begin, end, dmin, dmax, bf_per_kb = bf_per_kb,
-                                bf_per_decade = bf_per_decade, iter = iter, outprefix=outprefix,
+                                bf_per_decade = bf_per_decade, lambda=lambda, iter = iter, outprefix=outprefix,
                                 circularize=cs@settings$circularize)
     ops.bias = output.binder(ops.bias)
     if (!is.null(outprefix)) {save(ops.bias, file=paste0(outprefix, "_ops_bias.RData"))}
