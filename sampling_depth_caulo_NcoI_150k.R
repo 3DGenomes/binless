@@ -74,7 +74,7 @@ outputs = foreach (i=nreads,.combine=rbind) %do% {
 outputs
 summary(lm(data=outputs, log(runtime)~log(dset)))
 ggplot(outputs)+geom_point(aes(dset,runtime))+scale_x_log10()+scale_y_log10()+ylab("run time (s)")+xlab("number of reads (x1000)")+
-  ggtitle("t ~ bf^0.02")
+  ggtitle("t ~ size^-0.3")
 ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_runtime.png"), width=10, height=7.5)
 ggplot(melt(outputs[,.(dset,lambda_nu,lambda_delta)], id.vars="dset"))+
   geom_line(aes(dset,value,colour=variable))+scale_x_log10()+scale_y_log10()+ylab("lambda")+xlab("number of reads (x1000)")
@@ -106,6 +106,26 @@ ggplot(mat[dset!=300])+
   facet_wrap(~dset)
 ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_normalized.png"), width=10, height=7.5)
 
+#nu and delta: init
+nu.init = foreach (i=nreads,.combine=rbind) %do% {
+  load(paste0("data/caulo_",prefix,"_sub",i,"k_csnorm_optimized.RData"))
+  csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=cs@par$init$beta_nu, beta_delta=cs@par$init$beta_delta,
+                                   bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 100)[
+                                     ,.(pos,log_nu,log_delta,dset=i)]
+}
+nuref=csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=cs@par$beta_nu, beta_delta=cs@par$beta_delta,
+                                       bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 100)[
+                                         ,.(pos,log_nu_ref=log_nu,log_delta_ref=log_delta)]
+nu.init=nuref[nu.init]
+nu.init[,dset:=ordered(dset,levels=nreads)]
+ggplot(nu.init[,.(dset,pos,nu=exp(log_nu),nuref=exp(log_nu_ref))])+
+  geom_line(aes(pos,nu),colour="black")+geom_line(aes(pos,nuref),colour="red")+facet_wrap(~dset)+ylim(0,2)
+ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_nu_init.png"), width=10, height=7.5)
+ggplot(nu.init[,.(dset,pos,delta=exp(log_delta),nuref=exp(log_delta_ref))])+
+  geom_line(aes(pos,delta),colour="black")+geom_line(aes(pos,nuref),colour="red")+facet_wrap(~dset)+ylim(0,2)
+ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_delta_init.png"), width=10, height=7.5)
+
+
 #nu and delta: plots and correlation
 nu = foreach (i=nreads,.combine=rbind) %do% {
   load(paste0("data/caulo_",prefix,"_sub",i,"k_csnorm_optimized.RData"))
@@ -121,7 +141,7 @@ nu=nuref[nu]
 nu[,dset:=ordered(dset,levels=nreads)]
 ggplot(nu[,.(dset,pos,nu=exp(log_nu),nuref=exp(log_nu_ref))])+
   geom_line(aes(pos,nu),colour="black")+geom_line(aes(pos,nuref),colour="red")+facet_wrap(~dset)+ylim(0,2)
-ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_nu_init.png"), width=10, height=7.5)
+ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_nu.png"), width=10, height=7.5)
 #
 ggplot(nu[,.(dset,pos,delta=exp(log_delta),deltaref=exp(log_delta_ref))])+
   geom_line(aes(pos,delta),colour="black")+geom_line(aes(pos,deltaref),colour="red")+facet_wrap(~dset)+ylim(0,2)
