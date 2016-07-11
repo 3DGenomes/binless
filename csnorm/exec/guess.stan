@@ -104,8 +104,8 @@ model {
   //// prior
   log_nu ~ cauchy(0, 1); //give high probability to [0.5:2]
   log_delta ~ cauchy(0,1);
-  beta_nu_diff ~ normal(0,lambda_nu);
-  beta_delta_diff ~ normal(0,lambda_delta);
-  beta_nu_diff ~ double_exponential(0,10*lambda_nu);
-  beta_delta_diff ~ double_exponential(0,10*lambda_delta);
+  beta_nu_diff ~ normal(0,1/lambda_nu);
+  beta_delta_diff ~ normal(0,1/lambda_delta);
+  beta_nu_diff ~ double_exponential(0,10/lambda_nu);
+  beta_delta_diff ~ double_exponential(0,10/lambda_delta);
 }

@@ -77,8 +77,8 @@ model {
   //P-spline prior on the 2nd order differences (Krow-2 params)
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
-  beta_nu_diff ~ normal(0, lambda_nu);
-  beta_delta_diff ~ normal(0, lambda_delta);
+  beta_nu_diff ~ normal(0, 1/lambda_nu);
+  beta_delta_diff ~ normal(0, 1/lambda_delta);
 
   //cauchy hyperprior
   lambda_nu ~ cauchy(0,0.1);

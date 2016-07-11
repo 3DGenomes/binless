@@ -89,7 +89,7 @@ model {
   //P-spline prior on the differences (K-2 params)
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
-  beta_diag_diff ~ normal(0, lambda_diag);
+  beta_diag_diff ~ normal(0, 1/lambda_diag);
 
   //cauchy hyperprior
   lambda_diag ~ cauchy(0,0.1);
