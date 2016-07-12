@@ -2,6 +2,7 @@ library(ggplot2)
 library(data.table)
 library(csnorm)
 library(foreach)
+library(doParallel)
 
 setwd("/home/yannick/simulations/cs_norm")
 
@@ -19,23 +20,24 @@ save(cs, file="data/caulo_NcoI_all10M_csnorm.RData")
 
 ### normalize different datasets
 
-load("data/caulo_NcoI_all_csnorm.RData")
-
-coverage=4
-square.size=150000
-bf_per_kb=0.25
-cs=run_split_parallel(cs, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
-                      bf_per_decade=5, distance_bins_per_decade=100, lambdas=c(0.01,1,100),
-                      verbose = F, iter=10000, ncores=30,
-                      homogenize=F, outprefix="tmp/test")#, ops.count=ops.count, ops.bias=ops.bias)
-cs=run_split_parallel_recovery(cs, "tmp/test", square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
-                               bf_per_decade=5, distance_bins_per_decade=100, lambdas=c(0.01,1,100), verbose = F,
-                               iter=10000, ncores=30, homogenize=F)
-cs@pred=csnorm_predict_all(cs, ncores=30)
-cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
-cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-save(cs, file="data/caulo_NcoI_all_csnorm_optimized.RData")
-#save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,".RData"))
+registerDoParallel(cores=30)
+foreach (sampling=samplings) %dopar% {
+  load(paste0("data/caulo_NcoI_all",sampling,"_csnorm.RData"))
+  coverage=4
+  square.size=150000
+  bf_per_kb=0.25
+  cs=run_split_parallel(cs, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
+                        bf_per_decade=5, distance_bins_per_decade=100, lambdas=c(0.01,1,100),
+                        verbose = F, iter=10000, ncores=10,
+                        homogenize=F, outprefix=paste0("tmp/test",sampling))#, ops.count=ops.count, ops.bias=ops.bias)
+  #cs=run_split_parallel_recovery(cs, "tmp/test", square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
+  #                               bf_per_decade=5, distance_bins_per_decade=100, lambdas=c(0.01,1,100), verbose = F,
+  #                               iter=10000, ncores=30, homogenize=F)
+  cs@pred=csnorm_predict_all(cs, ncores=30)
+  cs=postprocess(cs, resolution=10000, ncores=10, verbose=F)
+  cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
+  save(cs, file=paste0("data/caulo_NcoI_all",sampling,"_csnorm_optimized.RData"))
+}
 
 
 
@@ -66,7 +68,7 @@ ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(normalized)))+
   geom_raster(aes(begin2,begin1,fill=log(normalized)))+
   geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=mat[is.interaction==T])+
-  scale_fill_gradient(low="white", high="black")+theme(legend.position = "none")+
+  scale_fill_gradient(low="white", high="black", na.value="white")+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~dset)
 ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_normalized.png"), width=10, height=7.5)
 
@@ -80,8 +82,9 @@ nuref=data.table(pos=cs@biases[,pos],log_nu_ref=cs@par$log_nu,log_delta_ref=cs@p
 nu=nuref[nu]
 nu[,dset:=ordered(dset,levels=samplings)]
 ggplot(rbind(nu[,.(var="log_nu",correlation=cor(log_nu_ref,log_nu)),by=dset],
-             nu[,.(var="log_delta",correlation=cor(log_delta_ref,log_delta)),by=dset]),aes(dset,correlation,colour=var))+
-  geom_point()+ylim(0,1)
+             nu[,.(var="log_delta",correlation=cor(log_delta_ref,log_delta)),by=dset],
+             data.table(dset=c("all","all"),var=c("log_nu","log_delta"),correlation=c(1,1))),
+       aes(dset,correlation,colour=var))+geom_point()+ylim(0,1)
 ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_nu_delta_correlation.png"), width=10, height=7.5)
 
 #diagonal decay
