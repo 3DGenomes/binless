@@ -70,7 +70,7 @@ ggplot(mat)+
   geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=mat[is.interaction==T])+
   scale_fill_gradient(low="white", high="black", na.value="white")+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~dset)
-ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_normalized.png"), width=10, height=7.5)
+ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_normalized.png"), width=10, height=10)
 
 #nu and delta correlation
 nu = foreach (i=samplings,.combine=rbind) %do% {
