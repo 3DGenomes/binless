@@ -336,7 +336,8 @@ run_split_parallel_counts_eC = function(biases, counts, retlist, dmin, dmax, bf_
 #' @export
 #' 
 run_split_parallel_recovery = function(cs, outprefix, square.size=100000, coverage=4, coverage.extradiag=1, bf_per_kb=1, bf_per_decade=5,
-                                       distance_bins_per_decade=100, verbose = F, iter=100000, ncores=30, homogenize=F) {
+                                       distance_bins_per_decade=100, lambdas=c(0.01,1,100), verbose = F, iter=100000, ncores=30,
+                                       homogenize=F) {
   output.binder = function(x) {
     a=sapply(names(x[[1]]), function(i) sapply(x, "[[", i,simplify=F))
     list(par=rbindlist(a[,1]), out=as.character(a[,2]), runtime=as.numeric(a[,3]))
@@ -353,9 +354,10 @@ run_split_parallel_recovery = function(cs, outprefix, square.size=100000, covera
     ops.count=sapply(X=Sys.glob(paste0(outprefix,"_counts_ret_*.RData")), FUN=function(x){ a=load(x); return(list(ret=get(a[1]), out="blah", runtime=-1))}, USE.NAMES=T, simplify=F)
     ops.count = output.binder(ops.count)
   }
-  run_split_parallel(cs, NULL, square.size, coverage, coverage.extradiag, bf_per_kb, bf_per_decade,
-                     distance_bins_per_decade, verbose, iter, ncores, homogenize, outprefix,
-                     ops.bias, ops.count)
+  run_split_parallel(cs, design=NULL, square.size=square.size, coverage=coverage, coverage.extradiag=coverage.extradiag,
+                     bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, distance_bins_per_decade=distance_bins_per_decade,
+                     lambdas=lambdas, verbose=verbose, iter=iter, ncores=ncores, homogenize=homogenize, outprefix=outprefix,
+                     ops.bias=ops.bias, ops.count=ops.count)
 }
 
 #' Plot bias run statistics using intermediate files

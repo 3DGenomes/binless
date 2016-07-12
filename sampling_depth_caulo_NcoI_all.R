@@ -28,12 +28,13 @@ cs=run_split_parallel(cs, square.size=square.size, coverage=coverage, bf_per_kb=
                       bf_per_decade=5, distance_bins_per_decade=100, lambdas=c(0.01,1,100),
                       verbose = F, iter=10000, ncores=30,
                       homogenize=F, outprefix="tmp/test")#, ops.count=ops.count, ops.bias=ops.bias)
-#cs=run_split_parallel_recovery(cs, "tmp/test", square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
-#                      bf_per_decade=5, distance_bins_per_decade=100, verbose = F, iter=10000, ncores=30,
-#                      homogenize=F)
+cs=run_split_parallel_recovery(cs, "tmp/test", square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
+                               bf_per_decade=5, distance_bins_per_decade=100, lambdas=c(0.01,1,100), verbose = F,
+                               iter=10000, ncores=30, homogenize=F)
+cs@pred=csnorm_predict_all(cs, ncores=30)
 cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
 cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-save(cs, file="data/caulo_NcoI_all5M_csnorm_optimized.RData")
+save(cs, file="data/caulo_NcoI_all_csnorm_optimized.RData")
 #save(oppar, file = paste0("data/",prefix,"_op_maxcount_-1_parallel_inhomogeneous_cov",coverage,"X_sq",round(square.size/1000),"k_bfpkb",bf_per_kb,".RData"))
 
 
