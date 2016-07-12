@@ -25,6 +25,7 @@ data {
   int<lower=0> counts_far[N];
   int<lower=0> counts_up[N];
   int<lower=0> counts_down[N];
+  real<lower=0> weight;
 }
 transformed data {
   //bias spline, sparse (nu and delta have the same design)
@@ -138,10 +139,10 @@ model {
   danglingR ~ neg_binomial_2_log(log_mean_DR, alpha);
   
   //counts: Close, Far, Up, Down
-  counts_close ~ neg_binomial_2_log(log_mean_cclose, alpha); // Close
-  counts_far   ~ neg_binomial_2_log(log_mean_cfar, alpha); // Far
-  counts_up    ~ neg_binomial_2_log(log_mean_cup, alpha); // Up
-  counts_down  ~ neg_binomial_2_log(log_mean_cdown, alpha); // Down
+  increment_log_prob(weight*neg_binomial_2_log_log(counts_close, log_mean_cclose, alpha));
+  increment_log_prob(weight*neg_binomial_2_log_log(counts_far, log_mean_cfar, alpha));
+  increment_log_prob(weight*neg_binomial_2_log_log(counts_up, log_mean_cup, alpha));
+  increment_log_prob(weight*neg_binomial_2_log_log(counts_down, log_mean_cdown, alpha));
   
   //// Priors
   //P-spline prior on the differences (K-2 params)

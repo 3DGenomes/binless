@@ -77,7 +77,7 @@ get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, f
 #' Single-cpu fitting
 #' @keywords internal
 #' 
-csnorm_fit = function(model, biases, counts, dmin, dmax, bf_per_kb=1, bf_per_decade=5, iter=10000, verbose=T, init=0, ...) {
+csnorm_fit = function(model, biases, counts, dmin, dmax, bf_per_kb=1, bf_per_decade=5, iter=10000, verbose=T, init=0, weight=1, ...) {
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   data = list( Krow=Krow, S=biases[,.N],
@@ -85,7 +85,9 @@ csnorm_fit = function(model, biases, counts, dmin, dmax, bf_per_kb=1, bf_per_dec
                danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
                Kdiag=Kdiag, dmin=dmin, dmax=dmax,
                N=counts[,.N], cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
-               counts_close=counts[,contact.close], counts_far=counts[,contact.far], counts_up=counts[,contact.up], counts_down=counts[,contact.down])
+               counts_close=counts[,contact.close], counts_far=counts[,contact.far],
+               counts_up=counts[,contact.up], counts_down=counts[,contact.down],
+               weight=weight)
   if (verbose==T) {
     message("CS norm: fit")
     message("Krow        : ", Krow)
