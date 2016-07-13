@@ -37,6 +37,8 @@ transformed data {
   //diagonal SCAM spline, dense
   matrix[N,Kdiag] Xdiag;
   row_vector[Kdiag] pdiag;
+  //scaling factor for genomic lambdas
+  real lfac;
   
   row_weights <- rep_vector(3, S); //dangling L/R + rejoined
   for (i in 1:N) {
@@ -48,6 +50,9 @@ transformed data {
 
   //diagonal SCAM spline, dense, exact and mean field model
   #include "scam_spline_construction.stan"
+
+  //scaling factor for genomic lambdas
+  lfac <- 30000*Krow/(max(cutsites)-min(cutsites));
 }
 parameters {
   //exposures
@@ -148,12 +153,12 @@ model {
   //P-spline prior on the differences (K-2 params)
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
-  beta_nu_diff ~ normal(0, 1/lambda_nu);
-  beta_delta_diff ~ normal(0, 1/lambda_delta);
+  beta_nu_diff ~ normal(0, 1/(lfac*lambda_nu));
+  beta_delta_diff ~ normal(0, 1/(lfac*lambda_delta));
   beta_diag_diff ~ normal(0, 1/lambda_diag);
   //weak lasso on bias splines (non-bayesian)
-  beta_nu_diff ~ double_exponential(0,10/lambda_nu);
-  beta_delta_diff ~ double_exponential(0,10/lambda_delta);
+  beta_nu_diff ~ double_exponential(0,10/(lfac*lambda_nu));
+  beta_delta_diff ~ double_exponential(0,10/(lfac*lambda_delta));
 
   //cauchy hyperprior
   lambda_nu ~ cauchy(0,0.1);

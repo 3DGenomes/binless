@@ -27,10 +27,20 @@ transformed data {
   int Xrow_u[S+1];
   vector[S] row_weights;
   row_vector[Krow] prow;
+  //rescale lambdas
+  real lnu;
+  real ldelta;
 
   row_weights <- rep_vector(1, S);
   #compute design matrix and projector
   #include "sparse_spline_construction.stan"
+  
+  {
+    real tmp;
+    tmp <- 30000*Krow/(max(cutsites)-min(cutsites));
+    lnu <- lambda_nu*tmp;
+    ldelta <- lambda_delta*tmp;
+  }
 }
 parameters {
   //exposures
@@ -104,8 +114,8 @@ model {
   //// prior
   log_nu ~ cauchy(0, 1); //give high probability to [0.5:2]
   log_delta ~ cauchy(0,1);
-  beta_nu_diff ~ normal(0,1/lambda_nu);
-  beta_delta_diff ~ normal(0,1/lambda_delta);
-  beta_nu_diff ~ double_exponential(0,10/lambda_nu);
-  beta_delta_diff ~ double_exponential(0,10/lambda_delta);
+  beta_nu_diff ~ normal(0,1/lnu);
+  beta_delta_diff ~ normal(0,1/ldelta);
+  beta_nu_diff ~ double_exponential(0,10/lnu);
+  beta_delta_diff ~ double_exponential(0,10/ldelta);
 }
