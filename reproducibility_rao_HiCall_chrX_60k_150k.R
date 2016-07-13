@@ -33,7 +33,7 @@ lambdas=c(0.01,0.1,1,10,100)
 ### normalize different datasets on a single CPU
 registerDoParallel(cores=30)
 foreach (bpk=bf_per_kb) %:% foreach (lambda=lambdas) %dopar% {
-  load(paste0("data/rao_HiCall_chrX_150k_csnorm.RData"))
+  load(paste0("data/rao_HiCall_chrX_60k_csnorm.RData"))
   cs@counts=fill_zeros(counts = cs@counts, biases = cs@biases)
   cs@counts[,distance:=abs(pos2-pos1)]
   bf_per_decade=5
@@ -56,7 +56,7 @@ foreach (bpk=bf_per_kb) %:% foreach (lambda=lambdas) %dopar% {
   #cs@pred=copy(csnorm_predict_all(cs,ncores=10,verbose=F))
   #cs=postprocess(cs, resolution=2000, ncores=10, verbose=F)
   #cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-  save(cs, file=paste0("data/rao_HiCall_chrX_150k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized.RData"))
+  save(cs, file=paste0("data/rao_HiCall_chrX_60k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized.RData"))
 }
 
 
@@ -65,23 +65,23 @@ foreach (bpk=bf_per_kb) %:% foreach (lambda=lambdas) %dopar% {
 ### normalize different datasets on a single CPU
 registerDoParallel(cores=30)
 foreach (bpk=bf_per_kb) %:% foreach (lambda=lambdas) %dopar% {
-  load(paste0("data/rao_HiCall_chrX_150k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized.RData"))
-  #cs@pred=csnorm_predict_all(cs,ncores=10,verbose=F)
+  load(paste0("data/rao_HiCall_chrX_60k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized.RData"))
+  cs@pred=csnorm_predict_all(cs,ncores=10,verbose=F)
   cs@binned=list()
   cs=postprocess(cs, resolution=5000, ncores=10, verbose=F)
   cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-  save(cs, file=paste0("data/rao_HiCall_chrX_150k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized.RData"))
+  save(cs, file=paste0("data/rao_HiCall_chrX_60k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized.RData"))
 }
 
 
 
 
 ### generate plots
-prefix="rao_HiCall_chrX_150k"
+prefix="rao_HiCall_chrX_60k"
 
 #outputs and runtime
 outputs = foreach (i=bf_per_kb,.combine=rbind) %:% foreach (j=lambdas,.combine=rbind) %do% {
-  load(paste0("data/rao_HiCall_chrX_150k_bfpkb",i,"_lambda",j,"_csnorm_optimized.RData"))
+  load(paste0("data/rao_HiCall_chrX_60k_bfpkb",i,"_lambda",j,"_csnorm_optimized.RData"))
   data.table(dset=paste("bf",i,"lam",j),bfpkb=i,lambda=j,
              out=tail(cs@par$output,1), runtime=cs@par$runtime+cs@par$init$runtime, iruntime=cs@par$init$runtime,
              lambda_nu=cs@par$lambda_nu, lambda_delta=cs@par$lambda_delta, logp=cs@par$logp)
@@ -97,7 +97,7 @@ ggsave(filename=paste0("images/",prefix,"_reproducibility_runtime.png"), width=1
 registerDoParallel(cores=30)
 get_fpt=function(x,y){a=acf(y,plot=F,lag.max=10000); l=a$lag[a$acf<=0][1]; x[l+1]-x[1]}
 nu.init = foreach (i=bf_per_kb,.combine=rbind) %:% foreach (j=lambdas,.combine=rbind) %dopar% {
-  load(paste0("data/rao_HiCall_chrX_150k_bfpkb",i,"_lambda",j,"_csnorm_optimized.RData"))
+  load(paste0("data/rao_HiCall_chrX_60k_bfpkb",i,"_lambda",j,"_csnorm_optimized.RData"))
   csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=cs@par$init$beta_nu, beta_delta=cs@par$init$beta_delta,
                                    bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 100)[
                                      ,.(pos,log_nu,log_delta,dset=paste("bf",i,"lam",j),
@@ -111,7 +111,7 @@ ggsave(filename=paste0("images/",prefix,"_reproducibility_nu_init.png"), width=1
 #nu and delta: plots and correlation
 registerDoParallel(cores=30)
 nu = foreach (i=bf_per_kb,.combine=rbind) %:% foreach (j=lambdas,.combine=rbind) %dopar% {
-  load(paste0("data/rao_HiCall_chrX_150k_bfpkb",i,"_lambda",j,"_csnorm_optimized.RData"))
+  load(paste0("data/rao_HiCall_chrX_60k_bfpkb",i,"_lambda",j,"_csnorm_optimized.RData"))
   csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=cs@par$beta_nu, beta_delta=cs@par$beta_delta,
                                    bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 100)[
                                      ,.(pos,log_nu,log_delta,dset=paste("bf",i,"lam",j),
@@ -139,7 +139,7 @@ ggsave(filename=paste0("images/",prefix,"_reproducibility_nu_delta_fpt.png"), wi
 #lFC
 lFC = foreach (i=bf_per_kb,.combine=rbind) %:%
   foreach (j=lambdas,.combine=function(x,y){if (x$logp[1]<y$logp[1]){return(y)}else{return(x)}}) %do% {
-    load(paste0("data/rao_HiCall_chrX_150k_bfpkb",i,"_lambda",j,"_csnorm_optimized.RData"))
+    load(paste0("data/rao_HiCall_chrX_60k_bfpkb",i,"_lambda",j,"_csnorm_optimized.RData"))
     get_cs_binned(cs,1,"CS")[,.(dset=i,lFC,logp=cs@par$logp)]
 }
 lFC[,dset:=ordered(dset,levels=bf_per_kb)]
@@ -149,7 +149,7 @@ ggsave(filename=paste0("images/",prefix,"_reproducibility_lFC.png"), width=10, h
 #normalized matrices
 mat = foreach (i=bf_per_kb,.combine=rbind) %:%
   foreach (j=lambdas,.combine=function(x,y){if (x$logp[1]<y$logp[1]){return(y)}else{return(x)}}) %do% {
-    load(paste0("data/rao_HiCall_chrX_150k_bfpkb",i,"_lambda",j,"_csnorm_optimized.RData"))
+    load(paste0("data/rao_HiCall_chrX_60k_bfpkb",i,"_lambda",j,"_csnorm_optimized.RData"))
     get_cs_binned(cs,1,"CS")[,.(dset=i,begin1,begin2,normalized,is.interaction,prob.observed.gt.expected,
                                 bfpkb=i,lambda=j,logp=cs@par$logp)]
   }
@@ -165,7 +165,7 @@ ggsave(filename=paste0("images/",prefix,"_reproducibility_normalized.png"), widt
 #diagonal decay
 decay = foreach (i=bf_per_kb,.combine=rbind) %:%
   foreach (j=lambdas,.combine=function(x,y){if (x$logp[1]<y$logp[1]){return(y)}else{return(x)}}) %do% {
-    load(paste0("data/rao_HiCall_chrX_150k_bfpkb",i,"_lambda",j,"_csnorm_optimized.RData"))
+    load(paste0("data/rao_HiCall_chrX_60k_bfpkb",i,"_lambda",j,"_csnorm_optimized.RData"))
     data.table(dist=cs@counts[,distance],decay=exp(cs@par$log_decay), dset=i,key="dist", logp=cs@par$logp)
 }
 decay[,dset:=ordered(dset,levels=bf_per_kb)]
