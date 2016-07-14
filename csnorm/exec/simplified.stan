@@ -1,5 +1,5 @@
 ////
-// Cut-site normalization model: initial guess
+// Cut-site normalization model: fit available data, partial mean-field approximation
 ////
 functions {
   #include "common_functions.stan"
@@ -10,12 +10,16 @@ data {
   int<lower=4> Krow; //number of functions in spline base for row biases
   int<lower=1> S; //number of cut sites
   vector[S] cutsites; //cut site locations
-  int<lower=0> rejoined[S];
-  int<lower=0> danglingL[S];
-  int<lower=0> danglingR[S];
-  //count sums
-  int<lower=0> counts_sum_left[S];
-  int<lower=0> counts_sum_right[S];
+  int rejoined[S];
+  int danglingL[S];
+  int danglingR[S];
+  //counts : explicit
+  int<lower=0> N; //number of counts
+  int<lower=1,upper=S> cidx[2,N]; //indices of rsite pairs
+  int<lower=0> counts_close[N]; //value of the count
+  int<lower=0> counts_far[N];
+  int<lower=0> counts_up[N];
+  int<lower=0> counts_down[N];
   real<lower=0> weight;
 }
 transformed data {
@@ -27,11 +31,16 @@ transformed data {
   row_vector[Krow] prow;
   //scaling factor for genomic lambdas
   real lfac;
-
-  row_weights <- rep_vector(1, S);
+  
+  row_weights <- rep_vector(3, S); //dangling L/R + rejoined
+  for (i in 1:N) {
+    row_weights[cidx[1,i]] <- row_weights[cidx[1,i]] + 1;
+    row_weights[cidx[2,i]] <- row_weights[cidx[2,i]] + 1;
+  }
   #compute design matrix and projector
   #include "sparse_spline_construction.stan"
-  
+
+  //scaling factor for genomic lambdas
   lfac <- 30000*Krow/(max(cutsites)-min(cutsites));
 }
 parameters {
@@ -44,7 +53,7 @@ parameters {
   vector[Krow-1] beta_delta;
   //dispersion
   real<lower=0> alpha;
-  //stiffnesses
+  //length scales
   real<lower=0> lambda_nu;
   real<lower=0> lambda_delta;
 }
@@ -60,9 +69,11 @@ transformed parameters {
   vector[S] log_mean_DR;
   vector[S] log_mean_RJ;
   //
-  vector[S] log_mean_cleft;
-  vector[S] log_mean_cright;
-
+  vector[N] log_mean_cclose;
+  vector[N] log_mean_cfar;
+  vector[N] log_mean_cup;
+  vector[N] log_mean_cdown;
+  
   //nu
   {
     vector[Krow] beta_nu_aug;
@@ -83,7 +94,6 @@ transformed parameters {
     log_delta <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
     beta_delta_diff <- beta_delta_centered[:(Krow-2)]-2*beta_delta_centered[2:(Krow-1)]+beta_delta_centered[3:];
   }
-
   //means
   {
     //biases
@@ -91,8 +101,10 @@ transformed parameters {
     log_mean_DL <- log_nu + eDE + log_delta;
     log_mean_DR <- log_nu + eDE - log_delta;
     //exact counts  
-    log_mean_cleft  <- log(2*S) + eC + log_nu + log_delta;
-    log_mean_cright <- log(2*S) + eC + log_nu - log_delta;
+    log_mean_cclose <- eC + (log_nu - log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
+    log_mean_cfar   <- eC + (log_nu + log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
+    log_mean_cup    <- eC + (log_nu + log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
+    log_mean_cdown  <- eC + (log_nu - log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
   }
 }
 model {
@@ -102,15 +114,63 @@ model {
   danglingL ~ neg_binomial_2_log(log_mean_DL, alpha);
   danglingR ~ neg_binomial_2_log(log_mean_DR, alpha);
   
-  //counts
-  increment_log_prob(weight*neg_binomial_2_log_log(counts_sum_left, log_mean_cleft, alpha));
-  increment_log_prob(weight*neg_binomial_2_log_log(counts_sum_right, log_mean_cright, alpha));
+  //counts: Close, Far, Up, Down
+  increment_log_prob(weight*neg_binomial_2_log_log(counts_close, log_mean_cclose, alpha));
+  increment_log_prob(weight*neg_binomial_2_log_log(counts_far, log_mean_cfar, alpha));
+  increment_log_prob(weight*neg_binomial_2_log_log(counts_up, log_mean_cup, alpha));
+  increment_log_prob(weight*neg_binomial_2_log_log(counts_down, log_mean_cdown, alpha));
   
-  //// prior
-  log_nu ~ cauchy(0, 1); //give high probability to [0.5:2]
-  log_delta ~ cauchy(0,1);
-  beta_nu_diff ~ normal(0,1/(lfac*lambda_nu));
-  beta_delta_diff ~ normal(0,1/(lfac*lambda_delta));
+  //// Priors
+  //P-spline prior on the differences (K-2 params)
+  //warning on jacobian can be ignored
+  //see GAM, Wood (2006), section 4.8.2 (p.187)
+  beta_nu_diff ~ normal(0, 1/(lfac*lambda_nu));
+  beta_delta_diff ~ normal(0, 1/(lfac*lambda_delta));
+  //weak lasso on bias splines (non-bayesian)
   beta_nu_diff ~ double_exponential(0,10/(lfac*lambda_nu));
   beta_delta_diff ~ double_exponential(0,10/(lfac*lambda_delta));
+
+  //cauchy hyperprior
+  lambda_nu ~ cauchy(0,0.1);
+  lambda_delta ~ cauchy(0,0.1);
+}
+generated quantities {
+  real deviance;
+  real deviance_null;
+  real deviance_proportion_explained;
+  #
+  real rejoined_deviance;
+  real rejoined_deviance_null;
+  real rejoined_deviance_proportion_explained;
+  #
+  real dangling_deviance;
+  real dangling_deviance_null;
+  real dangling_deviance_proportion_explained;
+  #
+  real count_deviance;
+  real count_deviance_null;
+  real count_deviance_proportion_explained;
+  #deviances
+  count_deviance <- neg_binomial_2_log_deviance(counts_close, log_mean_cclose, alpha, rep_vector(1,1)) +
+              neg_binomial_2_log_deviance(counts_far, log_mean_cfar, alpha, rep_vector(1,1)) +
+              neg_binomial_2_log_deviance(counts_up, log_mean_cup, alpha, rep_vector(1,1)) +
+              neg_binomial_2_log_deviance(counts_down, log_mean_cdown, alpha, rep_vector(1,1));
+  rejoined_deviance <- neg_binomial_2_log_deviance(rejoined, log_mean_RJ, alpha, rep_vector(1,1));
+  dangling_deviance <- neg_binomial_2_log_deviance(danglingL, log_mean_DL, alpha, rep_vector(1,1)) +
+                       neg_binomial_2_log_deviance(danglingR, log_mean_DR, alpha, rep_vector(1,1));
+  deviance <- rejoined_deviance + dangling_deviance + count_deviance;
+  #null deviances
+  rejoined_deviance_null <- neg_binomial_2_log_deviance(rejoined, rep_vector(eRJ,1), alpha, rep_vector(1,1));
+  dangling_deviance_null <- neg_binomial_2_log_deviance(danglingL, rep_vector(eDE,1), alpha, rep_vector(1,1)) +
+                            neg_binomial_2_log_deviance(danglingR, rep_vector(eDE,1), alpha, rep_vector(1,1));
+  count_deviance_null <- neg_binomial_2_log_deviance(counts_close, rep_vector(eC,1), alpha, rep_vector(1,1)) +
+                   neg_binomial_2_log_deviance(counts_far, rep_vector(eC,1), alpha, rep_vector(1,1)) +
+                   neg_binomial_2_log_deviance(counts_up, rep_vector(eC,1), alpha, rep_vector(1,1)) +
+                   neg_binomial_2_log_deviance(counts_down, rep_vector(eC,1), alpha, rep_vector(1,1));
+  deviance_null <- rejoined_deviance_null + dangling_deviance_null + count_deviance_null;
+  #proportions explained
+  rejoined_deviance_proportion_explained <- 100*(rejoined_deviance_null - rejoined_deviance)/rejoined_deviance_null;
+  dangling_deviance_proportion_explained <- 100*(dangling_deviance_null - dangling_deviance)/dangling_deviance_null;
+  count_deviance_proportion_explained <- 100*(count_deviance_null - count_deviance)/count_deviance_null;
+  deviance_proportion_explained <- 100*(deviance_null - deviance)/deviance_null;
 }

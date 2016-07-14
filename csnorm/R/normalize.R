@@ -74,22 +74,18 @@ get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, f
               beginrange1=beginrange1, endrange1=endrange1, beginrange2=beginrange2, endrange2=endrange2))
 }
 
-#' Single-cpu simplified fitting
+#' simplified fit
 #' @keywords internal
 #' 
-csnorm_simplified = function(model, biases, counts, dmin, dmax, bf_per_kb=1, bf_per_decade=5, iter=10000, verbose=T, init=0, weight=1, ...) {
-  #compute column sums
-  cs1=counts[,.(R=sum(contact.close+contact.down),L=sum(contact.far+contact.up)),by=pos1][,.(pos=pos1,L,R)]
-  cs2=counts[,.(R=sum(contact.far+contact.down),L=sum(contact.close+contact.up)),by=pos2][,.(pos=pos2,L,R)]
-  pos=data.table(pos=biases[,pos], key="pos")
-  sums=rbind(cs1,cs2)[,.(L=sum(L),R=sum(R)),keyby=pos][pos]
-  #run optimization
+csnorm_simplified = function(model, biases, counts, bf_per_kb=1, iter=10000, verbose=T, init=0, weight=1, ...) {
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
-  data=list(Krow=Krow, S=biases[,.N],
-            cutsites=biases[,pos], rejoined=biases[,rejoined],
-            danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            counts_sum_left=sums[,L], counts_sum_right=sums[,R],
-            weight=weight)
+  data = list( Krow=Krow, S=biases[,.N],
+               cutsites=biases[,pos], rejoined=biases[,rejoined],
+               danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+               N=counts[,.N], cidx=t(data.matrix(counts[,.(id1,id2)])),
+               counts_close=counts[,contact.close], counts_far=counts[,contact.far],
+               counts_up=counts[,contact.up], counts_down=counts[,contact.down],
+               weight=weight)
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 
