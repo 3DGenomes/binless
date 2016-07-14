@@ -74,18 +74,30 @@ get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, f
               beginrange1=beginrange1, endrange1=endrange1, beginrange2=beginrange2, endrange2=endrange2))
 }
 
-#' simplified fit
+#' Single-cpu simplified fitting
 #' @keywords internal
 #' 
-csnorm_simplified = function(model, biases, counts, log_decay, bf_per_kb=1, iter=10000, verbose=T, init=0, weight=1, ...) {
+csnorm_simplified = function(model, biases, counts, log_decay, log_nu, log_delta, bf_per_kb=1, iter=10000, verbose=T, init=0, weight=1, ...) {
+  #compute column sums
+  csub=copy(counts)
+  csub[,decay:=exp(log_decay)]
+  bsub=biases[,.(id)]
+  bsub[,c("nu","delta"):=list(exp(log_nu),exp(log_delta))]
+  csub=merge(bsub[,.(id1=id,nu,delta)],csub,by="id1",all.x=F,all.y=T)
+  csub=merge(bsub[,.(id2=id,nu,delta)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
+  cs1=csub[,.(R=sum(contact.close+contact.down),L=sum(contact.far+contact.up),ds=sum(decay*nu2*(delta2+1/delta2))),by=pos1][
+    ,.(pos=pos1,L,R,ds)]
+  cs2=csub[,.(R=sum(contact.far+contact.down),L=sum(contact.close+contact.up),ds=sum(decay*nu1*(delta1+1/delta1))),by=pos2][
+    ,.(pos=pos2,L,R,ds)]
+  pos=data.table(pos=biases[,pos], key="pos")
+  sums=rbind(cs1,cs2)[,.(L=sum(L),R=sum(R),ds=sum(ds)),keyby=pos][pos]
+  #run optimization
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
-  data = list( Krow=Krow, S=biases[,.N],
-               cutsites=biases[,pos], rejoined=biases[,rejoined],
-               danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-               N=counts[,.N], cidx=t(data.matrix(counts[,.(id1,id2)])),
-               counts_close=counts[,contact.close], counts_far=counts[,contact.far],
-               counts_up=counts[,contact.up], counts_down=counts[,contact.down],
-               weight=weight, log_decay=log_decay)
+  data=list(Krow=Krow, S=biases[,.N],
+            cutsites=biases[,pos], rejoined=biases[,rejoined],
+            danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+            counts_sum_left=sums[,L], counts_sum_right=sums[,R],
+            weight=weight, log_decay_sum=sums[,log(ds)])
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 
