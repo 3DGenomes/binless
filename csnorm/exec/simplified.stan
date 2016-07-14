@@ -21,6 +21,8 @@ data {
   int<lower=0> counts_up[N];
   int<lower=0> counts_down[N];
   real<lower=0> weight;
+  //fitted parameters
+  vector[N] log_decay;
 }
 transformed data {
   //bias spline, sparse (nu and delta have the same design)
@@ -101,10 +103,10 @@ transformed parameters {
     log_mean_DL <- log_nu + eDE + log_delta;
     log_mean_DR <- log_nu + eDE - log_delta;
     //exact counts  
-    log_mean_cclose <- eC + (log_nu - log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
-    log_mean_cfar   <- eC + (log_nu + log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
-    log_mean_cup    <- eC + (log_nu + log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
-    log_mean_cdown  <- eC + (log_nu - log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
+    log_mean_cclose <- eC + log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
+    log_mean_cfar   <- eC + log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
+    log_mean_cup    <- eC + log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
+    log_mean_cdown  <- eC + log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
   }
 }
 model {

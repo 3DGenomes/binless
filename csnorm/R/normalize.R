@@ -77,7 +77,7 @@ get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, f
 #' simplified fit
 #' @keywords internal
 #' 
-csnorm_simplified = function(model, biases, counts, bf_per_kb=1, iter=10000, verbose=T, init=0, weight=1, ...) {
+csnorm_simplified = function(model, biases, counts, log_decay, bf_per_kb=1, iter=10000, verbose=T, init=0, weight=1, ...) {
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   data = list( Krow=Krow, S=biases[,.N],
                cutsites=biases[,pos], rejoined=biases[,rejoined],
@@ -85,7 +85,7 @@ csnorm_simplified = function(model, biases, counts, bf_per_kb=1, iter=10000, ver
                N=counts[,.N], cidx=t(data.matrix(counts[,.(id1,id2)])),
                counts_close=counts[,contact.close], counts_far=counts[,contact.far],
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
-               weight=weight)
+               weight=weight, log_decay=log_decay)
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 
