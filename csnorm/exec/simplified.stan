@@ -14,9 +14,8 @@ data {
   int<lower=0> danglingL[S];
   int<lower=0> danglingR[S];
   //count sums
-  int<lower=1> B; //number of count batches
-  int<lower=0> counts_sum_left[B,S];
-  int<lower=0> counts_sum_right[B,S];
+  vector<lower=0>[S] counts_mean_left;
+  vector<lower=0>[S] counts_mean_right;
   real<lower=0> weight;
   //decay sums
   vector[S] log_decay_mean;
@@ -63,8 +62,8 @@ transformed parameters {
   vector[S] log_mean_DR;
   vector[S] log_mean_RJ;
   //
-  vector[S] log_mean_cleft;
-  vector[S] log_mean_cright;
+  vector[S] beta_cleft;
+  vector[S] beta_cright;
 
   //nu
   {
@@ -94,8 +93,8 @@ transformed parameters {
     log_mean_DL <- log_nu + eDE + log_delta;
     log_mean_DR <- log_nu + eDE - log_delta;
     //exact counts  
-    log_mean_cleft  <- log_decay_mean + eC + log_nu + log_delta;
-    log_mean_cright <- log_decay_mean + eC + log_nu - log_delta;
+    beta_cleft  <- alpha ./ exp(log_decay_mean + eC + log_nu + log_delta);
+    beta_cright <- alpha ./ exp(log_decay_mean + eC + log_nu - log_delta);
   }
 }
 model {
@@ -106,8 +105,8 @@ model {
   danglingR ~ neg_binomial_2_log(log_mean_DR, alpha);
   
   //counts
-  increment_log_prob(weight/B*neg_binomial_2_log_log(to_array_1d(counts_sum_left), to_vector(rep_matrix(log_mean_cleft,B)), alpha));
-  increment_log_prob(weight/B*neg_binomial_2_log_log(to_array_1d(counts_sum_right), to_vector(rep_matrix(log_mean_cright,B)), alpha));
+  increment_log_prob(weight*gamma_log(counts_mean_left, alpha, beta_cleft));
+  increment_log_prob(weight*gamma_log(counts_mean_right, alpha, beta_cright));
   
   //// prior
   log_nu ~ cauchy(0, 1); //give high probability to [0.5:2]

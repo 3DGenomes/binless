@@ -92,18 +92,12 @@ csnorm_simplified = function(model, biases, counts, log_decay, log_nu, log_delta
   pos=data.table(pos=biases[,pos], key="pos")
   sums=rbind(cs1,cs2)[,.(L=sum(L),R=sum(R),ds=sum(ds)),keyby=pos][pos]
   sums[,ds:=ds/(.N-1)]
-  #collect all counts
-  cs=rbind(csub[,.(pos=pos1,R=(contact.close+contact.down),L=(contact.far+contact.up))],
-           csub[,.(pos=pos2,R=(contact.far+contact.down),L=(contact.close+contact.up))])
-  setkey(cs,pos)
-  csl=matrix(cs[,L],nrow = biases[,.N]-1, biases[,.N])
-  csr=matrix(cs[,R],nrow = biases[,.N]-1, biases[,.N])
   #run optimization
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
-  data=list(Krow=Krow, S=biases[,.N], B=biases[,.N]-1,
+  data=list(Krow=Krow, S=biases[,.N],
             cutsites=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            counts_sum_left=csl, counts_sum_right=csr,
+            counts_mean_left=sums[,L/(2*(.N-1))], counts_mean_right=sums[,R/(2*(.N-1))],
             weight=weight, log_decay_mean=sums[,log(ds)])
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
