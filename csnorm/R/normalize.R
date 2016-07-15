@@ -77,28 +77,37 @@ get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, f
 #' Single-cpu simplified fitting
 #' @keywords internal
 #' 
-csnorm_simplified = function(model, biases, counts, log_decay, log_nu, log_delta, bf_per_kb=1, iter=10000, verbose=T, init=0, weight=1, ...) {
-  #compute column sums
+csnorm_simplified = function(model, biases, counts, log_decay, log_nu, log_delta, bf_per_kb=1, groups=10,
+                             iter=10000, verbose=T, init=0, ...) {
+  stopifnot(groups<=biases[,.N-1])
+  stopifnot(counts[,.N]==biases[,.N*(.N-1)/2]) #needs to be zero-filled
+  #add bias informations to counts
   csub=copy(counts)
   csub[,decay:=exp(log_decay)]
   bsub=biases[,.(id)]
   bsub[,c("nu","delta"):=list(exp(log_nu),exp(log_delta))]
   csub=merge(bsub[,.(id1=id,nu,delta)],csub,by="id1",all.x=F,all.y=T)
   csub=merge(bsub[,.(id2=id,nu,delta)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-  cs1=csub[,.(R=sum(contact.close+contact.down),L=sum(contact.far+contact.up),ds=sum(decay*nu2*(delta2+1/delta2))),by=pos1][
-    ,.(pos=pos1,L,R,ds)]
-  cs2=csub[,.(R=sum(contact.far+contact.down),L=sum(contact.close+contact.up),ds=sum(decay*nu1*(delta1+1/delta1))),by=pos2][
-    ,.(pos=pos2,L,R,ds)]
-  pos=data.table(pos=biases[,pos], key="pos")
-  sums=rbind(cs1,cs2)[,.(L=sum(L),R=sum(R),ds=sum(ds)),keyby=pos][pos]
-  sums[,ds:=ds/(.N-1)]
+  #collect all counts on left/right side and put into quantile groups
+  cs=rbind(csub[,.(pos=pos1,R=(contact.close+contact.down),L=(contact.far+contact.up),others=decay*nu2*(delta2+1/delta2))],
+           csub[,.(pos=pos2,R=(contact.far+contact.down),L=(contact.close+contact.up),others=decay*nu1*(delta1+1/delta1))])
+  setkey(cs,pos)
+  cs[,cbin:=ntile(L+R,groups),by=pos]
+  csl=dcast(cs[,.(pos,cbin,L)], pos~cbin, value.var="L", fun.aggregate=sum)
+  csl[,pos:=NULL]
+  stopifnot(dim(csl)==c(biases[,.N],groups))
+  csr=dcast(cs[,.(pos,cbin,R)], pos~cbin, value.var="R", fun.aggregate=sum)
+  csr[,pos:=NULL]
+  stopifnot(dim(csr)==c(biases[,.N],groups))
+  cso=dcast(cs[,.(pos,cbin,others)], pos~cbin, value.var="others", fun.aggregate=sum)
+  cso[,pos:=NULL]
+  stopifnot(dim(cso)==c(biases[,.N],groups))
   #run optimization
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   data=list(Krow=Krow, S=biases[,.N],
             cutsites=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            counts_mean_left=sums[,L/(2*(.N-1))], counts_mean_right=sums[,R/(2*(.N-1))],
-            weight=weight, log_decay_mean=sums[,log(ds)])
+            G=groups, counts_sum_left=csl, counts_sum_right=csr, log_decay_sum=log(cso))
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 

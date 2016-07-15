@@ -17,7 +17,8 @@ Imports:
     doParallel,
     MASS,
     matrixStats,
-    ggplot2
+    ggplot2,
+    dplyr
 LinkingTo: StanHeaders (>= 2.9.0), rstan (>= 2.9.0-3), BH (>= 1.58.0), Rcpp (>=
     0.11.0), RcppEigen
 RcppModules: stan_fit4dispersions_mod, stan_fit4fit_mod, stan_fit4fit_decay_mod,

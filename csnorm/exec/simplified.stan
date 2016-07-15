@@ -14,11 +14,11 @@ data {
   int<lower=0> danglingL[S];
   int<lower=0> danglingR[S];
   //count sums
-  vector<lower=0>[S] counts_mean_left;
-  vector<lower=0>[S] counts_mean_right;
-  real<lower=0> weight;
+  int<lower=1> G; //number of count batches
+  int<lower=0> counts_sum_left[S,G];
+  int<lower=0> counts_sum_right[S,G];
   //decay sums
-  vector[S] log_decay_mean;
+  matrix[S,G] log_decay_sum;
 }
 transformed data {
   //bias spline, sparse (nu and delta have the same design)
@@ -29,12 +29,28 @@ transformed data {
   row_vector[Krow] prow;
   //scaling factor for genomic lambdas
   real lfac;
+  //vectorized counts
+  int csl[S*G];
+  int csr[S*G];
 
   row_weights <- rep_vector(1, S);
   #compute design matrix and projector
   #include "sparse_spline_construction.stan"
   
+  //scaling factor
   lfac <- 30000*Krow/(max(cutsites)-min(cutsites));
+  
+  //vectorized counts
+  //need to transpose to be consistent with to_vector(matrix)
+  {
+    int begin;
+    begin<-1;
+    for (i in 1:G) {
+      csl[begin:(begin+S-1)] <- counts_sum_left[,i];
+      csr[begin:(begin+S-1)] <- counts_sum_right[,i];
+      begin<-begin+S;
+    }
+  }
 }
 parameters {
   //exposures
@@ -62,8 +78,8 @@ transformed parameters {
   vector[S] log_mean_DR;
   vector[S] log_mean_RJ;
   //
-  vector[S] beta_cleft;
-  vector[S] beta_cright;
+  vector[S*G] log_mean_cleft;
+  vector[S*G] log_mean_cright;
 
   //nu
   {
@@ -93,8 +109,8 @@ transformed parameters {
     log_mean_DL <- log_nu + eDE + log_delta;
     log_mean_DR <- log_nu + eDE - log_delta;
     //exact counts  
-    beta_cleft  <- alpha ./ exp(log_decay_mean + eC + log_nu + log_delta);
-    beta_cright <- alpha ./ exp(log_decay_mean + eC + log_nu - log_delta);
+    log_mean_cleft  <- to_vector(log_decay_sum + rep_matrix(eC + log_nu + log_delta, G));
+    log_mean_cright <- to_vector(log_decay_sum + rep_matrix(eC + log_nu - log_delta, G));
   }
 }
 model {
@@ -105,8 +121,10 @@ model {
   danglingR ~ neg_binomial_2_log(log_mean_DR, alpha);
   
   //counts
-  increment_log_prob(weight*gamma_log(counts_mean_left, alpha, beta_cleft));
-  increment_log_prob(weight*gamma_log(counts_mean_right, alpha, beta_cright));
+  //grouping reduces the number of likelihoods from S-1 to G, so reweighting is
+  //needed for a proper estimation of the lambdas
+  increment_log_prob((S-1)/G * neg_binomial_2_log_log(csl, log_mean_cleft, alpha));
+  increment_log_prob((S-1)/G * neg_binomial_2_log_log(csr, log_mean_cright, alpha));
   
   //// prior
   log_nu ~ cauchy(0, 1); //give high probability to [0.5:2]
