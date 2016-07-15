@@ -21,7 +21,7 @@ cs@data=data.table()
 save(cs, file="data/caulo_NcoI_150k_csdata.RData")
 
 #produce subsampled datasets
-foreach (nreads=c(5,10,20,30,40,50,60,75,100,200,300,400)) %do% {
+foreach (nreads=c(5,10,20,30,40,50,60,75,90,100,125,150,175,200,300,400)) %do% {
   load("data/caulo_NcoI_150k_csdata_with_data.RData")
   data=cs@data[sample(.N,nreads*1000)]
   cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=4042929)
@@ -33,7 +33,7 @@ foreach (nreads=c(5,10,20,30,40,50,60,75,100,200,300,400)) %do% {
 
 ### normalize different datasets on a single CPU
 registerDoParallel(cores=30)
-foreach (nreads=c(5,10,20,30,40,50,60,75,100,200,300,400)) %:% foreach (lambda=c(0.01,0.1,1,10,100)) %dopar% {
+foreach (nreads=c(5,10,20,30,40,50,60,75,90,100,125,150,175,200,300,400)) %:% foreach (lambda=c(0.01,0.1,1,10,100)) %dopar% {
   load(paste0("data/caulo_NcoI_150k_sub",nreads,"k_csnorm.RData"))
   cs@counts=fill_zeros(counts = cs@counts, biases = cs@biases)
   cs@counts[,distance:=pmin(abs(pos2-pos1), cs@settings$circularize+1-abs(pos2-pos1))]
@@ -64,7 +64,7 @@ foreach (nreads=c(5,10,20,30,40,50,60,75,100,200,300,400)) %:% foreach (lambda=c
 
 ### generate plots
 prefix="NcoI_150k"
-nreads=c(5,10,20,30,40,50,60,75,100,200,300,400)
+nreads=c(5,10,20,30,40,50,60,75,90,100,125,150,175,200,300,400)
 lambdas=c(0.01,0.1,1,10,100)
 
 outputs = foreach (i=nreads,.combine=rbind) %:% foreach (j=lambdas,.combine=rbind) %do% {
