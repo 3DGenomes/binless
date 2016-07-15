@@ -399,7 +399,7 @@ registerDoParallel(cores=30)
 foreach (nread=nreads) %:% foreach (lambda=lambdas) %dopar% {
   load(paste0("data/caulo_NcoI_150k_sub",nread,"k_lambda",lambda,"_csnorm_optimized.RData"))
   op=list(par=cs@par)
-  #log_decay=cs@par$log_decay
+  log_decay=cs@par$log_decay
   load(paste0("data/caulo_NcoI_150k_sub",nread,"k_csnorm.RData"))
   cs@counts=fill_zeros(counts = cs@counts, biases = cs@biases)
   cs@counts[,distance:=pmin(abs(pos2-pos1), cs@settings$circularize+1-abs(pos2-pos1))]
@@ -408,15 +408,20 @@ foreach (nread=nreads) %:% foreach (lambda=lambdas) %dopar% {
   dmin=1-0.01
   dmax=150000+0.01
   #initial guess
-  #init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
-  #  counts=cs@counts, biases=cs@biases, lambda=lambda,
-  #  bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=T, iter=10000)))
-  #op=list(par=init.op)
-  for (i in 1:3) {
-    a=system.time(output <- capture.output(op <- csnorm:::csnorm_simplified(
+  init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
+    counts=cs@counts, biases=cs@biases, lambda=lambda,
+    bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=T, iter=10000)))
+  op=list(par=init.op)
+  op$par$log_decay=log_decay
+  for (i in 1:1) {
+    #fit nu and delta without fij
+    a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_simplified(
       model=csnorm:::stanmodels$simplified, biases=cs@biases, counts = cs@counts,
-      dmin=dmin, dmax=dmax, log_decay=op$par$log_decay, log_nu=op$par$log_nu, log_delta=op$par$log_delta,
-      groups=10, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=100000, verbose = T, init=op)))
+      log_decay=op$par$log_decay, log_nu=op$par$log_nu, log_delta=op$par$log_delta, groups=10,
+      bf_per_kb=bf_per_kb, iter=100000, verbose = T, init=op)))
+    op=list(value=op.gen$value, par=c(op$par[c("beta_diag","lambda_diag","log_decay")],
+                                       op.gen$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta",
+                                                    "lambda_nu","lambda_delta","log_nu","log_delta")]))
   }
   op$par$runtime=a[1]+a[4]
   op$par$output=output

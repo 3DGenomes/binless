@@ -77,8 +77,8 @@ get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, f
 #' Single-cpu simplified fitting
 #' @keywords internal
 #' 
-csnorm_simplified = function(model, biases, counts, dmin, dmax, log_decay, log_nu, log_delta, bf_per_kb=1, bf_per_decade=5,
-                             groups=10, iter=10000, verbose=T, init=0, ...) {
+csnorm_simplified = function(model, biases, counts, log_decay, log_nu, log_delta, bf_per_kb=1, groups=10,
+                             iter=10000, verbose=T, init=0, ...) {
   stopifnot(groups<=biases[,.N-1])
   stopifnot(counts[,.N]==biases[,.N*(.N-1)/2]) #needs to be zero-filled
   #add bias informations to counts
@@ -89,8 +89,8 @@ csnorm_simplified = function(model, biases, counts, dmin, dmax, log_decay, log_n
   csub=merge(bsub[,.(id1=id,nu,delta)],csub,by="id1",all.x=F,all.y=T)
   csub=merge(bsub[,.(id2=id,nu,delta)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
   #collect all counts on left/right side and put into quantile groups
-  cs=rbind(csub[,.(pos=pos1,R=(contact.close+contact.down),L=(contact.far+contact.up),others=decay*nu2*(delta2+1/delta2))],
-           csub[,.(pos=pos2,R=(contact.far+contact.down),L=(contact.close+contact.up),others=decay*nu1*(delta1+1/delta1))])
+  cs=rbind(csub[,.(pos=pos1,ldist=log(distance),R=(contact.close+contact.down),L=(contact.far+contact.up),others=decay*nu2*(delta2+1/delta2))],
+           csub[,.(pos=pos2,ldist=log(distance),R=(contact.far+contact.down),L=(contact.close+contact.up),others=decay*nu1*(delta1+1/delta1))])
   setkey(cs,pos)
   cs[,cbin:=ntile(L+R,groups),by=pos]
   csl=dcast(cs[,.(pos,cbin,L)], pos~cbin, value.var="L", fun.aggregate=sum)
@@ -104,14 +104,9 @@ csnorm_simplified = function(model, biases, counts, dmin, dmax, log_decay, log_n
   stopifnot(dim(cso)==c(biases[,.N],groups))
   #run optimization
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
-  Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   data=list(Krow=Krow, S=biases[,.N],
             cutsites=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            Kdiag=Kdiag, dmin=dmin, dmax=dmax,
-            N=counts[,.N], cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
-            counts_close=counts[,contact.close], counts_far=counts[,contact.far],
-            counts_up=counts[,contact.up], counts_down=counts[,contact.down],
             G=groups, counts_sum_left=csl, counts_sum_right=csr, log_decay_sum=log(cso))
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
@@ -144,12 +139,13 @@ csnorm_fit = function(model, biases, counts, dmin, dmax, bf_per_kb=1, bf_per_dec
 #' Single-cpu fitting, only diagonal decay
 #' @keywords internal
 #' 
-csnorm_fit_extradiag = function(model, biases1, biases2, counts, dmin, dmax, bf_per_decade=5, iter=10000, verbose=T, init=0, ...) {
+csnorm_fit_extradiag = function(model, biases1, biases2, counts, dmin, dmax, bf_per_decade=5, iter=10000, verbose=T, weight=1, init=0, ...) {
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   data = list( S1=biases1[,.N], S2=biases2[,.N], Kdiag=Kdiag, dmin=dmin, dmax=dmax,
                N=counts[,.N], cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
                counts_close=counts[,contact.close], counts_far=counts[,contact.far], counts_up=counts[,contact.up], counts_down=counts[,contact.down],
-               log_nu1=biases1[,log_nu], log_nu2=biases2[,log_nu], log_delta1=biases1[,log_delta], log_delta2=biases2[,log_delta])
+               log_nu1=biases1[,log_nu], log_nu2=biases2[,log_nu], log_delta1=biases1[,log_delta], log_delta2=biases2[,log_delta],
+               weight=weight)
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 
