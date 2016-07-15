@@ -77,8 +77,8 @@ get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, f
 #' Single-cpu simplified fitting
 #' @keywords internal
 #' 
-csnorm_simplified = function(model, biases, counts, log_decay, log_nu, log_delta, bf_per_kb=1, groups=10,
-                             iter=10000, verbose=T, init=0, ...) {
+csnorm_simplified = function(model, biases, counts, dmin, dmax, log_decay, log_nu, log_delta, bf_per_kb=1, bf_per_decade=5,
+                             groups=10, iter=10000, verbose=T, init=0, ...) {
   stopifnot(groups<=biases[,.N-1])
   stopifnot(counts[,.N]==biases[,.N*(.N-1)/2]) #needs to be zero-filled
   #add bias informations to counts
@@ -104,9 +104,14 @@ csnorm_simplified = function(model, biases, counts, log_decay, log_nu, log_delta
   stopifnot(dim(cso)==c(biases[,.N],groups))
   #run optimization
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
+  Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   data=list(Krow=Krow, S=biases[,.N],
             cutsites=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+            Kdiag=Kdiag, dmin=dmin, dmax=dmax,
+            N=counts[,.N], cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
+            counts_close=counts[,contact.close], counts_far=counts[,contact.far],
+            counts_up=counts[,contact.up], counts_down=counts[,contact.down],
             G=groups, counts_sum_left=csl, counts_sum_right=csr, log_decay_sum=log(cso))
   optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }

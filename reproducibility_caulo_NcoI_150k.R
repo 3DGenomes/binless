@@ -413,23 +413,10 @@ foreach (nread=nreads) %:% foreach (lambda=lambdas) %dopar% {
   #  bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=T, iter=10000)))
   #op=list(par=init.op)
   for (i in 1:3) {
-    #fit diagonal decay only given nu and delta
-    biases=copy(cs@biases)
-    biases[,c("log_nu","log_delta"):=list(op$par$log_nu,op$par$log_delta)]
-    a=system.time(output <- capture.output(op.diag <- csnorm:::csnorm_fit_extradiag(
-      model=csnorm:::stanmodels$fit_extradiag, biases1=biases, biases2=biases, counts = cs@counts, dmin=dmin, dmax=dmax,
-      bf_per_decade=bf_per_decade, iter=100000, verbose = T, init=op)))
-    op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","alpha","lambda_diag","log_decay")],
-                                       op$par[c("eRJ","eDE","beta_nu","beta_delta",
-                                                "lambda_nu","lambda_delta","log_nu","log_delta")]))
-    #fit nu and delta without fij
-    a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_simplified(
+    a=system.time(output <- capture.output(op <- csnorm:::csnorm_simplified(
       model=csnorm:::stanmodels$simplified, biases=cs@biases, counts = cs@counts,
-      log_decay=op$par$log_decay, log_nu=op$par$log_nu, log_delta=op$par$log_delta, groups=10,
-      bf_per_kb=bf_per_kb, iter=100000, verbose = T, init=op)))
-    op=list(value=op.gen$value, par=c(op$par[c("beta_diag","lambda_diag","log_decay")],
-                                       op.gen$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta",
-                                                    "lambda_nu","lambda_delta","log_nu","log_delta")]))
+      dmin=dmin, dmax=dmax, log_decay=op$par$log_decay, log_nu=op$par$log_nu, log_delta=op$par$log_delta,
+      groups=10, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=100000, verbose = T, init=op)))
   }
   op$par$runtime=a[1]+a[4]
   op$par$output=output
