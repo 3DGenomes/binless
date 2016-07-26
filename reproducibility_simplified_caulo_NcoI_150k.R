@@ -35,8 +35,8 @@ lambdas=c(0.01,0.1,1,10,100)
 
 registerDoParallel(cores=30)
 foreach (nread=nreads) %:% foreach (lambda=lambdas) %dopar% {
-  load(paste0("data/caulo_NcoI_150k_sub",nread,"k_lambda",lambda,"_csnorm_optimized.RData"))
-  init.op=list(par=cs@par)
+  #load(paste0("data/caulo_NcoI_150k_sub",nread,"k_lambda",lambda,"_csnorm_optimized.RData"))
+  #init.op=list(par=cs@par)
   #log_decay=cs@par$log_decay
   load(paste0("data/caulo_NcoI_150k_sub",nread,"k_csnorm.RData"))
   cs@counts=fill_zeros(counts = cs@counts, biases = cs@biases)
@@ -46,11 +46,11 @@ foreach (nread=nreads) %:% foreach (lambda=lambdas) %dopar% {
   dmin=1-0.01
   dmax=150000+0.01
   #initial guess
-  #init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
-  #  counts=cs@counts, biases=cs@biases, lambda=lambda,
-  #  bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=T, iter=10000)))
-  #op=list(par=init.op)
-  #op$par$log_decay=log_decay
+  init.a=system.time(init.output <- capture.output(init.par <- csnorm:::run_split_parallel_initial_guess(
+    counts=cs@counts, biases=cs@biases, lambda=lambda,
+    bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=T, iter=10000)))
+  init.op=list(par=init.par)
+  init.op$par$log_decay=rep(0,cs@counts[,.N])
   for (i in 1:1) {
     #fit nu and delta without fij
     a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_simplified(
