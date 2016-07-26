@@ -398,8 +398,8 @@ lambdas=c(0.01,0.1,1,10,100)
 registerDoParallel(cores=30)
 foreach (nread=nreads) %:% foreach (lambda=lambdas) %dopar% {
   load(paste0("data/caulo_NcoI_150k_sub",nread,"k_lambda",lambda,"_csnorm_optimized.RData"))
-  op=list(par=cs@par)
-  log_decay=cs@par$log_decay
+  init.op=list(par=cs@par)
+  #log_decay=cs@par$log_decay
   load(paste0("data/caulo_NcoI_150k_sub",nread,"k_csnorm.RData"))
   cs@counts=fill_zeros(counts = cs@counts, biases = cs@biases)
   cs@counts[,distance:=pmin(abs(pos2-pos1), cs@settings$circularize+1-abs(pos2-pos1))]
@@ -408,25 +408,25 @@ foreach (nread=nreads) %:% foreach (lambda=lambdas) %dopar% {
   dmin=1-0.01
   dmax=150000+0.01
   #initial guess
-  init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
-    counts=cs@counts, biases=cs@biases, lambda=lambda,
-    bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=T, iter=10000)))
-  op=list(par=init.op)
-  op$par$log_decay=log_decay
+  #init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
+  #  counts=cs@counts, biases=cs@biases, lambda=lambda,
+  #  bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=T, iter=10000)))
+  #op=list(par=init.op)
+  #op$par$log_decay=log_decay
   for (i in 1:1) {
     #fit nu and delta without fij
     a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_simplified(
       model=csnorm:::stanmodels$simplified, biases=cs@biases, counts = cs@counts,
-      log_decay=op$par$log_decay, log_nu=op$par$log_nu, log_delta=op$par$log_delta, groups=10,
-      bf_per_kb=bf_per_kb, iter=100000, verbose = T, init=op)))
-    op=list(value=op.gen$value, par=c(op$par[c("beta_diag","lambda_diag","log_decay")],
+      log_decay=init.op$par$log_decay, log_nu=init.op$par$log_nu, log_delta=init.op$par$log_delta, groups=10,
+      bf_per_kb=bf_per_kb, iter=100000, verbose = T, init=init.op$par)))
+    op=list(value=op.gen$value, par=c(init.op$par[c("beta_diag","lambda_diag","log_decay")],
                                        op.gen$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta",
                                                     "lambda_nu","lambda_delta","log_nu","log_delta")]))
   }
   op$par$runtime=a[1]+a[4]
   op$par$output=output
-  init.op$runtime=init.a[1]+init.a[4]
-  init.op$output=init.output
+  #init.op$runtime=init.a[1]+init.a[4]
+  #init.op$output=init.output
   op$par$init=init.op
   op$par$value=op$value
   cs@par=op$par
@@ -452,7 +452,7 @@ outputs
 summary(lm(data=outputs, log(runtime)~log(size)+log(lambda)))
 ggplot(outputs)+geom_point(aes(size,runtime,colour=log(lambda)))+scale_x_log10()+scale_y_log10()+
   ylab("run time (s)")+xlab("dataset size")+ggtitle("t ~ size^-0.36")
-ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_runtime.png"), width=10, height=7.5)
+#ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_runtime.png"), width=10, height=7.5)
 
 #nu: initial with all lambdas
 registerDoParallel(cores=30)
@@ -509,7 +509,7 @@ nu=rbind(foreach (i=nreads,.combine=rbind) %:% foreach (j=lambdas,.combine=rbind
   })
 ggplot(nu)+geom_line(aes(pos,exp(log_nu),colour=cat))+facet_grid(lambda~size, labeller=label_both)+ylim(0,2)+ylab("nu")
 #ggsave(filename=paste0("images/caulo_NcoI_150k_sub_reproducibility_nu_weighted.png"), width=10, height=7.5)
-
+ggsave(filename="gibbs_full2_nu.png", width=10, height=7.5)
 
 #nu: simplified and full compared, optimal lambdas
 registerDoParallel(cores=30)
@@ -532,7 +532,7 @@ nufull = foreach (i=nreads,.combine=rbind) %:%
 nu=rbind(nusimplified,nufull)
 ggplot(nu)+geom_line(aes(pos,exp(log_nu),colour=cat))+facet_wrap(~size, labeller=label_both)+ylim(0,2)+ylab("nu")
 #ggsave(filename=paste0("images/caulo_NcoI_150k_sub_reproducibility_nu_weighted.png"), width=10, height=7.5)
-
+ggsave(filename="gibbs_full2_nuopt.png", width=10, height=7.5)
 
 #diagonal decay
 registerDoParallel(cores=30)
@@ -551,10 +551,29 @@ dfull = foreach (i=nreads,.combine=rbind) %:%
 decay=rbind(dsimplified,dfull)
 ggplot(decay)+geom_line(aes(dist,decay,colour=cat))+facet_wrap(~size, labeller=label_both)+
   ylab("decay")+scale_y_log10()+scale_x_log10()
+ggsave(filename="gibbs_full2_decay.png", width=10, height=7.5)
 
 
 
-
-
-
+#parameters
+registerDoParallel(cores=4)
+psimplified = foreach (i=nreads,.combine=rbind) %:% foreach (j=lambdas,.combine=rbind) %dopar% {
+    load(paste0("data/caulo_NcoI_150k_sub",i,"k_lambda",j,"_csnorm_optimized_init.RData"))
+    data.table(logp=cs@par$value,cat="simplified",size=i,lambda=j,
+               eC=cs@par$eC, eRJ=cs@par$eRJ, eDE=cs@par$eDE, lambda_diag=cs@par$lambda_diag,
+               lambda_delta=cs@par$lambda_delta, lambda_nu=cs@par$lambda_nu, alpha=cs@par$alpha)
+  }
+pfull = foreach (i=nreads,.combine=rbind) %:% foreach (j=lambdas,.combine=rbind) %dopar% {
+  load(paste0("data/caulo_NcoI_150k_sub",i,"k_lambda",j,"_csnorm_optimized.RData"))
+    data.table(logp=cs@par$value,cat="full",size=i,lambda=j,
+               eC=cs@par$eC, eRJ=cs@par$eRJ, eDE=cs@par$eDE, lambda_diag=cs@par$lambda_diag,
+               lambda_delta=cs@par$lambda_delta, lambda_nu=cs@par$lambda_nu, alpha=cs@par$alpha)
+  }
+params=rbind(psimplified,pfull)
+setkey(params, size,lambda,cat)
+ggplot(params,aes(size,exp(eC),colour=cat))+geom_point()+ylim(0,5)+ theme(axis.text.x = element_text(angle = 90, hjust = 1))+geom_jitter()+scale_x_log10()
+ggplot(params)+geom_point(aes(factor(paste(size,lambda)),lambda_nu,colour=cat))+ylim(0,25)
+ggplot(params)+geom_point(aes(factor(paste(size,lambda)),lambda_delta,colour=cat))#+ylim(0,25)
+ggplot(dcast(params[,.(cat,size,lambda,exp(eC))],size+lambda~cat)[,.(size,lambda,ratio=simplified/full)][order(ratio)])+
+  geom_point(aes(size,ratio,colour=log(lambda)))+ylim(0,2)
 
