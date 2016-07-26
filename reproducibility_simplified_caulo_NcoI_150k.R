@@ -49,23 +49,31 @@ foreach (nread=nreads) %:% foreach (lambda=lambdas) %dopar% {
   init.a=system.time(init.output <- capture.output(init.par <- csnorm:::run_split_parallel_initial_guess(
     counts=cs@counts, biases=cs@biases, lambda=lambda,
     bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=T, iter=10000)))
-  init.op=list(par=init.par)
-  init.op$par$log_decay=rep(0,cs@counts[,.N])
-  for (i in 1:1) {
+  op=list(par=init.par)
+  for (i in 1:3) {
+    #fit diagonal decay only given nu and delta
+    biases=copy(cs@biases)
+    biases[,c("log_nu","log_delta"):=list(op$par$log_nu,op$par$log_delta)]
+    a=system.time(output <- capture.output(op.diag <- csnorm:::csnorm_fit_extradiag(
+      model=csnorm:::stanmodels$fit_extradiag, biases1=biases, biases2=biases, counts = cs@counts, dmin=dmin, dmax=dmax,
+      bf_per_decade=bf_per_decade, iter=100000, verbose = T, init=op$par)))
+    op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","alpha","lambda_diag","log_decay")],
+                                       op$par[c("eRJ","eDE","beta_nu","beta_delta",
+                                                "lambda_nu","lambda_delta","log_nu","log_delta")]))
     #fit nu and delta without fij
     a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_simplified(
       model=csnorm:::stanmodels$simplified, biases=cs@biases, counts = cs@counts,
-      log_decay=init.op$par$log_decay, log_nu=init.op$par$log_nu, log_delta=init.op$par$log_delta, groups=10,
-      bf_per_kb=bf_per_kb, iter=100000, verbose = T, init=init.op$par)))
-    op=list(value=op.gen$value, par=c(init.op$par[c("beta_diag","lambda_diag","log_decay")],
+      log_decay=op$par$log_decay, log_nu=op$par$log_nu, log_delta=op$par$log_delta, groups=10,
+      bf_per_kb=bf_per_kb, iter=100000, verbose = T, init=op$par)))
+    op=list(value=op.gen$value, par=c(op$par[c("beta_diag","lambda_diag","log_decay")],
                                        op.gen$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta",
                                                     "lambda_nu","lambda_delta","log_nu","log_delta")]))
   }
   op$par$runtime=a[1]+a[4]
   op$par$output=output
-  #init.op$runtime=init.a[1]+init.a[4]
-  #init.op$output=init.output
-  op$par$init=init.op
+  init.par$runtime=init.a[1]+init.a[4]
+  init.par$output=init.output
+  op$par$init=init.par
   op$par$value=op$value
   cs@par=op$par
   cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, dmin=dmin, dmax=dmax))
