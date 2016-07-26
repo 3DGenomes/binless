@@ -31,8 +31,8 @@ lambdas=c(0.01,0.1,1,10,100)
 
 registerDoParallel(cores=30)
 foreach (nread=nreads) %:% foreach (lambda=lambdas) %dopar% {
-  load(paste0("data/caulo_NcoI_150k_sub",nread,"k_lambda",lambda,"_csnorm_optimized.RData"))
-  op=list(par=cs@par)
+  #load(paste0("data/caulo_NcoI_150k_sub",nread,"k_lambda",lambda,"_csnorm_optimized.RData"))
+  #init.op=list(par=cs@par)
   #log_decay=cs@par$log_decay
   load(paste0("data/caulo_NcoI_150k_sub",nread,"k_csnorm.RData"))
   cs@counts=fill_zeros(counts = cs@counts, biases = cs@biases)
@@ -42,19 +42,17 @@ foreach (nread=nreads) %:% foreach (lambda=lambdas) %dopar% {
   dmin=1-0.01
   dmax=150000+0.01
   #initial guess
-  #init.a=system.time(init.output <- capture.output(init.par <- csnorm:::run_split_parallel_initial_guess(
-  #  counts=cs@counts, biases=cs@biases, lambda=lambda,
-  #  bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=T, iter=10000)))
-  #op=list(par=init.par)
-  for (i in 1:1) {
+  init.a=system.time(init.output <- capture.output(init.par <- csnorm:::run_split_parallel_initial_guess(
+    counts=cs@counts, biases=cs@biases, lambda=lambda,
+    bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=T, iter=10000)))
+  op=list(par=init.par)
+  for (i in 1:3) {
     #fit diagonal decay only given nu and delta
-    #biases=copy(cs@biases)
-    #biases[,c("log_nu","log_delta"):=list(op$par$log_nu,op$par$log_delta)]
-    #a=system.time(output <- capture.output(op.diag <- csnorm:::csnorm_fit_extradiag(
-    #  model=csnorm:::stanmodels$fit_extradiag, biases1=biases, biases2=biases, counts = cs@counts, dmin=dmin, dmax=dmax,
-    #  bf_per_decade=bf_per_decade, iter=100000, verbose = T, init=op$par)))
-    op.diag=op
-    #op.diag$log_decay=rep(0,cs@counts[,.N])
+    biases=copy(cs@biases)
+    biases[,c("log_nu","log_delta"):=list(op$par$log_nu,op$par$log_delta)]
+    a=system.time(output <- capture.output(op.diag <- csnorm:::csnorm_fit_extradiag(
+      model=csnorm:::stanmodels$fit_extradiag, biases1=biases, biases2=biases, counts = cs@counts, dmin=dmin, dmax=dmax,
+      bf_per_decade=bf_per_decade, iter=100000, verbose = T, init=op$par)))
     op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","alpha","lambda_diag","log_decay")],
                                        op$par[c("eRJ","eDE","beta_nu","beta_delta",
                                                 "lambda_nu","lambda_delta","log_nu","log_delta")]))
@@ -69,9 +67,9 @@ foreach (nread=nreads) %:% foreach (lambda=lambdas) %dopar% {
   }
   op$par$runtime=a[1]+a[4]
   op$par$output=output
-  #init.par$runtime=init.a[1]+init.a[4]
-  #init.par$output=init.output
-  #op$par$init=init.par
+  init.par$runtime=init.a[1]+init.a[4]
+  init.par$output=init.output
+  op$par$init=init.par
   op$par$value=op$value
   cs@par=op$par
   cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, dmin=dmin, dmax=dmax))
@@ -153,6 +151,7 @@ nu=rbind(foreach (i=nreads,.combine=rbind) %:% foreach (j=lambdas,.combine=rbind
   })
 ggplot(nu)+geom_line(aes(pos,exp(log_nu),colour=cat))+facet_grid(lambda~size, labeller=label_both)+ylim(0,2)+ylab("nu")
 #ggsave(filename=paste0("images/caulo_NcoI_150k_sub_reproducibility_nu_weighted.png"), width=10, height=7.5)
+ggsave(filename="gibbs_full2_nu.png", width=10, height=7.5)
 
 #nu: simplified and full compared, optimal lambdas
 registerDoParallel(cores=30)
@@ -177,7 +176,23 @@ ggplot(nu)+geom_line(aes(pos,exp(log_nu),colour=cat))+facet_wrap(~size, labeller
 #ggsave(filename=paste0("images/caulo_NcoI_150k_sub_reproducibility_nu_weighted.png"), width=10, height=7.5)
 ggsave(filename="gibbs_full2_nuopt.png", width=10, height=7.5)
 
-#decay: simplified and full compared, optimal lambdas
+
+
+#diagonal decay: simplified and full compared, all lambdas
+registerDoParallel(cores=30)
+decay=rbind(foreach (i=nreads,.combine=rbind) %:% foreach (j=lambdas,.combine=rbind) %dopar% {
+  load(paste0("data/caulo_NcoI_150k_sub",i,"k_lambda",j,"_csnorm_optimized_init.RData"))
+  data.table(dist=cs@counts[,distance],decay=exp(cs@par$log_decay),logp=cs@par$value,cat="simplified",
+             size=i,lambda=j,key="dist")
+},
+foreach (i=nreads,.combine=rbind) %:% foreach (j=lambdas,.combine=rbind) %dopar% {
+  load(paste0("data/caulo_NcoI_150k_sub",i,"k_lambda",j,"_csnorm_optimized.RData"))
+  data.table(dist=cs@counts[,distance],decay=exp(cs@par$log_decay),logp=cs@par$value,cat="full",
+             size=i,lambda=j,key="dist")
+})
+ggplot(decay)+geom_line(aes(dist,decay,colour=cat))+facet_grid(lambda~size, labeller=label_both)+scale_y_log10()+scale_x_log10()
+
+#diagonal decay: optimal lambdas
 registerDoParallel(cores=30)
 dsimplified = foreach (i=nreads,.combine=rbind) %:%
   foreach (j=lambdas,.combine=function(x,y){if (x$logp[1]<y$logp[1]){return(y)}else{return(x)}}) %dopar% {
@@ -194,23 +209,7 @@ dfull = foreach (i=nreads,.combine=rbind) %:%
 decay=rbind(dsimplified,dfull)
 ggplot(decay)+geom_line(aes(dist,decay,colour=cat))+facet_wrap(~size, labeller=label_both)+
   ylab("decay")+scale_y_log10()+scale_x_log10()
-ggsave(filename="gibbs_full2_decay.png", width=10, height=7.5)
-
-
-#decay: simplified and full compared, all lambdas
-registerDoParallel(cores=30)
-decay=rbind(foreach (i=nreads,.combine=rbind) %:% foreach (j=lambdas,.combine=rbind) %dopar% {
-  load(paste0("data/caulo_NcoI_150k_sub",i,"k_lambda",j,"_csnorm_optimized_init.RData"))
-  data.table(dist=cs@counts[,distance],decay=exp(cs@par$log_decay),logp=cs@par$value,cat="simplified",
-             size=i,lambda=j,key="dist")
-},
-foreach (i=nreads,.combine=rbind) %:% foreach (j=lambdas,.combine=rbind) %dopar% {
-  load(paste0("data/caulo_NcoI_150k_sub",i,"k_lambda",j,"_csnorm_optimized.RData"))
-  data.table(dist=cs@counts[,distance],decay=exp(cs@par$log_decay),logp=cs@par$value,cat="full",
-             size=i,lambda=j,key="dist")
-})
-ggplot(decay)+geom_line(aes(dist,decay,colour=cat))+facet_grid(lambda~size, labeller=label_both)+scale_y_log10()+scale_x_log10()
-#ggsave(filename=paste0("images/caulo_NcoI_150k_sub_reproducibility_nu_weighted.png"), width=10, height=7.5)
+#ggsave(filename="gibbs_full2_decay.png", width=10, height=7.5)
 
 
 
