@@ -44,7 +44,7 @@ foreach (lambda=c(0.01,1,100)) %dopar% {
     bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, lambda=lambda, verbose=F, iter=10000)))
   counts.sub=cs@counts[sample(.N,round(sub/100*.N))]
   a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
-    model=csnorm:::stanmodels$fit, biases=cs@biases, counts = counts.sub, dmin=dmin, dmax=dmax,
+    biases=cs@biases, counts = counts.sub, dmin=dmin, dmax=dmax,
     bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=1, verbose = F, init=init.op, weight=cs@counts[,.N]/counts.sub[,.N])))
   op$par$runtime=a[1]+a[4]
   op$par$output=output

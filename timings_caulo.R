@@ -38,7 +38,7 @@ foreach (i=seq(150,500,by=50)) %dopar% {
                                          bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade,
                                          verbose=F, iter=10000)))
   a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
-    model=csnorm:::stanmodels$fit, biases=cs@biases, counts = cs@counts, dmin=dmin, dmax=dmax,
+    biases=cs@biases, counts = cs@counts, dmin=dmin, dmax=dmax,
     bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=100000, verbose = T, init=init.op)))
   op$par$runtime=a[1]+a[4]
   op$par$output=output
@@ -175,7 +175,7 @@ foreach (i=c(4,2,1,0.5,0.25,0.125,0.0625)) %dopar% {
     bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade,
     verbose=F, iter=10000)))
   a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
-    model=csnorm:::stanmodels$fit, biases=cs@biases, counts = cs@counts, dmin=dmin, dmax=dmax,
+    biases=cs@biases, counts = cs@counts, dmin=dmin, dmax=dmax,
     bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=100000, verbose = T, init=init.op)))
   op$par$runtime=a[1]+a[4]
   op$par$output=output

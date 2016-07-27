@@ -77,7 +77,7 @@ get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, f
 #' Single-cpu simplified fitting
 #' @keywords internal
 #' 
-csnorm_simplified = function(model, biases, counts, log_decay, log_nu, log_delta, bf_per_kb=1, groups=10,
+csnorm_simplified = function(biases, counts, log_decay, log_nu, log_delta, bf_per_kb=1, groups=10,
                              iter=10000, verbose=T, init=0, ...) {
   stopifnot(groups<=biases[,.N-1])
   stopifnot(counts[,.N]==biases[,.N*(.N-1)/2]) #needs to be zero-filled
@@ -108,13 +108,13 @@ csnorm_simplified = function(model, biases, counts, log_decay, log_nu, log_delta
             cutsites=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
             G=groups, counts_sum_left=csl, counts_sum_right=csr, log_decay_sum=log(cso))
-  optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
+  optimizing(stanmodels$simplified, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 
 #' Single-cpu fitting
 #' @keywords internal
 #' 
-csnorm_fit = function(model, biases, counts, dmin, dmax, bf_per_kb=1, bf_per_decade=5, iter=10000, verbose=T, init=0, weight=1, ...) {
+csnorm_fit = function(biases, counts, dmin, dmax, bf_per_kb=1, bf_per_decade=5, iter=10000, verbose=T, init=0, weight=1, ...) {
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   data = list( Krow=Krow, S=biases[,.N],
@@ -133,20 +133,20 @@ csnorm_fit = function(model, biases, counts, dmin, dmax, bf_per_kb=1, bf_per_dec
     message("Counts      : ", 4*counts[,.N])
     message("% zeros     : ", (counts[contact.close==0,.N]+counts[contact.far==0,.N]+counts[contact.up==0,.N]+counts[contact.down==0,.N])/counts[,4*.N]*100)
   }
-  optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
+  optimizing(stanmodels$fit, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 
 #' Single-cpu fitting, only diagonal decay
 #' @keywords internal
 #' 
-csnorm_fit_extradiag = function(model, biases1, biases2, counts, dmin, dmax, bf_per_decade=5, iter=10000, verbose=T, weight=1, init=0, ...) {
+csnorm_fit_extradiag = function(biases1, biases2, counts, dmin, dmax, bf_per_decade=5, iter=10000, verbose=T, weight=1, init=0, ...) {
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   data = list( S1=biases1[,.N], S2=biases2[,.N], Kdiag=Kdiag, dmin=dmin, dmax=dmax,
                N=counts[,.N], cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
                counts_close=counts[,contact.close], counts_far=counts[,contact.far], counts_up=counts[,contact.up], counts_down=counts[,contact.down],
                log_nu1=biases1[,log_nu], log_nu2=biases2[,log_nu], log_delta1=biases1[,log_delta], log_delta2=biases2[,log_delta],
                weight=weight)
-  optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
+  optimizing(stanmodels$fit_extradiag, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 
 #' Predict expected values for each count given optimized model parameters
@@ -254,7 +254,7 @@ run_split_parallel_biases = function(counts, biases, begin, end, dmin, dmax, bf_
     counts=extracted$counts, biases=extracted$biases1, bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax,
     bf_per_decade=bf_per_decade, lambda=lambda, verbose=T, iter=iter)))
   #run fit
-  a=system.time(output <- capture.output(op <- csnorm_fit(stanmodels$fit, extracted$biases1, extracted$counts, dmin, dmax,
+  a=system.time(output <- capture.output(op <- csnorm_fit(extracted$biases1, extracted$counts, dmin, dmax,
                                                           bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade,
                                                           verbose = T, iter = iter, init=init.op)))
   op$runtime=a[1]+a[4]+init.a[1]+init.a[4]
@@ -298,7 +298,7 @@ run_split_parallel_counts = function(counts, biases.aug, begin1, end1, begin2, e
                             begin2=begin2, end2=end2, fill.zeros=T, circularize=circularize)
   #run fit
   a=system.time(output <- capture.output(op <- csnorm_fit_extradiag(
-    stanmodels$fit_extradiag, extracted$biases1,extracted$biases2, extracted$counts,
+    extracted$biases1,extracted$biases2, extracted$counts,
     dmin, dmax, bf_per_decade = bf_per_decade, verbose = T, iter = iter)))
   op$runtime=a[1]+a[4]
   op$output=output
