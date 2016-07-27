@@ -1,5 +1,5 @@
 ////
-// Cut-site normalization model: initial guess
+// Cut-site normalization model: simplified fit for nu and delta
 ////
 functions {
   #include "common_functions.stan"

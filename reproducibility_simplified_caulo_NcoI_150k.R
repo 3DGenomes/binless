@@ -35,47 +35,10 @@ foreach (nread=nreads) %:% foreach (lambda=lambdas) %dopar% {
   #init.op=list(par=cs@par)
   #log_decay=cs@par$log_decay
   load(paste0("data/caulo_NcoI_150k_sub",nread,"k_csnorm.RData"))
-  cs@counts=fill_zeros(counts = cs@counts, biases = cs@biases)
-  cs@counts[,distance:=pmin(abs(pos2-pos1), cs@settings$circularize+1-abs(pos2-pos1))]
-  bf_per_decade=5
-  bf_per_kb=0.25
-  dmin=1-0.01
-  dmax=150000+0.01
-  #initial guess
-  init.a=system.time(init.output <- capture.output(init.par <- csnorm:::run_split_parallel_initial_guess(
-    counts=cs@counts, biases=cs@biases, lambda=lambda,
-    bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=T, iter=10000)))
-  op=list(par=init.par)
-  for (i in 1:3) {
-    #fit diagonal decay only given nu and delta
-    biases=copy(cs@biases)
-    biases[,c("log_nu","log_delta"):=list(op$par$log_nu,op$par$log_delta)]
-    a=system.time(output <- capture.output(op.diag <- csnorm:::csnorm_fit_extradiag(
-      biases1=biases, biases2=biases, counts = cs@counts, dmin=dmin, dmax=dmax,
-      bf_per_decade=bf_per_decade, iter=100000, verbose = T, init=op$par)))
-    op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","alpha","lambda_diag","log_decay")],
-                                       op$par[c("eRJ","eDE","beta_nu","beta_delta",
-                                                "lambda_nu","lambda_delta","log_nu","log_delta")]))
-    #fit nu and delta without fij
-    a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_simplified(
-      biases=cs@biases, counts = cs@counts,
-      log_decay=op$par$log_decay, log_nu=op$par$log_nu, log_delta=op$par$log_delta, groups=10,
-      bf_per_kb=bf_per_kb, iter=100000, verbose = T, init=op$par)))
-    op=list(value=op.gen$value, par=c(op$par[c("beta_diag","lambda_diag","log_decay")],
-                                       op.gen$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta",
-                                                    "lambda_nu","lambda_delta","log_nu","log_delta")]))
-  }
-  op$par$runtime=a[1]+a[4]
-  op$par$output=output
-  init.par$runtime=init.a[1]+init.a[4]
-  init.par$output=init.output
-  op$par$init=init.par
-  op$par$value=op$value
-  cs@par=op$par
-  cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, dmin=dmin, dmax=dmax))
-  #cs@pred=copy(csnorm_predict_all(cs,ncores=10,verbose=F))
-  #cs=postprocess(cs, resolution=10000, ncores=10, verbose=F)
-  #cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
+  #dmin=1-0.01
+  #dmax=150000+0.01
+  cs = run_gibbs(cs, design=NULL, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambda=lambda,
+                       ngibbs = 1, iter=100000, fit.decay=T, fit.genomic=F)
   save(cs, file=paste0("data/caulo_NcoI_150k_sub",nread,"k_lambda",lambda,"_csnorm_optimized_init.RData"))
 }
 

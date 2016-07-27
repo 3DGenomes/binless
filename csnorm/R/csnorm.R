@@ -31,6 +31,7 @@
 #' @import matrixStats
 #' @import ggplot2
 #' @import methods
+#' @import dplyr
 #'
 #' @docType package
 #' @name csnorm
