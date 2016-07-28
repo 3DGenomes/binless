@@ -38,7 +38,7 @@ foreach (nread=nreads) %:% foreach (lambda=lambdas) %dopar% {
   #dmin=1-0.01
   #dmax=150000+0.01
   cs = run_gibbs(cs, design=NULL, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambda=lambda,
-                       ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T)
+                       ngibbs = 1, iter=100000, fit.decay=T, fit.genomic=T)
   save(cs, file=paste0("data/caulo_NcoI_150k_sub",nread,"k_lambda",lambda,"_csnorm_optimized_init.RData"))
 }
 
@@ -113,8 +113,7 @@ nu=rbind(foreach (i=nreads,.combine=rbind) %:% foreach (j=lambdas,.combine=rbind
                                           dset=paste("full nreads",i,"lambda",j),size=i, lambda=j,cat="full",logp=cs@par$value)]
   })
 ggplot(nu)+geom_line(aes(pos,exp(log_nu),colour=cat))+facet_grid(lambda~size, labeller=label_both)+ylim(0,2)+ylab("nu")
-#ggsave(filename=paste0("images/caulo_NcoI_150k_sub_reproducibility_nu_weighted.png"), width=10, height=7.5)
-ggsave(filename="gibbs_full2_nu.png", width=10, height=7.5)
+ggsave(filename="images/caulo_NcoI_150k_full_vs_gibbs_nuall.png", width=10, height=7.5)
 
 #nu: simplified and full compared, optimal lambdas
 registerDoParallel(cores=30)
@@ -136,8 +135,7 @@ nufull = foreach (i=nreads,.combine=rbind) %:%
 }
 nu=rbind(nusimplified,nufull)
 ggplot(nu)+geom_line(aes(pos,exp(log_nu),colour=cat))+facet_wrap(~size, labeller=label_both)+ylim(0,2)+ylab("nu")
-#ggsave(filename=paste0("images/caulo_NcoI_150k_sub_reproducibility_nu_weighted.png"), width=10, height=7.5)
-ggsave(filename="gibbs_full2_nuopt.png", width=10, height=7.5)
+ggsave(filename="images/caulo_NcoI_150k_full_vs_gibbs_nu.png", width=10, height=7.5)
 
 
 
@@ -154,6 +152,7 @@ foreach (i=nreads,.combine=rbind) %:% foreach (j=lambdas,.combine=rbind) %dopar%
              size=i,lambda=j,key="dist")
 })
 ggplot(decay)+geom_line(aes(dist,decay,colour=cat))+facet_grid(lambda~size, labeller=label_both)+scale_y_log10()+scale_x_log10()
+ggsave(filename="images/caulo_NcoI_150k_full_vs_gibbs_decayall.png", width=10, height=7.5)
 
 #diagonal decay: optimal lambdas
 registerDoParallel(cores=30)
@@ -172,7 +171,7 @@ dfull = foreach (i=nreads,.combine=rbind) %:%
 decay=rbind(dsimplified,dfull)
 ggplot(decay)+geom_line(aes(dist,decay,colour=cat))+facet_wrap(~size, labeller=label_both)+
   ylab("decay")+scale_y_log10()+scale_x_log10()
-#ggsave(filename="gibbs_full2_decay.png", width=10, height=7.5)
+ggsave(filename="images/caulo_NcoI_150k_full_vs_gibbs_decay.png", width=10, height=7.5)
 
 
 

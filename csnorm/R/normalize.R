@@ -776,6 +776,7 @@ run_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=
       cs@diagnostics[[paste0("out.bias",i)]]=output
       cs@diagnostics[[paste0("runtime.bias",i)]]=a[1]+a[4]
     }
+    if (fit.genomic==T & fit.decay==T) op$value=op.gen$value+op.diag$value
   }
   op$par$runtime=sum(as.numeric(cs@diagnostics[grep("runtime",names(cs@diagnostics))]))
   op$par$output=output
