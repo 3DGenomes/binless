@@ -24,7 +24,7 @@ data {
   vector<lower=0>[N] weight;
   vector<lower=0>[N] dist;
   //genomic bias sums
-  vector<lower=0>[N] log_genomic_sum;
+  vector[N] log_genomic_sum;
 }
 transformed data {
   //diagonal SCAM spline, dense
