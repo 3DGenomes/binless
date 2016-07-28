@@ -38,7 +38,7 @@ foreach (nread=nreads) %:% foreach (lambda=lambdas) %dopar% {
   #dmin=1-0.01
   #dmax=150000+0.01
   cs = run_gibbs(cs, design=NULL, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambda=lambda,
-                       ngibbs = 1, iter=100000, fit.decay=T, fit.genomic=F)
+                       ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T)
   save(cs, file=paste0("data/caulo_NcoI_150k_sub",nread,"k_lambda",lambda,"_csnorm_optimized_init.RData"))
 }
 
@@ -197,4 +197,49 @@ ggplot(params)+geom_point(aes(factor(paste(size,lambda)),lambda_nu,colour=cat))+
 ggplot(params)+geom_point(aes(factor(paste(size,lambda)),lambda_delta,colour=cat))#+ylim(0,25)
 ggplot(dcast(params[,.(cat,size,lambda,exp(eC))],size+lambda~cat)[,.(size,lambda,ratio=simplified/full)][order(ratio)])+
   geom_point(aes(size,ratio,colour=log(lambda)))+ylim(0,2)
+
+
+
+
+
+load("data/caulo_NcoI_150k_sub400k_csnorm.RData")
+dmin=1-0.01
+dmax=150000+0.01
+bf_per_kb=1
+bf_per_decade=5
+bins_per_bf=10
+groups=10
+lambda=1
+#init
+init.a=system.time(init.output <- capture.output(init.par <- csnorm:::run_split_parallel_initial_guess(
+  counts=cs@counts, biases=cs@biases, lambda=lambda, verbose=T,
+  bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, iter=1000000)))
+cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4])
+op=list(par=init.par)
+#plot nu
+nu=csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=op$par$beta_nu, beta_delta=op$par$beta_delta,
+                                 bf_per_kb=bf_per_kb, points_per_kb = 100)[,.(pos,log_nu,cat="init")]
+ggplot(nu)+geom_line(aes(pos,exp(log_nu)))+ylim(0,2)+ylab("nu")
+#plot decay
+decay=data.table(dist=cs@counts[,distance],decay=exp(op$par$log_decay),cat="init",key="dist")
+ggplot(decay)+geom_line(aes(dist,decay))+scale_x_log10()+scale_y_log10()
+#diag
+biases=copy(cs@biases)
+biases[,c("log_nu","log_delta"):=list(op$par$log_nu,op$par$log_delta)]
+a=system.time(output <- capture.output(op.diag <- csnorm:::csnorm_simplified_decay(
+  biases = biases, counts = cs@counts,
+  log_nu = op$par$log_nu, log_delta = op$par$log_delta,
+  dmin = dmin, dmax = dmax, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, groups = groups,
+  iter=1000000, init=op$par)))
+op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","alpha","lambda_diag","log_decay")],
+                                   op$par[c("eRJ","eDE","beta_nu","beta_delta",
+                                            "lambda_nu","lambda_delta","log_nu","log_delta")]))
+#plot nu
+nu=rbind(nu,csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=op$par$beta_nu, beta_delta=op$par$beta_delta,
+                                    bf_per_kb=bf_per_kb, points_per_kb = 100)[,.(pos,log_nu,cat="diag")])
+ggplot(nu)+geom_line(aes(pos,exp(log_nu),colour=cat))+ylim(0,2)+ylab("nu")
+#plot decay
+decay=rbind(decay,data.table(dist=cs@counts[,distance],decay=exp(op$par$log_decay),cat="diag",key="dist"))
+ggplot(decay)+geom_line(aes(dist,decay,colour=cat))+scale_x_log10()+scale_y_log10()
+
 

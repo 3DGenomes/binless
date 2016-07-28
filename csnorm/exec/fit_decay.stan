@@ -21,7 +21,8 @@ transformed data {
   //diagonal SCAM spline, dense, exact
   matrix[N,Kdiag] Xdiag;
   row_vector[Kdiag] pdiag;
-  
+  row_vector[N] diag_weights;
+  diag_weights <- rep_row_vector(1,N);
   #include "scam_spline_construction.stan"
 }
 parameters {

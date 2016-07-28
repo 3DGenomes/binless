@@ -37,6 +37,7 @@ transformed data {
   //diagonal SCAM spline, dense
   matrix[N,Kdiag] Xdiag;
   row_vector[Kdiag] pdiag;
+  row_vector[N] diag_weights;
   //scaling factor for genomic lambdas
   real lfac;
   
@@ -49,6 +50,7 @@ transformed data {
   #include "sparse_spline_construction.stan"
 
   //diagonal SCAM spline, dense, exact and mean field model
+  diag_weights <- rep_row_vector(1,N);
   #include "scam_spline_construction.stan"
 
   //scaling factor for genomic lambdas

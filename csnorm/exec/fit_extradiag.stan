@@ -32,6 +32,8 @@ data {
 transformed data {
   matrix[N,Kdiag] Xdiag;
   row_vector[Kdiag] pdiag;
+  row_vector[N] diag_weights;
+  diag_weights <- rep_row_vector(1,N);
   if (max(cidx[1])>S1) {reject("first index larger than rsites");}
   if (max(cidx[2])>S2) {reject("second index larger than rsites");}
   //diagonal SCAM spline, dense, exact

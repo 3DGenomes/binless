@@ -114,12 +114,13 @@ csnorm_simplified_genomic = function(biases, counts, log_decay, log_nu, log_delt
 #' Single-cpu simplified fitting for nu and delta
 #' @keywords internal
 #' 
-csnorm_simplified_decay = function(biases, counts, log_decay, log_nu, log_delta, dmin, dmax, 
+csnorm_simplified_decay = function(biases, counts, log_nu, log_delta, dmin, dmax, 
                                    bf_per_decade=5, bins_per_bf=10, groups=10,
                                    iter=10000, verbose=T, init=0, ...) {
   stopifnot(groups<=biases[,.N-1])
   stopifnot(counts[,.N]==biases[,.N*(.N-1)/2]) #needs to be zero-filled
   #add bias informations to counts
+  setkey(counts, id1, id2, pos1, pos2)
   csub=copy(counts)
   bsub=biases[,.(id)]
   bsub[,c("nu","delta"):=list(exp(log_nu),exp(log_delta))]
@@ -143,7 +144,9 @@ csnorm_simplified_decay = function(biases, counts, log_decay, log_nu, log_delta,
   op=optimizing(stanmodels$simplified_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
   #rewrite log_decay as if it was calculated for each count
   csd[,log_decay:=op$par$log_decay]
-  op$par$log_decay=csd[csub,log_decay,on=key(csd)]
+  a=csd[csub,.(id1,id2,pos1,pos2,distance,log_decay),on=key(csd)]
+  setkeyv(a,key(counts))
+  op$par$log_decay=a[,log_decay]
   return(op)
 }
 
@@ -752,7 +755,7 @@ run_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=
       biases[,c("log_nu","log_delta"):=list(op$par$log_nu,op$par$log_delta)]
       a=system.time(output <- capture.output(op.diag <- csnorm_simplified_decay(
         biases = biases, counts = cs@counts,
-        log_decay = op$par$log_decay, log_nu = op$par$log_nu, log_delta = op$par$log_delta,
+        log_nu = op$par$log_nu, log_delta = op$par$log_delta,
         dmin = dmin, dmax = dmax, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, groups = groups,
         iter=iter, init=op$par)))
       op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","alpha","lambda_diag","log_decay")],

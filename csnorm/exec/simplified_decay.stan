@@ -30,7 +30,9 @@ transformed data {
   //diagonal SCAM spline, dense
   matrix[N,Kdiag] Xdiag;
   row_vector[Kdiag] pdiag;
- 
+  row_vector[N] diag_weights;
+  diag_weights <- weight';
+  
   //diagonal SCAM spline, dense, exact and mean field model
   #include "scam_spline_construction.stan"
 }
