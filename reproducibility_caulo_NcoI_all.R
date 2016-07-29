@@ -11,7 +11,8 @@ setwd("/home/yannick/simulations/cs_norm")
 
 
 #normalize in parallel
-load("data/caulo_NcoI_all_csnorm.RData")
+load("data/caulo_NcoI_1000k_csnorm.RData")
+cs@settings$circularize=-1
 bf_per_kb=0.25
 coverage=4
 square.size=150000
@@ -25,14 +26,14 @@ cs=run_split_parallel_recovery(cs, "tmp/test", square.size=square.size, coverage
 cs@pred=csnorm_predict_all(cs, ncores=30)
 cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
 cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-save(cs, file="data/caulo_NcoI_all_csnorm_optimized.RData")
+save(cs, file="data/caulo_NcoI_1000k_csnorm_optimized.RData")
 
 
 #normalize in serial
 registerDoParallel(cores=30)
 sub=10
 foreach (lambda=c(0.01,1,100)) %dopar% {
-  load("data/caulo_NcoI_all_csnorm.RData")
+  load("data/caulo_NcoI_1000k_csnorm.RData")
   bf_per_kb=0.25
   bf_per_decade=5
   dmin=1-0.01
@@ -41,11 +42,12 @@ foreach (lambda=c(0.01,1,100)) %dopar% {
   cs@counts[,distance:=pmin(abs(pos2-pos1), cs@settings$circularize+1-abs(pos2-pos1))]
   init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
     counts=cs@counts, biases=cs@biases,
-    bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, lambda=lambda, verbose=F, iter=10000)))
+    bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, lambda=lambda, verbose=F, iter=100000)))
   counts.sub=cs@counts[sample(.N,round(sub/100*.N))]
   a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
     biases=cs@biases, counts = counts.sub, dmin=dmin, dmax=dmax,
-    bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=1, verbose = F, init=init.op, weight=cs@counts[,.N]/counts.sub[,.N])))
+    bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=100000, verbose = T,
+    init=init.op, weight=cs@counts[,.N]/counts.sub[,.N])))
   op$par$runtime=a[1]+a[4]
   op$par$output=output
   op$par$logp=op$value
@@ -58,12 +60,12 @@ foreach (lambda=c(0.01,1,100)) %dopar% {
   cs@pred=csnorm_predict_all(cs,ncores=30,verbose=F)
   #cs=postprocess(cs, resolution=10000, ncores=10, verbose=F)
   #cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-  save(cs, file=paste0("data/caulo_NcoI_all_",sub,"pc_lambda",lambda,"_csnorm_optimized.RData"))
+  save(cs, file=paste0("data/caulo_NcoI_1000k_",sub,"pc_lambda",lambda,"_csnorm_optimized.RData"))
 }
 
 registerDoParallel(cores=3)
 foreach (lambda=c(0.01,1,100)) %dopar% {
-  load(paste0("data/caulo_NcoI_all_",sub,"pc_lambda",lambda,"_csnorm_optimized.RData"))
+  load(paste0("data/caulo_NcoI_1000k_",sub,"pc_lambda",lambda,"_csnorm_optimized.RData"))
   bf_per_kb=0.25
   bf_per_decade=5
   dmin=1-0.01
@@ -73,33 +75,53 @@ foreach (lambda=c(0.01,1,100)) %dopar% {
   cs@pred=csnorm_predict_all(cs,ncores=30,verbose=F)
   cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
   cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-  save(cs, file=paste0("data/caulo_NcoI_all_",sub,"pc_lambda",lambda,"_csnorm_optimized.RData"))
+  save(cs, file=paste0("data/caulo_NcoI_1000k_",sub,"pc_lambda",lambda,"_csnorm_optimized.RData"))
 }
 
 
+
+#normalize with gibbs sampler
+registerDoParallel(cores=3)
+foreach (lambda=c(0.01,1,100)) %dopar% {
+  load("data/caulo_NcoI_1000k_csnorm.RData")
+  cs = run_gibbs(cs, design=NULL, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambda=lambda,
+                 ngibbs = 1, iter=10000)
+  save(cs, file=paste0("data/caulo_NcoI_1000k_gibbs1_lambda",lambda,"_csnorm_optimized.RData"))
+}
 
 
 
 
 
 ### generate plots
-prefix="NcoI_all"
+prefix="NcoI_1000k"
 lambdas=c(0.01,1,100)
-sub=10
 
-#outputs and runtime
+#outputs and runtime: serial subsampled
+sub=10
 outputs = foreach (j=lambdas,.combine=rbind) %do% {
-  load(paste0("data/caulo_NcoI_all_10pc_lambda",j,"_csnorm_optimized.RData"))
+  load(paste0("data/caulo_NcoI_1000k_10pc_lambda",j,"_csnorm_optimized.RData"))
   data.table(dset=j,
              out=tail(cs@par$output,1), runtime=cs@par$runtime+cs@par$init$runtime,
              iruntime=cs@par$init$runtime,
              lambda_nu=cs@par$lambda_nu, lambda_delta=cs@par$lambda_delta, logp=cs@par$logp)
 }
 outputs
+#outputs and runtime: gibbs
+outputs = foreach (j=lambdas,.combine=rbind) %do% {
+  load(paste0("data/caulo_NcoI_1000k_gibbs1_lambda",j,"_csnorm_optimized.RData"))
+  data.table(dset=j,
+             out=tail(cs@par$output,1), runtime=cs@par$runtime,
+             lambda_nu=cs@par$lambda_nu, lambda_delta=cs@par$lambda_delta, logp=cs@par$value)
+}
+outputs
 
-fnames=c("data/caulo_NcoI_all_10pc_lambda0.01_csnorm_optimized.RData",
-         "data/caulo_NcoI_all_csnorm_optimized.RData")
-dsets=c("serial 10%","parallel")
+
+
+fnames=c("data/caulo_NcoI_1000k_10pc_lambda100_csnorm_optimized.RData",
+         "data/caulo_NcoI_1000k_gibbs1_lambda1_csnorm_optimized.RData",
+         "data/caulo_NcoI_1000k_csnorm_optimized.RData")
+dsets=c("serial 10%","gibbs", "parallel")
 
 
 #lFC
