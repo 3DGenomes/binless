@@ -542,7 +542,7 @@ diagnose_counts = function(cs, outprefix, coverage.extradiag=1, square.size=1500
 run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, coverage.extradiag=1, bf_per_kb=1, bf_per_decade=5,
                               distance_bins_per_decade=100, lambdas=c(0.01,1,100), verbose = F, iter=100000, ncores=30, homogenize=F,
                               outprefix=NULL, ops.bias=NULL, ops.count=NULL) {
-  stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<cs@biases[,max(pos)-min(pos)]) |
+  stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]/2))
   cs@settings = c(cs@settings, list(square.size=square.size, coverage=coverage, coverage.extradiag=coverage.extradiag,
                                     bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, distance_bins_per_decade=distance_bins_per_decade,
