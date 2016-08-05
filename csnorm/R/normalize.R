@@ -74,6 +74,42 @@ get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, f
               beginrange1=beginrange1, endrange1=endrange1, beginrange2=beginrange2, endrange2=endrange2))
 }
 
+#' Single-cpu simplified initial guess
+#' @keywords internal
+#' 
+csnorm_simplified_guess = function(biases, counts, lambda, dmin, dmax, bf_per_kb=1, bf_per_decade=5, groups=10, iter=10000) {
+  stopifnot(groups<=biases[,.N-1])
+  stopifnot(counts[,.N]==biases[,.N*(.N-1)/2]) #needs to be zero-filled
+  #add bias informations to counts
+  csub=copy(counts)
+  #collect all counts on left/right side and put into quantile groups
+  cs=rbind(csub[,.(pos=pos1,ldist=log(distance),R=(contact.close+contact.down),L=(contact.far+contact.up),others=2)],
+           csub[,.(pos=pos2,ldist=log(distance),R=(contact.far+contact.down),L=(contact.close+contact.up),others=2)])
+  setkey(cs,pos)
+  cs[,cbin:=ntile(L+R,groups),by=pos]
+  csl=dcast(cs[,.(pos,cbin,L)], pos~cbin, value.var="L", fun.aggregate=sum)
+  csl[,pos:=NULL]
+  stopifnot(dim(csl)==c(biases[,.N],groups))
+  csr=dcast(cs[,.(pos,cbin,R)], pos~cbin, value.var="R", fun.aggregate=sum)
+  csr[,pos:=NULL]
+  stopifnot(dim(csr)==c(biases[,.N],groups))
+  cso=dcast(cs[,.(pos,cbin,others)], pos~cbin, value.var="others", fun.aggregate=sum)
+  cso[,pos:=NULL]
+  stopifnot(dim(cso)==c(biases[,.N],groups))
+  #run optimization
+  Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
+  data=list(Krow=Krow, S=biases[,.N],
+            cutsites=biases[,pos], rejoined=biases[,rejoined],
+            danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+            G=groups, counts_sum_left=csl, counts_sum_right=csr, log_decay_sum=log(cso))
+  op=optimizing(stanmodels$simplified_guess, data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0)
+  Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
+  op$par=c(list(lambda_nu=lambda, lambda_delta=lambda, beta_diag=seq(0.1,1,length.out = Kdiag-1), lambda_diag=1,
+                log_decay=rep(0,counts[,.N])),
+           op$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta","log_nu","log_delta")])
+  return(op)
+}
+
 #' Single-cpu simplified fitting for nu and delta
 #' @keywords internal
 #' 
@@ -742,11 +778,11 @@ run_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=
   cs@settings$dmin=dmin
   cs@settings$dmax=dmax
   #initial guess
-  init.a=system.time(init.output <- capture.output(init.par <- run_split_parallel_initial_guess(
-    counts=cs@counts, biases=cs@biases, lambda=lambda, verbose=T,
-    bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, iter=iter)))
+  init.a = system.time(init.output <- capture.output(init.op <- csnorm_simplified_guess(
+    biases = cs@biases, counts = cs@counts, lambda=lambda, dmin=dmin, dmax=dmax,
+    groups = groups, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter)))
   cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4])
-  op=list(par=init.par)
+  op=init.op
   #gibbs sampling
   for (i in 1:ngibbs) {
     #fit diagonal decay given nu and delta
@@ -758,7 +794,7 @@ run_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=
         log_nu = op$par$log_nu, log_delta = op$par$log_delta,
         dmin = dmin, dmax = dmax, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, groups = groups,
         iter=iter, init=op$par)))
-      op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","alpha","lambda_diag","log_decay")],
+      op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","beta_diag_centered","alpha","lambda_diag","log_decay")],
                                          op$par[c("eRJ","eDE","beta_nu","beta_delta",
                                                   "lambda_nu","lambda_delta","log_nu","log_delta")]))
       cs@diagnostics[[paste0("out.decay",i)]]=output
@@ -770,7 +806,7 @@ run_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=
         biases = cs@biases, counts = cs@counts,
         log_decay = op$par$log_decay, log_nu = op$par$log_nu, log_delta = op$par$log_delta,
         groups = groups, bf_per_kb = bf_per_kb, iter = iter, init=op$par)))
-      op=list(value=op.gen$value, par=c(op$par[c("beta_diag","lambda_diag","log_decay")],
+      op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag","log_decay")],
                                       op.gen$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta",
                                                    "lambda_nu","lambda_delta","log_nu","log_delta")]))
       cs@diagnostics[[paste0("out.bias",i)]]=output
@@ -780,9 +816,9 @@ run_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=
   }
   op$par$runtime=sum(as.numeric(cs@diagnostics[grep("runtime",names(cs@diagnostics))]))
   op$par$output=output
-  init.par$runtime=init.a[1]+init.a[4]
-  init.par$output=init.output
-  op$par$init=init.par
+  init.op$par$runtime=init.a[1]+init.a[4]
+  init.op$par$output=init.output
+  op$par$init=init.op$par
   op$par$value=op$value
   cs@par=op$par
   #cs@pred=copy(csnorm_predict_all(cs,ncores=10,verbose=F))

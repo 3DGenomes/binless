@@ -11,7 +11,7 @@ setwd("/home/yannick/simulations/cs_norm")
 
 
 #normalize in parallel
-load("data/caulo_NcoI_1000k_csnorm.RData")
+load("data/caulo_NcoI_all_csnorm.RData")
 cs@settings$circularize=-1
 bf_per_kb=0.25
 coverage=4
@@ -26,14 +26,14 @@ cs=run_split_parallel_recovery(cs, "tmp/test", square.size=square.size, coverage
 cs@pred=csnorm_predict_all(cs, ncores=30)
 cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
 cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-save(cs, file="data/caulo_NcoI_1000k_csnorm_optimized.RData")
+save(cs, file="data/caulo_NcoI_all_csnorm_optimized.RData")
 
 
 #normalize in serial
 registerDoParallel(cores=30)
 sub=10
 foreach (lambda=c(0.01,1,100)) %dopar% {
-  load("data/caulo_NcoI_1000k_csnorm.RData")
+  load("data/caulo_NcoI_all_csnorm.RData")
   bf_per_kb=0.25
   bf_per_decade=5
   dmin=1-0.01
@@ -60,12 +60,11 @@ foreach (lambda=c(0.01,1,100)) %dopar% {
   cs@pred=csnorm_predict_all(cs,ncores=30,verbose=F)
   #cs=postprocess(cs, resolution=10000, ncores=10, verbose=F)
   #cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-  save(cs, file=paste0("data/caulo_NcoI_1000k_",sub,"pc_lambda",lambda,"_csnorm_optimized.RData"))
+  save(cs, file=paste0("data/caulo_NcoI_all_",sub,"pc_lambda",lambda,"_csnorm_optimized.RData"))
 }
-
 registerDoParallel(cores=3)
 foreach (lambda=c(0.01,1,100)) %dopar% {
-  load(paste0("data/caulo_NcoI_1000k_",sub,"pc_lambda",lambda,"_csnorm_optimized.RData"))
+  load(paste0("data/caulo_NcoI_all_",sub,"pc_lambda",lambda,"_csnorm_optimized.RData"))
   bf_per_kb=0.25
   bf_per_decade=5
   dmin=1-0.01
@@ -75,7 +74,7 @@ foreach (lambda=c(0.01,1,100)) %dopar% {
   cs@pred=csnorm_predict_all(cs,ncores=30,verbose=F)
   cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
   cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-  save(cs, file=paste0("data/caulo_NcoI_1000k_",sub,"pc_lambda",lambda,"_csnorm_optimized.RData"))
+  save(cs, file=paste0("data/caulo_NcoI_all_",sub,"pc_lambda",lambda,"_csnorm_optimized.RData"))
 }
 
 
@@ -83,10 +82,17 @@ foreach (lambda=c(0.01,1,100)) %dopar% {
 #normalize with gibbs sampler
 registerDoParallel(cores=3)
 foreach (lambda=c(0.01,1,100)) %dopar% {
-  load("data/caulo_NcoI_1000k_csnorm.RData")
+  load("data/caulo_NcoI_all_csnorm.RData")
   cs = run_gibbs(cs, design=NULL, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambda=lambda,
                  ngibbs = 1, iter=10000)
-  save(cs, file=paste0("data/caulo_NcoI_1000k_gibbs1_lambda",lambda,"_csnorm_optimized.RData"))
+  save(cs, file=paste0("data/caulo_NcoI_all_gibbs1_lambda",lambda,"_csnorm_optimized.RData"))
+}
+foreach (lambda=c(0.01,1,100)) %dopar% {
+  load(paste0("data/caulo_NcoI_all_gibbs1_lambda",lambda,"_csnorm_optimized.RData"))
+  cs@pred=csnorm_predict_all(cs,ncores=30,verbose=F)
+  cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
+  cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
+  save(cs, file=paste0("data/caulo_NcoI_all_gibbs1_lambda",lambda,"_csnorm_optimized.RData"))
 }
 
 
@@ -94,13 +100,13 @@ foreach (lambda=c(0.01,1,100)) %dopar% {
 
 
 ### generate plots
-prefix="NcoI_1000k"
+prefix="NcoI_all"
 lambdas=c(0.01,1,100)
 
 #outputs and runtime: serial subsampled
 sub=10
 outputs = foreach (j=lambdas,.combine=rbind) %do% {
-  load(paste0("data/caulo_NcoI_1000k_10pc_lambda",j,"_csnorm_optimized.RData"))
+  load(paste0("data/caulo_NcoI_all_10pc_lambda",j,"_csnorm_optimized.RData"))
   data.table(dset=j,
              out=tail(cs@par$output,1), runtime=cs@par$runtime+cs@par$init$runtime,
              iruntime=cs@par$init$runtime,
@@ -109,7 +115,7 @@ outputs = foreach (j=lambdas,.combine=rbind) %do% {
 outputs
 #outputs and runtime: gibbs
 outputs = foreach (j=lambdas,.combine=rbind) %do% {
-  load(paste0("data/caulo_NcoI_1000k_gibbs1_lambda",j,"_csnorm_optimized.RData"))
+  load(paste0("data/caulo_NcoI_all_gibbs1_lambda",j,"_csnorm_optimized.RData"))
   data.table(dset=j,
              out=tail(cs@par$output,1), runtime=cs@par$runtime,
              lambda_nu=cs@par$lambda_nu, lambda_delta=cs@par$lambda_delta, logp=cs@par$value)
@@ -118,8 +124,11 @@ outputs
 
 
 
+fnames=c("data/caulo_NcoI_all_10pc_lambda0.01_csnorm_optimized.RData",
+         "data/caulo_NcoI_all_gibbs1_lambda0.01_csnorm_optimized.RData",
+         "data/caulo_NcoI_all_csnorm_optimized.RData")
 fnames=c("data/caulo_NcoI_1000k_10pc_lambda100_csnorm_optimized.RData",
-         "data/caulo_NcoI_1000k_gibbs1_lambda1_csnorm_optimized.RData",
+         "data/caulo_NcoI_1000k_gibbs1_lambda0.01_csnorm_optimized.RData",
          "data/caulo_NcoI_1000k_csnorm_optimized.RData")
 dsets=c("serial 10%","gibbs", "parallel")
 
@@ -146,16 +155,18 @@ ggplot(mat)+
 ggsave(filename=paste0("images/caulo_",prefix,"_reproducibility_normalized.png"), width=10, height=5)
 
 #nu and delta correlation
-nu = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
+nu = foreach (i=fnames[1:2],j=dsets[1:2],.combine=rbind) %do% {
   load(i)
-  data.table(pos=cs@biases[,pos],log_nu=cs@par$log_nu,log_delta=cs@par$log_delta,dset=j,key="pos")
+  csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=cs@par$beta_nu, beta_delta=cs@par$beta_delta,
+                                   bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 10)[
+                                     ,.(pos,log_nu,log_delta,dset=j)]
 }
 ggplot(nu)+geom_line(aes(pos,log_nu,colour=dset))
 ggplot(nu)+geom_line(aes(pos,log_nu,colour=dset))+xlim(2e6,2.15e6)
 ggplot(nu)+geom_line(aes(pos,log_nu,colour=dset))+xlim(1e6,1.15e6)
 nu[,pbin:=cut(pos,3)]
 ggplot(nu)+geom_line(aes(pos,exp(log_nu),colour=dset))+facet_wrap(~pbin,scales = "free_x", nrow=3)+
-  scale_y_continuous(limits = c(0,2))+ylab("nu")
+  scale_y_continuous(limits = c(0,2))+ylab("nu")+scale_y_log10()
 ggsave(filename=paste0("images/caulo_",prefix,"_reproducibility_nu.png"), width=10, height=7.5)
 ggplot(nu)+geom_line(aes(pos,exp(log_delta),colour=dset))+facet_wrap(~pbin,scales = "free_x", nrow=3)+
   scale_y_continuous(limits = c(0,2))+ylab("delta")
@@ -163,7 +174,7 @@ ggplot(nu)+geom_line(aes(pos,exp(log_delta),colour=dset))+facet_wrap(~pbin,scale
 #diagonal decay
 decay = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
   load(i)
-  cs@par$decay[,.(dist,decay,dset=j)]
+  data.table(dist=cs@cs@par$decay[,.(dist,decay,dset=j)]
 }
 decay[,decay:=decay/exp(mean(log(decay))),by=dset]
 decay=decay[dist>100]

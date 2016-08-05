@@ -33,7 +33,7 @@ registerDoParallel(cores=30)
 foreach (group=ngroups) %:% foreach (lambda=lambdas) %dopar% {
   load(paste0("data/caulo_NcoI_150k_sub400k_csnorm.RData"))
   cs = run_gibbs(cs, design=NULL, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=group, lambda=lambda,
-                       ngibbs = 2, iter=100000, fit.decay=T, fit.genomic=T)
+                       ngibbs = 1, iter=100000, fit.decay=T, fit.genomic=T)
   save(cs, file=paste0("data/caulo_NcoI_150k_sub400k_lambda",lambda,"_gibbs1_",group,"groups_csnorm_optimized.RData"))
 }
 
