@@ -98,7 +98,7 @@ csnorm_simplified_guess = function(biases, counts, lambda, dmin, dmax, bf_per_kb
   stopifnot(dim(cso)==c(biases[,.N],groups))
   #run optimization
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
-  data=list(Krow=Krow, S=biases[,.N],
+  data=list(Krow=Krow, S=biases[,.N], lambda=lambda,
             cutsites=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
             G=groups, counts_sum_left=csl, counts_sum_right=csr, log_decay_sum=log(cso))
@@ -144,7 +144,8 @@ csnorm_simplified_genomic = function(biases, counts, log_decay, log_nu, log_delt
             cutsites=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
             G=groups, counts_sum_left=csl, counts_sum_right=csr, log_decay_sum=log(cso))
-  optimizing(stanmodels$simplified_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
+  optimizing(stanmodels$simplified_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
+             init=init, init_alpha=1e-5, ...)
 }
 
 #' Single-cpu simplified fitting for nu and delta
