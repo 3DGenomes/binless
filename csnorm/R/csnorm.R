@@ -24,14 +24,13 @@
 #' @useDynLib csnorm, .registration = TRUE
 #' @import rstan
 #' @import data.table
-#' @import Hmisc
 #' @import doParallel
 #' @import foreach
-#' @import MASS
 #' @import matrixStats
 #' @import ggplot2
 #' @import methods
-#' @import dplyr
+#' @importFrom Hmisc cut2
+#' @importFrom dplyr ntile
 #'
 #' @docType package
 #' @name csnorm
