@@ -47,8 +47,8 @@ outputs = foreach (i=sizes, .combine=rbind) %:% foreach (j=lambdas, .combine=rbi
 }
 outputs
 summary(lm(data=outputs, log(runtime)~log(size)+log(lambda)))
-ggplot(outputs)+geom_point(aes(size,runtime,colour=log(lambda)))+scale_x_log10()+scale_y_log10()+
-  ylab("run time (s)")+xlab("dataset size")+ggtitle("t ~ size^-0.36")
+ggplot(outputs)+geom_point(aes(size,runtime,colour=log(lambda)))+#scale_x_log10()+scale_y_log10()+
+  ylab("run time (s)")+xlab("dataset size")+ggtitle("t ~ size")
 
 #nu and delta: plots and correlation
 registerDoParallel(cores=30)
@@ -124,6 +124,7 @@ dcast(params[,.(cat,size,lambda,log(lambda_nu))],size+lambda~cat)
 
 
 
+#run optimization maually
 size=4
 load(paste0("data/caulo_NcoI_",size,"M_csnorm.RData"))
 cs@settings = c(cs@settings, list(bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10,
