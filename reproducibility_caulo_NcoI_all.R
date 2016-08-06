@@ -90,6 +90,7 @@ foreach (lambda=c(0.01,1,100)) %dopar% {
 foreach (lambda=c(0.01,1,100)) %dopar% {
   load(paste0("data/caulo_NcoI_all_gibbs1_lambda",lambda,"_csnorm_optimized.RData"))
   cs@pred=csnorm_predict_all(cs,ncores=30,verbose=F)
+  cs@binned=list()
   cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
   cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
   save(cs, file=paste0("data/caulo_NcoI_all_gibbs1_lambda",lambda,"_csnorm_optimized.RData"))
@@ -144,8 +145,9 @@ ggsave(filename=paste0("images/caulo_",prefix,"_reproducibility_lFC.png"), width
 #normalized matrices
 mat = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
   load(i)
-  get_cs_binned(cs,1,"CS")[,.(dset=j,begin1,begin2,normalized,is.interaction,prob.observed.gt.expected)]
+  get_cs_binned(cs,1,"CS")[,.(dset=j,begin1,begin2,normalized,lFC,observed, expected, is.interaction,prob.observed.gt.expected)]
 }
+#normalized
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(normalized)))+
   geom_raster(aes(begin2,begin1,fill=log(normalized)))+
@@ -153,6 +155,19 @@ ggplot(mat)+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~dset)
 ggsave(filename=paste0("images/caulo_",prefix,"_reproducibility_normalized.png"), width=10, height=5)
+#lFC
+ggplot(mat)+
+  geom_raster(aes(begin1,begin2,fill=lFC))+
+  geom_raster(aes(begin2,begin1,fill=lFC))+
+  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=mat[is.interaction==T])+
+  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
+  facet_wrap(~dset)
+#observed / expected
+ggplot(mat)+
+  geom_raster(aes(begin1,begin2,fill=log(observed)))+
+  geom_raster(aes(begin2,begin1,fill=log(expected)))+
+  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
+  facet_wrap(~dset)
 
 #nu and delta correlation
 nu = foreach (i=fnames[1:2],j=dsets[1:2],.combine=rbind) %do% {
@@ -166,17 +181,45 @@ ggplot(nu)+geom_line(aes(pos,log_nu,colour=dset))+xlim(2e6,2.15e6)
 ggplot(nu)+geom_line(aes(pos,log_nu,colour=dset))+xlim(1e6,1.15e6)
 nu[,pbin:=cut(pos,3)]
 ggplot(nu)+geom_line(aes(pos,exp(log_nu),colour=dset))+facet_wrap(~pbin,scales = "free_x", nrow=3)+
-  scale_y_continuous(limits = c(0,2))+ylab("nu")+scale_y_log10()
+  #scale_y_continuous(limits = c(0,2))+
+  ylab("nu")+scale_y_log10()
 ggsave(filename=paste0("images/caulo_",prefix,"_reproducibility_nu.png"), width=10, height=7.5)
-ggplot(nu)+geom_line(aes(pos,exp(log_delta),colour=dset))+facet_wrap(~pbin,scales = "free_x", nrow=3)+
-  scale_y_continuous(limits = c(0,2))+ylab("delta")
 
 #diagonal decay
-decay = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
+decay = foreach (i=fnames[1:2],j=dsets[1:2],.combine=rbind) %do% {
   load(i)
-  data.table(dist=cs@cs@par$decay[,.(dist,decay,dset=j)]
+  data.table(dist=cs@par$decay[,.(dist,decay,dset=j)])
 }
 decay[,decay:=decay/exp(mean(log(decay))),by=dset]
 decay=decay[dist>100]
 ggplot(decay)+geom_line(aes(dist,decay,colour=dset))+scale_x_log10()+scale_y_log10()
 ggsave(filename=paste0("images/caulo_",prefix,"_reproducibility_decay.png"), width=10, height=7.5)
+
+
+mat[begin1==520000&begin2==3440000]
+dsets[1]
+load(fnames[1])
+get_cs_binned(cs,1,"CS")[begin1==520000&begin2==3440000]
+binned1=csnorm_predict_binned(cs, resolution=10000)
+disp1=get_dispersions(binned1$mat)
+data1=list(B=binned1$mat[,.N],observed=binned1$mat[,observed],expected=binned1$mat[,expected],ncounts=binned1$mat[,ncounts])
+disp1 = optimizing(csnorm:::stanmodels$dispersions,
+                    data=data1, as_vector=F, hessian=F, iter=10000, verbose=T, init=0)$par
+#
+dsets[2]
+load(fnames[2])
+get_cs_binned(cs,1,"CS")[begin1==520000&begin2==3440000]
+binned2=csnorm_predict_binned(cs, resolution=10000)
+disp2=get_dispersions(binned2$mat)
+data2=list(B=binned2$mat[,.N],observed=binned2$mat[,observed],expected=binned2$mat[,expected],ncounts=binned2$mat[,ncounts])
+disp2 = optimizing(csnorm:::stanmodels$dispersions,
+                   data=data2, as_vector=F, hessian=F, iter=10000, verbose=T, init_alpha=1e-5)$par
+disp2$alpha
+
+
+mat[begin1==520000&begin2==3440000]
+binned1$mat[as.character(bin1)=="[5.2e+05,5.3e+05)" & as.character(bin2)=="[3.44e+06,3.45e+06)"]
+disp1$alpha
+binned2$mat[as.character(bin1)=="[5.2e+05,5.3e+05)" & as.character(bin2)=="[3.44e+06,3.45e+06)"]
+disp2$alpha
+

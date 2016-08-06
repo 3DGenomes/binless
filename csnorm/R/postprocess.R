@@ -137,7 +137,7 @@ csnorm_predict_binned = function(cs, resolution, b1=NULL, b2=NULL, e1=NULL, e2=N
 get_dispersions = function(binned, iter=10000) {
   data=list(B=binned[,.N],observed=binned[,observed],expected=binned[,expected],ncounts=binned[,ncounts])
   out <- capture.output(op <- optimizing(stanmodels$dispersions,
-                                         data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0)$par)
+                                         data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0, init_alpha=1e-5)$par)
   return(op)
 }
 
