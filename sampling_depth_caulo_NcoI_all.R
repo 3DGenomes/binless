@@ -22,24 +22,26 @@ save(cs, file="data/caulo_NcoI_all10M_csnorm.RData")
 samplings=c("1M","5M","10M")
 
 registerDoParallel(cores=30)
-foreach (sampling=samplings) %dopar% {
+foreach (sampling=c(samplings,"")) %dopar% {
   load(paste0("data/caulo_NcoI_all",sampling,"_csnorm.RData"))
-  coverage=4
-  square.size=150000
   bf_per_kb=0.25
-  cs=run_split_parallel(cs, square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
-                        bf_per_decade=5, distance_bins_per_decade=100, lambdas=c(0.01,1,100),
-                        verbose = F, iter=10000, ncores=10,
-                        homogenize=F, outprefix=paste0("tmp/test",sampling))#, ops.count=ops.count, ops.bias=ops.bias)
-  #cs=run_split_parallel_recovery(cs, "tmp/test", square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
-  #                               bf_per_decade=5, distance_bins_per_decade=100, lambdas=c(0.01,1,100), verbose = F,
-  #                               iter=10000, ncores=30, homogenize=F)
-  cs@pred=csnorm_predict_all(cs, ncores=30)
+  cs = run_simplified(cs, design=NULL, bf_per_kb=bf_per_kb, bf_per_decade=5, bins_per_bf=10, groups=10,
+                      lambdas=c(0.1,1,10), ngibbs = 1, iter=100000, ncores=10)
   cs=postprocess(cs, resolution=10000, ncores=10, verbose=F)
   cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
   save(cs, file=paste0("data/caulo_NcoI_all",sampling,"_csnorm_optimized.RData"))
 }
 
+
+#outputs
+outputs = foreach (j=c(samplings,""),.combine=rbind) %do% {
+  load(paste0("data/caulo_NcoI_all",j,"_csnorm_optimized.RData"))
+  data.table(dset=j,
+             out=tail(cs@par$output,1), runtime=cs@par$runtime,
+             lambda_nu=cs@par$lambda_nu, lambda_delta=cs@par$lambda_delta, logp=cs@par$value)
+}
+setkey(outputs,logp)
+outputs
 
 
 ### generate plots
@@ -100,3 +102,10 @@ decay[,decay:=decay/exp(mean(log(decay))),by=dset]
 decay=decay[dist>100]
 ggplot(decay)+geom_line(aes(dist,decay,colour=dset))+scale_x_log10()+scale_y_log10()
 ggsave(filename=paste0("images/caulo_",prefix,"_sampling_depth_decay.png"), width=10, height=7.5)
+
+
+
+
+
+
+
