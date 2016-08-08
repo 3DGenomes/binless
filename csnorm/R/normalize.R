@@ -179,6 +179,8 @@ csnorm_simplified_decay = function(biases, counts, log_nu, log_delta, dmin, dmax
             Kdiag=Kdiag, dmin=dmin, dmax=dmax, N=csd[,.N], counts_sum=csd[,count], weight=csd[,weight],
             dist=csd[,mdist], log_genomic_sum=csd[,log(others)])
   op=optimizing(stanmodels$simplified_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
+  #make nice decay data table
+  op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
   #rewrite log_decay as if it was calculated for each count
   csd[,log_decay:=op$par$log_decay]
   a=csd[csub,.(id1,id2,pos1,pos2,distance,log_decay),on=key(csd)]
@@ -725,36 +727,15 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
   return(cs)
 }
 
-
-#' Cut-site normalization (gibbs sampling)
-#' 
-#' Alternates two approximations to the exact model, fitting the diagonal decay and nu/delta.
-#' 
-#' @param cs CSnorm object as returned by \code{\link{merge_cs_norm_datasets}}
-#' @param bf_per_kb positive numeric. Number of cubic spline basis functions per
-#'   kilobase, for genomic bias estimates. Small values make the optimization 
-#'   easy, but makes the genomic biases stiffer.
-#' @param bf_per_decade positive numeric. Number of cubic spline basis functions
-#'   per distance decade (in bases), for diagonal decay. Default parameter 
-#'   should suffice.
-#' @param bins_per_bf positive integer. Number of distance bins to split basis
-#'   functions into. Must be sufficiently small so that the diagonal decay is
-#'   approximately constant in that bin.
-#' @param groups positive integer. Number of quantile groups to keep in each
-#'   distance bin.
-#' @param lambda positive numeric. Length scale to try out as initial condition.
-#' @param ngibbs positive integer. Number of gibbs sampling iterations.
-#' @param iter positive integer. Number of optimization steps for each stan
-#'   optimization call.
+#' Run approximate gibbs sampler on with a single starting condition
+#' @inheritParams run_simplified
 #' @param fit.decay,fit.genomic boolean. Whether to fit diagonal decay or
 #'   genomic biases. Set to FALSE only for diagnostics.
-#'   
-#' @return A csnorm object
+#' @keywords internal
 #' @export
 #' 
-#' @examples
-run_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambda=1,
-                     ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T) {
+run_simplified_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambda=1,
+                                ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -795,7 +776,8 @@ run_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=
         log_nu = op$par$log_nu, log_delta = op$par$log_delta,
         dmin = dmin, dmax = dmax, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, groups = groups,
         iter=iter, init=op$par)))
-      op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","beta_diag_centered","alpha","lambda_diag","log_decay")],
+      op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","beta_diag_centered","alpha",
+                                                       "lambda_diag","log_decay","decay")],
                                          op$par[c("eRJ","eDE","beta_nu","beta_delta",
                                                   "lambda_nu","lambda_delta","log_nu","log_delta")]))
       cs@diagnostics[[paste0("out.decay",i)]]=output
@@ -807,9 +789,9 @@ run_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=
         biases = cs@biases, counts = cs@counts,
         log_decay = op$par$log_decay, log_nu = op$par$log_nu, log_delta = op$par$log_delta,
         groups = groups, bf_per_kb = bf_per_kb, iter = iter, init=op$par)))
-      op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag","log_decay")],
-                                      op.gen$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta",
-                                                   "lambda_nu","lambda_delta","log_nu","log_delta")]))
+      op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag","log_decay","decay")],
+                                        op.gen$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta",
+                                                     "lambda_nu","lambda_delta","log_nu","log_delta")]))
       cs@diagnostics[[paste0("out.bias",i)]]=output
       cs@diagnostics[[paste0("runtime.bias",i)]]=a[1]+a[4]
     }
@@ -822,8 +804,43 @@ run_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=
   op$par$init=init.op$par
   op$par$value=op$value
   cs@par=op$par
-  #cs@pred=copy(csnorm_predict_all(cs,ncores=10,verbose=F))
-  #cs=postprocess(cs, resolution=10000, ncores=10, verbose=F)
-  #cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
   return(cs)
 }
+
+#' Cut-site normalization (simplified gibbs sampling)
+#' 
+#' Alternates two approximations to the exact model, fitting the diagonal decay and nu/delta.
+#' 
+#' @param cs CSnorm object as returned by \code{\link{merge_cs_norm_datasets}}
+#' @param bf_per_kb positive numeric. Number of cubic spline basis functions per
+#'   kilobase, for genomic bias estimates. Small values make the optimization 
+#'   easy, but makes the genomic biases stiffer.
+#' @param bf_per_decade positive numeric. Number of cubic spline basis functions
+#'   per distance decade (in bases), for diagonal decay. Default parameter 
+#'   should suffice.
+#' @param bins_per_bf positive integer. Number of distance bins to split basis
+#'   functions into. Must be sufficiently small so that the diagonal decay is
+#'   approximately constant in that bin.
+#' @param groups positive integer. Number of quantile groups to keep in each
+#'   distance bin.
+#' @param lambdas positive numeric. Length scales to try out as initial condition.
+#' @param ngibbs positive integer. Number of gibbs sampling iterations.
+#' @param iter positive integer. Number of optimization steps for each stan
+#'   optimization call.
+#' @param ncores positive integer. Number of cores to parallelize on.
+#'   
+#' @return A csnorm object
+#' @export
+#' 
+#' @examples
+run_simplified = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=c(0.1,1,10),
+                          ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, ncores=1) {
+  registerDoParallel(cores=ncores)
+  cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %dopar%
+    run_simplified_gibbs(cs, design=design, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
+                         bins_per_bf=bins_per_bf, groups=groups, lambda=lambda, ngibbs = ngibbs,
+                         iter=iter, fit.decay=T, fit.genomic=T)
+  cs@pred=copy(csnorm_predict_all(cs,ncores=ncores,verbose=F))
+  return(cs)
+}
+
