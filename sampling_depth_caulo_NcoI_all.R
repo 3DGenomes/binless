@@ -19,6 +19,7 @@ save(cs, file="data/caulo_NcoI_all10M_csnorm.RData")
 
 
 ### normalize different datasets
+samplings=c("1M","5M","10M")
 
 registerDoParallel(cores=30)
 foreach (sampling=samplings) %dopar% {
