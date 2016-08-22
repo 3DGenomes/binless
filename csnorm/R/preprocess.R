@@ -322,7 +322,7 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000) {
 #' @param condition character. WT, KO etc.
 #' @param replicate character. Replicate number
 #' @param name character. A name for the experiment. By default, it is condition and replicate
-#' @param enzyme character. HindIII, DpnII etc. For now, it is NULL and cannot be changed
+#' @param enzyme character. HindIII, DpnII etc.
 #' @param experiment character. Hi-C Capture-C etc. For now it is Hi-C and cannot be changed
 #' @inheritParams read_tsv
 #' @inheritParams categorize_by_new_type
@@ -333,11 +333,10 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000) {
 #' @export
 #' 
 #' @examples
-read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "unspecified", experiment = "Hi-C",
+read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "HindIII", experiment = "Hi-C",
                             name = paste(condition, replicate), skip = 0L, nrows = -1L,
                             circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1), maxlen = 600,
                             save.data=T) {
-  match.arg(enzyme)
   match.arg(experiment)
   message("*** READ")
   data=read_tsv(infile, skip=skip, nrows=nrows)
@@ -368,20 +367,33 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "u
 #'
 #' @examples
 merge_cs_norm_datasets = function(datasets) {
+  #compile table of experiments, sorted by id
   experiments = rbindlist(lapply(datasets, function(x) x@info))
   setkey(experiments, name)
-  stopifnot(experiments[,.N]==experiments[,uniqueN(name)])
-  #
+  stopifnot(experiments[,.N]==experiments[,uniqueN(name)]) #id must be unique
+  #all experiments must have the same settings
   stopifnot(uniqueN(rbindlist(lapply(datasets, function(x) x@settings)))==1)
-  #
+  #merge biases and counts into data tables, make IDs unique
   biases = lapply(datasets, function(x) x@biases)
-  names(biases) <- sapply(datasets, function(x) x@info$name)
   counts = lapply(datasets, function(x) x@counts)
+  names(biases) <- sapply(datasets, function(x) x@info$name)
   names(counts) <- sapply(datasets, function(x) x@info$name)
-  #
+  stopifnot(all(sapply(datasets, function(x) x@biases[,all(id==1:.N)])))
+  sizes=sapply(biases, function(x) x[,.N])
+  sizes=cumsum(sizes)
+  if (length(datasets)>1) {
+    for (i in 2:length(datasets)) {
+      biases[i][,id:=id+sizes[i-1]]
+      counts[i][,id1:=id1+sizes[i-1]]
+      counts[i][,id2:=id2+sizes[i-1]]
+    }
+  }
+  biases=rbindlist(biases, use.names=T, idcol="name")
+  counts=rbindlist(counts, use.names=T, idcol="name")
+  stopifnot(biases[,all(id==1:.N)])
+  #return CSnorm object
   new("CSnorm", experiments=experiments,
                 design=data.table(),
                 settings=datasets[[1]]@settings,
-                biases=rbindlist(biases, use.names=T, idcol="name"),
-                counts=rbindlist(counts, use.names=T, idcol="name"))
+                biases=biases, counts=counts)
 }
