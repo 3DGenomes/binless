@@ -11,7 +11,7 @@ Depends:
     Rcpp (>= 0.11.0)
 Imports:
     data.table (>= 1.9.6),
-    rstan (>= 2.9.0-3),
+    rstan (>= 2.11.1),
     Hmisc,
     foreach,
     doParallel,
@@ -19,14 +19,8 @@ Imports:
     matrixStats,
     ggplot2,
     dplyr
-LinkingTo: StanHeaders (>= 2.9.0), rstan (>= 2.9.0-3), BH (>= 1.58.0), Rcpp (>=
-    0.11.0), RcppEigen
-RcppModules: stan_fit4dispersions_mod, stan_fit4fit_mod, stan_fit4fit_decay_mod,
-    stan_fit4fit_eC_mod, stan_fit4fit_extradiag_mod, stan_fit4homogenize_mod,
-    stan_fit4predict_all_mod, stan_fit4predict_binned_mod,
-    stan_fit4gen_genomic_biases_mod, stan_fit4guess_mod,
-    stan_fit4simplified_genomic_mod, stan_fit4simplified_decay_mod,
-    stan_fit4simplified_guess_mod
+LinkingTo: StanHeaders (>= 2.11.0), rstan (>= 2.11.1), BH (>= 1.60.0), Rcpp (>=
+    0.12.0), RcppEigen
 RoxygenNote: 5.0.1
 NeedsCompilation: yes
 Collate:
