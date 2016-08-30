@@ -383,9 +383,9 @@ merge_cs_norm_datasets = function(datasets) {
   sizes=cumsum(sizes)
   if (length(datasets)>1) {
     for (i in 2:length(datasets)) {
-      biases[i][,id:=id+sizes[i-1]]
-      counts[i][,id1:=id1+sizes[i-1]]
-      counts[i][,id2:=id2+sizes[i-1]]
+      biases[[i]][,id:=id+sizes[i-1]]
+      counts[[i]][,id1:=id1+sizes[i-1]]
+      counts[[i]][,id2:=id2+sizes[i-1]]
     }
   }
   biases=rbindlist(biases, use.names=T, idcol="name")
