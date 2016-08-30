@@ -83,10 +83,10 @@ transformed parameters {
 model {
   //// Exact likelihoods
   //counts: Close, Far, Up, Down
-  increment_log_prob(weight*neg_binomial_2_log_log(counts_close, log_mean_cclose, alpha));
-  increment_log_prob(weight*neg_binomial_2_log_log(counts_far, log_mean_cfar, alpha));
-  increment_log_prob(weight*neg_binomial_2_log_log(counts_up, log_mean_cup, alpha));
-  increment_log_prob(weight*neg_binomial_2_log_log(counts_down, log_mean_cdown, alpha));
+  target += weight*neg_binomial_2_log_lpmf(counts_close | log_mean_cclose, alpha);
+  target += weight*neg_binomial_2_log_lpmf(counts_far | log_mean_cfar, alpha);
+  target += weight*neg_binomial_2_log_lpmf(counts_up | log_mean_cup, alpha);
+  target += weight*neg_binomial_2_log_lpmf(counts_down | log_mean_cdown, alpha);
   
 
   //// Priors

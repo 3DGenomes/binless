@@ -90,7 +90,7 @@ model {
   danglingR ~ neg_binomial_2_log(log_mean_DR, alpha);
   
   //counts
-  for (i in 1:N) increment_log_prob(weight[i] * neg_binomial_2_log_log(counts_sum[i], log_mean_counts[i], alpha));
+  for (i in 1:N) target += weight[i] * neg_binomial_2_log_lpmf(counts_sum[i] | log_mean_counts[i], alpha);
   
   //// prior
   beta_diag_diff ~ normal(0,1/lambda_diag);

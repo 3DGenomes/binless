@@ -108,8 +108,8 @@ model {
   danglingR ~ neg_binomial_2_log(log_mean_DR, alpha);
   
   //counts
-  increment_log_prob((S-1) * neg_binomial_2_log_log(counts_sum_left, log_mean_cleft, alpha));
-  increment_log_prob((S-1) * neg_binomial_2_log_log(counts_sum_right, log_mean_cright, alpha));
+  target += (S-1) * neg_binomial_2_log_lpmf(counts_sum_left | log_mean_cleft, alpha);
+  target += (S-1) * neg_binomial_2_log_lpmf(counts_sum_right | log_mean_cright, alpha);
   
   //// prior
   log_nu ~ cauchy(0, 1); //give high probability to [0.5:2]

@@ -127,8 +127,8 @@ model {
   //counts
   //grouping reduces the number of likelihoods from S-1 to G, so reweighting is
   //needed for a proper estimation of the lambdas
-  increment_log_prob(weight * neg_binomial_2_log_log(csl, log_mean_cleft, alpha));
-  increment_log_prob(weight * neg_binomial_2_log_log(csr, log_mean_cright, alpha));
+  target += weight * neg_binomial_2_log_lpmf(csl | log_mean_cleft, alpha);
+  target += weight * neg_binomial_2_log_lpmf(csr | log_mean_cright, alpha);
   
   //// prior
   log_nu ~ cauchy(0, 1); //give high probability to [0.5:2]
