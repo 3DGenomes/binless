@@ -155,7 +155,7 @@ setMethod("show",signature="CSnorm",definition=function(object) {
   } else {
     cat(" Genome is linear\n", sep="")
   }
-  cat(" There are ", object@biases[,.N], " cut sites\n", sep="")
+  cat(" There are ", object@biases[,uniqueN(pos)], " unique cut sites\n", sep="")
   ncounts=object@counts[,sum((contact.close>0)+(contact.far>0)+(contact.up>0)+(contact.down>0))]
   cat(" and ", ncounts, " nonzero counts\n", sep="")
   nreads=object@counts[,sum(contact.close+contact.far+contact.up+contact.down)]
