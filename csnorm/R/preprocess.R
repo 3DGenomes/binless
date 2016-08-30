@@ -169,7 +169,7 @@ prepare_for_sparse_cs_norm = function(data, both=F, circularize=-1) {
   X=dcast.data.table(enrich[id1 == id2 & category %in% c("dangling.L", "dangling.R", "rejoined"),
                             .(id=id1, pos=re.closest1, category, N)],
                      ...~category, value.var="N", fun.aggregate = sum)
-  X=rbind(X,rsites[id%nin%X[,id],.(id,pos=re.pos,dangling.L=0,dangling.R=0,rejoined=0)])
+  X=rbind(X,rsites[!(id%in%X[,id]),.(id,pos=re.pos,dangling.L=0,dangling.R=0,rejoined=0)])
   setkey(X,id)
   stopifnot(all(X[,id==.I])) #IDs must start at one and have no gaps, for current stan implementation
   #

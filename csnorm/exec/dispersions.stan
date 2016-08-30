@@ -14,7 +14,7 @@ parameters {
 }
 transformed parameters {
   vector<lower=0>[B] dispersion;
-  dispersion <- alpha*ncounts;
+  dispersion = alpha*ncounts;
 }
 model {
   observed ~ neg_binomial_2(expected,dispersion);

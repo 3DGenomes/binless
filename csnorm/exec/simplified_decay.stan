@@ -31,7 +31,7 @@ transformed data {
   matrix[N,Kdiag] Xdiag;
   row_vector[Kdiag] pdiag;
   row_vector[N] diag_weights;
-  diag_weights <- weight';
+  diag_weights = weight';
   
   //diagonal SCAM spline, dense, exact and mean field model
   #include "scam_spline_construction.stan"
@@ -64,22 +64,22 @@ transformed parameters {
   {
     vector[Kdiag] beta_diag_aug;
     real epsilon;
-    epsilon <- -1; //decreasing spline
-    beta_diag_aug[1] <- 0;
-    beta_diag_aug[2:] <- beta_diag;
-    beta_diag_centered <- epsilon * (beta_diag_aug - (pdiag * beta_diag_aug) * rep_vector(1, Kdiag));
-    log_decay <- Xdiag * beta_diag_centered;
-    beta_diag_diff <- beta_diag_centered[:(Kdiag-2)]-2*beta_diag_centered[2:(Kdiag-1)]+beta_diag_centered[3:];
+    epsilon = -1; //decreasing spline
+    beta_diag_aug[1] = 0;
+    beta_diag_aug[2:] = beta_diag;
+    beta_diag_centered = epsilon * (beta_diag_aug - (pdiag * beta_diag_aug) * rep_vector(1, Kdiag));
+    log_decay = Xdiag * beta_diag_centered;
+    beta_diag_diff = beta_diag_centered[:(Kdiag-2)]-2*beta_diag_centered[2:(Kdiag-1)]+beta_diag_centered[3:];
   }
 
   //means
   {
     //biases
-    log_mean_RJ <- log_nu + eRJ;
-    log_mean_DL <- log_nu + eDE + log_delta;
-    log_mean_DR <- log_nu + eDE - log_delta;
+    log_mean_RJ = log_nu + eRJ;
+    log_mean_DL = log_nu + eDE + log_delta;
+    log_mean_DR = log_nu + eDE - log_delta;
     //exact counts  
-    log_mean_counts  <- eC + log_decay + log_genomic_sum;
+    log_mean_counts  = eC + log_decay + log_genomic_sum;
   }
 }
 model {
@@ -90,7 +90,7 @@ model {
   danglingR ~ neg_binomial_2_log(log_mean_DR, alpha);
   
   //counts
-  for (i in 1:N) increment_log_prob(weight[i] * neg_binomial_2_log_log(counts_sum[i], log_mean_counts[i], alpha));
+  for (i in 1:N) target += weight[i] * neg_binomial_2_log_lpmf(counts_sum[i] | log_mean_counts[i], alpha);
   
   //// prior
   beta_diag_diff ~ normal(0,1/lambda_diag);

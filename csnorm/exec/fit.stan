@@ -51,18 +51,18 @@ transformed data {
   {
     vector[SD] row_weightsD;
     int nnzs[Dsets+1];
-    row_weightsD <- rep_vector(3, SD); //dangling L/R + rejoined
+    row_weightsD = rep_vector(3, SD); //dangling L/R + rejoined
     for (i in 1:N) {
-      row_weightsD[cidx[1,i]] <- row_weightsD[cidx[1,i]] + 1;
-      row_weightsD[cidx[2,i]] <- row_weightsD[cidx[2,i]] + 1;
+      row_weightsD[cidx[1,i]] = row_weightsD[cidx[1,i]] + 1;
+      row_weightsD[cidx[2,i]] = row_weightsD[cidx[2,i]] + 1;
     }
-    nnzs[1] <- 1;
-    for (i in 1:Dsets) nnzs[i+1] <- nnzs[i]+nnz(bbegin[i+1]-bbegin[i]);
+    nnzs[1] = 1;
+    for (i in 1:Dsets) nnzs[i+1] = nnzs[i]+nnz(bbegin[i+1]-bbegin[i]);
     
     #compute design matrix and projector
     for (d in 1:Dsets) {
       int S;
-      S <- bbegin[d+1]-bbegin[d];
+      S = bbegin[d+1]-bbegin[d];
       {
         vector[S] cutsites;
         vector[nnz(S)] Xrow_w;
@@ -70,36 +70,36 @@ transformed data {
         int Xrow_u[S+1];
         vector[S] row_weights;
         row_vector[Krow] prow;
-        cutsites <- cutsitesD[bbegin[d]:(bbegin[d+1]-1)];
-        row_weights <- row_weightsD[bbegin[d]:(bbegin[d+1]-1)];
+        cutsites = cutsitesD[bbegin[d]:(bbegin[d+1]-1)];
+        row_weights = row_weightsD[bbegin[d]:(bbegin[d+1]-1)];
         #include "sparse_spline_construction.stan"
-        XDrow_w[nnzs[d]:(nnzs[d+1]-1)] <- Xrow_w;
-        XDrow_v[nnzs[d]:(nnzs[d+1]-1)] <- Xrow_v + Krow*(d-1);
-        XDrow_u[bbegin[d]:bbegin[d+1]] <- Xrow_u + bbegin[d]-1;
-        prowD[d] <- prow;
+        XDrow_w[nnzs[d]:(nnzs[d+1]-1)] = Xrow_w;
+        XDrow_v[nnzs[d]:(nnzs[d+1]-1)] = Xrow_v + Krow*(d-1);
+        XDrow_u[bbegin[d]:bbegin[d+1]] = Xrow_u + bbegin[d]-1;
+        prowD[d] = prow;
       }
     }
   }
   //diagonal SCAM spline, dense
   {
-    Xdiag <- bspline(log(dist), Kdiag, splinedegree(), log(dmin), log(dmax));
+    Xdiag = bspline(log(dist), Kdiag, splinedegree(), log(dmin), log(dmax));
     //projector for diagonal (SCAM)
     for (d in 1:Dsets) {
       int sz;
-      sz <- cbegin[d+1]-cbegin[d];
+      sz = cbegin[d+1]-cbegin[d];
       {
         row_vector[sz] diag_weights;
         vector[Kdiag] pdiag;
-        diag_weights <- rep_row_vector(1,sz);
-        diag_weights <- diag_weights/mean(diag_weights);
-        pdiag <- diag_weights * Xdiag[cbegin[d]:(cbegin[d+1]-1),:];
-        pdiagD[d] <- pdiag / (pdiag * rep_vector(1,Kdiag));
+        diag_weights = rep_row_vector(1,sz);
+        diag_weights = diag_weights/mean(diag_weights);
+        pdiag = diag_weights * Xdiag[cbegin[d]:(cbegin[d+1]-1),:];
+        pdiagD[d] = pdiag / (pdiag * rep_vector(1,Kdiag));
       }
     }
   }
   
   //scaling factor for genomic lambdas
-  lfac <- 30000*Krow/(max(cutsites)-min(cutsites));
+  lfac = 30000*Krow/(max(cutsites)-min(cutsites));
 }
 parameters {
   //exposures
@@ -144,13 +144,13 @@ transformed parameters {
     for (d in 1:Dsets) {
       vector[Krow] beta_nu_aug;
       vector[Krow] tmp;
-      beta_nu_aug[1] <- 0;
-      beta_nu_aug[2:] <- beta_nu[XB[d]];
-      tmp <- beta_nu_aug - (prowD[d] * beta_nu_aug) * rep_vector(1,Krow);
-      beta_nu_centered[((d-1)*Krow+1):(d*Krow)] <- tmp;
-      beta_nu_diff[d] <- tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
+      beta_nu_aug[1] = 0;
+      beta_nu_aug[2:] = beta_nu[XB[d]];
+      tmp = beta_nu_aug - (prowD[d] * beta_nu_aug) * rep_vector(1,Krow);
+      beta_nu_centered[((d-1)*Krow+1):(d*Krow)] = tmp;
+      beta_nu_diff[d] = tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
     }
-    log_nu <- csr_matrix_times_vector(SD, Dsets*Krow, Xrow_w, Xrow_v, Xrow_u, beta_nu_centered);
+    log_nu = csr_matrix_times_vector(SD, Dsets*Krow, Xrow_w, Xrow_v, Xrow_u, beta_nu_centered);
   }
   
   //delta
@@ -159,13 +159,13 @@ transformed parameters {
     for (d in 1:Dsets) {
       vector[Krow] beta_delta_aug;
       vector[Krow] tmp;
-      beta_delta_aug[1] <- 0;
-      beta_delta_aug[2:] <- beta_delta[XB[d]];
-      tmp <- beta_delta_aug - (prowD[d] * beta_delta_aug) * rep_vector(1,Krow);
-      beta_delta_centered[((d-1)*Krow+1):(d*Krow)] <- tmp;
-      beta_delta_diff[d] <- tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
+      beta_delta_aug[1] = 0;
+      beta_delta_aug[2:] = beta_delta[XB[d]];
+      tmp = beta_delta_aug - (prowD[d] * beta_delta_aug) * rep_vector(1,Krow);
+      beta_delta_centered[((d-1)*Krow+1):(d*Krow)] = tmp;
+      beta_delta_diff[d] = tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
     }
-    log_delta <- csr_matrix_times_vector(SD, Dsets*Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
+    log_delta = csr_matrix_times_vector(SD, Dsets*Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
   }
   
   //decay
@@ -173,35 +173,35 @@ transformed parameters {
     vector[Kdiag] beta_diag_aug;
     vector[Kdiag] tmp;
     real epsilon;
-    epsilon <- -1; //decreasing spline
-    beta_diag_aug[1] <- 0;
-    beta_diag_aug[2:] <- beta_diag[XD[d]];
-    tmp <- epsilon * (beta_diag_aug - (pdiagD[d] * beta_diag_aug) * rep_vector(1, Kdiag));
-    beta_diag_centered[((d-1)*Kdiag+1):(d*Kdiag)] <- tmp;
-    beta_diag_diff[d] <- tmp[:(Kdiag-2)]-2*tmp[2:(Kdiag-1)]+tmp[3:];
+    epsilon = -1; //decreasing spline
+    beta_diag_aug[1] = 0;
+    beta_diag_aug[2:] = beta_diag[XD[d]];
+    tmp = epsilon * (beta_diag_aug - (pdiagD[d] * beta_diag_aug) * rep_vector(1, Kdiag));
+    beta_diag_centered[((d-1)*Kdiag+1):(d*Kdiag)] = tmp;
+    beta_diag_diff[d] = tmp[:(Kdiag-2)]-2*tmp[2:(Kdiag-1)]+tmp[3:];
   }
-  log_decay <- Xdiag * beta_diag_centered;
+  log_decay = Xdiag * beta_diag_centered;
     
   //means
   {
     //biases
-    log_mean_RJ <- log_nu;
-    log_mean_DL <- log_nu + log_delta;
-    log_mean_DR <- log_nu - log_delta;
+    log_mean_RJ = log_nu;
+    log_mean_DL = log_nu + log_delta;
+    log_mean_DR = log_nu - log_delta;
     //exact counts  
-    log_mean_cclose <- log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
-    log_mean_cfar   <- log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
-    log_mean_cup    <- log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
-    log_mean_cdown  <- log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
+    log_mean_cclose = log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
+    log_mean_cfar   = log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
+    log_mean_cup    = log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
+    log_mean_cdown  = log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
     //add exposures
     for (d in 1:Dsets) {
-      log_mean_RJ[bbegin[d]:(bbegin[d+1]-1)]     <- log_mean_RJ[bbegin[d]:(bbegin[d+1]-1)] + eRJ[d];
-      log_mean_DL[bbegin[d]:(bbegin[d+1]-1)]     <- log_mean_DL[bbegin[d]:(bbegin[d+1]-1)] + eDE[d];
-      log_mean_DR[bbegin[d]:(bbegin[d+1]-1)]     <- log_mean_DR[bbegin[d]:(bbegin[d+1]-1)] + eDE[d];
-      log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)] <- log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
-      log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)]   <- log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
-      log_mean_cup[cbegin[d]:(cbegin[d+1]-1)]    <- log_mean_cup[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
-      log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)]  <- log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
+      log_mean_RJ[bbegin[d]:(bbegin[d+1]-1)]     = log_mean_RJ[bbegin[d]:(bbegin[d+1]-1)] + eRJ[d];
+      log_mean_DL[bbegin[d]:(bbegin[d+1]-1)]     = log_mean_DL[bbegin[d]:(bbegin[d+1]-1)] + eDE[d];
+      log_mean_DR[bbegin[d]:(bbegin[d+1]-1)]     = log_mean_DR[bbegin[d]:(bbegin[d+1]-1)] + eDE[d];
+      log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)] = log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
+      log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)]   = log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
+      log_mean_cup[cbegin[d]:(cbegin[d+1]-1)]    = log_mean_cup[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
+      log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)]  = log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
     }
   }
 }
@@ -213,10 +213,10 @@ model {
   danglingR ~ neg_binomial_2_log(log_mean_DR, alpha);
   
   //counts: Close, Far, Up, Down
-  increment_log_prob(weight*neg_binomial_2_log_log(counts_close, log_mean_cclose, alpha));
-  increment_log_prob(weight*neg_binomial_2_log_log(counts_far, log_mean_cfar, alpha));
-  increment_log_prob(weight*neg_binomial_2_log_log(counts_up, log_mean_cup, alpha));
-  increment_log_prob(weight*neg_binomial_2_log_log(counts_down, log_mean_cdown, alpha));
+  target += weight*neg_binomial_2_log_lpmf(counts_close | log_mean_cclose, alpha);
+  target += weight*neg_binomial_2_log_lpmf(counts_far | log_mean_cfar, alpha);
+  target += weight*neg_binomial_2_log_lpmf(counts_up | log_mean_cup, alpha);
+  target += weight*neg_binomial_2_log_lpmf(counts_down | log_mean_cdown, alpha);
   
   //// Priors
   for (d in 1:Dsets) {
