@@ -10,9 +10,9 @@
 
   //diagonal SCAM spline, dense, exact and mean field model
   {
-    diag_weights <- diag_weights/mean(diag_weights);
-    Xdiag <- bspline(log(dist), Kdiag, splinedegree(), log(dmin), log(dmax));
+    diag_weights = diag_weights/mean(diag_weights);
+    Xdiag = bspline(log(dist), Kdiag, splinedegree(), log(dmin), log(dmax));
     //projector for diagonal (SCAM)
-    pdiag <- diag_weights * Xdiag;
-    pdiag <- pdiag / (pdiag * rep_vector(1,Kdiag));
+    pdiag = diag_weights * Xdiag;
+    pdiag = pdiag / (pdiag * rep_vector(1,Kdiag));
   }

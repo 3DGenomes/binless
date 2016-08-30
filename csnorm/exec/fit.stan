@@ -41,20 +41,20 @@ transformed data {
   //scaling factor for genomic lambdas
   real lfac;
   
-  row_weights <- rep_vector(3, S); //dangling L/R + rejoined
+  row_weights = rep_vector(3, S); //dangling L/R + rejoined
   for (i in 1:N) {
-    row_weights[cidx[1,i]] <- row_weights[cidx[1,i]] + 1;
-    row_weights[cidx[2,i]] <- row_weights[cidx[2,i]] + 1;
+    row_weights[cidx[1,i]] = row_weights[cidx[1,i]] + 1;
+    row_weights[cidx[2,i]] = row_weights[cidx[2,i]] + 1;
   }
   #compute design matrix and projector
   #include "sparse_spline_construction.stan"
 
   //diagonal SCAM spline, dense, exact and mean field model
-  diag_weights <- rep_row_vector(1,N);
+  diag_weights = rep_row_vector(1,N);
   #include "scam_spline_construction.stan"
 
   //scaling factor for genomic lambdas
-  lfac <- 30000*Krow/(max(cutsites)-min(cutsites));
+  lfac = 30000*Krow/(max(cutsites)-min(cutsites));
 }
 parameters {
   //exposures
@@ -97,45 +97,45 @@ transformed parameters {
   {
     vector[Krow] beta_nu_aug;
     vector[Krow] beta_nu_centered;
-    beta_nu_aug[1] <- 0;
-    beta_nu_aug[2:] <- beta_nu;
-    beta_nu_centered <- beta_nu_aug - (prow * beta_nu_aug) * rep_vector(1,Krow);
-    log_nu <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_nu_centered);
-    beta_nu_diff <- beta_nu_centered[:(Krow-2)]-2*beta_nu_centered[2:(Krow-1)]+beta_nu_centered[3:];
+    beta_nu_aug[1] = 0;
+    beta_nu_aug[2:] = beta_nu;
+    beta_nu_centered = beta_nu_aug - (prow * beta_nu_aug) * rep_vector(1,Krow);
+    log_nu = csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_nu_centered);
+    beta_nu_diff = beta_nu_centered[:(Krow-2)]-2*beta_nu_centered[2:(Krow-1)]+beta_nu_centered[3:];
   }
   //delta
   {
     vector[Krow] beta_delta_aug;
     vector[Krow] beta_delta_centered;
-    beta_delta_aug[1] <- 0;
-    beta_delta_aug[2:] <- beta_delta;
-    beta_delta_centered <- beta_delta_aug - (prow * beta_delta_aug) * rep_vector(1,Krow);
-    log_delta <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
-    beta_delta_diff <- beta_delta_centered[:(Krow-2)]-2*beta_delta_centered[2:(Krow-1)]+beta_delta_centered[3:];
+    beta_delta_aug[1] = 0;
+    beta_delta_aug[2:] = beta_delta;
+    beta_delta_centered = beta_delta_aug - (prow * beta_delta_aug) * rep_vector(1,Krow);
+    log_delta = csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
+    beta_delta_diff = beta_delta_centered[:(Krow-2)]-2*beta_delta_centered[2:(Krow-1)]+beta_delta_centered[3:];
   }
   //decay
   {
     vector[Kdiag] beta_diag_aug;
     real epsilon;
-    epsilon <- -1; //decreasing spline
-    beta_diag_aug[1] <- 0;
-    beta_diag_aug[2:] <- beta_diag;
-    beta_diag_centered <- epsilon * (beta_diag_aug - (pdiag * beta_diag_aug) * rep_vector(1, Kdiag));
-    log_decay <- Xdiag * beta_diag_centered;
-    beta_diag_diff <- beta_diag_centered[:(Kdiag-2)]-2*beta_diag_centered[2:(Kdiag-1)]+beta_diag_centered[3:];
+    epsilon = -1; //decreasing spline
+    beta_diag_aug[1] = 0;
+    beta_diag_aug[2:] = beta_diag;
+    beta_diag_centered = epsilon * (beta_diag_aug - (pdiag * beta_diag_aug) * rep_vector(1, Kdiag));
+    log_decay = Xdiag * beta_diag_centered;
+    beta_diag_diff = beta_diag_centered[:(Kdiag-2)]-2*beta_diag_centered[2:(Kdiag-1)]+beta_diag_centered[3:];
   }
 
   //means
   {
     //biases
-    log_mean_RJ <- log_nu + eRJ;
-    log_mean_DL <- log_nu + eDE + log_delta;
-    log_mean_DR <- log_nu + eDE - log_delta;
+    log_mean_RJ = log_nu + eRJ;
+    log_mean_DL = log_nu + eDE + log_delta;
+    log_mean_DR = log_nu + eDE - log_delta;
     //exact counts  
-    log_mean_cclose <- eC + log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
-    log_mean_cfar   <- eC + log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
-    log_mean_cup    <- eC + log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
-    log_mean_cdown  <- eC + log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
+    log_mean_cclose = eC + log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
+    log_mean_cfar   = eC + log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
+    log_mean_cup    = eC + log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
+    log_mean_cdown  = eC + log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
   }
 }
 model {
@@ -184,26 +184,26 @@ generated quantities {
   real count_deviance_null;
   real count_deviance_proportion_explained;
   #deviances
-  count_deviance <- neg_binomial_2_log_deviance(counts_close, log_mean_cclose, alpha, rep_vector(1,1)) +
+  count_deviance = neg_binomial_2_log_deviance(counts_close, log_mean_cclose, alpha, rep_vector(1,1)) +
               neg_binomial_2_log_deviance(counts_far, log_mean_cfar, alpha, rep_vector(1,1)) +
               neg_binomial_2_log_deviance(counts_up, log_mean_cup, alpha, rep_vector(1,1)) +
               neg_binomial_2_log_deviance(counts_down, log_mean_cdown, alpha, rep_vector(1,1));
-  rejoined_deviance <- neg_binomial_2_log_deviance(rejoined, log_mean_RJ, alpha, rep_vector(1,1));
-  dangling_deviance <- neg_binomial_2_log_deviance(danglingL, log_mean_DL, alpha, rep_vector(1,1)) +
+  rejoined_deviance = neg_binomial_2_log_deviance(rejoined, log_mean_RJ, alpha, rep_vector(1,1));
+  dangling_deviance = neg_binomial_2_log_deviance(danglingL, log_mean_DL, alpha, rep_vector(1,1)) +
                        neg_binomial_2_log_deviance(danglingR, log_mean_DR, alpha, rep_vector(1,1));
-  deviance <- rejoined_deviance + dangling_deviance + count_deviance;
+  deviance = rejoined_deviance + dangling_deviance + count_deviance;
   #null deviances
-  rejoined_deviance_null <- neg_binomial_2_log_deviance(rejoined, rep_vector(eRJ,1), alpha, rep_vector(1,1));
-  dangling_deviance_null <- neg_binomial_2_log_deviance(danglingL, rep_vector(eDE,1), alpha, rep_vector(1,1)) +
+  rejoined_deviance_null = neg_binomial_2_log_deviance(rejoined, rep_vector(eRJ,1), alpha, rep_vector(1,1));
+  dangling_deviance_null = neg_binomial_2_log_deviance(danglingL, rep_vector(eDE,1), alpha, rep_vector(1,1)) +
                             neg_binomial_2_log_deviance(danglingR, rep_vector(eDE,1), alpha, rep_vector(1,1));
-  count_deviance_null <- neg_binomial_2_log_deviance(counts_close, rep_vector(eC,1), alpha, rep_vector(1,1)) +
+  count_deviance_null = neg_binomial_2_log_deviance(counts_close, rep_vector(eC,1), alpha, rep_vector(1,1)) +
                    neg_binomial_2_log_deviance(counts_far, rep_vector(eC,1), alpha, rep_vector(1,1)) +
                    neg_binomial_2_log_deviance(counts_up, rep_vector(eC,1), alpha, rep_vector(1,1)) +
                    neg_binomial_2_log_deviance(counts_down, rep_vector(eC,1), alpha, rep_vector(1,1));
-  deviance_null <- rejoined_deviance_null + dangling_deviance_null + count_deviance_null;
+  deviance_null = rejoined_deviance_null + dangling_deviance_null + count_deviance_null;
   #proportions explained
-  rejoined_deviance_proportion_explained <- 100*(rejoined_deviance_null - rejoined_deviance)/rejoined_deviance_null;
-  dangling_deviance_proportion_explained <- 100*(dangling_deviance_null - dangling_deviance)/dangling_deviance_null;
-  count_deviance_proportion_explained <- 100*(count_deviance_null - count_deviance)/count_deviance_null;
-  deviance_proportion_explained <- 100*(deviance_null - deviance)/deviance_null;
+  rejoined_deviance_proportion_explained = 100*(rejoined_deviance_null - rejoined_deviance)/rejoined_deviance_null;
+  dangling_deviance_proportion_explained = 100*(dangling_deviance_null - dangling_deviance)/dangling_deviance_null;
+  count_deviance_proportion_explained = 100*(count_deviance_null - count_deviance)/count_deviance_null;
+  deviance_proportion_explained = 100*(deviance_null - deviance)/deviance_null;
 }
