@@ -74,8 +74,10 @@ transformed data {
         row_weights = row_weightsD[bbegin[d]:(bbegin[d+1]-1)];
         #include "sparse_spline_construction.stan"
         XDrow_w[nnzs[d]:(nnzs[d+1]-1)] = Xrow_w;
-        XDrow_v[nnzs[d]:(nnzs[d+1]-1)] = Xrow_v + Krow*(d-1);
-        XDrow_u[bbegin[d]:bbegin[d+1]] = Xrow_u + bbegin[d]-1;
+        for (i in 1:size(Xrow_v)) Xrow_v[i] = Xrow_v[i] + Krow*(d-1);
+        XDrow_v[nnzs[d]:(nnzs[d+1]-1)] = Xrow_v;
+        for (i in 1:size(Xrow_u)) Xrow_u[i] = Xrow_u[i] + bbegin[d]-1;
+        XDrow_u[bbegin[d]:bbegin[d+1]] = Xrow_u;
         prowD[d] = prow;
       }
     }
@@ -89,7 +91,7 @@ transformed data {
       sz = cbegin[d+1]-cbegin[d];
       {
         row_vector[sz] diag_weights;
-        vector[Kdiag] pdiag;
+        row_vector[Kdiag] pdiag;
         diag_weights = rep_row_vector(1,sz);
         diag_weights = diag_weights/mean(diag_weights);
         pdiag = diag_weights * Xdiag[cbegin[d]:(cbegin[d+1]-1),:];
@@ -99,7 +101,7 @@ transformed data {
   }
   
   //scaling factor for genomic lambdas
-  lfac = 30000*Krow/(max(cutsites)-min(cutsites));
+  lfac = 30000*Krow/(max(cutsitesD)-min(cutsitesD));
 }
 parameters {
   //exposures
@@ -150,7 +152,7 @@ transformed parameters {
       beta_nu_centered[((d-1)*Krow+1):(d*Krow)] = tmp;
       beta_nu_diff[d] = tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
     }
-    log_nu = csr_matrix_times_vector(SD, Dsets*Krow, Xrow_w, Xrow_v, Xrow_u, beta_nu_centered);
+    log_nu = csr_matrix_times_vector(SD, Dsets*Krow, XDrow_w, XDrow_v, XDrow_u, beta_nu_centered);
   }
   
   //delta
@@ -165,7 +167,7 @@ transformed parameters {
       beta_delta_centered[((d-1)*Krow+1):(d*Krow)] = tmp;
       beta_delta_diff[d] = tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
     }
-    log_delta = csr_matrix_times_vector(SD, Dsets*Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
+    log_delta = csr_matrix_times_vector(SD, Dsets*Krow, XDrow_w, XDrow_v, XDrow_u, beta_delta_centered);
   }
   
   //decay
@@ -213,10 +215,12 @@ model {
   danglingR ~ neg_binomial_2_log(log_mean_DR, alpha);
   
   //counts: Close, Far, Up, Down
-  target += weight*neg_binomial_2_log_lpmf(counts_close | log_mean_cclose, alpha);
-  target += weight*neg_binomial_2_log_lpmf(counts_far | log_mean_cfar, alpha);
-  target += weight*neg_binomial_2_log_lpmf(counts_up | log_mean_cup, alpha);
-  target += weight*neg_binomial_2_log_lpmf(counts_down | log_mean_cdown, alpha);
+  for (d in 1:Dsets) {
+    target += weight[d]*neg_binomial_2_log_lpmf(counts_close[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)], alpha);
+    target += weight[d]*neg_binomial_2_log_lpmf(counts_far[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)], alpha);
+    target += weight[d]*neg_binomial_2_log_lpmf(counts_up[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cup[cbegin[d]:(cbegin[d+1]-1)], alpha);
+    target += weight[d]*neg_binomial_2_log_lpmf(counts_down[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)], alpha);
+  }
   
   //// Priors
   for (d in 1:Dsets) {
