@@ -153,7 +153,7 @@
     //bisection algorithm
     while (ctr <= nmax && left != right) {
       ctr = ctr + 1;
-      print(ctr, " left=", left, " (",x[left], ") right=", right, " (", x[right], ") pos=", pos, " (", x[pos], ")");
+      //print(ctr, " left=", left, " (",x[left], ") right=", right, " (", x[right], ") pos=", pos, " (", x[pos], ")");
       if ( (x[right]-z)*(x[pos]-z) > 0 ) {right = pos;} else {left = pos;}
       if (right-left==1 && x[right] > z && x[left] <= z) return left;
       pos = (right+left)/2;
