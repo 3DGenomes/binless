@@ -62,27 +62,27 @@ generated quantities {
     //design matrix
     {
       vector[Nclose+Nfar+Nup+Ndown] tmpN;
-      tmpN[:Nclose] <- dist_close;
-      tmpN[(Nclose+1):(Nclose+Nfar)] <- dist_far;
-      tmpN[(Nclose+Nfar+1):(Nclose+Nfar+Nup)] <- dist_up;
-      tmpN[(Nclose+Nfar+Nup+1):] <- dist_down;
-      Xdiag <- bspline(log(tmpN), Kdiag, splinedegree(), log(dmin), log(dmax));
+      tmpN[:Nclose] = dist_close;
+      tmpN[(Nclose+1):(Nclose+Nfar)] = dist_far;
+      tmpN[(Nclose+Nfar+1):(Nclose+Nfar+Nup)] = dist_up;
+      tmpN[(Nclose+Nfar+Nup+1):] = dist_down;
+      Xdiag = bspline(log(tmpN), Kdiag, splinedegree(), log(dmin), log(dmax));
     }
     //decay
-    log_decay <- Xdiag * beta_diag_centered;
-    log_decay_close <- log_decay[:Nclose];
-    log_decay_far <- log_decay[(Nclose+1):(Nclose+Nfar)];
-    log_decay_up <- log_decay[(Nclose+Nfar+1):(Nclose+Nfar+Nup)];
-    log_decay_down <- log_decay[(Nclose+Nfar+Nup+1):];
+    log_decay = Xdiag * beta_diag_centered;
+    log_decay_close = log_decay[:Nclose];
+    log_decay_far = log_decay[(Nclose+1):(Nclose+Nfar)];
+    log_decay_up = log_decay[(Nclose+Nfar+1):(Nclose+Nfar+Nup)];
+    log_decay_down = log_decay[(Nclose+Nfar+Nup+1):];
   }
   
   //means
-  log_mean_cclose <- eC + log_decay_close + (log_nu - log_delta)[index_close[1]] 
+  log_mean_cclose = eC + log_decay_close + (log_nu - log_delta)[index_close[1]] 
                                          + (log_nu + log_delta)[index_close[2]];
-  log_mean_cfar   <- eC + log_decay_far   + (log_nu + log_delta)[index_far[1]]   
+  log_mean_cfar   = eC + log_decay_far   + (log_nu + log_delta)[index_far[1]]   
                                           + (log_nu - log_delta)[index_far[2]];
-  log_mean_cup    <- eC + log_decay_up    + (log_nu + log_delta)[index_up[1]]    
+  log_mean_cup    = eC + log_decay_up    + (log_nu + log_delta)[index_up[1]]    
                                           + (log_nu + log_delta)[index_up[2]];
-  log_mean_cdown  <- eC + log_decay_down  + (log_nu - log_delta)[index_down[1]]  
+  log_mean_cdown  = eC + log_decay_down  + (log_nu - log_delta)[index_down[1]]  
                                           + (log_nu - log_delta)[index_down[2]];
 }

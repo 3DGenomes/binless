@@ -22,7 +22,7 @@ transformed data {
   matrix[N,Kdiag] Xdiag;
   row_vector[Kdiag] pdiag;
   row_vector[N] diag_weights;
-  diag_weights <- rep_row_vector(1,N);
+  diag_weights = rep_row_vector(1,N);
   #include "scam_spline_construction.stan"
 }
 parameters {
@@ -42,12 +42,12 @@ transformed parameters {
   {
     vector[Kdiag] beta_diag_aug;
     real epsilon;
-    epsilon <- -1; //decreasing spline
-    beta_diag_aug[1] <- 0;
-    beta_diag_aug[2:] <- beta_diag;
-    beta_diag_centered <- epsilon * (beta_diag_aug - (pdiag * beta_diag_aug) * rep_vector(1, Kdiag));
-    log_decay <- Xdiag * beta_diag_centered;
-    beta_diag_diff <- beta_diag_centered[:(Kdiag-2)]-2*beta_diag_centered[2:(Kdiag-1)]+beta_diag_centered[3:];
+    epsilon = -1; //decreasing spline
+    beta_diag_aug[1] = 0;
+    beta_diag_aug[2:] = beta_diag;
+    beta_diag_centered = epsilon * (beta_diag_aug - (pdiag * beta_diag_aug) * rep_vector(1, Kdiag));
+    log_decay = Xdiag * beta_diag_centered;
+    beta_diag_diff = beta_diag_centered[:(Kdiag-2)]-2*beta_diag_centered[2:(Kdiag-1)]+beta_diag_centered[3:];
   }
 }
 model {

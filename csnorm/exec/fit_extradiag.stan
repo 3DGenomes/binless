@@ -33,7 +33,7 @@ transformed data {
   matrix[N,Kdiag] Xdiag;
   row_vector[Kdiag] pdiag;
   row_vector[N] diag_weights;
-  diag_weights <- rep_row_vector(1,N);
+  diag_weights = rep_row_vector(1,N);
   if (max(cidx[1])>S1) {reject("first index larger than rsites");}
   if (max(cidx[2])>S2) {reject("second index larger than rsites");}
   //diagonal SCAM spline, dense, exact
@@ -63,30 +63,30 @@ transformed parameters {
   {
     vector[Kdiag] beta_diag_aug;
     real epsilon;
-    epsilon <- -1; //decreasing spline
-    beta_diag_aug[1] <- 0;
-    beta_diag_aug[2:] <- beta_diag;
-    beta_diag_centered <- epsilon * (beta_diag_aug - (pdiag * beta_diag_aug) * rep_vector(1, Kdiag));
-    log_decay <- Xdiag * beta_diag_centered;
-    beta_diag_diff <- beta_diag_centered[:(Kdiag-2)]-2*beta_diag_centered[2:(Kdiag-1)]+beta_diag_centered[3:];
+    epsilon = -1; //decreasing spline
+    beta_diag_aug[1] = 0;
+    beta_diag_aug[2:] = beta_diag;
+    beta_diag_centered = epsilon * (beta_diag_aug - (pdiag * beta_diag_aug) * rep_vector(1, Kdiag));
+    log_decay = Xdiag * beta_diag_centered;
+    beta_diag_diff = beta_diag_centered[:(Kdiag-2)]-2*beta_diag_centered[2:(Kdiag-1)]+beta_diag_centered[3:];
   }
 
   //means
   {
     //exact counts  
-    log_mean_cclose <- eC + log_decay + (log_nu1 - log_delta1)[cidx[1]] + (log_nu2 + log_delta2)[cidx[2]];
-    log_mean_cfar   <- eC + log_decay + (log_nu1 + log_delta1)[cidx[1]] + (log_nu2 - log_delta2)[cidx[2]];
-    log_mean_cup    <- eC + log_decay + (log_nu1 + log_delta1)[cidx[1]] + (log_nu2 + log_delta2)[cidx[2]];
-    log_mean_cdown  <- eC + log_decay + (log_nu1 - log_delta1)[cidx[1]] + (log_nu2 - log_delta2)[cidx[2]];
+    log_mean_cclose = eC + log_decay + (log_nu1 - log_delta1)[cidx[1]] + (log_nu2 + log_delta2)[cidx[2]];
+    log_mean_cfar   = eC + log_decay + (log_nu1 + log_delta1)[cidx[1]] + (log_nu2 - log_delta2)[cidx[2]];
+    log_mean_cup    = eC + log_decay + (log_nu1 + log_delta1)[cidx[1]] + (log_nu2 + log_delta2)[cidx[2]];
+    log_mean_cdown  = eC + log_decay + (log_nu1 - log_delta1)[cidx[1]] + (log_nu2 - log_delta2)[cidx[2]];
   }
 }
 model {
   //// Exact likelihoods
   //counts: Close, Far, Up, Down
-  increment_log_prob(weight*neg_binomial_2_log_log(counts_close, log_mean_cclose, alpha));
-  increment_log_prob(weight*neg_binomial_2_log_log(counts_far, log_mean_cfar, alpha));
-  increment_log_prob(weight*neg_binomial_2_log_log(counts_up, log_mean_cup, alpha));
-  increment_log_prob(weight*neg_binomial_2_log_log(counts_down, log_mean_cdown, alpha));
+  target += weight*neg_binomial_2_log_lpmf(counts_close | log_mean_cclose, alpha);
+  target += weight*neg_binomial_2_log_lpmf(counts_far | log_mean_cfar, alpha);
+  target += weight*neg_binomial_2_log_lpmf(counts_up | log_mean_cup, alpha);
+  target += weight*neg_binomial_2_log_lpmf(counts_down | log_mean_cdown, alpha);
   
 
   //// Priors
@@ -103,15 +103,15 @@ generated quantities {
   real deviance_null;
   real deviance_proportion_explained;
   #deviances
-  deviance <- neg_binomial_2_log_deviance(counts_close, log_mean_cclose, alpha, rep_vector(1,1)) +
+  deviance = neg_binomial_2_log_deviance(counts_close, log_mean_cclose, alpha, rep_vector(1,1)) +
               neg_binomial_2_log_deviance(counts_far, log_mean_cfar, alpha, rep_vector(1,1)) +
               neg_binomial_2_log_deviance(counts_up, log_mean_cup, alpha, rep_vector(1,1)) +
               neg_binomial_2_log_deviance(counts_down, log_mean_cdown, alpha, rep_vector(1,1));
   #null deviances
-  deviance_null <- neg_binomial_2_log_deviance(counts_close, rep_vector(eC,1), alpha, rep_vector(1,1)) +
+  deviance_null = neg_binomial_2_log_deviance(counts_close, rep_vector(eC,1), alpha, rep_vector(1,1)) +
                    neg_binomial_2_log_deviance(counts_far, rep_vector(eC,1), alpha, rep_vector(1,1)) +
                    neg_binomial_2_log_deviance(counts_up, rep_vector(eC,1), alpha, rep_vector(1,1)) +
                    neg_binomial_2_log_deviance(counts_down, rep_vector(eC,1), alpha, rep_vector(1,1));
   #proportions explained
-  deviance_proportion_explained <- 100*(deviance_null - deviance)/deviance_null;
+  deviance_proportion_explained = 100*(deviance_null - deviance)/deviance_null;
 }

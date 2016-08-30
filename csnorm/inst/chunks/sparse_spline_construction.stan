@@ -23,41 +23,41 @@
     int idx_u; //counters for filling of sparse matrix
     int idx_w;
     //
-    dx <- 1.01*(max(cutsites)-min(cutsites))/(Krow-splinedegree()); //make it slightly larger
-    t <- min(cutsites) - dx*0.01 + dx * range(-splinedegree(),Krow-splinedegree()-1)';
+    dx = 1.01*(max(cutsites)-min(cutsites))/(Krow-splinedegree()); //make it slightly larger
+    t = min(cutsites) - dx*0.01 + dx * range(-splinedegree(),Krow-splinedegree()-1)';
     //get indices of cutsites which cross to the next segment and build x_n.
-    x_n[1] <- 1;
-    x_n[2:(Krow-splinedegree())] <- cumulative_hist(cutsites, t[(splinedegree()+2):]);
-    x_n[Krow-splinedegree()+1] <- rows(cutsites)+1;
+    x_n[1] = 1;
+    x_n[2:(Krow-splinedegree())] = cumulative_hist(cutsites, t[(splinedegree()+2):]);
+    x_n[Krow-splinedegree()+1] = rows(cutsites)+1;
     //
     //build spline, interval per interval
-    idx_u <- 1;
-    idx_w <- 1;
+    idx_u = 1;
+    idx_w = 1;
     for (i in 1:(Krow-splinedegree())) {
       //at any cutsites, there are splinedegree()+1 nonzero b-splines. Compute them.
       int xbegin;
       int xend;
-      xbegin <- x_n[i];
-      xend <- x_n[i+1]-1;
+      xbegin = x_n[i];
+      xend = x_n[i+1]-1;
       {
         matrix[xend-xbegin+1,splinedegree()+1] tmp;
-        tmp <- bspl_gen(cutsites[xbegin:xend], dx, t[i:(i+splinedegree())], splinedegree());
+        tmp = bspl_gen(cutsites[xbegin:xend], dx, t[i:(i+splinedegree())], splinedegree());
         for (ti in 1:(xend-xbegin+1)) {
-          Xrow_u[idx_u] <- idx_w;
-          idx_u <- idx_u + 1;
+          Xrow_u[idx_u] = idx_w;
+          idx_u = idx_u + 1;
           for (tj in 1:(splinedegree()+1)) {
-            Xrow_w[idx_w] <- tmp[ti,tj];
-            Xrow_v[idx_w] <- i+tj-1;
-            idx_w <- idx_w + 1;
+            Xrow_w[idx_w] = tmp[ti,tj];
+            Xrow_v[idx_w] = i+tj-1;
+            idx_w = idx_w + 1;
           }
         }
       }
     }
-    Xrow_u[idx_u] <- idx_w; 
+    Xrow_u[idx_u] = idx_w; 
   }
   //END sparse calculation
 
   //projector for biases (GAM)
-  row_weights <- row_weights/mean(row_weights);
-  prow <- vector_times_csr_matrix(Krow, row_weights, Xrow_w, Xrow_v, Xrow_u);
-  prow <- prow / (prow * rep_vector(1,Krow));
+  row_weights = row_weights/mean(row_weights);
+  prow = vector_times_csr_matrix(Krow, row_weights, Xrow_w, Xrow_v, Xrow_u);
+  prow = prow / (prow * rep_vector(1,Krow));

@@ -30,15 +30,15 @@ transformed data {
   real lnu;
   real ldelta;
   
-  row_weights <- rep_vector(1, S);
+  row_weights = rep_vector(1, S);
   #compute design matrix and projector
   #include "sparse_spline_construction.stan"
 
   {
     real tmp;
-    tmp <- 30000*Krow/(max(cutsites)-min(cutsites));
-    lnu <- lambda_nu*tmp;
-    ldelta <- lambda_delta*tmp;
+    tmp = 30000*Krow/(max(cutsites)-min(cutsites));
+    lnu = lambda_nu*tmp;
+    ldelta = lambda_delta*tmp;
   }
 }
 parameters {
@@ -62,21 +62,21 @@ transformed parameters {
   {
     vector[Krow] beta_nu_aug;
     vector[Krow] beta_nu_centered;
-    beta_nu_aug[1] <- 0;
-    beta_nu_aug[2:] <- beta_nu;
-    beta_nu_centered <- beta_nu_aug - (prow * beta_nu_aug) * rep_vector(1,Krow);
-    log_nu <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_nu_centered);
-    beta_nu_diff <- beta_nu_centered[:(Krow-2)]-2*beta_nu_centered[2:(Krow-1)]+beta_nu_centered[3:];
+    beta_nu_aug[1] = 0;
+    beta_nu_aug[2:] = beta_nu;
+    beta_nu_centered = beta_nu_aug - (prow * beta_nu_aug) * rep_vector(1,Krow);
+    log_nu = csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_nu_centered);
+    beta_nu_diff = beta_nu_centered[:(Krow-2)]-2*beta_nu_centered[2:(Krow-1)]+beta_nu_centered[3:];
   }
   //delta
   {
     vector[Krow] beta_delta_aug;
     vector[Krow] beta_delta_centered;
-    beta_delta_aug[1] <- 0;
-    beta_delta_aug[2:] <- beta_delta;
-    beta_delta_centered <- beta_delta_aug - (prow * beta_delta_aug) * rep_vector(1,Krow);
-    log_delta <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
-    beta_delta_diff <- beta_delta_centered[:(Krow-2)]-2*beta_delta_centered[2:(Krow-1)]+beta_delta_centered[3:];
+    beta_delta_aug[1] = 0;
+    beta_delta_aug[2:] = beta_delta;
+    beta_delta_centered = beta_delta_aug - (prow * beta_delta_aug) * rep_vector(1,Krow);
+    log_delta = csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
+    beta_delta_diff = beta_delta_centered[:(Krow-2)]-2*beta_delta_centered[2:(Krow-1)]+beta_delta_centered[3:];
   }
 }
 model {

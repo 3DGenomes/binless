@@ -37,26 +37,26 @@ transformed data {
   //weight, needed to avoid integer division
   int weight;
 
-  row_weights <- rep_vector(1, S);
+  row_weights = rep_vector(1, S);
   #compute design matrix and projector
   #include "sparse_spline_construction.stan"
   
   //scaling factor
-  lfac <- 30000*Krow/(max(cutsites)-min(cutsites));
+  lfac = 30000*Krow/(max(cutsites)-min(cutsites));
   
   //vectorized counts
   //need to transpose to be consistent with to_vector(matrix)
   {
     int begin;
-    begin<-1;
+    begin=1;
     for (i in 1:G) {
-      csl[begin:(begin+S-1)] <- counts_sum_left[,i];
-      csr[begin:(begin+S-1)] <- counts_sum_right[,i];
-      begin<-begin+S;
+      csl[begin:(begin+S-1)] = counts_sum_left[,i];
+      csr[begin:(begin+S-1)] = counts_sum_right[,i];
+      begin=begin+S;
     }
   }
-  weight <- S-1;
-  weight <- weight/G;
+  weight = S-1;
+  weight = weight/G;
 }
 parameters {
   //exposures
@@ -88,32 +88,32 @@ transformed parameters {
   {
     vector[Krow] beta_nu_aug;
     vector[Krow] beta_nu_centered;
-    beta_nu_aug[1] <- 0;
-    beta_nu_aug[2:] <- beta_nu;
-    beta_nu_centered <- beta_nu_aug - (prow * beta_nu_aug) * rep_vector(1,Krow);
-    log_nu <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_nu_centered);
-    beta_nu_diff <- beta_nu_centered[:(Krow-2)]-2*beta_nu_centered[2:(Krow-1)]+beta_nu_centered[3:];
+    beta_nu_aug[1] = 0;
+    beta_nu_aug[2:] = beta_nu;
+    beta_nu_centered = beta_nu_aug - (prow * beta_nu_aug) * rep_vector(1,Krow);
+    log_nu = csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_nu_centered);
+    beta_nu_diff = beta_nu_centered[:(Krow-2)]-2*beta_nu_centered[2:(Krow-1)]+beta_nu_centered[3:];
   }
   //delta
   {
     vector[Krow] beta_delta_aug;
     vector[Krow] beta_delta_centered;
-    beta_delta_aug[1] <- 0;
-    beta_delta_aug[2:] <- beta_delta;
-    beta_delta_centered <- beta_delta_aug - (prow * beta_delta_aug) * rep_vector(1,Krow);
-    log_delta <- csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
-    beta_delta_diff <- beta_delta_centered[:(Krow-2)]-2*beta_delta_centered[2:(Krow-1)]+beta_delta_centered[3:];
+    beta_delta_aug[1] = 0;
+    beta_delta_aug[2:] = beta_delta;
+    beta_delta_centered = beta_delta_aug - (prow * beta_delta_aug) * rep_vector(1,Krow);
+    log_delta = csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
+    beta_delta_diff = beta_delta_centered[:(Krow-2)]-2*beta_delta_centered[2:(Krow-1)]+beta_delta_centered[3:];
   }
 
   //means
   {
     //biases
-    log_mean_RJ <- log_nu + eRJ;
-    log_mean_DL <- log_nu + eDE + log_delta;
-    log_mean_DR <- log_nu + eDE - log_delta;
+    log_mean_RJ = log_nu + eRJ;
+    log_mean_DL = log_nu + eDE + log_delta;
+    log_mean_DR = log_nu + eDE - log_delta;
     //exact counts  
-    log_mean_cleft  <- to_vector(log_decay_sum + rep_matrix(eC + log_nu + log_delta, G));
-    log_mean_cright <- to_vector(log_decay_sum + rep_matrix(eC + log_nu - log_delta, G));
+    log_mean_cleft  = to_vector(log_decay_sum + rep_matrix(eC + log_nu + log_delta, G));
+    log_mean_cright = to_vector(log_decay_sum + rep_matrix(eC + log_nu - log_delta, G));
   }
 }
 model {
@@ -126,8 +126,8 @@ model {
   //counts
   //grouping reduces the number of likelihoods from S-1 to G, so reweighting is
   //needed for a proper estimation of the lambdas
-  increment_log_prob(weight * neg_binomial_2_log_log(csl, log_mean_cleft, alpha));
-  increment_log_prob(weight * neg_binomial_2_log_log(csr, log_mean_cright, alpha));
+  target += weight * neg_binomial_2_log_lpmf(csl | log_mean_cleft, alpha);
+  target += weight * neg_binomial_2_log_lpmf(csr | log_mean_cright, alpha);
   
   //// prior
   log_nu ~ cauchy(0, 1); //give high probability to [0.5:2]

@@ -60,55 +60,55 @@ generated quantities {
   //decay
   {
     matrix[npoints,Kdiag] Xdiag;
-    log_dist <- range(0,npoints-1)*(log(dmax)-log(dmin))/(npoints-1)+log(dmin);
-    Xdiag <- bspline(log_dist, Kdiag, splinedegree(), log(dmin), log(dmax));
-    log_decay <- Xdiag * beta_diag_centered;
+    log_dist = range(0,npoints-1)*(log(dmax)-log(dmin))/(npoints-1)+log(dmin);
+    Xdiag = bspline(log_dist, Kdiag, splinedegree(), log(dmin), log(dmax));
+    log_decay = Xdiag * beta_diag_centered;
   }
 
   //observed and normalized
-  observed <- rep_matrix(0,B1,B2);
-  normalized <- rep_matrix(0,B1,B2);
+  observed = rep_matrix(0,B1,B2);
+  normalized = rep_matrix(0,B1,B2);
   for (i in 1:N) { //do not vectorize to avoid aliasing issues
     int b1;
     int b2;
     int k;
-    b1<-cbins1[i];
-    b2<-cbins2[i];
-    observed[b1,b2] <- observed[b1,b2] + counts[i];
-    k <- bisect(log(cdist[i]), npoints/2, log_dist);
-    normalized[b1,b2] <- normalized[b1,b2] + counts[i]/cmean[i]*exp(log_decay[k]);
+    b1=cbins1[i];
+    b2=cbins2[i];
+    observed[b1,b2] = observed[b1,b2] + counts[i];
+    k = bisect(log(cdist[i]), npoints/2, log_dist);
+    normalized[b1,b2] = normalized[b1,b2] + counts[i]/cmean[i]*exp(log_decay[k]);
   }
   
   //expected and ncounts
-  ncounts <- rep_matrix(0,B1,B2);
-  expected <- rep_matrix(0,B1,B2);
+  ncounts = rep_matrix(0,B1,B2);
+  expected = rep_matrix(0,B1,B2);
   for (i in 1:S1) {
     real pos1;
     int k;
-    pos1 <- cutsites1[i];
-    k <- 1;
+    pos1 = cutsites1[i];
+    k = 1;
     for (j in 1:S2) {
       real pos2;
-      pos2 <- cutsites2[j];
+      pos2 = cutsites2[j];
       if (pos2 > pos1) {
         int b1;
         int b2;
-        b1<-bbins1[i];
-        b2<-bbins2[j];
-        ncounts[b1,b2] <- ncounts[b1,b2]+4; //1 for each count type
+        b1=bbins1[i];
+        b2=bbins2[j];
+        ncounts[b1,b2] = ncounts[b1,b2]+4; //1 for each count type
         if (circularize>0) {
           if (pos2-pos1>circularize/2) {
-            k <- bisect(log(circularize+1-(pos2-pos1)), k, log_dist);
+            k = bisect(log(circularize+1-(pos2-pos1)), k, log_dist);
           } else {
-            k <- bisect(log(pos2-pos1), k, log_dist);
+            k = bisect(log(pos2-pos1), k, log_dist);
           }
         } else {
-          k <- bisect(log(pos2-pos1), k, log_dist);
+          k = bisect(log(pos2-pos1), k, log_dist);
         }
-        expected[b1,b2] <- expected[b1,b2] +
+        expected[b1,b2] = expected[b1,b2] +
             exp(eC + log_nu1[i] + log_nu2[j] + log_decay[k])*2*cosh(log_delta1[i])*2*cosh(log_delta2[j]);
       }
     }
   }
-  normalized <- normalized ./ ncounts;
+  normalized = normalized ./ ncounts;
 }
