@@ -21,27 +21,40 @@ csd2=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_Interact
 csd3=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate2_reads_int.tsv",
                      "data/caulo_BglIIr2_all", "WT", "2", enzyme="BglII", circularize=4042929, dangling.L=c(0,3,5),
                      dangling.R=c(3,0,-2), maxlen=600, save.data=T)
-#load("data/caulo_NcoI_all_csdata.RData")
-#csd1=csd
-#load("data/caulo_BglIIr1_all_csdata.RData")
-#csd2=csd
-#load("data/caulo_BglIIr2_all_csdata.RData")
-#csd3=csd
+
+
+#zoom on a portion of the dataset
+load("data/caulo_BglIIr2_all_csdata_with_data.RData")
+data=csd@data[re.closest1>=2000000&re.closest1<=2150000&re.closest2>=2000000&re.closest2<=2150000]
+cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
+csd = new("CSdata", info=csd@info, settings=list(circularize=-1),
+          data=data, biases=cs_data$biases, counts=cs_data$counts)
+save(csd, file="data/caulo_BglIIr2_150k_csdata_with_data.RData")
+csd@data=data.table()
+save(csd, file="data/caulo_BglIIr2_150k_csdata.RData")
+csd2=csd
+
+
+load("data/caulo_NcoI_150k_csdata.RData")
+csd1=csd
+load("data/caulo_BglIIr1_150k_csdata.RData")
+csd2=csd
+load("data/caulo_BglIIr2_150k_csdata.RData")
+csd3=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2,csd3))
-save(cs, file="data/caulo_csnorm.RData")
+save(cs, file="data/caulo_150k_csnorm.RData")
 
 
 
-#normalize with gibbs sampler
-load("data/caulo_csnorm.RData")
-cs = run_simplified(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=c(0.01,0.1,1,10,100),
-               ngibbs = 3, iter=10000, ncores=30)
+#normalize with serial sampler
+load("data/caulo_150k_csnorm.RData")
+cs = csnorm_fit(cs@biases, cs@counts, design=NULL, bf_per_kb=0.25, bf_per_decade=5, iter=10000)
 #save(cs, file="data/caulo_wt_csnorm_optimized.RData")
 #cs@pred=csnorm_predict_all(cs,ncores=30,verbose=F)
 cs@binned=list()
 cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
 cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-save(cs, file="data/caulo_ko_csnorm_optimized.RData")
+#save(cs, file="data/caulo_ko_csnorm_optimized.RData")
 
 
 
