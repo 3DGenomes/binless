@@ -346,16 +346,16 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "H
   cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=circularize)
   dset_statistics(cs_data$biases,cs_data$counts)
   message("*** WRITE")
-  cs = new("CSdata", info=list(name=name, condition=condition, replicate=replicate,
+  csd = new("CSdata", info=list(name=name, condition=condition, replicate=replicate,
                                enzyme=enzyme, experiment=experiment,
                                dangling.L=deparse(dangling.L), dangling.R=deparse(dangling.R), maxlen=maxlen,
                                filename=infile),
                      settings=list(circularize=circularize),
                      data=data, biases=cs_data$biases, counts=cs_data$counts)
-  if (save.data==T) save(cs, file=paste0(outprefix,"_csdata_with_data.RData"))
-  cs@data=data.table()
-  save(cs, file=paste0(outprefix,"_csdata.RData"))
-  return(cs)
+  if (save.data==T) save(csd, file=paste0(outprefix,"_csdata_with_data.RData"))
+  csd@data=data.table()
+  save(csd, file=paste0(outprefix,"_csdata.RData"))
+  return(csd)
 }
 
 #' Merge one or more CSdata objects into a CSnorm object
