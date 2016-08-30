@@ -321,7 +321,7 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000) {
 #' @param outprefix character. Prefix to output intermediate files.
 #' @param condition character. WT, KO etc.
 #' @param replicate character. Replicate number
-#' @param name character. A name for the experiment. By default, it is condition and replicate
+#' @param name character. A name for the experiment. By default, it is condition, enzyme and replicate
 #' @param enzyme character. HindIII, DpnII etc.
 #' @param experiment character. Hi-C Capture-C etc. For now it is Hi-C and cannot be changed
 #' @inheritParams read_tsv
@@ -334,7 +334,7 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000) {
 #' 
 #' @examples
 read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "HindIII", experiment = "Hi-C",
-                            name = paste(condition, replicate), skip = 0L, nrows = -1L,
+                            name = paste(condition, enzyme, replicate), skip = 0L, nrows = -1L,
                             circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1), maxlen = 600,
                             save.data=T) {
   match.arg(experiment)
