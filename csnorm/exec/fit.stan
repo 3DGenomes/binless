@@ -27,7 +27,7 @@ data {
   //counts : explicit
   int<lower=0> N; //number of counts
   int<lower=1,upper=N> cbegin[Dsets+1]; //cbegin[i]=j: dataset i starts at j
-  int<lower=1,upper=S> cidx[2,N]; //indices of rsite pairs, referring to vector[SD] cutsitesD
+  int<lower=1,upper=SD> cidx[2,N]; //indices of rsite pairs, referring to vector[SD] cutsitesD
   vector<lower=dmin,upper=dmax>[N] dist; //genomic distance between rsites
   int<lower=0> counts_close[N]; //value of the count
   int<lower=0> counts_far[N];
