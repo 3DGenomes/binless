@@ -328,34 +328,6 @@ run_split_parallel_initial_guess = function(counts, biases, design, bf_per_kb, d
               beta_diag=beta_diag, lambda_diag=rep(1,Decays), log_decay=rep(0,counts[,.N])))
 }
 
-#' Initial guess for normalization
-#' @keywords internal
-#' @export
-#' 
-run_temp = function(counts, biases, design, bf_per_kb, dmin, dmax, bf_per_decade, lambda, verbose, iter) {
-  #compute column sums
-  cs1=counts[,.(R=sum(contact.close+contact.down),L=sum(contact.far+contact.up)),by=c("name","id1")][,.(name,id=id1,L,R)]
-  cs2=counts[,.(R=sum(contact.far+contact.down),L=sum(contact.close+contact.up)),by=c("name","id2")][,.(name,id=id2,L,R)]
-  pos=biases[,.(name,id)]
-  setkey(pos, name, id)
-  sums=rbind(cs1,cs2)[,.(L=sum(L),R=sum(R)),keyby=c("name","id")][pos]
-  #run optimization
-  Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
-  bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
-  data=list(Dsets=design[,.N], Biases=design[,uniqueN(genomic)],
-            XB=array(design[,genomic],dim=design[,.N]), Krow=Krow, SD=biases[,.N], bbegin=bbegin,
-            cutsitesD=biases[,pos], rejoined=biases[,rejoined],
-            danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            counts_sum_left=sums[,L], counts_sum_right=sums[,R],
-            lambda_nu=lambda, lambda_delta=lambda)
-  op=optimizing(csnorm:::stanmodels$temp, data=data,
-                as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)
-}
-
-
-
-
-
 #' Genomic bias estimation part of parallel run
 #' @keywords internal
 #' 
