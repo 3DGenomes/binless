@@ -12,7 +12,7 @@ NULL
 #' @section Warning:
 #' Memory-intensive
 #' @examples
-fill_zeros = function(counts,biases,biases2=NULL) {
+fill_zeros = function(counts,biases,biases2=NULL,circularize=-1L) {
   if (is.null(biases2)) biases2=biases
   newcounts=CJ(biases[,paste(id,pos)],biases2[,paste(id,pos)])
   newcounts[,c("id1","pos1"):=tstrsplit(V1, " ")]
@@ -26,6 +26,11 @@ fill_zeros = function(counts,biases,biases2=NULL) {
   newcounts[is.na(contact.far),contact.far:=0]
   newcounts[is.na(contact.up),contact.up:=0]
   newcounts[is.na(contact.down),contact.down:=0]
+  if (circularize>0) {
+    newcounts[,distance:=pmin(abs(pos2-pos1), circularize+1-abs(pos2-pos1))]
+  } else {
+    newcounts[,distance:=abs(pos2-pos1)]
+  }
   return(newcounts)
 }
 
@@ -62,14 +67,7 @@ get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, f
   counts.local=counts[pos1>=begin1&pos1<end1&pos2>=begin2&pos2<end2]
   counts.local[,c("id1","id2"):=list(id1-beginrange1+1,id2-beginrange2+1)]
   #fill zeros
-  if (fill.zeros==T) {
-    counts.local=fill_zeros(counts=counts.local,biases=biases.1,biases2=biases.2)
-    if (circularize>0) {
-      counts.local[,distance:=pmin(abs(pos2-pos1), circularize+1-abs(pos2-pos1))]
-    } else {
-      counts.local[,distance:=abs(pos2-pos1)]
-    }
-  }
+  if (fill.zeros==T) counts.local=fill_zeros(counts=counts.local,biases=biases.1,biases2=biases.2, circularize=circularize)
   return(list(counts=counts.local,biases1=biases.1,biases2=biases.2,
               beginrange1=beginrange1, endrange1=endrange1, beginrange2=beginrange2, endrange2=endrange2))
 }
@@ -742,12 +740,7 @@ run_simplified_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, b
   cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, groups=groups,
                                     lambda=lambda, iter=iter))
   #fill counts matrix
-  cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases)
-  if (cs@settings$circularize>0) {
-    cs@counts[,distance:=pmin(abs(pos2-pos1), cs@settings$circularize+1-abs(pos2-pos1))]
-  } else {
-    cs@counts[,distance:=abs(pos2-pos1)]
-  }
+  cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize)
   #report min/max distance
   dmin=0.99
   if (cs@settings$circularize>0) {
@@ -855,12 +848,7 @@ run_serial = function(cs, bf_per_kb=1, bf_per_decade=5, lambda=1, iter=100000, s
   #add settings
   cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, lambda=lambda, iter=iter))
   #fill counts matrix
-  cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases)
-  if (cs@settings$circularize>0) {
-    cs@counts[,distance:=pmin(abs(pos2-pos1), cs@settings$circularize+1-abs(pos2-pos1))]
-  } else {
-    cs@counts[,distance:=abs(pos2-pos1)]
-  }
+  cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize)
   #report min/max distance
   dmin=0.99
   if (cs@settings$circularize>0) {
