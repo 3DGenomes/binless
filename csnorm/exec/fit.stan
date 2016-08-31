@@ -42,7 +42,7 @@ transformed data {
   int XDrow_u[SD+1];
   row_vector[Krow] prowD[Dsets];
   //diagonal SCAM spline, dense
-  matrix[N,Kdiag] Xdiag;
+  matrix[N,Dsets*Kdiag] Xdiag;
   row_vector[Kdiag] pdiagD[Dsets];
   //scaling factor for genomic lambdas
   real lfac;
@@ -84,7 +84,15 @@ transformed data {
   }
   //diagonal SCAM spline, dense
   {
-    Xdiag = bspline(log(dist), Kdiag, splinedegree(), log(dmin), log(dmax));
+    {
+      matrix[N,Kdiag] tmpXdiag;
+      tmpXdiag = bspline(log(dist), Kdiag, splinedegree(), log(dmin), log(dmax));
+      Xdiag = rep_matrix(0, N, Dsets*Kdiag);
+      for (d in 1:Dsets) {
+        Xdiag[cbegin[d]:(cbegin[d+1]-1),((d-1)*Kdiag+1):(d*Kdiag)] = tmpXdiag[cbegin[d]:(cbegin[d+1]-1),:];
+      }
+    }
+      
     //projector for diagonal (SCAM)
     for (d in 1:Dsets) {
       int sz;
@@ -94,7 +102,7 @@ transformed data {
         row_vector[Kdiag] pdiag;
         diag_weights = rep_row_vector(1,sz);
         diag_weights = diag_weights/mean(diag_weights);
-        pdiag = diag_weights * Xdiag[cbegin[d]:(cbegin[d+1]-1),:];
+        pdiag = diag_weights * Xdiag[cbegin[d]:(cbegin[d+1]-1),((d-1)*Kdiag+1):(d*Kdiag)];
         pdiagD[d] = pdiag / (pdiag * rep_vector(1,Kdiag));
       }
     }
