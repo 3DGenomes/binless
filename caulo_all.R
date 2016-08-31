@@ -27,7 +27,7 @@ csd3=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_Interact
 #csd2=csd
 #load("data/caulo_BglIIr2_all_csdata.RData")
 #csd3=csd
-cs=merge_cs_norm_datasets(list(csd1,csd2,csd3))
+cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="none")
 save(cs, file="data/caulo_csnorm.RData")
 
 

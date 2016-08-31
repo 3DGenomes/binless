@@ -41,7 +41,7 @@ load("data/caulo_BglIIr1_150k_csdata.RData")
 csd2=csd
 load("data/caulo_BglIIr2_150k_csdata.RData")
 csd3=csd
-cs=merge_cs_norm_datasets(list(csd1,csd2,csd3))
+cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="none")
 save(cs, file="data/caulo_150k_csnorm.RData")
 
 

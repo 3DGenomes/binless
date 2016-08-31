@@ -358,15 +358,20 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "H
   return(csd)
 }
 
-#' Merge one or more CSdata objects into a CSnorm object
+#' Merge one or more CSdata objects into a CSnorm object and set experimental design
 #'
 #' @param datasets list of CSdata objects
+#' @param different.decays character. If "none" (default), one decay is modelled
+#'   for all experiments. If "all", each experiment has its own decay. If
+#'   "enzyme", experiments with a different enzyme get their own decay. If
+#'   "condition", experiments with a different condition get their own decay.
+#'   Arguments can be abbreviated
 #'
 #' @return CSnorm object
 #' @export
 #'
 #' @examples
-merge_cs_norm_datasets = function(datasets) {
+merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enzyme","condition")) {
   #compile table of experiments, sorted by id
   experiments = rbindlist(lapply(datasets, function(x) x@info))
   setkey(experiments, name)
@@ -374,8 +379,8 @@ merge_cs_norm_datasets = function(datasets) {
   #all experiments must have the same settings
   stopifnot(uniqueN(rbindlist(lapply(datasets, function(x) x@settings)))==1)
   #merge biases and counts into data tables, make IDs unique
-  biases = lapply(datasets, function(x) x@biases)
-  counts = lapply(datasets, function(x) x@counts)
+  biases = lapply(datasets, function(x) copy(x@biases))
+  counts = lapply(datasets, function(x) copy(x@counts))
   names(biases) <- sapply(datasets, function(x) x@info$name)
   names(counts) <- sapply(datasets, function(x) x@info$name)
   stopifnot(all(sapply(datasets, function(x) x@biases[,all(id==1:.N)])))
@@ -391,9 +396,24 @@ merge_cs_norm_datasets = function(datasets) {
   biases=rbindlist(biases, use.names=T, idcol="name")
   counts=rbindlist(counts, use.names=T, idcol="name")
   stopifnot(biases[,all(id==1:.N)])
+  #design matrix
+  different.decays=match.arg(different.decays)
+  design=experiments[,.(name,enzyme,condition)]
+  design[,genomic:=as.integer(factor(enzyme))]
+  if (different.decays=="none") {
+    design[,decay:=1]
+  } else if (different.decays=="all") {
+    design[,decay:=.I]
+  } else if (different.decays=="enzyme") {
+    design[,decay:=as.integer(factor(enzyme))]
+  } else if (different.decays=="condition") {
+    design[,decay:=as.integer(factor(condition))]
+  }
+  design[,c("enzyme","condition"):=list(NULL,NULL)]
   #return CSnorm object
   new("CSnorm", experiments=experiments,
-                design=data.table(),
+                design=design,
                 settings=datasets[[1]]@settings,
                 biases=biases, counts=counts)
 }
+

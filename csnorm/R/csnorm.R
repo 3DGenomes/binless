@@ -163,6 +163,8 @@ setMethod("show",signature="CSnorm",definition=function(object) {
   cat(" Reads density excl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
   nreads=nreads+object@biases[,sum(dangling.L+dangling.R+rejoined)]
   cat(" Reads density incl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
+  cat(" Experimental design matrix:\n")
+  show(cs@design)
   if (length(object@par)==0) {
     cat(" Dataset not yet normalized\n")
   } else {
