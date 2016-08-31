@@ -374,6 +374,7 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "H
 merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enzyme","condition")) {
   #compile table of experiments, sorted by id
   experiments = rbindlist(lapply(datasets, function(x) x@info))
+  experiments[,name:=ordered(name, levels=name)]
   setkey(experiments, name)
   stopifnot(experiments[,.N]==experiments[,uniqueN(name)]) #id must be unique
   #all experiments must have the same settings
@@ -396,6 +397,10 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
   biases=rbindlist(biases, use.names=T, idcol="name")
   counts=rbindlist(counts, use.names=T, idcol="name")
   stopifnot(biases[,all(id==1:.N)])
+  biases[,name:=ordered(name,levels=experiments[,levels(name)])]
+  setkey(biases,name,id,pos)
+  counts[,name:=ordered(name,levels=experiments[,levels(name)])]
+  setkey(counts,name,id1,pos1,id2,pos2)
   #design matrix
   different.decays=match.arg(different.decays)
   design=experiments[,.(name,enzyme,condition)]

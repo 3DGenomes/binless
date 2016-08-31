@@ -192,25 +192,23 @@ csnorm_simplified_decay = function(biases, counts, log_nu, log_delta, dmin, dmax
 #' Single-cpu fitting
 #' @keywords internal
 #' 
-csnorm_fit = function(biases, counts, dmin, dmax, bf_per_kb=1, bf_per_decade=5, iter=10000, verbose=T, init=0, weight=1, ...) {
+csnorm_fit = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_decade=5, iter=10000,
+                      verbose=T, init=0, weight=rep(1,design[,.N]), ...) {
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
-  data = list( Krow=Krow, S=biases[,.N],
-               cutsites=biases[,pos], rejoined=biases[,rejoined],
+  bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
+  cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
+  data = list( Dsets=design[,.N], Biases=design[,uniqueN(genomic)], Decays=design[,uniqueN(decay)],
+               XB=cs@design[,genomic], XD=cs@design[,decay],
+               Krow=Krow, SD=biases[,.N], bbegin=bbegin,
+               cutsitesD=biases[,pos], rejoined=biases[,rejoined],
                danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
                Kdiag=Kdiag, dmin=dmin, dmax=dmax,
-               N=counts[,.N], cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
+               N=counts[,.N], cbegin=cbegin,
+               cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
                counts_close=counts[,contact.close], counts_far=counts[,contact.far],
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
                weight=weight)
-  if (verbose==T) {
-    message("CS norm: fit")
-    message("Krow        : ", Krow)
-    message("Kdiag       : ", Kdiag)
-    message("Biases      : ", biases[,.N])
-    message("Counts      : ", 4*counts[,.N])
-    message("% zeros     : ", (counts[contact.close==0,.N]+counts[contact.far==0,.N]+counts[contact.up==0,.N]+counts[contact.down==0,.N])/counts[,4*.N]*100)
-  }
   optimizing(stanmodels$fit, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
 }
 
@@ -844,3 +842,79 @@ run_simplified = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_pe
   return(cs)
 }
 
+
+#' Run exact model on a single cpu
+#' @inheritParams run_exact
+#' @keywords internal
+#' @export
+#' 
+run_serial = function(cs, bf_per_kb=1, bf_per_decade=5, lambda=1, iter=100000, subsampling.pc=100) {
+  #basic checks
+  stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
+               (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
+  #add settings
+  cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, lambda=lambda, iter=iter))
+  #fill counts matrix
+  cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases)
+  if (cs@settings$circularize>0) {
+    cs@counts[,distance:=pmin(abs(pos2-pos1), cs@settings$circularize+1-abs(pos2-pos1))]
+  } else {
+    cs@counts[,distance:=abs(pos2-pos1)]
+  }
+  #report min/max distance
+  dmin=0.99
+  if (cs@settings$circularize>0) {
+    dmax=cs@settings$circularize/2+0.01
+  } else {
+    dmax=cs@biases[,max(pos)-min(pos)]+0.01
+  }
+  cs@settings$dmin=dmin
+  cs@settings$dmax=dmax
+  setkey(cs@biases,name,id,pos)
+  setkey(cs@counts,name,id1,pos1,id2,pos2)
+  #initial guess
+  init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
+    counts=cs@counts, biases=cs@biases,
+    bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, lambda=lambda, verbose=T, iter=iter)))
+  #main optimization, subsampled
+  counts.sub=cs@counts[sample(.N,round(subsampling.pc/100*.N))]
+  setkeyv(counts.sub,key(cs@counts))
+  a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
+    biases=cs@biases, counts = counts.sub, design=cs@design, dmin=dmin, dmax=dmax,
+    bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter, verbose = T,
+    init=init.op, weight=counts.sub[,.N,by=name]$N/cs@counts[,.N,by=name]$N)))
+  #report statistics
+  op$par$runtime=a[1]+a[4]
+  op$par$output=output
+  op$par$logp=op$value
+  init.op$runtime=init.a[1]+init.a[4]
+  init.op$output=init.output
+  op$par$init=init.op
+  op$par$counts.sub=counts.sub
+  cs@par=op$par
+  cs
+}
+
+
+
+#' Cut-site normalization (exact model)
+#' 
+#' Will run the exact model of normalization (on one cpu for each lambda 
+#' provided) and returns the most likely model and predicted quantities. Useful
+#' for comparison purposes. If you don't know what to use, try 
+#' \code{\link{run_simplified}}.
+#' 
+#' @inheritParams run_simplified
+#' @param subsampling.pc numeric. Percentage of the data used to do the calculations (default 100%).
+#'   
+#' @return A csnorm object
+#' @export
+#' 
+#' @examples
+run_exact = function(cs, bf_per_kb=1, bf_per_decade=5, lambdas=c(0.1,1,10), ncores=1, iter=100000, subsampling.pc=100) {
+  registerDoParallel(cores=ncores)
+  cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %dopar%
+    run_serial(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, lambda=lambda, iter=iter, subsampling.pc=subsampling.pc)
+  cs@pred=copy(csnorm_predict_all(cs,ncores=ncores,verbose=F))
+  return(cs)
+}
