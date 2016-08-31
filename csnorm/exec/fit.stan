@@ -15,7 +15,7 @@ data {
   //genomic biases
   int<lower=4> Krow; //number of functions in spline base for row biases
   int<lower=1> SD; //number of cut sites across all datasets
-  int<lower=1,upper=SD> bbegin[Dsets+1]; //bbegin[i]=j: dataset i starts at j
+  int<lower=1,upper=SD+1> bbegin[Dsets+1]; //bbegin[i]=j: dataset i starts at j
   vector[SD] cutsitesD; //cut site locations, all data
   int rejoined[SD];
   int danglingL[SD];
@@ -26,7 +26,7 @@ data {
   real<lower=dmin> dmax;
   //counts : explicit
   int<lower=0> N; //number of counts
-  int<lower=1,upper=N> cbegin[Dsets+1]; //cbegin[i]=j: dataset i starts at j
+  int<lower=1,upper=N+1> cbegin[Dsets+1]; //cbegin[i]=j: dataset i starts at j
   int<lower=1,upper=SD> cidx[2,N]; //indices of rsite pairs, referring to vector[SD] cutsitesD
   vector<lower=dmin,upper=dmax>[N] dist; //genomic distance between rsites
   int<lower=0> counts_close[N]; //value of the count
@@ -76,11 +76,11 @@ transformed data {
         XDrow_w[nnzs[d]:(nnzs[d+1]-1)] = Xrow_w;
         for (i in 1:size(Xrow_v)) Xrow_v[i] = Xrow_v[i] + Krow*(d-1);
         XDrow_v[nnzs[d]:(nnzs[d+1]-1)] = Xrow_v;
-        for (i in 1:size(Xrow_u)) Xrow_u[i] = Xrow_u[i] + bbegin[d]-1;
-        XDrow_u[bbegin[d]:bbegin[d+1]] = Xrow_u;
         prowD[d] = prow;
       }
     }
+    XDrow_u[1] = 1;
+    for (i in 1:SD) XDrow_u[i+1] = XDrow_u[i]+nnz(1);
   }
   //diagonal SCAM spline, dense
   {

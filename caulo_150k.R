@@ -41,21 +41,78 @@ load("data/caulo_BglIIr1_150k_csdata.RData")
 csd2=csd
 load("data/caulo_BglIIr2_150k_csdata.RData")
 csd3=csd
-cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="none")
+cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="all")
+cs=merge_cs_norm_datasets(list(csd1))
 save(cs, file="data/caulo_150k_csnorm.RData")
 
 
 
 #normalize with serial sampler
-load("data/caulo_150k_csnorm.RData")
-cs = csnorm_fit(cs@biases, cs@counts, design=NULL, bf_per_kb=0.25, bf_per_decade=5, iter=10000)
-#save(cs, file="data/caulo_wt_csnorm_optimized.RData")
-#cs@pred=csnorm_predict_all(cs,ncores=30,verbose=F)
-cs@binned=list()
-cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
-cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-#save(cs, file="data/caulo_ko_csnorm_optimized.RData")
-
+#registerDoParallel(cores=30)
+#foreach (bpk=bf_per_kb) %:% foreach (lambda=lambdas) %dopar% {
+  load(paste0("data/caulo_150k_csnorm.RData"))
+  cs@counts=fill_zeros(counts = cs@counts, biases = cs@biases)
+  bf_per_decade=5
+  dmin=1-0.01
+  dmax=150000+0.01
+  bpk=0.25
+  lambda=1
+  
+  init.op=csnorm:::run_split_parallel_initial_guess(
+    counts=cs@counts[name=="WT NcoI 1"], biases=cs@biases[name=="WT NcoI 1"],
+    design=data.table(name="WT NcoI 1",genomic=1,decay=1), lambda=lambda,
+    bf_per_kb=bpk, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=F, iter=10000)
+  
+  
+  init.op=csnorm:::run_split_parallel_initial_guess(
+    counts=cs@counts, biases=cs@biases, design=cs@design, lambda=lambda,
+    bf_per_kb=bpk, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=F, iter=10000)
+  
+  load("data/caulo_NcoI_150k_bfpkb0.25_lambda1_csnorm_optimized.RData")
+  cst=cs
+  c(cst@par$init$eRJ,init.op$eRJ[1])
+  c(cst@par$init$eDE,init.op$eDE[1])
+  c(cst@par$init$eC,init.op$eC[1])
+  #
+  ggplot(data.table(id=1:length(cst@par$init$beta_nu), old=cst@par$init$beta_nu, new=init.op$beta_nu[2,]))+
+    geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
+  mean(cst@par$init$beta_nu)
+  mean(init.op$beta_nu[2,])
+  #
+  ggplot(data.table(id=1:80, old=cst@par$init$log_nu, new=init.op$log_nu[1:80]))+
+    geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
+  mean(cst@par$init$log_nu)
+  mean(init.op$log_nu[1:80])
+  #
+  ggplot(data.table(id=1:length(cst@par$init$beta_delta), old=cst@par$init$beta_delta, new=init.op$beta_delta[2,]))+
+    geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
+  mean(cst@par$init$beta_delta)
+  mean(init.op$beta_delta[2,])
+  #
+  ggplot(data.table(id=1:80, old=cst@par$init$log_delta, new=init.op$log_delta[1:80]))+
+    geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
+  mean(cst@par$init$log_delta)
+  mean(init.op$log_delta[1:80])
+  
+  init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
+    counts=cs@counts, biases=cs@biases, lambda=lambda,
+    bf_per_kb=bpk, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=F, iter=10000)))
+  a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
+    biases=cs@biases, counts = cs@counts, dmin=dmin, dmax=dmax,
+    bf_per_kb=bpk, bf_per_decade=bf_per_decade, iter=100000, verbose = F, init=init.op)))
+  op$par$runtime=a[1]+a[4]
+  op$par$output=output
+  init.op$runtime=init.a[1]+init.a[4]
+  init.op$output=init.output
+  op$par$init=init.op
+  op$par$value=op$value
+  cs@par=op$par
+  cs@settings = c(cs@settings, list(bf_per_kb=bpk, bf_per_decade=bf_per_decade, dmin=dmin, dmax=dmax))
+  cs@pred=copy(csnorm_predict_all(cs,ncores=10,verbose=F))
+  cs=postprocess(cs, resolution=10000, ncores=10, verbose=F)
+  cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
+  save(cs, file=paste0("data/caulo_NcoI_150k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized.RData"))
+#}
 
 
 
