@@ -14,24 +14,32 @@ NULL
 #' @examples
 fill_zeros = function(counts,biases,biases2=NULL,circularize=-1L) {
   if (is.null(biases2)) biases2=biases
-  newcounts=CJ(biases[,paste(id,pos)],biases2[,paste(id,pos)])
-  newcounts[,c("id1","pos1"):=tstrsplit(V1, " ")]
-  newcounts[,c("id2","pos2"):=tstrsplit(V2, " ")]
-  newcounts[,c("id1","id2","pos1","pos2","V1","V2"):=list(as.integer(id1),as.integer(id2),as.integer(pos1),as.integer(pos2),NULL,NULL)]
-  newcounts=newcounts[pos1<pos2]
-  setkey(newcounts, id1, id2, pos1, pos2)
-  setkey(counts, id1, id2, pos1, pos2)
-  newcounts=counts[newcounts]
-  newcounts[is.na(contact.close),contact.close:=0]
-  newcounts[is.na(contact.far),contact.far:=0]
-  newcounts[is.na(contact.up),contact.up:=0]
-  newcounts[is.na(contact.down),contact.down:=0]
-  if (circularize>0) {
-    newcounts[,distance:=pmin(abs(pos2-pos1), circularize+1-abs(pos2-pos1))]
+  runname=biases[,unique(name)]
+  if (length(runname)>1) {
+    foreach (i=runname, .combine=rbind) %do%
+      fill_zeros(counts[name==i],biases[name==i],biases2[name==i],circularize=circularize)
   } else {
-    newcounts[,distance:=abs(pos2-pos1)]
+    newcounts=CJ(biases[,paste(id,pos)],biases2[,paste(id,pos)])
+    newcounts[,c("id1","pos1"):=tstrsplit(V1, " ")]
+    newcounts[,c("id2","pos2"):=tstrsplit(V2, " ")]
+    newcounts[,c("id1","id2","pos1","pos2","V1","V2"):=
+                list(as.integer(id1),as.integer(id2),as.integer(pos1),as.integer(pos2),NULL,NULL)]
+    newcounts=newcounts[pos1<pos2]
+    setkey(newcounts, id1, id2, pos1, pos2)
+    setkey(counts, id1, id2, pos1, pos2)
+    newcounts=counts[newcounts]
+    newcounts[is.na(contact.close),contact.close:=0]
+    newcounts[is.na(contact.far),contact.far:=0]
+    newcounts[is.na(contact.up),contact.up:=0]
+    newcounts[is.na(contact.down),contact.down:=0]
+    newcounts[is.na(name),name:=runname]
+    if (circularize>0) {
+      newcounts[,distance:=pmin(abs(pos2-pos1), circularize+1-abs(pos2-pos1))]
+    } else {
+      newcounts[,distance:=abs(pos2-pos1)]
+    }
+    newcounts
   }
-  return(newcounts)
 }
 
 #' Get subset of counts and biases data.table
