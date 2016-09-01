@@ -57,48 +57,11 @@ save(cs, file="data/caulo_150k_csnorm.RData")
   dmax=150000+0.01
   bpk=0.25
   lambda=1
-  
-  init.op=csnorm:::run_split_parallel_initial_guess(
-    counts=cs@counts[name=="WT NcoI 1"], biases=cs@biases[name=="WT NcoI 1"],
-    design=data.table(name="WT NcoI 1",genomic=1,decay=1), lambda=lambda,
-    bf_per_kb=bpk, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=F, iter=10000)
-  
-  
-  init.op=csnorm:::run_split_parallel_initial_guess(
-    counts=cs@counts, biases=cs@biases, design=cs@design, lambda=lambda,
-    bf_per_kb=bpk, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=F, iter=10000)
-  
-  load("data/caulo_NcoI_150k_bfpkb0.25_lambda1_csnorm_optimized.RData")
-  cst=cs
-  c(cst@par$init$eRJ,init.op$eRJ[1])
-  c(cst@par$init$eDE,init.op$eDE[1])
-  c(cst@par$init$eC,init.op$eC[1])
-  #
-  ggplot(data.table(id=1:length(cst@par$init$beta_nu), old=cst@par$init$beta_nu, new=init.op$beta_nu[2,]))+
-    geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
-  mean(cst@par$init$beta_nu)
-  mean(init.op$beta_nu[2,])
-  #
-  ggplot(data.table(id=1:80, old=cst@par$init$log_nu, new=init.op$log_nu[1:80]))+
-    geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
-  mean(cst@par$init$log_nu)
-  mean(init.op$log_nu[1:80])
-  #
-  ggplot(data.table(id=1:length(cst@par$init$beta_delta), old=cst@par$init$beta_delta, new=init.op$beta_delta[2,]))+
-    geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
-  mean(cst@par$init$beta_delta)
-  mean(init.op$beta_delta[2,])
-  #
-  ggplot(data.table(id=1:80, old=cst@par$init$log_delta, new=init.op$log_delta[1:80]))+
-    geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
-  mean(cst@par$init$log_delta)
-  mean(init.op$log_delta[1:80])
-  
   init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
-    counts=cs@counts, biases=cs@biases, lambda=lambda,
+    counts=cs@counts, biases=cs@biases, design=cs@design, lambda=lambda,
     bf_per_kb=bpk, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=F, iter=10000)))
   a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
-    biases=cs@biases, counts = cs@counts, dmin=dmin, dmax=dmax,
+    biases=cs@biases, counts = cs@counts, design = cs@design, dmin=dmin, dmax=dmax,
     bf_per_kb=bpk, bf_per_decade=bf_per_decade, iter=100000, verbose = F, init=init.op)))
   op$par$runtime=a[1]+a[4]
   op$par$output=output
@@ -111,10 +74,32 @@ save(cs, file="data/caulo_150k_csnorm.RData")
   cs@pred=copy(csnorm_predict_all(cs,ncores=10,verbose=F))
   cs=postprocess(cs, resolution=10000, ncores=10, verbose=F)
   cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-  save(cs, file=paste0("data/caulo_NcoI_150k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized.RData"))
+  save(cs, file=paste0("data/caulo_NcoI_150k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized_new.RData"))
 #}
 
 
+  
+  
+  load("data/caulo_NcoI_150k_bfpkb0.25_lambda1_csnorm_optimized.RData")
+  cst=cs
+  load("data/caulo_NcoI_150k_bfpkb0.25_lambda1_csnorm_optimized_new.RData")
+  c(cst@par$eRJ,cs@par$eRJ[1])
+  c(cst@par$eDE,cs@par$eDE[1])
+  c(cst@par$eC,cs@par$eC[1])
+  #
+  ggplot(data.table(id=1:length(cst@par$beta_nu), old=cst@par$beta_nu, new=cs@par$beta_nu[2,]))+
+    geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
+  mean(cst@par$init$beta_nu)
+  mean(init.op$beta_nu[2,])
+  #
+  ggplot(data.table(id=1:80, old=cst@par$log_nu, new=cs@par$log_nu[81:161]))+
+    geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
+  mean(cst@par$log_nu)
+  mean(cs@par$log_nu)
+  #
+  ggplot(data.table(id=1:21, old=cs@par$log_nu[81:101], new=cs@par$log_nu[102:122]))+
+    geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
+  
 
 
 ### generate plots
