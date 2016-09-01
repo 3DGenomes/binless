@@ -199,13 +199,13 @@ csnorm_simplified_decay = function(biases, counts, log_nu, log_delta, dmin, dmax
 #' @keywords internal
 #' 
 csnorm_fit = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_decade=5, iter=10000,
-                      verbose=T, init=0, weight=rep(1,design[,.N]), ...) {
+                      verbose=T, init=0, weight=array(1,dim=design[,.N]), ...) {
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
   cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
   data = list( Dsets=design[,.N], Biases=design[,uniqueN(genomic)], Decays=design[,uniqueN(decay)],
-               XB=cs@design[,genomic], XD=cs@design[,decay],
+               XB=as.array(design[,genomic]), XD=as.array(design[,decay]),
                Krow=Krow, SD=biases[,.N], bbegin=bbegin,
                cutsitesD=biases[,pos], rejoined=biases[,rejoined],
                danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
@@ -310,7 +310,7 @@ run_split_parallel_initial_guess = function(counts, biases, design, bf_per_kb, d
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
   data=list(Dsets=design[,.N], Biases=design[,uniqueN(genomic)],
-            XB=array(design[,genomic],dim=design[,.N]), Krow=Krow, SD=biases[,.N], bbegin=bbegin,
+            XB=as.array(design[,genomic]), Krow=Krow, SD=biases[,.N], bbegin=bbegin,
             cutsitesD=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
             counts_sum_left=sums[,L], counts_sum_right=sums[,R],
@@ -324,8 +324,10 @@ run_split_parallel_initial_guess = function(counts, biases, design, bf_per_kb, d
   return(list(eRJ=op$par$eRJ, eDE=op$par$eDE, eC=op$par$eC,
               alpha=op$par$alpha, beta_nu=op$par$beta_nu, beta_delta=op$par$beta_delta,
               log_nu=op$par$log_nu, log_delta=op$par$log_delta,
-              lambda_nu=rep(lambda,data$Biases), lambda_delta=rep(lambda,data$Biases),
-              beta_diag=beta_diag, lambda_diag=rep(1,Decays), log_decay=rep(0,counts[,.N])))
+              lambda_nu=array(lambda,dim=data$Biases),
+              lambda_delta=array(lambda,dim=data$Biases),
+              beta_diag=beta_diag, lambda_diag=array(1,dim=Decays),
+              log_decay=rep(0,counts[,.N])))
 }
 
 #' Genomic bias estimation part of parallel run
