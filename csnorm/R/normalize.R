@@ -248,28 +248,16 @@ csnorm_predict_all = function(cs, verbose=T, ncores=1) {
   dmin=cs@settings$dmin
   dmax=cs@settings$dmax
   Kdiag=round((log10(dmax)-log10(dmin))*cs@settings$bf_per_decade)
-  registerDoParallel(cores=ncores)
   ncounts=cs@counts[,.N]
-  stepsize=ncores*10
-  output.binder = function(x) {
-    a=sapply(names(x[[1]]), function(i) sapply(x, "[[", i,simplify=F))
-    list(par=rbindlist(a[,1]), out=as.character(a[,2]), runtime=as.numeric(a[,3]))
-  }
-  pred = foreach (i=seq(1,ncounts+stepsize,stepsize), .packages=c("data.table","rstan"), .combine="rbind") %dopar% {
-    counts=cs@counts[i:min(.N,i+stepsize-1)]
-    cclose=counts[,.(id1,id2,distance,count=contact.close)]
-    cfar=counts[,.(id1,id2,distance,count=contact.far)]
-    cup=counts[,.(id1,id2,distance,count=contact.up)]
-    cdown=counts[,.(id1,id2,distance,count=contact.down)]
-    data = list( Kdiag=Kdiag, S=biases[,.N], cutsites=biases[,pos], dmin=dmin, dmax=dmax,
-                 Nclose=cclose[,.N], counts_close=cclose[,count], index_close=t(data.matrix(cclose[,.(id1,id2)])), dist_close=cclose[,distance],
-                 Nfar=cfar[,.N],     counts_far=cfar[,count],     index_far=t(data.matrix(cfar[,.(id1,id2)])), dist_far=cfar[,distance],
-                 Nup=cup[,.N],       counts_up=cup[,count],       index_up=t(data.matrix(cup[,.(id1,id2)])), dist_up=cup[,distance],
-                 Ndown=cdown[,.N],   counts_down=cdown[,count],   index_down=t(data.matrix(cdown[,.(id1,id2)])), dist_down=cdown[,distance],
-                 eC=par$eC, log_nu=par$log_nu, log_delta=par$log_delta,
-                 beta_diag_centered=par$beta_diag_centered)
-    as.data.table(optimizing(stanmodels$predict_all, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)$par)
-  }
+  counts=cs@counts
+  cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
+  design=cs@design
+  data = list( Dsets=design[,.N], Decays=design[,uniqueN(decay)], XD=as.array(design[,decay]),
+               Kdiag=Kdiag, SD=biases[,.N], cutsitesD=biases[,pos], dmin=dmin, dmax=dmax,
+               N=counts[,.N], cbegin=cbegin, cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
+               eC=par$eC, log_nu=par$log_nu, log_delta=par$log_delta,
+               beta_diag_centered=par$beta_diag_centered)
+  pred=as.data.table(optimizing(stanmodels$predict_all, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)$par)
   return(pred)
 }
 
