@@ -99,6 +99,15 @@ save(cs, file="data/caulo_150k_csnorm.RData")
   #
   ggplot(data.table(id=1:21, old=cs@par$log_nu[81:101], new=cs@par$log_nu[102:122]))+
     geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
+  #
+  ggplot() +
+    geom_line(aes(dist,old),colour="red",data=data.table(dist=cst@counts[,distance], old=cst@par$log_decay, key="dist"))+
+    geom_line(aes(dist,new),colour="green",
+              data=data.table(dist=cs@counts[,distance], new=cs@par$log_decay,
+                              name=cs@counts[,name], key="dist")[name=="WT NcoI 1"])+scale_x_log10()
+  
+  mean(cst@par$log_nu)
+  mean(cs@par$log_nu)
   
 
 
