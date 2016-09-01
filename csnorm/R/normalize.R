@@ -215,7 +215,9 @@ csnorm_fit = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_de
                counts_close=counts[,contact.close], counts_far=counts[,contact.far],
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
                weight=weight)
-  optimizing(stanmodels$fit, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
+  op=optimizing(stanmodels$fit, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
+  op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
+  return(op)
 }
 
 #' Single-cpu fitting, only diagonal decay
@@ -880,7 +882,7 @@ run_serial = function(cs, bf_per_kb=1, bf_per_decade=5, lambda=1, iter=100000, s
   init.op$runtime=init.a[1]+init.a[4]
   init.op$output=init.output
   op$par$init=init.op
-  op$par$counts.sub=counts.sub
+  if (subsampling.pc<100) op$par$counts.sub=counts.sub
   cs@par=op$par
   cs
 }
