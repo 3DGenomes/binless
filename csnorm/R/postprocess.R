@@ -67,9 +67,9 @@ iterative_normalization = function(raw, niterations=100) {
 #' @keywords internal
 #' @export
 #' 
-csnorm_predict_binned = function(cs, resolution, ncores=1) {
+csnorm_predict_binned = function(cs, groups, resolution, ncores=1) {
   Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
-  Dsets=cs@design[,.N]
+  Dsets=cs@experiments[,.N]
   stopifnot(Dsets*Kdiag==length(cs@par$beta_diag_centered))
   npoints=100*Kdiag #evaluate spline with 100 equidistant points per basis function
   #bin existing counts and biases
@@ -84,11 +84,11 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
   stepsize=max(2,ceiling(Dsets*length(bins)/(5*ncores)))
   cs@counts[,c("chunk1","chunk2"):=list(ibin1 %/% stepsize, ibin2 %/% stepsize)]
   cs@biases[,chunk:=ibin %/% stepsize]
-  chunks=CJ(cs@biases[,min(chunk):max(chunk)],cs@biases[,min(chunk):max(chunk)],cs@design[,1:.N])[V1<=V2]
+  chunks=CJ(cs@biases[,min(chunk):max(chunk)],cs@biases[,min(chunk):max(chunk)],cs@experiments[,1:.N])[V1<=V2]
   #run it
   registerDoParallel(cores=ncores)
   binned = foreach (i=chunks[,V1], j=chunks[,V2], k=chunks[,V3], .packages=c("data.table","rstan"), .combine="rbind") %dopar% {
-    n=cs@design[k,name]
+    n=cs@experiments[k,name]
     counts=copy(cs@counts[name==n&chunk1==i&chunk2==j])
     biases1=copy(cs@biases[name==n&chunk==i])
     biases2=copy(cs@biases[name==n&chunk==j])
