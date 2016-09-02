@@ -137,38 +137,10 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
     }
   }
   setkey(binned,name,bin1,bin2)
-  #re-run once to get the diagonal decay (ugly, but works)
-  n=cs@design[1,name]
-  counts=cs@counts[name==n&chunk1==0&chunk2==0]
-  biases1=cs@biases[name==n&chunk==0]
-  biases2=cs@biases[name==n&chunk==0]
-  coffset=c(biases1[,min(id)-1],biases2[,min(id)-1])
-  cidx=t(data.matrix(counts[,.(id1-coffset[1],id2-coffset[2])]))
-  boffset=c(biases1[,min(ibin)-1],biases2[,min(ibin)-1])
-  data = list( S1=biases1[,.N], S2=biases2[,.N], cutsites1=biases1[,pos], cutsites2=biases2[,pos],
-               #
-               N=counts[,.N], cidx=cidx,
-               counts_close=as.array(counts[,contact.close]), counts_far=as.array(counts[,contact.far]),
-               counts_up=as.array(counts[,contact.up]), counts_down=as.array(counts[,contact.down]),
-               #
-               B1=biases1[,max(ibin)-min(ibin)+1], B2=biases2[,max(ibin)-min(ibin)+1],
-               bbins1=as.array(biases1[,ibin-boffset[1]]), bbins2=as.array(biases2[,ibin-boffset[2]]),
-               cbins1=as.array(counts[,ibin1-boffset[1]]), cbins2=as.array(counts[,ibin2-boffset[2]]),
-               #
-               Kdiag=Kdiag, npoints=npoints, circularize=cs@settings$circularize,
-               dmin=cs@settings$dmin, dmax=cs@settings$dmax,
-               #
-               eC=cs@par$eC[1],
-               log_nu1=as.array(biases1[,log_nu]), log_nu2=as.array(biases2[,log_nu]),
-               log_delta1=as.array(biases1[,log_delta]), log_delta2=as.array(biases2[,log_delta]),
-               beta_diag_centered=cs@par$beta_diag_centered[1:Kdiag]
-  )
-  out <- capture.output(op <- optimizing(csnorm:::stanmodels$predict_binned,
-                                             data=data, as_vector=F, hessian=F, iter=1, verbose=T, init=0))
   #remove created entries
   cs@counts[,c("bin1","bin2","ibin1","ibin2","chunk1","chunk2"):=list(NULL,NULL,NULL,NULL,NULL,NULL)]
   cs@biases[,c("bin","ibin","chunk","log_nu","log_delta"):=list(NULL,NULL,NULL,NULL,NULL)]
-  return(list(resolution=resolution, dist=exp(op$par$log_dist), decay=exp(op$par$log_decay), mat=binned))
+  return(mat)
 }
 
 #' Predict dispersions for a binned matrix
@@ -340,11 +312,11 @@ thresholds_estimator = function(observed, expected, dispersion, threshold=0.95, 
 postprocess = function(cs, resolution=10000, ncores=1, verbose=F, ice=-1) {
   ### run remaining steps
   if (verbose==T) cat("*** buid binned matrices\n")
-  binned=csnorm_predict_binned(cs, resolution=resolution, ncores=ncores)
+  mat=csnorm_predict_binned(cs, resolution=resolution, ncores=ncores)
   if (verbose==T) cat("*** estimate dispersions\n")
-  disp=get_dispersions(binned$mat)
+  disp=get_dispersions(mat)
   if (verbose==T) cat("*** detect interactions\n")
-  mat=detect_interactions(binned$mat, disp$dispersion, ncores=ncores) #interaction detection using binned dispersion estimates
+  mat=detect_interactions(mat, disp$dispersion, ncores=ncores) #interaction detection using binned dispersion estimates
   setkey(mat,name,bin1,bin2)
   if (ice>0) {
     cat("*** iterative normalization with ",ice," iterations\n")
@@ -357,7 +329,7 @@ postprocess = function(cs, resolution=10000, ncores=1, verbose=F, ice=-1) {
   csb=new("CSbinned", resolution=resolution,
                       range=c(b1=cs@biases[,min(pos)], e1=cs@biases[,max(pos)],
                               b2=cs@biases[,min(pos)], e2=cs@biases[,max(pos)]),
-                      decay=data.table(dist=binned$dist, decay=binned$decay),
+                      decay=data.table(),
                       alpha=disp$alpha,
                       mat=mat, raw=data.table(),
                       ice=data.table(), ice.iterations=-1)
