@@ -234,15 +234,18 @@ csnorm_fit_extradiag = function(biases1, biases2, counts, dmin, dmax, bf_per_dec
 }
 
 #' Predict expected values for each count given optimized model parameters
-#'
+#' 
 #' @param cs CSnorm object
 #' @param verbose
 #' @param ncores
-#'
+#'   
+#' @section Warning: Do not call this function to compute a binned matrix. It
+#'   should (almost) never be used and might be removed in the future.
+#'   
 #' @return a stan optimization output with the predictions.
 #' @keywords internal
 #' @export
-#'
+#' 
 #' @examples
 csnorm_predict_all = function(cs, verbose=T, ncores=1) {
   biases=cs@biases
@@ -717,10 +720,6 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
   retlist$alpha=op$par$alpha
   #ggplot(test)+geom_point(aes(bdist, log_decay))
   #ggplot(melt(test, id.vars=c("bdist","begin","end")))+geom_point(aes(bdist,value,colour=variable))
-  if (verbose==T) cat("*** predict all means\n")
-  pred=csnorm_predict_all(cs, ncores=ncores)
-  pred #for some reason it's needed
-  cs@pred=pred
   if (verbose==T) cat("*** done\n")
   cs@par=retlist
   cs@diagnostics=list(out.bias=ops.bias$out, out.count=ops.count$out, runtime.count=ops.count$runtime, runtime.bias=ops.bias$runtime)
@@ -835,7 +834,6 @@ run_simplified = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_pe
     run_simplified_gibbs(cs, design=design, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
                          bins_per_bf=bins_per_bf, groups=groups, lambda=lambda, ngibbs = ngibbs,
                          iter=iter, fit.decay=T, fit.genomic=T)
-  cs@pred=copy(csnorm_predict_all(cs,ncores=ncores,verbose=F))
   return(cs)
 }
 
@@ -907,6 +905,5 @@ run_exact = function(cs, bf_per_kb=1, bf_per_decade=5, lambdas=c(0.1,1,10), ncor
   registerDoParallel(cores=ncores)
   cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %dopar%
     run_serial(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, lambda=lambda, iter=iter, subsampling.pc=subsampling.pc)
-  cs@pred=copy(csnorm_predict_all(cs,ncores=ncores,verbose=F))
   return(cs)
 }

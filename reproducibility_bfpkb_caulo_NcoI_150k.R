@@ -51,7 +51,6 @@ foreach (bpk=bf_per_kb) %:% foreach (lambda=lambdas) %dopar% {
   op$par$value=op$value
   cs@par=op$par
   cs@settings = c(cs@settings, list(bf_per_kb=bpk, bf_per_decade=bf_per_decade, dmin=dmin, dmax=dmax))
-  cs@pred=copy(csnorm_predict_all(cs,ncores=10,verbose=F))
   cs=postprocess(cs, resolution=10000, ncores=10, verbose=F)
   cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
   save(cs, file=paste0("data/caulo_NcoI_150k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized.RData"))

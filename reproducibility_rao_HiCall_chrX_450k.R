@@ -33,7 +33,6 @@ foreach (lambda=lambdas) %dopar% {
 }
 foreach (lambda=lambdas) %dopar% {
   load(paste0("data/rao_HiCall_chrX_450k_csnorm_optimized_bfpkb1_lambda",lambda,".RData"))
-  cs@pred=csnorm_predict_all(cs,ncores=30,verbose=F)
   cs@binned=list()
   cs=postprocess(cs, resolution=5000, ncores=30, verbose=F)
   cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)

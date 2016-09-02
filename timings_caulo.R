@@ -49,7 +49,6 @@ foreach (i=seq(150,500,by=50)) %dopar% {
   op$par$init=init.op
   cs@par=op$par
   cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, dmin=dmin, dmax=dmax))
-  cs@pred=copy(csnorm_predict_all(cs,ncores=10,verbose=F))
   cs=postprocess(cs, resolution=10000, ncores=10, verbose=F)
   cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
   save(cs, file=paste0("data/caulo_NcoI_",i,"k_csnorm_optimized_bfpkb",bf_per_kb,".RData"))
@@ -186,7 +185,6 @@ foreach (i=c(4,2,1,0.5,0.25,0.125,0.0625)) %dopar% {
   op$par$init=init.op
   cs@par=op$par
   cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, dmin=dmin, dmax=dmax))
-  cs@pred=copy(csnorm_predict_all(cs,ncores=10,verbose=F))
   cs=postprocess(cs, resolution=10000, ncores=10, verbose=F)
   cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
   save(cs, file=paste0("data/caulo_NcoI_350k_csnorm_optimized_bfpkb",bf_per_kb,".RData"))
