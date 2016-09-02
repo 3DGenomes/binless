@@ -42,28 +42,25 @@ bin_counts = function(counts, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL) {
 #' @export
 #'
 #' @examples
-iterative_normalization = function(csb, niterations=100) {
-  bdata = csb@raw
-  binned = bdata[bin1<bin2,.(bin1,bin2,N=observed)]
-  binned = rbind(binned, binned[,.(bin1=bin2,bin2=bin1,N)])
-  binned[,N.weighted:=N]
-  #iterate
-  for (i in 1:niterations) {
-    binned[,b1:=sum(N.weighted),by=bin1]
-    binned[,b2:=sum(N.weighted),by=bin2]
-    binned[,b1:=b1/mean(b1)]
-    binned[,b2:=b2/mean(b2)]
-    binned[,N.weighted:=N.weighted/b1/b2]
+iterative_normalization = function(raw, niterations=100) {
+  binned = foreach (n=raw[,unique(name)], .combine="rbind") %do% {
+    binned = raw[name==n&bin1<bin2,.(bin1,bin2,N=observed)]
+    binned = rbind(binned, binned[,.(bin1=bin2,bin2=bin1,N)])
+    binned[,N.weighted:=N]
+    #iterate
+    for (i in 1:niterations) {
+      binned[,b1:=sum(N.weighted),by=bin1]
+      binned[,b2:=sum(N.weighted),by=bin2]
+      binned[,b1:=b1/mean(b1)]
+      binned[,b2:=b2/mean(b2)]
+      binned[,N.weighted:=N.weighted/b1/b2]
+    }
+    binned[,c("b1","b2","N"):=list(NULL,NULL,NULL)]
+    setnames(binned,"N.weighted",paste0("ice.",niterations))
+    binned=binned[bin1<bin2]
+    binned[,name:=n]
+    setkey(binned,name,bin1,bin2)
   }
-  binned[,c("b1","b2","N"):=list(NULL,NULL,NULL)]
-  setnames(binned,"N.weighted","N")
-  binned[,begin1:=do.call(as.integer, tstrsplit(as.character(bin1), "[[,]")[2])]
-  binned[,end1:=do.call(as.integer, tstrsplit(as.character(bin1), "[],)]")[2])]
-  binned[,begin2:=do.call(as.integer, tstrsplit(as.character(bin2), "[[,]")[2])]
-  binned[,end2:=do.call(as.integer, tstrsplit(as.character(bin2), "[],)]")[2])]
-  csb@ice=binned[begin1<begin2]
-  csb@ice.iterations=niterations
-  return(csb)
 }
 
 #' Bin observed and expected counts at a given resolution
@@ -95,49 +92,51 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
     counts=copy(cs@counts[name==n&chunk1==i&chunk2==j])
     biases1=copy(cs@biases[name==n&chunk==i])
     biases2=copy(cs@biases[name==n&chunk==j])
-    coffset=c(biases1[,min(id)-1],biases2[,min(id)-1])
-    cidx=t(data.matrix(counts[,.(id1-coffset[1],id2-coffset[2])]))
-    boffset=c(biases1[,min(ibin)-1],biases2[,min(ibin)-1])
-    data = list( S1=biases1[,.N], S2=biases2[,.N], cutsites1=biases1[,pos], cutsites2=biases2[,pos],
-                 #
-                 N=counts[,.N], cidx=cidx,
-                 counts_close=as.array(counts[,contact.close]), counts_far=as.array(counts[,contact.far]),
-                 counts_up=as.array(counts[,contact.up]), counts_down=as.array(counts[,contact.down]),
-                 #
-                 B1=biases1[,max(ibin)-min(ibin)+1], B2=biases2[,max(ibin)-min(ibin)+1],
-                 bbins1=as.array(biases1[,ibin-boffset[1]]), bbins2=as.array(biases2[,ibin-boffset[2]]),
-                 cbins1=as.array(counts[,ibin1-boffset[1]]), cbins2=as.array(counts[,ibin2-boffset[2]]),
-                 #
-                 Kdiag=Kdiag, npoints=npoints, circularize=cs@settings$circularize,
-                 dmin=cs@settings$dmin, dmax=cs@settings$dmax,
-                 #
-                 eC=cs@par$eC[k],
-                 log_nu1=as.array(biases1[,log_nu]), log_nu2=as.array(biases2[,log_nu]),
-                 log_delta1=as.array(biases1[,log_delta]), log_delta2=as.array(biases2[,log_delta]),
-                 beta_diag_centered=cs@par$beta_diag_centered[((k-1)*Kdiag+1):(k*Kdiag)]
-                 )
-    out <- capture.output(binned <- optimizing(csnorm:::stanmodels$predict_binned,
-                                             data=data, as_vector=F, hessian=F, iter=1, verbose=T, init=0))
-    #format output
-    so = data.table(melt(binned$par$observed))
-    setnames(so,"value","observed")
-    so[,expected:=melt(binned$par$expected)$value]
-    so[,ncounts:=melt(binned$par$ncounts)$value]
-    so[,normalized:=melt(binned$par$normalized)$value]
-    so=so[ncounts>0]
-    so[,c("Var1","Var2"):=list(Var1+boffset[1],Var2+boffset[2])]
-    setkey(so,Var1)
-    so=biases1[,.(bin1=bin[1]),keyby=ibin][so]
-    setkey(so,Var2)
-    so=biases2[,.(bin2=bin[1]),keyby=ibin][so]
-    so[,c("ibin","i.ibin"):=list(NULL,NULL)]
-    so[,lFC:=log2(observed/expected)]
-    so[,name:=n]
-    so
+    if (biases1[,.N]==0 | biases2[,.N]==0) {
+      data.table()
+    } else {
+      coffset=c(biases1[,min(id)-1],biases2[,min(id)-1])
+      cidx=t(data.matrix(counts[,.(id1-coffset[1],id2-coffset[2])]))
+      boffset=c(biases1[,min(ibin)-1],biases2[,min(ibin)-1])
+      data = list( S1=biases1[,.N], S2=biases2[,.N], cutsites1=as.array(biases1[,pos]), cutsites2=as.array(biases2[,pos]),
+                   #
+                   N=counts[,.N], cidx=cidx,
+                   counts_close=as.array(counts[,contact.close]), counts_far=as.array(counts[,contact.far]),
+                   counts_up=as.array(counts[,contact.up]), counts_down=as.array(counts[,contact.down]),
+                   #
+                   B1=biases1[,max(ibin)-min(ibin)+1], B2=biases2[,max(ibin)-min(ibin)+1],
+                   bbins1=as.array(biases1[,ibin-boffset[1]]), bbins2=as.array(biases2[,ibin-boffset[2]]),
+                   cbins1=as.array(counts[,ibin1-boffset[1]]), cbins2=as.array(counts[,ibin2-boffset[2]]),
+                   #
+                   Kdiag=Kdiag, npoints=npoints, circularize=cs@settings$circularize,
+                   dmin=cs@settings$dmin, dmax=cs@settings$dmax,
+                   #
+                   eC=cs@par$eC[k],
+                   log_nu1=as.array(biases1[,log_nu]), log_nu2=as.array(biases2[,log_nu]),
+                   log_delta1=as.array(biases1[,log_delta]), log_delta2=as.array(biases2[,log_delta]),
+                   beta_diag_centered=cs@par$beta_diag_centered[((k-1)*Kdiag+1):(k*Kdiag)]
+                   )
+      out <- capture.output(binned <- optimizing(csnorm:::stanmodels$predict_binned,
+                                               data=data, as_vector=F, hessian=F, iter=1, verbose=T, init=0))
+      #format output
+      so = data.table(melt(binned$par$observed))
+      setnames(so,"value","observed")
+      so[,expected:=melt(binned$par$expected)$value]
+      so[,ncounts:=melt(binned$par$ncounts)$value]
+      so[,normalized:=melt(binned$par$normalized)$value]
+      so=so[ncounts>0]
+      so[,c("Var1","Var2"):=list(Var1+boffset[1],Var2+boffset[2])]
+      setkey(so,Var1)
+      so=biases1[,.(bin1=bin[1]),keyby=ibin][so]
+      setkey(so,Var2)
+      so=biases2[,.(bin2=bin[1]),keyby=ibin][so]
+      so[,c("ibin","i.ibin"):=list(NULL,NULL)]
+      so[,lFC:=log2(observed/expected)]
+      so[,name:=n]
+      so
+    }
   }
   setkey(binned,name,bin1,bin2)
-  binned[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
-  binned[,c("chunk1","chunk2"):=list(ibin1 %/% stepsize, ibin2 %/% stepsize)]
   #re-run once to get the diagonal decay (ugly, but works)
   n=cs@design[1,name]
   counts=cs@counts[name==n&chunk1==0&chunk2==0]
@@ -159,10 +158,10 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
                Kdiag=Kdiag, npoints=npoints, circularize=cs@settings$circularize,
                dmin=cs@settings$dmin, dmax=cs@settings$dmax,
                #
-               eC=cs@par$eC[k],
+               eC=cs@par$eC[1],
                log_nu1=as.array(biases1[,log_nu]), log_nu2=as.array(biases2[,log_nu]),
                log_delta1=as.array(biases1[,log_delta]), log_delta2=as.array(biases2[,log_delta]),
-               beta_diag_centered=cs@par$beta_diag_centered[((k-1)*Kdiag+1):(k*Kdiag)]
+               beta_diag_centered=cs@par$beta_diag_centered[1:Kdiag]
   )
   out <- capture.output(op <- optimizing(csnorm:::stanmodels$predict_binned,
                                              data=data, as_vector=F, hessian=F, iter=1, verbose=T, init=0))
@@ -338,7 +337,7 @@ thresholds_estimator = function(observed, expected, dispersion, threshold=0.95, 
 #' @export
 #'
 #' @examples
-postprocess = function(cs, resolution=10000, ncores=1, verbose=F) {
+postprocess = function(cs, resolution=10000, ncores=1, verbose=F, ice=-1) {
   ### run remaining steps
   if (verbose==T) cat("*** buid binned matrices\n")
   binned=csnorm_predict_binned(cs, resolution=resolution, ncores=ncores)
@@ -346,12 +345,21 @@ postprocess = function(cs, resolution=10000, ncores=1, verbose=F) {
   disp=get_dispersions(binned$mat)
   if (verbose==T) cat("*** detect interactions\n")
   mat=detect_interactions(binned$mat, disp$dispersion, ncores=ncores) #interaction detection using binned dispersion estimates
+  setkey(mat,name,bin1,bin2)
+  if (ice>0) {
+    cat("*** iterative normalization with ",ice," iterations\n")
+    raw=mat[,.(name,bin1,bin2,observed)]
+    setkey(raw,name,bin1,bin2)
+    iced=iterative_normalization(raw, niterations=ice)
+    setkey(iced,name,bin1,bin2)
+    mat=merge(mat,iced,all.x=T,all.y=F)
+  }
   csb=new("CSbinned", resolution=resolution,
                       range=c(b1=cs@biases[,min(pos)], e1=cs@biases[,max(pos)],
                               b2=cs@biases[,min(pos)], e2=cs@biases[,max(pos)]),
                       decay=data.table(dist=binned$dist, decay=binned$decay),
                       alpha=disp$alpha,
-                      mat=mat, raw=mat[,.(bin1,begin1,end1,bin2,begin2,end2,observed)],
+                      mat=mat, raw=data.table(),
                       ice=data.table(), ice.iterations=-1)
   cs@binned[length(cs@binned)+1]=csb
   return(cs)
