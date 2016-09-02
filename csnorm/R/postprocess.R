@@ -298,6 +298,16 @@ thresholds_estimator = function(observed, expected, dispersion, threshold=0.95, 
   return(list(p1,p2,p3))
 }
 
+group_data = function(cs, type=c("all","condition","replicate","enzyme","experiment")) {
+  type=match.arg(type, several.ok=T)
+  if ("all" %in% type) {
+    if (length(type)>1) stop("type 'all' cannot be combined with other types")
+    return(cs@experiments[,.(name,group=.I,groupname=name)])
+  } else {
+    cs@experiments[,.(name,group=.GRP,groupname=do.call(paste,mget(type))),by=type]
+  }
+}
+
 #' Wrapper for the postprocessing steps
 #'
 #' @param cs CSnorm object.
