@@ -212,19 +212,6 @@ detect_interactions = function(binned, dispersions, threshold=0.95, ncores=1, no
   mat[is.na(prob.observed.gt.expected)&observed>=expected,c("prob.observed.gt.expected","detection.type"):=list(ppois(observed,expected,lower.tail=F),"poisson")]
   mat[is.na(prob.observed.gt.expected)&observed<expected,c("prob.observed.gt.expected","detection.type"):=list(ppois(observed,expected,lower.tail=T),"poisson")]
   mat[,is.interaction:=prob.observed.gt.expected>threshold | 1-prob.observed.gt.expected>threshold]
-  #write begins/ends
-  bin1.begin=mat[,bin1]
-  bin1.end=mat[,bin1]
-  bin2.begin=mat[,bin2]
-  bin2.end=mat[,bin2]
-  levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[[,]")[2][[1]]
-  levels(bin1.end) <- tstrsplit(as.character(levels(bin1.end)), "[[,)]")[2][[1]]
-  levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[[,]")[2][[1]]
-  levels(bin2.end) <- tstrsplit(as.character(levels(bin2.end)), "[[,)]")[2][[1]]
-  mat[,begin1:=as.integer(as.character(bin1.begin))]
-  mat[,end1:=as.integer(as.character(bin1.end))]
-  mat[,begin2:=as.integer(as.character(bin2.begin))]
-  mat[,end2:=as.integer(as.character(bin2.end))]
   return(mat)
 }
 
@@ -298,7 +285,43 @@ thresholds_estimator = function(observed, expected, dispersion, threshold=0.95, 
   return(list(p1,p2,p3))
 }
 
-group_data = function(cs, type=c("all","condition","replicate","enzyme","experiment")) {
+bin_all_datasets = function(cs, resolution, ncores=1, ice=-1, verbose=T) {
+  if (verbose==T) cat("*** build binned matrices for each experiment\n")
+  mat=csnorm_predict_binned(cs, resolution, ncores=ncores)
+  setkey(mat,name,bin1,bin2)
+  if (ice>0) {
+    cat("*** iterative normalization with ",ice," iterations\n")
+    raw=mat[,.(name,bin1,bin2,observed)]
+    setkey(raw,name,bin1,bin2)
+    iced=iterative_normalization(raw, niterations=ice)
+    setkey(iced,name,bin1,bin2)
+    mat=merge(mat,iced,all.x=T,all.y=F)
+  }
+  #write begins/ends
+  bin1.begin=mat[,bin1]
+  bin1.end=mat[,bin1]
+  bin2.begin=mat[,bin2]
+  bin2.end=mat[,bin2]
+  levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[[,]")[2][[1]]
+  levels(bin1.end) <- tstrsplit(as.character(levels(bin1.end)), "[[,)]")[2][[1]]
+  levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[[,]")[2][[1]]
+  levels(bin2.end) <- tstrsplit(as.character(levels(bin2.end)), "[[,)]")[2][[1]]
+  mat[,begin1:=as.integer(as.character(bin1.begin))]
+  mat[,end1:=as.integer(as.character(bin1.end))]
+  mat[,begin2:=as.integer(as.character(bin2.begin))]
+  mat[,end2:=as.integer(as.character(bin2.end))]
+  #create CSbinned object
+  csb=new("CSbinned", resolution=resolution,
+          range=c(b1=cs@biases[,min(pos)], e1=cs@biases[,max(pos)],
+                  b2=cs@biases[,min(pos)], e2=cs@biases[,max(pos)]),
+          decay=data.table(),
+          alpha=-1,
+          mat=mat, raw=data.table(),
+          ice=data.table(), ice.iterations=-1)
+  cs@binned[length(cs@binned)+1]=csb
+}
+
+group_datasets = function(cs, type=c("all","condition","replicate","enzyme","experiment")) {
   type=match.arg(type, several.ok=T)
   if ("all" %in% type) {
     if (length(type)>1) stop("type 'all' cannot be combined with other types")
@@ -307,6 +330,7 @@ group_data = function(cs, type=c("all","condition","replicate","enzyme","experim
     cs@experiments[,.(name,group=.GRP,groupname=do.call(paste,mget(type))),by=type]
   }
 }
+
 
 #' Wrapper for the postprocessing steps
 #'
@@ -320,30 +344,10 @@ group_data = function(cs, type=c("all","condition","replicate","enzyme","experim
 #'
 #' @examples
 postprocess = function(cs, resolution=10000, ncores=1, verbose=F, ice=-1) {
-  ### run remaining steps
-  if (verbose==T) cat("*** buid binned matrices\n")
-  mat=csnorm_predict_binned(cs, resolution=resolution, ncores=ncores)
   if (verbose==T) cat("*** estimate dispersions\n")
   disp=get_dispersions(mat)
   if (verbose==T) cat("*** detect interactions\n")
   mat=detect_interactions(mat, disp$dispersion, ncores=ncores) #interaction detection using binned dispersion estimates
-  setkey(mat,name,bin1,bin2)
-  if (ice>0) {
-    cat("*** iterative normalization with ",ice," iterations\n")
-    raw=mat[,.(name,bin1,bin2,observed)]
-    setkey(raw,name,bin1,bin2)
-    iced=iterative_normalization(raw, niterations=ice)
-    setkey(iced,name,bin1,bin2)
-    mat=merge(mat,iced,all.x=T,all.y=F)
-  }
-  csb=new("CSbinned", resolution=resolution,
-                      range=c(b1=cs@biases[,min(pos)], e1=cs@biases[,max(pos)],
-                              b2=cs@biases[,min(pos)], e2=cs@biases[,max(pos)]),
-                      decay=data.table(),
-                      alpha=disp$alpha,
-                      mat=mat, raw=data.table(),
-                      ice=data.table(), ice.iterations=-1)
-  cs@binned[length(cs@binned)+1]=csb
   return(cs)
 }
 
