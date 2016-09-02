@@ -72,46 +72,49 @@ iterative_normalization = function(csb, niterations=100) {
 #' 
 csnorm_predict_binned = function(cs, resolution, ncores=1) {
   Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
-  stopifnot(Kdiag==length(cs@par$beta_diag_centered))
+  Dsets=cs@design[,.N]
+  stopifnot(Dsets*Kdiag==length(cs@par$beta_diag_centered))
   npoints=100*Kdiag #evaluate spline with 100 equidistant points per basis function
   #bin existing counts and biases
   bins=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
   cs@counts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
                                     cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
-  cs@counts[,c("ibin1","ibin2"):=list(as.integer(bin1),as.integer(bin2))]
+  cs@counts[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
   cs@biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
-  cs@biases[,ibin:=as.integer(bin)]
+  cs@biases[,ibin:=as.integer(bin)-1]
   cs@biases[,c("log_nu","log_delta"):=list(cs@par$log_nu,cs@par$log_delta)]
   #split computation across cores
-  nbins=length(bins)
-  stepsize=max(2,ceiling(nbins/(5*ncores)))
+  stepsize=max(2,ceiling(Dsets*length(bins)/(5*ncores)))
   cs@counts[,c("chunk1","chunk2"):=list(ibin1 %/% stepsize, ibin2 %/% stepsize)]
   cs@biases[,chunk:=ibin %/% stepsize]
-  chunks=CJ(cs@biases[,min(chunk):max(chunk)],cs@biases[,min(chunk):max(chunk)])[V1<=V2]
-  binned = foreach (i=chunks[,V1], j=chunks[,V2], .packages=c("data.table","rstan"), .combine="rbind") %dopar% {
-    counts=copy(cs@counts[chunk1==i&chunk2==j])
-    biases1=copy(cs@biases[chunk==i])
-    biases2=copy(cs@biases[chunk==j])
+  chunks=CJ(cs@biases[,min(chunk):max(chunk)],cs@biases[,min(chunk):max(chunk)],cs@design[,1:.N])[V1<=V2]
+  #run it
+  registerDoParallel(cores=ncores)
+  binned = foreach (i=chunks[,V1], j=chunks[,V2], k=chunks[,V3], .packages=c("data.table","rstan"), .combine="rbind") %dopar% {
+    n=cs@design[k,name]
+    counts=copy(cs@counts[name==n&chunk1==i&chunk2==j])
+    biases1=copy(cs@biases[name==n&chunk==i])
+    biases2=copy(cs@biases[name==n&chunk==j])
     coffset=c(biases1[,min(id)-1],biases2[,min(id)-1])
     cidx=t(data.matrix(counts[,.(id1-coffset[1],id2-coffset[2])]))
     boffset=c(biases1[,min(ibin)-1],biases2[,min(ibin)-1])
     data = list( S1=biases1[,.N], S2=biases2[,.N], cutsites1=biases1[,pos], cutsites2=biases2[,pos],
                  #
                  N=counts[,.N], cidx=cidx,
-                 counts_close=counts[,contact.close], counts_far=counts[,contact.far],
-                 counts_up=counts[,contact.up], counts_down=counts[,contact.down],
+                 counts_close=as.array(counts[,contact.close]), counts_far=as.array(counts[,contact.far]),
+                 counts_up=as.array(counts[,contact.up]), counts_down=as.array(counts[,contact.down]),
                  #
-                 B1=biases1[,uniqueN(bin)], B2=biases2[,uniqueN(bin)],
-                 bbins1=biases1[,ibin-boffset[1]], bbins2=biases2[,ibin-boffset[2]],
-                 cbins1=counts[,ibin1-boffset[1]], cbins2=counts[,ibin2-boffset[2]],
+                 B1=biases1[,max(ibin)-min(ibin)+1], B2=biases2[,max(ibin)-min(ibin)+1],
+                 bbins1=as.array(biases1[,ibin-boffset[1]]), bbins2=as.array(biases2[,ibin-boffset[2]]),
+                 cbins1=as.array(counts[,ibin1-boffset[1]]), cbins2=as.array(counts[,ibin2-boffset[2]]),
                  #
                  Kdiag=Kdiag, npoints=npoints, circularize=cs@settings$circularize,
                  dmin=cs@settings$dmin, dmax=cs@settings$dmax,
                  #
-                 eC=cs@par$eC,
-                 log_nu1=biases1[,log_nu], log_nu2=biases2[,log_nu],
-                 log_delta1=biases1[,log_delta], log_delta2=biases2[,log_delta],
-                 beta_diag_centered=cs@par$beta_diag_centered
+                 eC=cs@par$eC[k],
+                 log_nu1=as.array(biases1[,log_nu]), log_nu2=as.array(biases2[,log_nu]),
+                 log_delta1=as.array(biases1[,log_delta]), log_delta2=as.array(biases2[,log_delta]),
+                 beta_diag_centered=cs@par$beta_diag_centered[((k-1)*Kdiag+1):(k*Kdiag)]
                  )
     out <- capture.output(binned <- optimizing(csnorm:::stanmodels$predict_binned,
                                              data=data, as_vector=F, hessian=F, iter=1, verbose=T, init=0))
@@ -129,40 +132,43 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
     so=biases2[,.(bin2=bin[1]),keyby=ibin][so]
     so[,c("ibin","i.ibin"):=list(NULL,NULL)]
     so[,lFC:=log2(observed/expected)]
+    so[,name:=n]
     so
   }
-  setkey(binned,begin1,begin2)
+  setkey(binned,name,bin1,bin2)
+  binned[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
+  binned[,c("chunk1","chunk2"):=list(ibin1 %/% stepsize, ibin2 %/% stepsize)]
   #re-run once to get the diagonal decay (ugly, but works)
-  counts=cs@counts[chunk1==1&chunk2==1]
-  biases1=cs@biases[chunk==1]
-  biases2=cs@biases[chunk==1]
+  n=cs@design[1,name]
+  counts=cs@counts[name==n&chunk1==0&chunk2==0]
+  biases1=cs@biases[name==n&chunk==0]
+  biases2=cs@biases[name==n&chunk==0]
   coffset=c(biases1[,min(id)-1],biases2[,min(id)-1])
   cidx=t(data.matrix(counts[,.(id1-coffset[1],id2-coffset[2])]))
   boffset=c(biases1[,min(ibin)-1],biases2[,min(ibin)-1])
   data = list( S1=biases1[,.N], S2=biases2[,.N], cutsites1=biases1[,pos], cutsites2=biases2[,pos],
                #
                N=counts[,.N], cidx=cidx,
-               counts_close=counts[,contact.close], counts_far=counts[,contact.far],
-               counts_up=counts[,contact.up], counts_down=counts[,contact.down],
+               counts_close=as.array(counts[,contact.close]), counts_far=as.array(counts[,contact.far]),
+               counts_up=as.array(counts[,contact.up]), counts_down=as.array(counts[,contact.down]),
                #
-               B1=biases1[,uniqueN(bin)], B2=biases2[,uniqueN(bin)],
-               bbins1=biases1[,ibin-boffset[1]], bbins2=biases2[,ibin-boffset[2]],
-               cbins1=counts[,ibin1-boffset[1]], cbins2=counts[,ibin2-boffset[2]],
+               B1=biases1[,max(ibin)-min(ibin)+1], B2=biases2[,max(ibin)-min(ibin)+1],
+               bbins1=as.array(biases1[,ibin-boffset[1]]), bbins2=as.array(biases2[,ibin-boffset[2]]),
+               cbins1=as.array(counts[,ibin1-boffset[1]]), cbins2=as.array(counts[,ibin2-boffset[2]]),
                #
                Kdiag=Kdiag, npoints=npoints, circularize=cs@settings$circularize,
                dmin=cs@settings$dmin, dmax=cs@settings$dmax,
                #
-               eC=cs@par$eC,
-               log_nu1=biases1[,log_nu], log_nu2=biases2[,log_nu],
-               log_delta1=biases1[,log_delta], log_delta2=biases2[,log_delta],
-               beta_diag_centered=cs@par$beta_diag_centered
+               eC=cs@par$eC[k],
+               log_nu1=as.array(biases1[,log_nu]), log_nu2=as.array(biases2[,log_nu]),
+               log_delta1=as.array(biases1[,log_delta]), log_delta2=as.array(biases2[,log_delta]),
+               beta_diag_centered=cs@par$beta_diag_centered[((k-1)*Kdiag+1):(k*Kdiag)]
   )
   out <- capture.output(op <- optimizing(csnorm:::stanmodels$predict_binned,
-                                               data=data, as_vector=F, hessian=F, iter=1, verbose=T, init=0))
+                                             data=data, as_vector=F, hessian=F, iter=1, verbose=T, init=0))
   #remove created entries
   cs@counts[,c("bin1","bin2","ibin1","ibin2","chunk1","chunk2"):=list(NULL,NULL,NULL,NULL,NULL,NULL)]
   cs@biases[,c("bin","ibin","chunk","log_nu","log_delta"):=list(NULL,NULL,NULL,NULL,NULL)]
-  
   return(list(resolution=resolution, dist=exp(op$par$log_dist), decay=exp(op$par$log_decay), mat=binned))
 }
 
