@@ -72,7 +72,7 @@ save(cs, file="data/caulo_150k_csnorm.RData")
   cs@par=op$par
   cs@settings = c(cs@settings, list(bf_per_kb=bpk, bf_per_decade=bf_per_decade, dmin=dmin, dmax=dmax))
   cs=bin_all_datasets(cs, resolution=10000, ncores=10, verbose=T, ice=1)
-  mat=group_datasets(cs@experiments, cs@binned[[1]], type="enzyme", ice=1, verbose=T)
+  cs@binned[[1]]=group_datasets(cs@experiments, cs@binned[[1]], type="enzyme", ice=1, verbose=T)
 save(cs, file=paste0("data/caulo_NcoI_150k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized_new.RData"))
 #}
 

@@ -104,25 +104,14 @@ setMethod("show",signature="CSdata",definition=function(object) {
 #' @examples
 setClass("CSbinned",
          slots = list(resolution="numeric",
-                      range="numeric",
-                      decay="data.table",
-                      alpha="numeric",
-                      raw="data.table",
-                      mat="data.table",
-                      ice="data.table",
-                      ice.iterations="numeric"))
+                      individual="data.table",
+                      grouped="list",
+                      metadata="data.table"))
 
 setMethod("show",signature="CSbinned",definition=function(object) {
-  cat("   At ", object@resolution/1000, " kb resolution: ", sep="")
-  if (object@mat[,.N]>0) {
-    cat("CS ")
-    n=names(object@mat)
-    greps=grepl("^ice.",n)
-    for (i in (1:length(n))[greps]) cat("ICE(", substring(n[i],5), ") ", sep="")
-    if ("observed" %in% n) cat("RAW ")
-  cat("\n")
-  }
-})
+  cat("   At", object@resolution/1000, "kb resolution:\n")
+  show(object@metadata)
+  })
 
 #' Class to hold cut-site normalization data
 #'

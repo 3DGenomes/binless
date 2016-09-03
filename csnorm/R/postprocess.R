@@ -324,14 +324,11 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, verbose=T) {
   mat[,end1:=as.integer(as.character(bin1.end))]
   mat[,begin2:=as.integer(as.character(bin2.begin))]
   mat[,end2:=as.integer(as.character(bin2.end))]
+  #create metadata
+  meta=data.table(type="all",raw=T,cs=T,ice=(ice>0),ice.iterations=ifelse(ice>0,ice,NA))
   #create CSbinned object
   csb=new("CSbinned", resolution=resolution,
-          range=c(b1=cs@biases[,min(pos)], e1=cs@biases[,max(pos)],
-                  b2=cs@biases[,min(pos)], e2=cs@biases[,max(pos)]),
-          decay=data.table(),
-          alpha=-1,
-          mat=mat, raw=data.table(),
-          ice=data.table(), ice.iterations=-1)
+          individual=mat, metadata=meta)
   cs@binned[length(cs@binned)+1]=csb
   cs
 }
@@ -352,8 +349,8 @@ group_datasets = function(experiments, csb, type=c("condition","replicate","enzy
   if (verbose==T) cat("*** creating groups\n")
   groups=experiments[,.(name,group=.GRP,groupname=do.call(paste,mget(type))),by=type][,.(name,group,groupname)]
   if (verbose==T) cat("*** merging matrices\n")
-  mat=merge(csb@mat,groups,by="name",all=T)[,.(observed=sum(observed),expected=sum(expected),normalized=sum(normalized)),
-                                              by=c("group","groupname","bin1","bin2","begin1","end1","begin2","end2")]
+  mat=merge(csb@individual,groups,by="name",all=T)[,.(observed=sum(observed),expected=sum(expected),normalized=sum(normalized)),
+                                                   by=c("group","groupname","bin1","bin2","begin1","end1","begin2","end2")]
   mat[,lFC:=log2(observed/expected)]
   setkey(mat,groupname,bin1,bin2)
   if (ice>0) {
@@ -364,7 +361,10 @@ group_datasets = function(experiments, csb, type=c("condition","replicate","enzy
     setkey(iced,groupname,bin1,bin2)
     mat=merge(mat,iced,all.x=T,all.y=F)
   }
-  return(mat)
+  csb@grouped=c(csb@grouped,mat)
+  meta=data.table(type=paste(type),raw=T,cs=T,ice=(ice>0),ice.iterations=ifelse(ice>0,ice,NA))
+  csb@metadata=rbind(csb@metadata,meta)
+  return(csb)
 }
 
 
