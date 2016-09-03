@@ -71,13 +71,22 @@ save(cs, file="data/caulo_150k_csnorm.RData")
   op$par$value=op$value
   cs@par=op$par
   cs@settings = c(cs@settings, list(bf_per_kb=bpk, bf_per_decade=bf_per_decade, dmin=dmin, dmax=dmax))
-  cs=postprocess(cs, resolution=10000, ncores=10, verbose=F)
-  save(cs, file=paste0("data/caulo_NcoI_150k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized_new.RData"))
+  cs=bin_all_datasets(cs, resolution=10000, ncores=10, verbose=T, ice=1)
+  mat=group_datasets(cs@experiments, cs@binned[[1]], type="enzyme", ice=1, verbose=T)
+save(cs, file=paste0("data/caulo_NcoI_150k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized_new.RData"))
 #}
 
-all(cs@binned[[2]]@mat[,.(bin1,bin2,observed,expected,ncounts,normalized,name)]==cs@binned[[1]]@mat[,.(bin1,bin2,observed,expected,ncounts,normalized,name)])
-  
-  
+ggplot(cs@binned[[1]]@mat)+
+  geom_raster(aes(begin1,begin2,fill=log(normalized)))+
+  geom_raster(aes(begin2,begin1,fill=log(normalized)))+
+  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
+  facet_wrap(~name)
+ggplot(mat)+
+  geom_raster(aes(begin1,begin2,fill=log(normalized)))+
+  geom_raster(aes(begin2,begin1,fill=log(normalized)))+
+  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
+  facet_wrap(~groupname)
+
   load("data/caulo_NcoI_150k_bfpkb0.25_lambda1_csnorm_optimized.RData")
   cst=cs
   load("data/caulo_NcoI_150k_bfpkb0.25_lambda1_csnorm_optimized_new.RData")

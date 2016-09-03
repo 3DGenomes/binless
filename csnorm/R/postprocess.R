@@ -42,9 +42,9 @@ bin_counts = function(counts, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL) {
 #' @export
 #'
 #' @examples
-iterative_normalization = function(raw, niterations=100) {
-  binned = foreach (n=raw[,unique(name)], .combine="rbind") %do% {
-    binned = raw[name==n&bin1<bin2,.(bin1,bin2,N=observed)]
+iterative_normalization = function(raw, niterations=100, namecol="name") {
+  binned = foreach (n=raw[,unique(get(namecol))], .combine="rbind") %do% {
+    binned = raw[get(namecol)==n&bin1<bin2,.(bin1,bin2,N=observed)]
     binned = rbind(binned, binned[,.(bin1=bin2,bin2=bin1,N)])
     binned[,N.weighted:=N]
     #iterate
@@ -58,8 +58,8 @@ iterative_normalization = function(raw, niterations=100) {
     binned[,c("b1","b2","N"):=list(NULL,NULL,NULL)]
     setnames(binned,"N.weighted",paste0("ice.",niterations))
     binned=binned[bin1<bin2]
-    binned[,name:=n]
-    setkey(binned,name,bin1,bin2)
+    binned[,c(namecol):=n]
+    setkeyv(binned,c(namecol,"bin1","bin2"))
   }
 }
 
@@ -67,7 +67,7 @@ iterative_normalization = function(raw, niterations=100) {
 #' @keywords internal
 #' @export
 #' 
-csnorm_predict_binned = function(cs, groups, resolution, ncores=1) {
+csnorm_predict_binned = function(cs, resolution, ncores=1) {
   Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
   Dsets=cs@experiments[,.N]
   stopifnot(Dsets*Kdiag==length(cs@par$beta_diag_centered))
@@ -140,7 +140,7 @@ csnorm_predict_binned = function(cs, groups, resolution, ncores=1) {
   #remove created entries
   cs@counts[,c("bin1","bin2","ibin1","ibin2","chunk1","chunk2"):=list(NULL,NULL,NULL,NULL,NULL,NULL)]
   cs@biases[,c("bin","ibin","chunk","log_nu","log_delta"):=list(NULL,NULL,NULL,NULL,NULL)]
-  return(mat)
+  return(binned)
 }
 
 #' Predict dispersions for a binned matrix
@@ -285,19 +285,33 @@ thresholds_estimator = function(observed, expected, dispersion, threshold=0.95, 
   return(list(p1,p2,p3))
 }
 
-bin_all_datasets = function(cs, resolution, ncores=1, ice=-1, verbose=T) {
+#' Bin normalized datasets
+#' 
+#' @param cs CSnorm object, optimized.
+#' @param resolution integer. The desired resolution of the matrix.
+#' @param ncores integer. The number of cores to parallelize on.
+#' @param ice integer. If positive, perform the optional Iterative Correction
+#'   algorithm. The value determines the number of iterations.
+#' @param verbose
+#'   
+#' @return A CSnorm object containing an additional binned matrix in cs@binned
+#' @export
+#' 
+#' @examples
+bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, verbose=T) {
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
   mat=csnorm_predict_binned(cs, resolution, ncores=ncores)
   setkey(mat,name,bin1,bin2)
   if (ice>0) {
-    cat("*** iterative normalization with ",ice," iterations\n")
+    if (verbose==T) cat("*** iterative normalization with ",ice," iterations\n")
     raw=mat[,.(name,bin1,bin2,observed)]
     setkey(raw,name,bin1,bin2)
-    iced=iterative_normalization(raw, niterations=ice)
+    iced=iterative_normalization(raw, niterations=ice, namecol="name")
     setkey(iced,name,bin1,bin2)
     mat=merge(mat,iced,all.x=T,all.y=F)
   }
   #write begins/ends
+  if (verbose==T) cat("*** write begin/end positions\n")
   bin1.begin=mat[,bin1]
   bin1.end=mat[,bin1]
   bin2.begin=mat[,bin2]
@@ -319,17 +333,40 @@ bin_all_datasets = function(cs, resolution, ncores=1, ice=-1, verbose=T) {
           mat=mat, raw=data.table(),
           ice=data.table(), ice.iterations=-1)
   cs@binned[length(cs@binned)+1]=csb
+  cs
 }
 
-group_datasets = function(cs, type=c("all","condition","replicate","enzyme","experiment")) {
+#' Group binned matrices of datasets
+#'
+#' @param experiments The cs@experiments data.table.
+#' @param csb The CSbinned object containing individual matrices.
+#' @param type The type of grouping to be performed. Any combination of the given arguments is possible.
+#' @inheritParams bin_all_datasets
+#'
+#' @return
+#' @export
+#'
+#' @examples
+group_datasets = function(experiments, csb, type=c("condition","replicate","enzyme","experiment"), ice=-1, verbose=T) {
   type=match.arg(type, several.ok=T)
-  if ("all" %in% type) {
-    if (length(type)>1) stop("type 'all' cannot be combined with other types")
-    return(cs@experiments[,.(name,group=.I,groupname=name)])
-  } else {
-    cs@experiments[,.(name,group=.GRP,groupname=do.call(paste,mget(type))),by=type]
+  if (verbose==T) cat("*** creating groups\n")
+  groups=experiments[,.(name,group=.GRP,groupname=do.call(paste,mget(type))),by=type][,.(name,group,groupname)]
+  if (verbose==T) cat("*** merging matrices\n")
+  mat=merge(csb@mat,groups,by="name",all=T)[,.(observed=sum(observed),expected=sum(expected),normalized=sum(normalized)),
+                                              by=c("group","groupname","bin1","bin2","begin1","end1","begin2","end2")]
+  mat[,lFC:=log2(observed/expected)]
+  setkey(mat,groupname,bin1,bin2)
+  if (ice>0) {
+    cat("*** iterative normalization with ",ice," iterations\n")
+    raw=mat[,.(groupname,bin1,bin2,observed)]
+    setkey(raw,groupname,bin1,bin2)
+    iced=iterative_normalization(raw, niterations=ice,namecol="groupname")
+    setkey(iced,groupname,bin1,bin2)
+    mat=merge(mat,iced,all.x=T,all.y=F)
   }
+  return(mat)
 }
+
 
 
 #' Wrapper for the postprocessing steps
