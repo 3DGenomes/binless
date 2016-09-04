@@ -115,9 +115,9 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
                    log_nu1=as.array(biases1[,log_nu]), log_nu2=as.array(biases2[,log_nu]),
                    log_delta1=as.array(biases1[,log_delta]), log_delta2=as.array(biases2[,log_delta]),
                    beta_diag_centered=cs@par$beta_diag_centered[((k-1)*Kdiag+1):(k*Kdiag)]
-                   )
+      )
       out <- capture.output(binned <- optimizing(csnorm:::stanmodels$predict_binned,
-                                               data=data, as_vector=F, hessian=F, iter=1, verbose=T, init=0))
+                                                 data=data, as_vector=F, hessian=F, iter=1, verbose=T, init=0))
       #format output
       so = data.table(melt(binned$par$observed))
       setnames(so,"value","observed")
@@ -341,7 +341,7 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
   #create CSbinned object
   csb=new("CSbinned", resolution=resolution,
           individual=mat, metadata=meta)
-  cs@binned[length(cs@binned)+1]=csb
+  cs@binned=append(cs@binned,csb)
   cs
 }
 
@@ -350,30 +350,41 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
 #' @param experiments The cs@experiments data.table.
 #' @param csb The CSbinned object containing individual matrices.
 #' @param type The type of grouping to be performed. Any combination of the given arguments is possible.
+#' @param dispersion.fun function. How to treat dispersions. Any many-to-one mapping such as sum, min or mean.
 #' @inheritParams bin_all_datasets
 #'
 #' @return
 #' @export
 #'
 #' @examples
-group_datasets = function(experiments, csb, type=c("condition","replicate","enzyme","experiment"), ice=-1, verbose=T) {
+group_datasets = function(experiments, csb, type=c("condition","replicate","enzyme","experiment"), dispersion.fun=sum, ice=-1, verbose=T) {
   type=match.arg(type, several.ok=T)
+  dispersion.fun=match.fun(dispersion.fun)
   if (verbose==T) cat("*** creating groups\n")
   groups=experiments[,.(name,group=.GRP,groupname=do.call(paste,mget(type))),by=type][,.(name,group,groupname)]
   if (verbose==T) cat("*** merging matrices\n")
-  mat=merge(csb@individual,groups,by="name",all=T)[,.(observed=sum(observed),expected=sum(expected),normalized=sum(normalized)),
+  mat=merge(csb@individual,groups,by="name",all=T)[,.(observed=sum(observed),expected=sum(expected),decaymat=mean(decaymat),
+                                                      dispersion=dispersion.fun(dispersion)),
                                                    by=c("group","groupname","bin1","bin2","begin1","end1","begin2","end2")]
-  mat[,lFC:=log2(observed/expected)]
-  setkey(mat,groupname,bin1,bin2)
+  setnames(mat,"groupname","name")
+  setkey(mat,name,bin1,bin2)
+  stopifnot(mat[,uniqueN(group)==uniqueN(name)]) #otherwise need to change subsequent steps
+  #ice
   if (ice>0) {
     cat("*** iterative normalization with ",ice," iterations\n")
-    raw=mat[,.(groupname,bin1,bin2,observed)]
-    setkey(raw,groupname,bin1,bin2)
-    iced=iterative_normalization(raw, niterations=ice,namecol="groupname")
-    setkey(iced,groupname,bin1,bin2)
+    raw=mat[,.(name,bin1,bin2,observed)]
+    setkey(raw,name,bin1,bin2)
+    iced=iterative_normalization(raw, niterations=ice, namecol="name")
+    setkey(iced,name,bin1,bin2)
     mat=merge(mat,iced,all.x=T,all.y=F)
   }
-  csb@grouped=c(csb@grouped,mat)
+  #compute normalized matrices
+  mat[,expected.sd:=sqrt(expected+expected^2/dispersion)] #negative binomial SD
+  mat[,normalized:=(dispersion+observed)/(dispersion+expected)] #posterior predictive mean and SD
+  mat[,normalized.sd:=sqrt(dispersion+observed)/(dispersion+expected)]
+  mat[,c("icelike","icelike.sd"):=list(normalized*decaymat,normalized.sd*decaymat)]
+  #store matrices
+  csb@grouped=append(csb@grouped,list(mat))
   meta=data.table(type=paste(type),raw=T,cs=T,ice=(ice>0),ice.iterations=ifelse(ice>0,ice,NA))
   csb@metadata=rbind(csb@metadata,meta)
   return(csb)

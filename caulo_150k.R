@@ -19,8 +19,8 @@ csd2=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_Interact
                       "data/caulo_BglIIr1_all", "WT", "1", enzyme="BglII", circularize=4042929, dangling.L=c(0,3,5),
                       dangling.R=c(3,0,-2), maxlen=600, save.data=T)
 csd3=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate2_reads_int.tsv",
-                     "data/caulo_BglIIr2_all", "WT", "2", enzyme="BglII", circularize=4042929, dangling.L=c(0,3,5),
-                     dangling.R=c(3,0,-2), maxlen=600, save.data=T)
+                      "data/caulo_BglIIr2_all", "WT", "2", enzyme="BglII", circularize=4042929, dangling.L=c(0,3,5),
+                      dangling.R=c(3,0,-2), maxlen=600, save.data=T)
 
 
 #zoom on a portion of the dataset
@@ -50,30 +50,29 @@ save(cs, file="data/caulo_150k_csnorm.RData")
 #normalize with serial sampler
 #registerDoParallel(cores=30)
 #foreach (bpk=bf_per_kb) %:% foreach (lambda=lambdas) %dopar% {
-  load(paste0("data/caulo_150k_csnorm.RData"))
-  cs@counts=fill_zeros(counts = cs@counts, biases = cs@biases)
-  bf_per_decade=5
-  dmin=1-0.01
-  dmax=150000+0.01
-  bpk=0.25
-  lambda=1
-  init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
-    counts=cs@counts, biases=cs@biases, design=cs@design, lambda=lambda,
-    bf_per_kb=bpk, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=F, iter=10000)))
-  a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
-    biases=cs@biases, counts = cs@counts, design = cs@design, dmin=dmin, dmax=dmax,
-    bf_per_kb=bpk, bf_per_decade=bf_per_decade, iter=100000, verbose = F, init=init.op)))
-  op$par$runtime=a[1]+a[4]
-  op$par$output=output
-  init.op$runtime=init.a[1]+init.a[4]
-  init.op$output=init.output
-  op$par$init=init.op
-  op$par$value=op$value
-  cs@par=op$par
-  cs@settings = c(cs@settings, list(bf_per_kb=bpk, bf_per_decade=bf_per_decade, dmin=dmin, dmax=dmax))
-  cs=bin_all_datasets(cs, resolution=10000, ncores=10, verbose=T, ice=1, dispersion.type=3)
-  
-  cs@binned[[1]]=group_datasets(cs@experiments, cs@binned[[1]], type="enzyme", ice=1, verbose=T)
+load(paste0("data/caulo_150k_csnorm.RData"))
+cs@counts=fill_zeros(counts = cs@counts, biases = cs@biases)
+bf_per_decade=5
+dmin=1-0.01
+dmax=150000+0.01
+bpk=0.25
+lambda=1
+init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
+  counts=cs@counts, biases=cs@biases, design=cs@design, lambda=lambda,
+  bf_per_kb=bpk, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=F, iter=10000)))
+a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
+  biases=cs@biases, counts = cs@counts, design = cs@design, dmin=dmin, dmax=dmax,
+  bf_per_kb=bpk, bf_per_decade=bf_per_decade, iter=100000, verbose = F, init=init.op)))
+op$par$runtime=a[1]+a[4]
+op$par$output=output
+init.op$runtime=init.a[1]+init.a[4]
+init.op$output=init.output
+op$par$init=init.op
+op$par$value=op$value
+cs@par=op$par
+cs@settings = c(cs@settings, list(bf_per_kb=bpk, bf_per_decade=bf_per_decade, dmin=dmin, dmax=dmax))
+cs=bin_all_datasets(cs, resolution=10000, ncores=10, verbose=T, ice=1, dispersion.type=3)
+cs@binned[[1]]=group_datasets(cs@experiments, cs@binned[[1]], type="enzyme", dispersion.fun=sum, ice=1, verbose=T)
 save(cs, file=paste0("data/caulo_NcoI_150k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized_new.RData"))
 #}
 
@@ -82,41 +81,41 @@ ggplot(cs@binned[[1]]@individual)+
   geom_raster(aes(begin2,begin1,fill=log(normalized)))+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~name)
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(normalized)))+
+ggplot(cs@binned[[1]]@grouped)+
+  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(normalized)))+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~groupname)
+  facet_wrap(~name)
 
-  load("data/caulo_NcoI_150k_bfpkb0.25_lambda1_csnorm_optimized.RData")
-  cst=cs
-  load("data/caulo_NcoI_150k_bfpkb0.25_lambda1_csnorm_optimized_new.RData")
-  c(cst@par$eRJ,cs@par$eRJ[1])
-  c(cst@par$eDE,cs@par$eDE[1])
-  c(cst@par$eC,cs@par$eC[1])
-  #
-  ggplot(data.table(id=1:length(cst@par$beta_nu), old=cst@par$beta_nu, new=cs@par$beta_nu[2,]))+
-    geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
-  mean(cst@par$init$beta_nu)
-  mean(init.op$beta_nu[2,])
-  #
-  ggplot(data.table(id=1:80, old=cst@par$log_nu, new=cs@par$log_nu[81:161]))+
-    geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
-  mean(cst@par$log_nu)
-  mean(cs@par$log_nu)
-  #
-  ggplot(data.table(id=1:21, old=cs@par$log_nu[81:101], new=cs@par$log_nu[102:122]))+
-    geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
-  #
-  ggplot() +
-    geom_line(aes(dist,old),colour="red",data=data.table(dist=cst@counts[,distance], old=cst@par$log_decay, key="dist"))+
-    geom_line(aes(dist,new),colour="green",
-              data=data.table(dist=cs@counts[,distance], new=cs@par$log_decay,
-                              name=cs@counts[,name], key="dist")[name=="WT NcoI 1"])+scale_x_log10()
-  
-  mean(cst@par$log_nu)
-  mean(cs@par$log_nu)
-  
+load("data/caulo_NcoI_150k_bfpkb0.25_lambda1_csnorm_optimized.RData")
+cst=cs
+load("data/caulo_NcoI_150k_bfpkb0.25_lambda1_csnorm_optimized_new.RData")
+c(cst@par$eRJ,cs@par$eRJ[1])
+c(cst@par$eDE,cs@par$eDE[1])
+c(cst@par$eC,cs@par$eC[1])
+#
+ggplot(data.table(id=1:length(cst@par$beta_nu), old=cst@par$beta_nu, new=cs@par$beta_nu[2,]))+
+  geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
+mean(cst@par$init$beta_nu)
+mean(init.op$beta_nu[2,])
+#
+ggplot(data.table(id=1:80, old=cst@par$log_nu, new=cs@par$log_nu[81:161]))+
+  geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
+mean(cst@par$log_nu)
+mean(cs@par$log_nu)
+#
+ggplot(data.table(id=1:21, old=cs@par$log_nu[81:101], new=cs@par$log_nu[102:122]))+
+  geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
+#
+ggplot() +
+  geom_line(aes(dist,old),colour="red",data=data.table(dist=cst@counts[,distance], old=cst@par$log_decay, key="dist"))+
+  geom_line(aes(dist,new),colour="green",
+            data=data.table(dist=cs@counts[,distance], new=cs@par$log_decay,
+                            name=cs@counts[,name], key="dist")[name=="WT NcoI 1"])+scale_x_log10()
+
+mean(cst@par$log_nu)
+mean(cs@par$log_nu)
+
 
 
 ### generate plots
@@ -179,8 +178,8 @@ ggplot(nu)+geom_line(aes(pos,exp(log_nu),colour=dset))+facet_wrap(~pbin,scales =
 nu.obs = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
   load(i)
   a=data.table(id=cs@counts[,id1], pos=cs@counts[,pos1],
-             obs=cs@counts[,contact.down]*exp(-cs@pred$log_mean_cdown),
-             dset=j)[sample(.N,min(.N,100000))]
+               obs=cs@counts[,contact.down]*exp(-cs@pred$log_mean_cdown),
+               dset=j)[sample(.N,min(.N,100000))]
   a=merge(a,cs@biases[,.(id,nu=exp(cs@par$log_nu))],by="id")
   a[,obs:=obs*nu]
   setkey(a,nu,pos)
