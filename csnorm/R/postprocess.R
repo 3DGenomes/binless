@@ -337,7 +337,8 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
   mat[,normalized.sd:=sqrt(dispersion+observed)/(dispersion+expected)]
   mat[,c("icelike","icelike.sd"):=list(normalized*decaymat,normalized.sd*decaymat)]
   #create metadata
-  meta=data.table(type="all",raw=T,cs=T,ice=(ice>0),ice.iterations=ifelse(ice>0,ice,NA))
+  meta=data.table(type="all",raw=T,cs=T,ice=(ice>0),ice.iterations=ifelse(ice>0,ice,NA),
+                  names=deparse(as.character(mat[,unique(name)])))
   #create CSbinned object
   csb=new("CSbinned", resolution=resolution,
           individual=mat, metadata=meta)
@@ -385,7 +386,8 @@ group_datasets = function(experiments, csb, type=c("condition","replicate","enzy
   mat[,c("icelike","icelike.sd"):=list(normalized*decaymat,normalized.sd*decaymat)]
   #store matrices
   csb@grouped=append(csb@grouped,list(mat))
-  meta=data.table(type=paste(type),raw=T,cs=T,ice=(ice>0),ice.iterations=ifelse(ice>0,ice,NA))
+  meta=data.table(type=paste(type),raw=T,cs=T,ice=(ice>0),ice.iterations=ifelse(ice>0,ice,NA),
+                  names=deparse(as.character(mat[,unique(name)])))
   csb@metadata=rbind(csb@metadata,meta)
   return(csb)
 }
