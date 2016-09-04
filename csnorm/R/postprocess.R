@@ -282,20 +282,24 @@ generate_genomic_biases = function(biases, beta_nu, beta_delta, bf_per_kb=1, poi
   return(dt)
 }
 
-#' Bin normalized datasets
+#' Bin normalized datasets and compute dispersions at that resolution
 #' 
 #' @param cs CSnorm object, optimized.
 #' @param resolution integer. The desired resolution of the matrix.
 #' @param ncores integer. The number of cores to parallelize on.
-#' @param ice integer. If positive, perform the optional Iterative Correction
+#' @param ice integer. If positive, perform the optional Iterative Correction 
 #'   algorithm. The value determines the number of iterations.
+#' @param dispersion.type integer. Type 1: original dispersion. Type 2: original
+#'   dispersion multplied by ncounts. Type 3: Fit dispersion and multiply by
+#'   ncounts.
 #' @param verbose
 #'   
 #' @return A CSnorm object containing an additional binned matrix in cs@binned
 #' @export
 #' 
 #' @examples
-bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, verbose=T) {
+bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.type=c(1,2,3), verbose=T) {
+  stopifnot(length(dispersion.type)==1 && dispersion.type>=1 && dispersion.type<=3)
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
   mat=csnorm_predict_binned(cs, resolution, ncores=ncores)
   setkey(mat,name,bin1,bin2)
@@ -321,6 +325,12 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, verbose=T) {
   mat[,end1:=as.integer(as.character(bin1.end))]
   mat[,begin2:=as.integer(as.character(bin2.begin))]
   mat[,end2:=as.integer(as.character(bin2.end))]
+  #store dispersions
+  if (verbose==T) cat("*** Dispersion type ",dispersion.type,"\n")
+  mat[,dispersion:=switch(dispersion.type,
+                          cs@par$alpha,
+                          cs@par$alpha*ncounts,
+                          get_dispersions(mat)$dispersion)]
   #create metadata
   meta=data.table(type="all",raw=T,cs=T,ice=(ice>0),ice.iterations=ifelse(ice>0,ice,NA))
   #create CSbinned object
@@ -378,8 +388,6 @@ group_datasets = function(experiments, csb, type=c("condition","replicate","enzy
 #' 
 #' @examples
 detect_interactions = function(binned, threshold=0.95, ncores=1, normal.approx=100){
-  #compute dispersions
-  disp=get_dispersions(binned)
   #report gamma parameters
   mat=copy(binned)
   mat[,c("alpha1","beta1"):=list(dispersions,dispersions/expected)]
