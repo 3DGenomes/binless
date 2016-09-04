@@ -123,7 +123,7 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
       setnames(so,"value","observed")
       so[,expected:=melt(binned$par$expected)$value]
       so[,ncounts:=melt(binned$par$ncounts)$value]
-      so[,normalized:=melt(binned$par$normalized)$value]
+      so[,decaymat:=melt(binned$par$decaymat)$value]
       so=so[ncounts>0]
       so[,c("Var1","Var2"):=list(Var1+boffset[1],Var2+boffset[2])]
       setkey(so,Var1)
@@ -131,7 +131,6 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
       setkey(so,Var2)
       so=biases2[,.(bin2=bin[1]),keyby=ibin][so]
       so[,c("ibin","i.ibin"):=list(NULL,NULL)]
-      so[,lFC:=log2(observed/expected)]
       so[,name:=n]
       so
     }
@@ -184,35 +183,6 @@ compute_normal_overlap = function(mu1,sd1,mu2,sd2, bounds=5, ncores=1) {
     a=integrate(function(x){exp(dnorm(x,mean=(m2-m1)/s1,sd=s2/s1,log=T)+pnorm(x,mean=0,sd=1,log.p=T))},(xmin-m1)/s1,(xmax-m1)/s1)
     if (a$abs.error<=0 | a$message != "OK") {NA} else {a$value}
   }
-}
-
-#' Detect significant interactions wrt expected
-#'
-#' @param binned as returned by \code{\link{csnorm_predict_binned}}
-#' @param dispersions as returned by \code{\link{get_dispersions}}
-#' @param threshold significance threshold, between 0 and 1
-#' @param ncores number of cores used for parallelization
-#' @param normal.approx use normal approximation if dispersion is larger than this
-#'
-#' @return the binned matrix with additional information relating to these significant interactions
-#' @keywords internal
-#' @export
-#'
-#' @examples
-detect_interactions = function(binned, dispersions, threshold=0.95, ncores=1, normal.approx=100){
-  #report gamma parameters
-  mat=copy(binned)
-  mat[,c("alpha1","beta1"):=list(dispersions,dispersions/expected)]
-  mat[,c("alpha2","beta2"):=list(alpha1+observed,beta1+1)]
-  mat[alpha1<normal.approx,c("prob.observed.gt.expected","detection.type"):=list(compute_gamma_overlap(alpha1,beta1,alpha2,beta2,ncores=ncores),"gamma")]
-  mat[,c("mean1","sd1"):=list(expected,expected/sqrt(dispersions))]
-  mat[,c("mean2","sd2"):=list(alpha2/beta2, sqrt(alpha2)/beta2)]
-  mat[alpha1>=normal.approx,c("prob.observed.gt.expected","detection.type"):=list(compute_normal_overlap(mean1,sd1, mean2, sd2, ncores=ncores),"normal")]
-  mat[,prob.observed.gt.expected:=as.numeric(prob.observed.gt.expected)]
-  mat[is.na(prob.observed.gt.expected)&observed>=expected,c("prob.observed.gt.expected","detection.type"):=list(ppois(observed,expected,lower.tail=F),"poisson")]
-  mat[is.na(prob.observed.gt.expected)&observed<expected,c("prob.observed.gt.expected","detection.type"):=list(ppois(observed,expected,lower.tail=T),"poisson")]
-  mat[,is.interaction:=prob.observed.gt.expected>threshold | 1-prob.observed.gt.expected>threshold]
-  return(mat)
 }
 
 #' estimates the values of the count or dispersion required to cross a given threshold
@@ -367,25 +337,35 @@ group_datasets = function(experiments, csb, type=c("condition","replicate","enzy
   return(csb)
 }
 
-
-
-#' Wrapper for the postprocessing steps
-#'
-#' @param cs CSnorm object.
-#' @param resolution positive integer. The requested matrix resolution.
-#' @param ncores number of CPUs to use.
-#' @param verbose boolean.
-#'
-#' @return
+#' Detect significant interactions wrt expected
+#' 
+#' @param binned as returned by \code{\link{csnorm_predict_binned}}
+#' @param threshold significance threshold, between 0 and 1
+#' @param ncores number of cores used for parallelization
+#' @param normal.approx integer. Use normal approximation if dispersion is
+#'   larger than this (should be larger than 10)
+#'   
+#' @return the binned matrix with additional information relating to these
+#'   significant interactions
 #' @export
-#'
+#' 
 #' @examples
-postprocess = function(cs, resolution=10000, ncores=1, verbose=F, ice=-1) {
-  if (verbose==T) cat("*** estimate dispersions\n")
-  disp=get_dispersions(mat)
-  if (verbose==T) cat("*** detect interactions\n")
-  mat=detect_interactions(mat, disp$dispersion, ncores=ncores) #interaction detection using binned dispersion estimates
-  return(cs)
+detect_interactions = function(binned, threshold=0.95, ncores=1, normal.approx=100){
+  #compute dispersions
+  disp=get_dispersions(binned)
+  #report gamma parameters
+  mat=copy(binned)
+  mat[,c("alpha1","beta1"):=list(dispersions,dispersions/expected)]
+  mat[,c("alpha2","beta2"):=list(alpha1+observed,beta1+1)]
+  mat[alpha1<normal.approx,c("prob.observed.gt.expected","detection.type"):=list(compute_gamma_overlap(alpha1,beta1,alpha2,beta2,ncores=ncores),"gamma")]
+  mat[,c("mean1","sd1"):=list(expected,expected/sqrt(dispersions))]
+  mat[,c("mean2","sd2"):=list(alpha2/beta2, sqrt(alpha2)/beta2)]
+  mat[alpha1>=normal.approx,c("prob.observed.gt.expected","detection.type"):=list(compute_normal_overlap(mean1,sd1, mean2, sd2, ncores=ncores),"normal")]
+  mat[,prob.observed.gt.expected:=as.numeric(prob.observed.gt.expected)]
+  mat[is.na(prob.observed.gt.expected)&observed>=expected,c("prob.observed.gt.expected","detection.type"):=list(ppois(observed,expected,lower.tail=F),"poisson")]
+  mat[is.na(prob.observed.gt.expected)&observed<expected,c("prob.observed.gt.expected","detection.type"):=list(ppois(observed,expected,lower.tail=T),"poisson")]
+  mat[,is.interaction:=prob.observed.gt.expected>threshold | 1-prob.observed.gt.expected>threshold]
+  return(mat)
 }
 
 
