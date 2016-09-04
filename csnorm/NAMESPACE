@@ -2,9 +2,11 @@
 
 export(bin_all_datasets)
 export(bin_counts)
+export(call_interactions)
 export(categorize_by_new_type)
 export(csnorm_predict_all)
 export(csnorm_predict_binned)
+export(detect_differences)
 export(detect_interactions)
 export(diagnose_biases)
 export(diagnose_counts)

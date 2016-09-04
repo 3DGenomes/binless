@@ -185,6 +185,37 @@ compute_normal_overlap = function(mu1,sd1,mu2,sd2, bounds=5, ncores=1) {
   }
 }
 
+#' Interaction calling
+#' 
+#' @param mat
+#' @param name character. Name of reference experiment. Used for naming
+#'   probability column "prob.gt.name".
+#' @param threshold significance threshold, between 0 and 1
+#' @param ncores number of cores used for parallelization
+#' @param normal.approx integer. Use normal approximation if dispersion is 
+#'   larger than this (should be larger than 10)
+#'   
+#' @return the matrix with called interactions
+#' @keywords internal
+#' @export
+#' 
+#' @examples
+call_interactions = function(mat, name, threshold=0.95, ncores=1, normal.approx=100) {
+  colname=paste0("prob.gt.",name)
+  mat[alpha1<normal.approx,c(colname,"detection.type"):=list(
+    compute_gamma_overlap(alpha1,beta1,alpha2,beta2,ncores=ncores),"gamma")]
+  mat[,c("mean1","sd1"):=list(alpha1/beta1, sqrt(alpha1)/beta1)]
+  mat[,c("mean2","sd2"):=list(alpha2/beta2, sqrt(alpha2)/beta2)]
+  mat[alpha1>=normal.approx,c(colname,"detection.type"):=list(
+    compute_normal_overlap(mean1,sd1, mean2, sd2, ncores=ncores),"normal")]
+  mat[,c(colname):=as.numeric(get(colname))]
+  mat[,is.significant:=get(colname)>threshold | 1-get(colname)>threshold]
+  if (mat[is.na(get(colname)),.N]>0) {
+    cat("Warning:",mat[is.na(get(colname)),.N],"out of ",mat[,.N], "calls could not be computed!\n")
+  }
+  return(mat)
+}
+
 #' estimates the values of the count or dispersion required to cross a given threshold
 #' 
 #' For illustration purposes. Has a border effect at high counts that can be safely ignored.
@@ -394,30 +425,66 @@ group_datasets = function(experiments, csb, type=c("condition","replicate","enzy
 
 #' Detect significant interactions wrt expected
 #' 
-#' @param binned as returned by \code{\link{csnorm_predict_binned}}
+#' @param mat as returned by \code{\link{csnorm_predict_binned}}
 #' @param threshold significance threshold, between 0 and 1
 #' @param ncores number of cores used for parallelization
-#' @param normal.approx integer. Use normal approximation if dispersion is
-#'   larger than this (should be larger than 10)
+#' @inheritParams call_interactions
 #'   
 #' @return the binned matrix with additional information relating to these
 #'   significant interactions
 #' @export
 #' 
 #' @examples
-detect_interactions = function(experiments, binned, threshold=0.95, ncores=1, normal.approx=100){
+detect_interactions = function(mat, threshold=0.95, ncores=1, normal.approx=100){
   #report gamma parameters
-  mat=copy(binned)
-  mat[,c("alpha1","beta1"):=list(dispersions,dispersions/expected)]
-  mat[,c("alpha2","beta2"):=list(alpha1+observed,beta1+1)]
-  mat[alpha1<normal.approx,c("prob.observed.gt.expected","detection.type"):=list(compute_gamma_overlap(alpha1,beta1,alpha2,beta2,ncores=ncores),"gamma")]
-  mat[,c("mean1","sd1"):=list(expected,expected/sqrt(dispersions))]
-  mat[,c("mean2","sd2"):=list(alpha2/beta2, sqrt(alpha2)/beta2)]
-  mat[alpha1>=normal.approx,c("prob.observed.gt.expected","detection.type"):=list(compute_normal_overlap(mean1,sd1, mean2, sd2, ncores=ncores),"normal")]
-  mat[,prob.observed.gt.expected:=as.numeric(prob.observed.gt.expected)]
-  mat[is.na(prob.observed.gt.expected)&observed>=expected,c("prob.observed.gt.expected","detection.type"):=list(ppois(observed,expected,lower.tail=F),"poisson")]
-  mat[is.na(prob.observed.gt.expected)&observed<expected,c("prob.observed.gt.expected","detection.type"):=list(ppois(observed,expected,lower.tail=T),"poisson")]
-  mat[,is.interaction:=prob.observed.gt.expected>threshold | 1-prob.observed.gt.expected>threshold]
+  mat[,c("alpha1","beta1"):=list(dispersion,dispersion)] #posterior
+  mat[,c("alpha2","beta2"):=list(alpha1+observed,beta1+expected)] #posterior predictive
+  mat=call_interactions(mat,"expected",threshold=threshold,ncores=ncores,normal.approx=normal.approx)
+  mat[,c("alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2"):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
   return(mat)
 }
 
+
+#' Detect significant differences with a reference
+#' 
+#' @param binned as returned by \code{\link{csnorm_predict_binned}}
+#' @param ref character. Detect differences between this group and all others
+#' @inheritParams call_interactions
+#'   
+#' @return the binned matrix with additional information relating to these
+#'   significant interactions
+#' @export
+#' 
+#' @examples
+detect_differences = function(binned, ref, threshold=0.95, ncores=1, normal.approx=100){
+  names=binned[,unique(name)]
+  if (!(ref %in% names)) stop("Group name not found! Valid names are: ",deparse(as.character(names)))
+  mat=copy(binned)
+  names=names[names!=ref]
+  refmat=mat[name==ref,.(bin1,bin2,alpha1=dispersion+observed,beta1=dispersion+expected)]
+  setkey(refmat,bin1,bin2)
+  qmat = foreach (n=names,.combine="rbind") %do% {
+    #merge parameters
+    qmat=mat[name==n,.(bin1,bin2,alpha2=dispersion+observed,beta2=dispersion+expected)]
+    setkey(qmat,bin1,bin2)
+    qmat=merge(refmat,qmat,all=T)
+    qmat=qmat[!(is.na(alpha1)|is.na(beta1)|is.na(alpha2)|is.na(beta2))]
+    #call interactions
+    qmat=call_interactions(qmat,ref,threshold=threshold,ncores=ncores,normal.approx=normal.approx)
+    #compute ratio matrix
+    qmat[,ratio:=ifelse(alpha2>1,(beta2/beta1)*(alpha1/(alpha2-1)),NA)]
+    qmat[,ratio.sd:=ifelse(alpha2>2,(beta2/beta1)*sqrt((alpha1*(alpha1+alpha2-1))/((alpha2-2)*(alpha2-1)^2)),NA)]
+    #remove extra columns
+    qmat[,c("alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2"):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
+    qmat
+  }
+  #merge everything back, removing extra columns first
+  matnames=names(mat)
+  if ("is.significant" %in% matnames) {
+    mat[,c(matnames[grep(".gt.",matnames)],"detection.type","is.significant"):=list(NULL,NULL,NULL)]
+    if ("ratio" %in% matnames) mat[,c("ratio","ratio.sd"):=list(NULL,NULL)]
+  }
+  mat=merge(mat,qmat,all=T,by=c("bin1","bin2"))
+  return(mat)
+}
+  
