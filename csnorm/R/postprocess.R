@@ -331,6 +331,11 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
                           cs@par$alpha,
                           cs@par$alpha*ncounts,
                           get_dispersions(mat)$dispersion)]
+  #compute normalized matrices
+  mat[,expected.sd:=sqrt(expected+expected^2/dispersion)] #negative binomial SD
+  mat[,normalized:=(dispersion+observed)/(dispersion+expected)] #posterior predictive mean and SD
+  mat[,normalized.sd:=sqrt(dispersion+observed)/(dispersion+expected)]
+  mat[,c("icelike","icelike.sd"):=list(normalized*decaymat,normalized.sd*decaymat)]
   #create metadata
   meta=data.table(type="all",raw=T,cs=T,ice=(ice>0),ice.iterations=ifelse(ice>0,ice,NA))
   #create CSbinned object
@@ -387,7 +392,7 @@ group_datasets = function(experiments, csb, type=c("condition","replicate","enzy
 #' @export
 #' 
 #' @examples
-detect_interactions = function(binned, threshold=0.95, ncores=1, normal.approx=100){
+detect_interactions = function(experiments, binned, threshold=0.95, ncores=1, normal.approx=100){
   #report gamma parameters
   mat=copy(binned)
   mat[,c("alpha1","beta1"):=list(dispersions,dispersions/expected)]

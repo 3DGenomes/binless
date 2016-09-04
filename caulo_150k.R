@@ -72,13 +72,14 @@ save(cs, file="data/caulo_150k_csnorm.RData")
   cs@par=op$par
   cs@settings = c(cs@settings, list(bf_per_kb=bpk, bf_per_decade=bf_per_decade, dmin=dmin, dmax=dmax))
   cs=bin_all_datasets(cs, resolution=10000, ncores=10, verbose=T, ice=1, dispersion.type=3)
+  
   cs@binned[[1]]=group_datasets(cs@experiments, cs@binned[[1]], type="enzyme", ice=1, verbose=T)
 save(cs, file=paste0("data/caulo_NcoI_150k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized_new.RData"))
 #}
 
 ggplot(cs@binned[[1]]@individual)+
-  geom_raster(aes(begin1,begin2,fill=log(decaymat)))+
-  geom_raster(aes(begin2,begin1,fill=log(decaymat)))+
+  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
+  geom_raster(aes(begin2,begin1,fill=log(normalized)))+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~name)
 ggplot(mat)+
