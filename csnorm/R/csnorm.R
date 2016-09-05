@@ -93,6 +93,7 @@ setMethod("show",signature="CSdata",definition=function(object) {
 #' Class to hold binned matrices at a given resolution
 #'
 #' @slot resolution numeric. Matrix resolution, in bases
+#' @slot dispersion.type numeric. How the dispersion was calculated
 #' @slot range numeric. A named vector of begins and ends of the matrix, in bases
 #' @slot decay data.table. A table reporting the diagonal decay as fitted by CSnorm
 #' @slot alpha numeric. The dispersion for that resolution
@@ -107,12 +108,13 @@ setMethod("show",signature="CSdata",definition=function(object) {
 #' @examples
 setClass("CSbinned",
          slots = list(resolution="numeric",
+                      dispersion.type="numeric",
                       individual="data.table",
                       grouped="list",
                       metadata="data.table"))
 
 setMethod("show",signature="CSbinned",definition=function(object) {
-  cat("   At", object@resolution/1000, "kb resolution:\n")
+  cat("   At", object@resolution/1000, "kb resolution (dispersion type ", object@dispersion.type, "):\n")
   show(object@metadata)
   })
 

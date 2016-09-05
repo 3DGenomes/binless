@@ -331,6 +331,10 @@ generate_genomic_biases = function(biases, beta_nu, beta_delta, bf_per_kb=1, poi
 #' @examples
 bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.type=c(1,2,3), verbose=T) {
   stopifnot(length(dispersion.type)==1 && dispersion.type>=1 && dispersion.type<=3)
+  if (any(sapply(cs@binned, function(x){x@resolution==resolution && x@dispersion.type==dispersion.type}))) {
+    stop("Refusing to overwrite already existing matrices at ", resolution/1000, "kb with dispersion type ",dispersion.type,
+         ". Use them or remove them from the cs@binned list")
+  }
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
   mat=csnorm_predict_binned(cs, resolution, ncores=ncores)
   setkey(mat,name,bin1,bin2)
@@ -369,9 +373,9 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
   mat[,c("icelike","icelike.sd"):=list(normalized*decaymat,normalized.sd*decaymat)]
   #create metadata
   meta=data.table(type="all",raw=T,cs=T,ice=(ice>0),ice.iterations=ifelse(ice>0,ice,NA),
-                  names=deparse(as.character(mat[,unique(name)])))
+                  names=deparse(as.character(mat[,unique(name)])), dispersion.fun=NA)
   #create CSbinned object
-  csb=new("CSbinned", resolution=resolution,
+  csb=new("CSbinned", resolution=resolution, dispersion.type=dispersion.type,
           individual=mat, metadata=meta)
   cs@binned=append(cs@binned,csb)
   cs
@@ -379,19 +383,29 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
 
 #' Group binned matrices of datasets
 #'
-#' @param experiments The cs@experiments data.table.
-#' @param csb The CSbinned object containing individual matrices.
+#' @param cs CSnorm object
+#' @param resolution,dispersion.type see \code{\link{bin_all_datasets}}, used to identify the input matrices.
 #' @param type The type of grouping to be performed. Any combination of the given arguments is possible.
 #' @param dispersion.fun function. How to treat dispersions. Any many-to-one mapping such as sum, min or mean.
 #' @inheritParams bin_all_datasets
 #'
-#' @return
+#' @return CSnorm object
 #' @export
 #'
 #' @examples
-group_datasets = function(experiments, csb, type=c("condition","replicate","enzyme","experiment"), dispersion.fun=sum, ice=-1, verbose=T) {
+group_datasets = function(cs, resolution, dispersion.type,
+                          type=c("condition","replicate","enzyme","experiment"), dispersion.fun=sum, ice=-1, verbose=T) {
+  #fetch and check inputs
+  experiments=cs@experiments
+  csbi=get_cs_binned_idx(cs, resolution=resolution, dispersion.type=dispersion.type)
+  csb=cs@binned[[csbi]]
   type=match.arg(type, several.ok=T)
   dispersion.fun=match.fun(dispersion.fun)
+  if (any(sapply(csb@metadata[,.I], function(x){csb@metadata[x,type]==type && csb@metadata[x,dispersion.fun]==deparse(dispersion.fun)}))) {
+    stop("Refusing to overwrite already existing ", type, " group matrices with dispersion function ",dispersion.fun,
+         ". Use them or remove them from the cs@binned[[",csbi,"]]@grouped list and @metadata table")
+  }
+  #
   if (verbose==T) cat("*** creating groups\n")
   groups=experiments[,.(name,group=.GRP,groupname=do.call(paste,mget(type))),by=type][,.(name,group,groupname)]
   if (verbose==T) cat("*** merging matrices\n")
@@ -418,24 +432,31 @@ group_datasets = function(experiments, csb, type=c("condition","replicate","enzy
   #store matrices
   csb@grouped=append(csb@grouped,list(mat))
   meta=data.table(type=paste(type),raw=T,cs=T,ice=(ice>0),ice.iterations=ifelse(ice>0,ice,NA),
-                  names=deparse(as.character(mat[,unique(name)])))
+                  names=deparse(as.character(mat[,unique(name)])), dispersion.fun=deparse(dispersion.fun))
   csb@metadata=rbind(csb@metadata,meta)
-  return(csb)
+  cs@binned[[csbi]]=csb
+  return(cs)
 }
 
 #' Detect significant interactions wrt expected
 #' 
-#' @param mat as returned by \code{\link{csnorm_predict_binned}}
+#' @param cs CSnorm object
+#' @param resolution,type,dispersion.type,dispersion.fun see
+#'   \code{\link{bin_all_datasets}} and \code{\link{group_datasets}}, used to
+#'   identify the input matrices.
+#' @param type The type of grouping to be performed. Any combination of the
+#'   given arguments is possible.
 #' @param threshold significance threshold, between 0 and 1
 #' @param ncores number of cores used for parallelization
 #' @inheritParams call_interactions
 #'   
-#' @return the binned matrix with additional information relating to these
+#' @return the binned matrix with additional information relating to these 
 #'   significant interactions
 #' @export
 #' 
 #' @examples
-detect_interactions = function(mat, threshold=0.95, ncores=1, normal.approx=100){
+detect_interactions = function(cs, resolution, type, dispersion.type, dispersion.fun, threshold=0.95, ncores=1, normal.approx=100){
+  mat=copy(get_matrices(cs, resolution, type, dispersion.type, dispersion.fun))
   #report gamma parameters
   mat[,c("alpha1","beta1"):=list(dispersion,dispersion)] #posterior
   mat[,c("alpha2","beta2"):=list(alpha1+observed,beta1+expected)] #posterior predictive
