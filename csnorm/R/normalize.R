@@ -124,44 +124,6 @@ csnorm_simplified_guess = function(biases, counts, design, lambda, dmin, dmax, b
 #' Single-cpu simplified fitting for nu and delta
 #' @keywords internal
 #' 
-csnorm_simplified_genomic = function(biases, counts, log_decay, log_nu, log_delta, bf_per_kb=1, groups=10,
-                             iter=10000, verbose=T, init=0, ...) {
-  stopifnot(groups<=biases[,.N-1])
-  stopifnot(counts[,.N]==biases[,.N*(.N-1)/2]) #needs to be zero-filled
-  #add bias informations to counts
-  csub=copy(counts)
-  csub[,decay:=exp(log_decay)]
-  bsub=biases[,.(id)]
-  bsub[,c("nu","delta"):=list(exp(log_nu),exp(log_delta))]
-  csub=merge(bsub[,.(id1=id,nu,delta)],csub,by="id1",all.x=F,all.y=T)
-  csub=merge(bsub[,.(id2=id,nu,delta)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-  #collect all counts on left/right side and put into quantile groups
-  cs=rbind(csub[,.(pos=pos1,ldist=log(distance),R=(contact.close+contact.down),L=(contact.far+contact.up),others=decay*nu2*(delta2+1/delta2))],
-           csub[,.(pos=pos2,ldist=log(distance),R=(contact.far+contact.down),L=(contact.close+contact.up),others=decay*nu1*(delta1+1/delta1))])
-  setkey(cs,pos)
-  cs[,cbin:=ntile(L+R,groups),by=pos]
-  csl=dcast(cs[,.(pos,cbin,L)], pos~cbin, value.var="L", fun.aggregate=sum)
-  csl[,pos:=NULL]
-  stopifnot(dim(csl)==c(biases[,.N],groups))
-  csr=dcast(cs[,.(pos,cbin,R)], pos~cbin, value.var="R", fun.aggregate=sum)
-  csr[,pos:=NULL]
-  stopifnot(dim(csr)==c(biases[,.N],groups))
-  cso=dcast(cs[,.(pos,cbin,others)], pos~cbin, value.var="others", fun.aggregate=sum)
-  cso[,pos:=NULL]
-  stopifnot(dim(cso)==c(biases[,.N],groups))
-  #run optimization
-  Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
-  data=list(Krow=Krow, S=biases[,.N],
-            cutsites=biases[,pos], rejoined=biases[,rejoined],
-            danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            G=groups, counts_sum_left=csl, counts_sum_right=csr, log_decay_sum=log(cso))
-  optimizing(stanmodels$simplified_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
-             init=init, init_alpha=1e-5, ...)
-}
-
-#' Single-cpu simplified fitting for nu and delta
-#' @keywords internal
-#' 
 csnorm_simplified_decay = function(biases, counts, design, log_nu, log_delta, dmin, dmax, 
                                    bf_per_decade=5, bins_per_bf=10, groups=10,
                                    iter=10000, verbose=T, init=0, ...) {
@@ -200,6 +162,44 @@ csnorm_simplified_decay = function(biases, counts, design, log_nu, log_delta, dm
   setkeyv(a,key(counts))
   op$par$log_decay=a[,log_decay]
   return(op)
+}
+
+#' Single-cpu simplified fitting for nu and delta
+#' @keywords internal
+#' 
+csnorm_simplified_genomic = function(biases, counts, log_decay, log_nu, log_delta, bf_per_kb=1, groups=10,
+                                     iter=10000, verbose=T, init=0, ...) {
+  stopifnot(groups<=biases[,.N-1])
+  stopifnot(counts[,.N]==biases[,.N*(.N-1)/2]) #needs to be zero-filled
+  #add bias informations to counts
+  csub=copy(counts)
+  csub[,decay:=exp(log_decay)]
+  bsub=biases[,.(id)]
+  bsub[,c("nu","delta"):=list(exp(log_nu),exp(log_delta))]
+  csub=merge(bsub[,.(id1=id,nu,delta)],csub,by="id1",all.x=F,all.y=T)
+  csub=merge(bsub[,.(id2=id,nu,delta)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
+  #collect all counts on left/right side and put into quantile groups
+  cs=rbind(csub[,.(pos=pos1,ldist=log(distance),R=(contact.close+contact.down),L=(contact.far+contact.up),others=decay*nu2*(delta2+1/delta2))],
+           csub[,.(pos=pos2,ldist=log(distance),R=(contact.far+contact.down),L=(contact.close+contact.up),others=decay*nu1*(delta1+1/delta1))])
+  setkey(cs,pos)
+  cs[,cbin:=ntile(L+R,groups),by=pos]
+  csl=dcast(cs[,.(pos,cbin,L)], pos~cbin, value.var="L", fun.aggregate=sum)
+  csl[,pos:=NULL]
+  stopifnot(dim(csl)==c(biases[,.N],groups))
+  csr=dcast(cs[,.(pos,cbin,R)], pos~cbin, value.var="R", fun.aggregate=sum)
+  csr[,pos:=NULL]
+  stopifnot(dim(csr)==c(biases[,.N],groups))
+  cso=dcast(cs[,.(pos,cbin,others)], pos~cbin, value.var="others", fun.aggregate=sum)
+  cso[,pos:=NULL]
+  stopifnot(dim(cso)==c(biases[,.N],groups))
+  #run optimization
+  Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
+  data=list(Krow=Krow, S=biases[,.N],
+            cutsites=biases[,pos], rejoined=biases[,rejoined],
+            danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+            G=groups, counts_sum_left=csl, counts_sum_right=csr, log_decay_sum=log(cso))
+  optimizing(stanmodels$simplified_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
+             init=init, init_alpha=1e-5, ...)
 }
 
 #' Single-cpu fitting
