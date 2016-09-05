@@ -83,35 +83,40 @@ get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, f
 #' Single-cpu simplified initial guess
 #' @keywords internal
 #' 
-csnorm_simplified_guess = function(biases, counts, lambda, dmin, dmax, bf_per_kb=1, bf_per_decade=5, groups=10, iter=10000) {
-  stopifnot(groups<=biases[,.N-1])
-  stopifnot(counts[,.N]==biases[,.N*(.N-1)/2]) #needs to be zero-filled
-  #add bias informations to counts
-  csub=copy(counts)
+csnorm_simplified_guess = function(biases, counts, design, lambda, dmin, dmax, bf_per_kb=1, bf_per_decade=5, groups=10, iter=10000) {
+  for (n in biases[,unique(name)]) {
+    stopifnot(groups<=biases[name==n,.N-1])
+    stopifnot(counts[name==n,.N]==biases[name==n,.N*(.N-1)/2]) #needs to be zero-filled
+  }
   #collect all counts on left/right side and put into quantile groups
-  cs=rbind(csub[,.(pos=pos1,ldist=log(distance),R=(contact.close+contact.down),L=(contact.far+contact.up),others=2)],
-           csub[,.(pos=pos2,ldist=log(distance),R=(contact.far+contact.down),L=(contact.close+contact.up),others=2)])
-  setkey(cs,pos)
-  cs[,cbin:=ntile(L+R,groups),by=pos]
-  csl=dcast(cs[,.(pos,cbin,L)], pos~cbin, value.var="L", fun.aggregate=sum)
-  csl[,pos:=NULL]
-  stopifnot(dim(csl)==c(biases[,.N],groups))
-  csr=dcast(cs[,.(pos,cbin,R)], pos~cbin, value.var="R", fun.aggregate=sum)
-  csr[,pos:=NULL]
-  stopifnot(dim(csr)==c(biases[,.N],groups))
-  cso=dcast(cs[,.(pos,cbin,others)], pos~cbin, value.var="others", fun.aggregate=sum)
-  cso[,pos:=NULL]
-  stopifnot(dim(cso)==c(biases[,.N],groups))
+  cts=rbind(counts[,.(id=id1,ldist=log(distance),R=(contact.close+contact.down),L=(contact.far+contact.up),others=2)],
+           counts[,.(id=id2,ldist=log(distance),R=(contact.far+contact.down),L=(contact.close+contact.up),others=2)])
+  setkey(cts,id)
+  cts[,cbin:=ntile(L+R,groups),by=id]
+  ctsl=dcast(cts[,.(id,cbin,L)], id~cbin, value.var="L", fun.aggregate=sum)
+  ctsl[,id:=NULL]
+  stopifnot(dim(ctsl)==c(biases[,.N],groups))
+  ctsr=dcast(cts[,.(id,cbin,R)], id~cbin, value.var="R", fun.aggregate=sum)
+  ctsr[,id:=NULL]
+  stopifnot(dim(ctsr)==c(biases[,.N],groups))
+  ctso=dcast(cts[,.(id,cbin,others)], id~cbin, value.var="others", fun.aggregate=sum)
+  ctso[,id:=NULL]
+  stopifnot(dim(ctso)==c(biases[,.N],groups))
   #run optimization
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
-  data=list(Krow=Krow, S=biases[,.N], lambda=lambda,
-            cutsites=biases[,pos], rejoined=biases[,rejoined],
+  bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
+  data=list(Dsets=design[,.N], Biases=design[,uniqueN(genomic)], XB=as.array(design[,genomic]),
+            Krow=Krow, SD=biases[,.N], bbegin=bbegin,
+            cutsitesD=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            G=groups, counts_sum_left=csl, counts_sum_right=csr, log_decay_sum=log(cso))
+            G=groups, counts_sum_left=ctsl, counts_sum_right=ctsr, log_decay_sum=log(ctso), lambda=lambda)
   op=optimizing(stanmodels$simplified_guess, data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0)
+  #add diagonal decay inits
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
-  op$par=c(list(lambda_nu=lambda, lambda_delta=lambda, beta_diag=seq(0.1,1,length.out = Kdiag-1), lambda_diag=1,
-                log_decay=rep(0,counts[,.N])),
+  Decays=design[,uniqueN(decay)]
+  beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
+  op$par=c(list(lambda_nu=lambda, lambda_delta=lambda, beta_diag=beta_diag,
+                lambda_diag=array(1,dim=Decays), log_decay=rep(0,counts[,.N])),
            op$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta","log_nu","log_delta")])
   return(op)
 }
@@ -733,12 +738,11 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
 #' @keywords internal
 #' @export
 #' 
-run_simplified_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambda=1,
+run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambda=1,
                                 ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
-  stopifnot(is.null(design))
   #add settings
   cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, groups=groups,
                                     lambda=lambda, iter=iter))
@@ -755,7 +759,7 @@ run_simplified_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, b
   cs@settings$dmax=dmax
   #initial guess
   init.a = system.time(init.output <- capture.output(init.op <- csnorm_simplified_guess(
-    biases = cs@biases, counts = cs@counts, lambda=lambda, dmin=dmin, dmax=dmax,
+    biases = cs@biases, counts = cs@counts, design = cs@design, lambda=lambda, dmin=dmin, dmax=dmax,
     groups = groups, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter)))
   cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4])
   op=init.op
@@ -827,11 +831,11 @@ run_simplified_gibbs = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, b
 #' @export
 #' 
 #' @examples
-run_simplified = function(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=c(0.1,1,10),
+run_simplified = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=c(0.1,1,10),
                           ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, ncores=1) {
   registerDoParallel(cores=ncores)
   cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %dopar%
-    run_simplified_gibbs(cs, design=design, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
+    run_simplified_gibbs(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
                          bins_per_bf=bins_per_bf, groups=groups, lambda=lambda, ngibbs = ngibbs,
                          iter=iter, fit.decay=T, fit.genomic=T)
   return(cs)

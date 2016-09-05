@@ -41,7 +41,7 @@ load("data/caulo_BglIIr1_150k_csdata.RData")
 csd2=csd
 load("data/caulo_BglIIr2_150k_csdata.RData")
 csd3=csd
-cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="none")
+cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="all")
 cs=merge_cs_norm_datasets(list(csd1))
 save(cs, file="data/caulo_150k_csnorm.RData")
 
@@ -78,6 +78,49 @@ cs@binned[[1]]@grouped[[2]]=detect_differences(cs@binned[[1]]@grouped[[1]], ref=
 
 save(cs, file=paste0("data/caulo_NcoI_150k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized_new.RData"))
 #}
+
+
+
+
+#### run gibbs sampler
+library(ggplot2)
+library(data.table)
+library(csnorm)
+library(foreach)
+
+setwd("/home/yannick/simulations/cs_norm")
+
+
+load("data/caulo_NcoI_150k_csdata.RData")
+csd1=csd
+load("data/caulo_BglIIr1_150k_csdata.RData")
+csd2=csd
+load("data/caulo_BglIIr2_150k_csdata.RData")
+csd3=csd
+cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="all")
+
+#add settings
+bf_per_kb=0.25
+bf_per_decade=5
+dmin=1-0.01
+dmax=150000+0.01
+lambda=1
+groups=10
+bins_per_bf=10
+iter=10000
+cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, groups=groups,
+                                  lambda=lambda, iter=iter))
+#fill counts matrix
+cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize)
+cs@settings$dmin=dmin
+cs@settings$dmax=dmax
+#initial guess
+init.a = system.time(init.output <- capture.output(init.op <- csnorm:::csnorm_simplified_guess(
+  biases = cs@biases, counts = cs@counts, design = cs@design, lambda=lambda, dmin=dmin, dmax=dmax,
+  groups = groups, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter)))
+cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4])
+op=init.op
+
 
 ggplot(cs@binned[[1]]@individual)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+

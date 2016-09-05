@@ -19,14 +19,16 @@ csd2=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_Interact
                       "data/caulo_BglIIr1_all", "WT", "1", enzyme="BglII", circularize=4042929, dangling.L=c(0,3,5),
                       dangling.R=c(3,0,-2), maxlen=600, save.data=T)
 csd3=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate2_reads_int.tsv",
-                     "data/caulo_BglIIr2_all", "WT", "2", enzyme="BglII", circularize=4042929, dangling.L=c(0,3,5),
-                     dangling.R=c(3,0,-2), maxlen=600, save.data=T)
-#load("data/caulo_NcoI_all_csdata.RData")
-#csd1=csd
-#load("data/caulo_BglIIr1_all_csdata.RData")
-#csd2=csd
-#load("data/caulo_BglIIr2_all_csdata.RData")
-#csd3=csd
+                      "data/caulo_BglIIr2_all", "WT", "2", enzyme="BglII", circularize=4042929, dangling.L=c(0,3,5),
+                      dangling.R=c(3,0,-2), maxlen=600, save.data=T)
+
+
+load("data/caulo_NcoI_all_csdata.RData")
+csd1=csd
+load("data/caulo_BglIIr1_all_csdata.RData")
+csd2=csd
+load("data/caulo_BglIIr2_all_csdata.RData")
+csd3=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="none")
 save(cs, file="data/caulo_csnorm.RData")
 
