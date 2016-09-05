@@ -98,67 +98,43 @@ csd2=csd
 load("data/caulo_BglIIr2_150k_csdata.RData")
 csd3=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="all")
+cs=merge_cs_norm_datasets(list(csd1))
 
 cs=csnorm:::run_simplified_gibbs(cs, bf_per_kb=0.25, lambda=1, ngibbs=2, iter=10000)
-
-
-#add settings
-bf_per_kb=0.25
 bf_per_decade=5
 dmin=1-0.01
 dmax=150000+0.01
+bf_per_kb=0.25
 lambda=1
-groups=10
 bins_per_bf=10
-iter=10000
-cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, groups=groups,
-                                  lambda=lambda, iter=iter))
-#fill counts matrix
-cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize)
-cs@settings$dmin=dmin
-cs@settings$dmax=dmax
-#initial guess
-init.a = system.time(init.output <- capture.output(init.op <- csnorm:::csnorm_simplified_guess(
-  biases = cs@biases, counts = cs@counts, design = cs@design, lambda=lambda, dmin=dmin, dmax=dmax,
-  groups = groups, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter)))
-cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4])
-op=init.op
-#
-biases=copy(cs@biases)
-biases[,c("log_nu","log_delta"):=list(op$par$log_nu,op$par$log_delta)]
-a=system.time(output <- capture.output(op.diag <- csnorm:::csnorm_simplified_decay(
-  biases = biases, counts = cs@counts, design=cs@design,
-  log_nu = op$par$log_nu, log_delta = op$par$log_delta,
-  dmin = dmin, dmax = dmax, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, groups = groups,
-  iter=iter, init=op$par)))
-op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","beta_diag_centered","alpha",
-                                                 "lambda_diag","log_decay","decay")],
-                                   op$par[c("eRJ","eDE","beta_nu","beta_delta",
-                                            "lambda_nu","lambda_delta","log_nu","log_delta")]))
-cs@diagnostics[[paste0("out.decay",i)]]=output
-cs@diagnostics[[paste0("runtime.decay",i)]]=a[1]+a[4]
-#
-a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_simplified_genomic(
-  biases = cs@biases, counts = cs@counts, design=cs@design,
-  log_decay = op$par$log_decay, log_nu = op$par$log_nu, log_delta = op$par$log_delta,
-  groups = groups, bf_per_kb = bf_per_kb, iter = iter, init=op$par)))
-op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag","log_decay","decay")],
-                                  op.gen$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta",
-                                               "lambda_nu","lambda_delta","log_nu","log_delta")]))
-cs@diagnostics[[paste0("out.bias",i)]]=output
-cs@diagnostics[[paste0("runtime.bias",i)]]=a[1]+a[4]
-#
-op$value=op.gen$value+op.diag$value
-op$par$runtime=sum(as.numeric(cs@diagnostics[grep("runtime",names(cs@diagnostics))]))
-op$par$output=output
-init.op$par$runtime=init.a[1]+init.a[4]
-init.op$par$output=init.output
-op$par$init=init.op$par
-op$par$value=op$value
-cs@par=op$par
+groups=10
+lambda=1
+ngibbs = 3
+iter=100000
 
+load("master_init_op.RData")
+op.old=op
+load("develop_init_op2.RData")
+c(op.old$par$eC,op$par$eC)
+c(op.old$par$eRJ,op$par$eRJ)
+c(op.old$par$eDE,op$par$eDE)
+#
+ggplot(data.table(pos=cs@biases[,pos],old=op.old$par$log_nu,new=op$par$log_nu))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
+ggplot(data.table(pos=1:length(op.old$par$beta_nu),old=op.old$par$beta_nu,new=op$par$beta_nu[1,]))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
+#
+ggplot(data.table(dist=cs@counts[,distance],old=op.old$par$log_decay,new=op$par$log_decay),key="dist")+geom_line(aes(dist,old),colour="blue")+geom_line(aes(dist,new),colour="red")
+ggplot(data.table(pos=1:length(op.old$par$beta_diag),old=op.old$par$beta_diag,new=op$par$beta_diag[1,]))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
 
-
+#
+load("master_init_data.RData")
+data.old=data
+load("develop_init_data.RData")
+c(data.old$Krow,data$Krow)
+c(data.old$S,data$SD)
+all(data.old$cutsites==data$cutsitesD)
+ggplot(data.table(pos=data$cutsitesD,old=data.old$counts_sum_left$`1`,new=data$counts_sum_left$`1`))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
+ggplot(data.table(pos=data$cutsitesD,old=data.old$counts_sum_right$`5`,new=data$counts_sum_right$`5`))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
+ggplot(data.table(pos=data$cutsitesD,old=data.old$log_decay_sum$`5`,new=data$log_decay_sum$`5`))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
 
 
 
