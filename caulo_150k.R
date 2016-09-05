@@ -112,9 +112,9 @@ lambda=1
 ngibbs = 3
 iter=100000
 
-load("master_init_op.RData")
+load("master_genomic_op.RData")
 op.old=op
-load("develop_init_op2.RData")
+load("develop_genomic_op.RData")
 c(op.old$par$eC,op$par$eC)
 c(op.old$par$eRJ,op$par$eRJ)
 c(op.old$par$eDE,op$par$eDE)
@@ -122,7 +122,7 @@ c(op.old$par$eDE,op$par$eDE)
 ggplot(data.table(pos=cs@biases[,pos],old=op.old$par$log_nu,new=op$par$log_nu))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
 ggplot(data.table(pos=1:length(op.old$par$beta_nu),old=op.old$par$beta_nu,new=op$par$beta_nu[1,]))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
 #
-ggplot(data.table(dist=cs@counts[,distance],old=op.old$par$log_decay,new=op$par$log_decay),key="dist")+geom_line(aes(dist,old),colour="blue")+geom_line(aes(dist,new),colour="red")
+ggplot(data.table(dist=cs@counts[,distance],old=op.old$par$log_decay,new=op$par$log_decay),key="dist")+geom_line(aes(dist,old),colour="blue")+geom_line(aes(dist,new),colour="red")+scale_x_log10()
 ggplot(data.table(pos=1:length(op.old$par$beta_diag),old=op.old$par$beta_diag,new=op$par$beta_diag[1,]))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
 
 #

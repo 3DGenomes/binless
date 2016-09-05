@@ -15,9 +15,9 @@ data {
   int<lower=1> SD; //number of cut sites across all datasets
   int<lower=1,upper=SD+1> bbegin[Dsets+1]; //bbegin[i]=j: dataset i starts at j
   vector[SD] cutsitesD; //cut site locations, all data
-  int rejoined[SD];
-  int danglingL[SD];
-  int danglingR[SD];
+  int<lower=0> rejoined[SD];
+  int<lower=0> danglingL[SD];
+  int<lower=0> danglingR[SD];
   //count sums
   int<lower=1> G; //number of count batches
   int<lower=0> counts_sum_left[SD,G];
@@ -179,8 +179,14 @@ model {
   //grouping reduces the number of likelihoods from S-1 to G, so reweighting is
   //needed for a proper estimation of the lambdas
   for (d in 1:Dsets) {
-    target += weight[d] * neg_binomial_2_log_lpmf(csl[bbegin[d]:(bbegin[d+1]-1)] | log_mean_cleft[bbegin[d]:(bbegin[d+1]-1)], alpha);
-    target += weight[d] * neg_binomial_2_log_lpmf(csr[bbegin[d]:(bbegin[d+1]-1)] | log_mean_cright[bbegin[d]:(bbegin[d+1]-1)], alpha);
+    for (i in 1:G) {
+      int gbegin;
+      gbegin = (i-1)*SD;
+      target += weight[d] * neg_binomial_2_log_lpmf(
+        csl[(gbegin+bbegin[d]):(gbegin+bbegin[d+1]-1)] | log_mean_cleft[(gbegin+bbegin[d]):(gbegin+bbegin[d+1]-1)], alpha);
+      target += weight[d] * neg_binomial_2_log_lpmf(
+        csr[(gbegin+bbegin[d]):(gbegin+bbegin[d+1]-1)] | log_mean_cright[(gbegin+bbegin[d]):(gbegin+bbegin[d+1]-1)], alpha);
+    }
   }
   
   //// prior
