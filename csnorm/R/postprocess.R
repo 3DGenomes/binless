@@ -319,7 +319,7 @@ generate_genomic_biases = function(biases, beta_nu, beta_delta, bf_per_kb=1, poi
 #' @param resolution integer. The desired resolution of the matrix.
 #' @param ncores integer. The number of cores to parallelize on.
 #' @param ice integer. If positive, perform the optional Iterative Correction 
-#'   algorithm. The value determines the number of iterations.
+#'   algorithm, useful for comparison purposes. The value determines the number of iterations.
 #' @param dispersion.type integer. Type 1: original dispersion. Type 2: original
 #'   dispersion multplied by ncounts. Type 3: Fit dispersion and multiply by
 #'   ncounts.

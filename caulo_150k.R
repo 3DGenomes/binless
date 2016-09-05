@@ -101,6 +101,12 @@ cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="all")
 cs=merge_cs_norm_datasets(list(csd1))
 
 cs=csnorm:::run_simplified_gibbs(cs, bf_per_kb=0.25, lambda=1, ngibbs=2, iter=10000)
+cs=bin_all_datasets(cs, resolution=10000, ncores=10, verbose=T, ice=1, dispersion.type=3)
+cs@binned[[1]]=group_datasets(cs@experiments, cs@binned[[1]], type="enzyme", dispersion.fun=sum, ice=1, verbose=T)
+cs@binned[[1]]@grouped[[1]]=detect_interactions(cs@binned[[1]]@grouped[[1]], threshold=0.95, ncores=1, normal.approx=100)
+cs@binned[[1]]@grouped[[2]]=detect_differences(cs@binned[[1]]@grouped[[1]], ref="NcoI", threshold=0.95, ncores=1, normal.approx=100)
+
+
 bf_per_decade=5
 dmin=1-0.01
 dmax=150000+0.01

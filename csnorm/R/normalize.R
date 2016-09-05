@@ -903,7 +903,7 @@ run_serial = function(cs, bf_per_kb=1, bf_per_decade=5, lambda=1, iter=100000, s
 #' \code{\link{run_simplified}}.
 #' 
 #' @inheritParams run_simplified
-#' @param subsampling.pc numeric. Percentage of the data used to do the calculations (default 100%).
+#' @param subsampling.pc numeric. Percentage of the data used to do the calculations (default 100).
 #'   
 #' @return A csnorm object
 #' @export

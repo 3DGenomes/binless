@@ -14,12 +14,15 @@
 #' \code{\link{generate_fake_dataset}} follows model specification
 #'
 #' @section Normalization:
-#' \code{\link{run_split_parallel}}
+#' \code{\link{run_simplified}}
 #'
 #' @section Postprocessing:
-#' \code{\link{postprocess}}
-#' \code{\link{iterative_normalization}}
+#' \code{\link{bin_all_datasets}}
+#' \code{\link{group_datasets}}
+#' \code{\link{detect_interactions}}
+#' \code{\link{detect_differences}}
 #' \code{\link{thresholds_estimator}}
+#' \code{\link{generate_genomic_biases}}
 #'
 #' @useDynLib csnorm, .registration = TRUE
 #' @import rstan
