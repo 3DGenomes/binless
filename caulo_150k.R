@@ -135,7 +135,44 @@ all(data.old$cutsites==data$cutsitesD)
 ggplot(data.table(pos=data$cutsitesD,old=data.old$counts_sum_left$`1`,new=data$counts_sum_left$`1`))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
 ggplot(data.table(pos=data$cutsitesD,old=data.old$counts_sum_right$`5`,new=data$counts_sum_right$`5`))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
 ggplot(data.table(pos=data$cutsitesD,old=data.old$log_decay_sum$`5`,new=data$log_decay_sum$`5`))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
+all(data$counts_sum_left==data.old$counts_sum_left)
+all(data$counts_sum_right==data.old$counts_sum_right)
+all(data$log_decay_sum==data.old$log_decay_sum)
 
+load("master_init_data.RData")
+data.old=data
+smold=stan_model(file="master_guess.stan")
+op.old=optimizing(smold,data=data.old,iter=10000,verbose=T,init=0,as_vector=F, hessian=F, tol_rel_grad=1e2, tol_rel_obj=1e2, seed=1, sample_file="master_sample.dat")
+load("develop_init_data.RData")
+sm=stan_model(file="develop_guess.stan")
+op=optimizing(sm,data=data,iter=10000,verbose=T,init=0,as_vector=F, hessian=F, tol_rel_grad=1e2, tol_rel_obj=1e2, seed=1, sample_file="develop_sample.dat")
+#
+c(op.old$par$eC,op$par$eC)
+ggplot(data.table(pos=cs@biases[,pos],old=op.old$par$log_nu,new=op$par$log_nu))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
+ggplot(data.table(pos=cs@biases[,pos],old=op.old$par$log_nu,new=op$par$log_nu))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
+#
+c(op.old$par$gweight,op$par$gweight)
+c(op.old$par$glfac,op$par$glfac)
+ggplot(data.table(pos=1:length(op$par$gcsl),old=op.old$par$gcsl,new=op$par$gcsl))+geom_line(aes(pos,old),colour="blue")+geom_line(aes(pos,new),colour="red")
+ggplot(data.table(pos=1:length(op$par$gcsl),old=op.old$par$gcsl,new=op$par$gcsl))+geom_point(aes(new,old))+stat_function(fun=identity)
+ggplot(data.table(pos=1:length(op$par$gcsr),old=op.old$par$gcsr,new=op$par$gcsr))+geom_point(aes(new,old))+stat_function(fun=identity)
+ggplot(data.table(pos=1:length(op.old$par$gXrow_w),old=op.old$par$gXrow_w,new=op$par$gXDrow_w))+geom_point(aes(new,old))+stat_function(fun=identity)
+ggplot(data.table(pos=1:length(op.old$par$gXrow_v),old=op.old$par$gXrow_v,new=op$par$gXDrow_v))+geom_point(aes(new,old))+stat_function(fun=identity)
+ggplot(data.table(pos=1:length(op.old$par$gXrow_u),old=op.old$par$gXrow_u,new=op$par$gXDrow_u))+geom_point(aes(new,old))+stat_function(fun=identity)
+ggplot(data.table(pos=1:length(op.old$par$gprow),old=op.old$par$gprow,new=op$par$gprowD[1,]))+geom_point(aes(new,old))+stat_function(fun=identity)
+#
+data.new=data[names(data.old)]
+data.new$S=data$SD
+data.new$cutsites=data$cutsitesD
+init.new=list(eC=as.numeric(op$par$eC), eRJ=as.numeric(op$par$eRJ), eDE=as.numeric(op$par$eDE),
+              alpha=op$par$alpha, beta_nu=op$par$beta_nu[1,], beta_delta=op$par$beta_delta[1,])
+op.old=optimizing(smold,data=data.old,iter=10000,verbose=T,init=init.new,as_vector=F, hessian=F)
+#
+a.old=fread("master_sample.dat")
+a=fread("develop_sample.dat")
+tmp=data.table(cbind(head(names(a.old),n=4000),head(names(a),n=4000)))
+cbind(tail(names(a.old)),tail(names(a)))
+tmp=data.table(cbind(head(as.numeric(a.old[1]),n=2147),head(as.numeric(a[1]),n=2147)))
 
 
 
