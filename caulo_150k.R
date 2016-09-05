@@ -114,7 +114,7 @@ iter=100000
 
 load("master_genomic_op.RData")
 op.old=op
-load("develop_genomic_op.RData")
+load("develop_genomic_op2.RData")
 c(op.old$par$eC,op$par$eC)
 c(op.old$par$eRJ,op$par$eRJ)
 c(op.old$par$eDE,op$par$eDE)

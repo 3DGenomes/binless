@@ -39,7 +39,7 @@ transformed data {
   int csl[SD*G];
   int csr[SD*G];
   //weight, needed to avoid integer division
-  int weight[Dsets];
+  real weight[Dsets];
 
   //Bias GAM spline, sparse
   {
