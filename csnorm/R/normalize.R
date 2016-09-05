@@ -167,10 +167,12 @@ csnorm_simplified_decay = function(biases, counts, design, log_nu, log_delta, dm
 #' Single-cpu simplified fitting for nu and delta
 #' @keywords internal
 #' 
-csnorm_simplified_genomic = function(biases, counts, log_decay, log_nu, log_delta, bf_per_kb=1, groups=10,
+csnorm_simplified_genomic = function(biases, counts, design, log_decay, log_nu, log_delta, bf_per_kb=1, groups=10,
                                      iter=10000, verbose=T, init=0, ...) {
-  stopifnot(groups<=biases[,.N-1])
-  stopifnot(counts[,.N]==biases[,.N*(.N-1)/2]) #needs to be zero-filled
+  for (n in biases[,unique(name)]) {
+    stopifnot(groups<=biases[name==n,.N-1])
+    stopifnot(counts[name==n,.N]==biases[name==n,.N*(.N-1)/2]) #needs to be zero-filled
+  }
   #add bias informations to counts
   csub=copy(counts)
   csub[,decay:=exp(log_decay)]
@@ -179,25 +181,27 @@ csnorm_simplified_genomic = function(biases, counts, log_decay, log_nu, log_delt
   csub=merge(bsub[,.(id1=id,nu,delta)],csub,by="id1",all.x=F,all.y=T)
   csub=merge(bsub[,.(id2=id,nu,delta)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
   #collect all counts on left/right side and put into quantile groups
-  cs=rbind(csub[,.(pos=pos1,ldist=log(distance),R=(contact.close+contact.down),L=(contact.far+contact.up),others=decay*nu2*(delta2+1/delta2))],
-           csub[,.(pos=pos2,ldist=log(distance),R=(contact.far+contact.down),L=(contact.close+contact.up),others=decay*nu1*(delta1+1/delta1))])
-  setkey(cs,pos)
-  cs[,cbin:=ntile(L+R,groups),by=pos]
-  csl=dcast(cs[,.(pos,cbin,L)], pos~cbin, value.var="L", fun.aggregate=sum)
-  csl[,pos:=NULL]
-  stopifnot(dim(csl)==c(biases[,.N],groups))
-  csr=dcast(cs[,.(pos,cbin,R)], pos~cbin, value.var="R", fun.aggregate=sum)
-  csr[,pos:=NULL]
-  stopifnot(dim(csr)==c(biases[,.N],groups))
-  cso=dcast(cs[,.(pos,cbin,others)], pos~cbin, value.var="others", fun.aggregate=sum)
-  cso[,pos:=NULL]
-  stopifnot(dim(cso)==c(biases[,.N],groups))
+  cts=rbind(csub[,.(id=id1,ldist=log(distance),R=(contact.close+contact.down),L=(contact.far+contact.up),others=decay*nu2*(delta2+1/delta2))],
+            csub[,.(id=id2,ldist=log(distance),R=(contact.far+contact.down),L=(contact.close+contact.up),others=decay*nu1*(delta1+1/delta1))])
+  setkey(cts,id)
+  cts[,cbin:=ntile(L+R,groups),by=id]
+  ctsl=dcast(cts[,.(id,cbin,L)], id~cbin, value.var="L", fun.aggregate=sum)
+  ctsl[,id:=NULL]
+  stopifnot(dim(ctsl)==c(biases[,.N],groups))
+  ctsr=dcast(cts[,.(id,cbin,R)], id~cbin, value.var="R", fun.aggregate=sum)
+  ctsr[,id:=NULL]
+  stopifnot(dim(ctsr)==c(biases[,.N],groups))
+  ctso=dcast(cts[,.(id,cbin,others)], id~cbin, value.var="others", fun.aggregate=sum)
+  ctso[,id:=NULL]
+  stopifnot(dim(ctso)==c(biases[,.N],groups))
   #run optimization
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
-  data=list(Krow=Krow, S=biases[,.N],
-            cutsites=biases[,pos], rejoined=biases[,rejoined],
+  bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
+  data=list(Dsets=design[,.N], Biases=design[,uniqueN(genomic)], XB=as.array(design[,genomic]),
+            Krow=Krow, SD=biases[,.N], bbegin=bbegin,
+            cutsitesD=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            G=groups, counts_sum_left=csl, counts_sum_right=csr, log_decay_sum=log(cso))
+            G=groups, counts_sum_left=ctsl, counts_sum_right=ctsr, log_decay_sum=log(ctso))
   optimizing(stanmodels$simplified_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
              init=init, init_alpha=1e-5, ...)
 }
@@ -784,7 +788,7 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
     #fit nu and delta given diagonal decay
     if (fit.genomic==T) {
       a=system.time(output <- capture.output(op.gen <- csnorm_simplified_genomic(
-        biases = cs@biases, counts = cs@counts,
+        biases = cs@biases, counts = cs@counts, design = cs@design,
         log_decay = op$par$log_decay, log_nu = op$par$log_nu, log_delta = op$par$log_delta,
         groups = groups, bf_per_kb = bf_per_kb, iter = iter, init=op$par)))
       op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag","log_decay","decay")],

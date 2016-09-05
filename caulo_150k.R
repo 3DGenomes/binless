@@ -99,6 +99,9 @@ load("data/caulo_BglIIr2_150k_csdata.RData")
 csd3=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="all")
 
+cs=csnorm:::run_simplified_gibbs(cs, bf_per_kb=0.25, lambda=1, ngibbs=2, iter=10000)
+
+
 #add settings
 bf_per_kb=0.25
 bf_per_decade=5
@@ -123,8 +126,8 @@ op=init.op
 #
 biases=copy(cs@biases)
 biases[,c("log_nu","log_delta"):=list(op$par$log_nu,op$par$log_delta)]
-a=system.time(output <- capture.output(op.diag <- csnorm_simplified_decay(
-  biases = biases, counts = cs@counts,
+a=system.time(output <- capture.output(op.diag <- csnorm:::csnorm_simplified_decay(
+  biases = biases, counts = cs@counts, design=cs@design,
   log_nu = op$par$log_nu, log_delta = op$par$log_delta,
   dmin = dmin, dmax = dmax, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, groups = groups,
   iter=iter, init=op$par)))
@@ -135,8 +138,8 @@ op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","beta_diag_cen
 cs@diagnostics[[paste0("out.decay",i)]]=output
 cs@diagnostics[[paste0("runtime.decay",i)]]=a[1]+a[4]
 #
-a=system.time(output <- capture.output(op.gen <- csnorm_simplified_genomic(
-  biases = cs@biases, counts = cs@counts,
+a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_simplified_genomic(
+  biases = cs@biases, counts = cs@counts, design=cs@design,
   log_decay = op$par$log_decay, log_nu = op$par$log_nu, log_delta = op$par$log_delta,
   groups = groups, bf_per_kb = bf_per_kb, iter = iter, init=op$par)))
 op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag","log_decay","decay")],
