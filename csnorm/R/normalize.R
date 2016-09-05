@@ -162,13 +162,15 @@ csnorm_simplified_genomic = function(biases, counts, log_decay, log_nu, log_delt
 #' Single-cpu simplified fitting for nu and delta
 #' @keywords internal
 #' 
-csnorm_simplified_decay = function(biases, counts, log_nu, log_delta, dmin, dmax, 
+csnorm_simplified_decay = function(biases, counts, design, log_nu, log_delta, dmin, dmax, 
                                    bf_per_decade=5, bins_per_bf=10, groups=10,
                                    iter=10000, verbose=T, init=0, ...) {
-  stopifnot(groups<=biases[,.N-1])
-  stopifnot(counts[,.N]==biases[,.N*(.N-1)/2]) #needs to be zero-filled
+  for (n in biases[,unique(name)]) {
+    stopifnot(groups<=biases[name==n,.N-1])
+    stopifnot(counts[name==n,.N]==biases[name==n,.N*(.N-1)/2]) #needs to be zero-filled
+  }
   #add bias informations to counts
-  setkey(counts, id1, id2, pos1, pos2)
+  setkey(counts, id1, id2)
   csub=copy(counts)
   bsub=biases[,.(id)]
   bsub[,c("nu","delta"):=list(exp(log_nu),exp(log_delta))]
@@ -182,13 +184,13 @@ csnorm_simplified_decay = function(biases, counts, log_nu, log_delta, dmin, dmax
   csub[,c("ldist","count","others"):=list(
     log(distance), contact.far+contact.down+contact.close+contact.up, nu1*nu2*(delta1+1/delta1)*(delta2+1/delta2))]
   csub[,cbin:=ntile(count,groups),by=dbin]
-  csd = csub[,.(mdist=exp(mean(ldist)), count=sum(count), others=sum(others), weight=4*.N), keyby=c("dbin","cbin")]
+  csd = csub[,.(mdist=exp(mean(ldist)), count=sum(count), others=sum(others), weight=4*.N), keyby=c("name", "dbin","cbin")]
   #run optimization
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
-  data=list(S=biases[,.N], rejoined=biases[,rejoined], danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            log_nu=log_nu, log_delta=log_delta,
-            Kdiag=Kdiag, dmin=dmin, dmax=dmax, N=csd[,.N], counts_sum=csd[,count], weight=csd[,weight],
-            dist=csd[,mdist], log_genomic_sum=csd[,log(others)])
+  cbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
+  data=list(Dsets=design[,.N], Decays=design[,uniqueN(decay)], XD=as.array(design[,decay]),
+            Kdiag=Kdiag, dmin=dmin, dmax=dmax, N=csd[,.N], cbegin=cbegin,
+            counts_sum=csd[,count], weight=csd[,weight], dist=csd[,mdist], log_genomic_sum=csd[,log(others)])
   op=optimizing(stanmodels$simplified_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
   #make nice decay data table
   op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
@@ -767,10 +769,8 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
   for (i in 1:ngibbs) {
     #fit diagonal decay given nu and delta
     if (fit.decay==T) {
-      biases=copy(cs@biases)
-      biases[,c("log_nu","log_delta"):=list(op$par$log_nu,op$par$log_delta)]
       a=system.time(output <- capture.output(op.diag <- csnorm_simplified_decay(
-        biases = biases, counts = cs@counts,
+        biases = cs@biases, counts = cs@counts, design=cs@design,
         log_nu = op$par$log_nu, log_delta = op$par$log_delta,
         dmin = dmin, dmax = dmax, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, groups = groups,
         iter=iter, init=op$par)))

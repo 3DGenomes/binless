@@ -120,6 +120,44 @@ init.a = system.time(init.output <- capture.output(init.op <- csnorm:::csnorm_si
   groups = groups, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter)))
 cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4])
 op=init.op
+#
+biases=copy(cs@biases)
+biases[,c("log_nu","log_delta"):=list(op$par$log_nu,op$par$log_delta)]
+a=system.time(output <- capture.output(op.diag <- csnorm_simplified_decay(
+  biases = biases, counts = cs@counts,
+  log_nu = op$par$log_nu, log_delta = op$par$log_delta,
+  dmin = dmin, dmax = dmax, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, groups = groups,
+  iter=iter, init=op$par)))
+op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","beta_diag_centered","alpha",
+                                                 "lambda_diag","log_decay","decay")],
+                                   op$par[c("eRJ","eDE","beta_nu","beta_delta",
+                                            "lambda_nu","lambda_delta","log_nu","log_delta")]))
+cs@diagnostics[[paste0("out.decay",i)]]=output
+cs@diagnostics[[paste0("runtime.decay",i)]]=a[1]+a[4]
+#
+a=system.time(output <- capture.output(op.gen <- csnorm_simplified_genomic(
+  biases = cs@biases, counts = cs@counts,
+  log_decay = op$par$log_decay, log_nu = op$par$log_nu, log_delta = op$par$log_delta,
+  groups = groups, bf_per_kb = bf_per_kb, iter = iter, init=op$par)))
+op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag","log_decay","decay")],
+                                  op.gen$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta",
+                                               "lambda_nu","lambda_delta","log_nu","log_delta")]))
+cs@diagnostics[[paste0("out.bias",i)]]=output
+cs@diagnostics[[paste0("runtime.bias",i)]]=a[1]+a[4]
+#
+op$value=op.gen$value+op.diag$value
+op$par$runtime=sum(as.numeric(cs@diagnostics[grep("runtime",names(cs@diagnostics))]))
+op$par$output=output
+init.op$par$runtime=init.a[1]+init.a[4]
+init.op$par$output=init.output
+op$par$init=init.op$par
+op$par$value=op$value
+cs@par=op$par
+
+
+
+
+
 
 
 ggplot(cs@binned[[1]]@individual)+
