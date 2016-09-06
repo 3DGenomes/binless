@@ -35,8 +35,12 @@ get_matrices_idx = function(cs, resolution, type, dispersion.type, dispersion.fu
   idx1=which(sapply(cs@binned, function(x){x@resolution==resolution && x@dispersion.type==dispersion.type}))
   stopifnot(length(idx1)==1)
   csb=cs@binned[[idx1]]
-  idx2=which(sapply(csb@metadata[,.I],
+  if (type=="all") {
+    idx2=0
+  } else {
+    idx2=which(sapply(csb@metadata[,.I],
                     function(x){csb@metadata[x,type]==type && csb@metadata[x,dispersion.fun]==deparse(dispersion.fun)}))-1
+  }
   stopifnot(length(idx2)==1)
   return(c(idx1,idx2))
 }

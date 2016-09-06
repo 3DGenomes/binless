@@ -2,6 +2,7 @@ library(ggplot2)
 library(data.table)
 library(csnorm)
 library(foreach)
+library(doParallel)
 
 setwd("/home/yannick/simulations/cs_norm")
 
@@ -36,13 +37,18 @@ save(cs, file="data/caulo_csnorm.RData")
 
 #normalize with gibbs sampler
 load("data/caulo_csnorm.RData")
-cs = run_simplified(cs, design=NULL, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=c(0.01,0.1,1,10,100),
-               ngibbs = 3, iter=10000, ncores=30)
-#save(cs, file="data/caulo_wt_csnorm_optimized.RData")
-cs@binned=list()
-cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
-cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
-save(cs, file="data/caulo_ko_csnorm_optimized.RData")
+cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=c(0.01,0.1,1,10,100),
+               ngibbs = 1, iter=10000, ncores=30)
+save(cs, file="data/caulo_csnorm_optimized.RData")
+load("data/caulo_csnorm_optimized.RData")
+cs=bin_all_datasets(cs, resolution=10000, ncores=30, verbose=T, ice=1, dispersion.type=2)
+cs@binned[[2]]@individual=detect_interactions(cs, resolution=10000, type="all", dispersion.type=2, dispersion.fun=sum,
+                        threshold=0.95, ncores=30, normal.approx=100)
+cs=group_datasets(cs, resolution=10000, dispersion.type=3, type="enzyme", dispersion.fun=sum, ice=1, verbose=T)
+mat=detect_interactions(cs, resolution=10000, type="enzyme", dispersion.type=3, dispersion.fun=sum,
+                        threshold=0.95, ncores=1, normal.approx=100)
+#mat2=detect_differences(mat, ref="NcoI", threshold=0.95, ncores=1, normal.approx=100)
+save(cs, file="data/caulo_csnorm_optimized.RData")
 
 
 
@@ -57,39 +63,31 @@ dsets=c("caulo wt","caulo ko")
 
 
 #lFC
-lFC = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
-  load(i)
-  get_cs_binned(cs,1,"CS")[,.(dset=j,lFC)]
+lFC = foreach (j=c(1,2,3),.combine=rbind) %do% {
+  get_matrices(cs, resolution=10000, type="all", dispersion.type=j, dispersion.fun=NA)[,.(name,disp.type=j,lFC=log2(normalized))]
 }
-ggplot(lFC)+geom_density(aes(lFC,colour=dset))
+ggplot(lFC)+geom_density(aes(lFC,colour=name))+facet_grid(disp.type~.)
 #ggsave(filename=paste0("images/",prefix,"_lFC.png"), width=10, height=7.5)
 
 #normalized matrices
-mat = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
-  load(i)
-  get_cs_binned(cs,1,"CS")[,.(dset=j,begin1,begin2,normalized,lFC,observed, expected, is.interaction,prob.observed.gt.expected)]
+mat = foreach (j=c(1,2,3),.combine=rbind) %do% {
+  get_matrices(cs, resolution=10000, type="all", dispersion.type=j, dispersion.fun=NA)[
+    ,.(name,disp.type=j,begin1,begin2,normalized,normalized.sd,icelike,icelike.sd,observed, expected,is.significant,prob.gt.expected)]
 }
-#normalized
+#icelike
+ggplot(mat)+
+  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
+  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
+  geom_point(aes(begin1,begin2,colour=prob.gt.expected<0.5),data=mat[is.significant==T])+
+  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
+  facet_grid(disp.type~name)
+#ggsave(filename=paste0("images/",prefix,"_normalized.png"), width=10, height=5)
+#normalized with error bars
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(normalized)))+
-  geom_raster(aes(begin2,begin1,fill=log(normalized)))+
-  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=mat[is.interaction==T])+
+  geom_raster(aes(begin2,begin1,fill=log(normalized.sd)))+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~dset)
-#ggsave(filename=paste0("images/",prefix,"_normalized.png"), width=10, height=5)
-#lFC
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=lFC))+
-  geom_raster(aes(begin2,begin1,fill=lFC))+
-  geom_point(aes(begin1,begin2,colour=prob.observed.gt.expected<0.5),data=mat[is.interaction==T])+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~dset)
-#observed / expected
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(observed)))+
-  geom_raster(aes(begin2,begin1,fill=log(expected)))+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~dset)
+  facet_grid(disp.type~name)
 
 #nu and delta correlation
 nu = foreach (i=fnames,j=dsets,.combine=rbind) %do% {

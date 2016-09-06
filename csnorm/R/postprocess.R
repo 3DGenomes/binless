@@ -73,25 +73,27 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
   stopifnot(Dsets*Kdiag==length(cs@par$beta_diag_centered))
   npoints=100*Kdiag #evaluate spline with 100 equidistant points per basis function
   #bin existing counts and biases
-  bins=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
-  cs@counts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
+  biases=cs@biases
+  counts=cs@counts
+  bins=seq(biases[,min(pos)-1],biases[,max(pos)+1+resolution],resolution)
+  counts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
                                     cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
-  cs@counts[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
-  cs@biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
-  cs@biases[,ibin:=as.integer(bin)-1]
-  cs@biases[,c("log_nu","log_delta"):=list(cs@par$log_nu,cs@par$log_delta)]
+  counts[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
+  biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
+  biases[,ibin:=as.integer(bin)-1]
+  biases[,c("log_nu","log_delta"):=list(cs@par$log_nu,cs@par$log_delta)]
   #split computation across cores
   stepsize=max(2,ceiling(Dsets*length(bins)/(5*ncores)))
-  cs@counts[,c("chunk1","chunk2"):=list(ibin1 %/% stepsize, ibin2 %/% stepsize)]
-  cs@biases[,chunk:=ibin %/% stepsize]
-  chunks=CJ(cs@biases[,min(chunk):max(chunk)],cs@biases[,min(chunk):max(chunk)],cs@experiments[,1:.N])[V1<=V2]
+  counts[,c("chunk1","chunk2"):=list(ibin1 %/% stepsize, ibin2 %/% stepsize)]
+  biases[,chunk:=ibin %/% stepsize]
+  chunks=CJ(biases[,min(chunk):max(chunk)],biases[,min(chunk):max(chunk)],cs@experiments[,1:.N])[V1<=V2]
   #run it
   registerDoParallel(cores=ncores)
   binned = foreach (i=chunks[,V1], j=chunks[,V2], k=chunks[,V3], .packages=c("data.table","rstan"), .combine="rbind") %dopar% {
     n=cs@experiments[k,name]
-    counts=copy(cs@counts[name==n&chunk1==i&chunk2==j])
-    biases1=copy(cs@biases[name==n&chunk==i])
-    biases2=copy(cs@biases[name==n&chunk==j])
+    counts=copy(counts[name==n&chunk1==i&chunk2==j])
+    biases1=copy(biases[name==n&chunk==i])
+    biases2=copy(biases[name==n&chunk==j])
     if (biases1[,.N]==0 | biases2[,.N]==0) {
       data.table()
     } else {
@@ -137,8 +139,8 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
   }
   setkey(binned,name,bin1,bin2)
   #remove created entries
-  cs@counts[,c("bin1","bin2","ibin1","ibin2","chunk1","chunk2"):=list(NULL,NULL,NULL,NULL,NULL,NULL)]
-  cs@biases[,c("bin","ibin","chunk","log_nu","log_delta"):=list(NULL,NULL,NULL,NULL,NULL)]
+  counts[,c("bin1","bin2","ibin1","ibin2","chunk1","chunk2"):=list(NULL,NULL,NULL,NULL,NULL,NULL)]
+  biases[,c("bin","ibin","chunk","log_nu","log_delta"):=list(NULL,NULL,NULL,NULL,NULL)]
   return(binned)
 }
 
@@ -152,6 +154,19 @@ get_dispersions = function(binned, iter=10000) {
                                          data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0, init_alpha=1e-5)$par)
   return(op)
 }
+
+
+#' Predict dispersions for a binned matrix
+#' @keywords internal
+#' @export
+#' 
+get_dispersions2 = function(binned, iter=10000) {
+  data=list(B=binned[,.N],observed=binned[,observed],expected=binned[,expected])
+  out <- capture.output(op <- optimizing(stanmodels$dispersions2,
+                                         data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0, init_alpha=1e-5)$par)
+  return(op)
+}
+
 
 #' compute \eqn{p(\Gamma_2>\Gamma_1) = \int_{0}^{+\infty} dx p_{\Gamma_2}(x) \int_{0}^{x} dy p_{\Gamma_1}(y)}
 #' @keywords internal
@@ -319,10 +334,11 @@ generate_genomic_biases = function(biases, beta_nu, beta_delta, bf_per_kb=1, poi
 #' @param resolution integer. The desired resolution of the matrix.
 #' @param ncores integer. The number of cores to parallelize on.
 #' @param ice integer. If positive, perform the optional Iterative Correction 
-#'   algorithm, useful for comparison purposes. The value determines the number of iterations.
-#' @param dispersion.type integer. Type 1: original dispersion. Type 2: original
-#'   dispersion multplied by ncounts. Type 3: Fit dispersion and multiply by
-#'   ncounts.
+#'   algorithm, useful for comparison purposes. The value determines the number
+#'   of iterations.
+#' @param dispersion.type integer. Type 1: original dispersion. Type 2: Fit same
+#'   dispersion to all bins. Type 3: Fit one dispersion and multiply by ncounts
+#'   to get that of a bin.
 #' @param verbose
 #'   
 #' @return A CSnorm object containing an additional binned matrix in cs@binned
@@ -364,7 +380,7 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
   if (verbose==T) cat("*** Dispersion type ",dispersion.type,"\n")
   mat[,dispersion:=switch(dispersion.type,
                           cs@par$alpha,
-                          cs@par$alpha*ncounts,
+                          get_dispersions2(mat)$dispersion,
                           get_dispersions(mat)$dispersion)]
   #compute normalized matrices
   mat[,expected.sd:=sqrt(expected+expected^2/dispersion)] #negative binomial SD
@@ -373,7 +389,7 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
   mat[,c("icelike","icelike.sd"):=list(normalized*decaymat,normalized.sd*decaymat)]
   #create metadata
   meta=data.table(type="all",raw=T,cs=T,ice=(ice>0),ice.iterations=ifelse(ice>0,ice,NA),
-                  names=deparse(as.character(mat[,unique(name)])), dispersion.fun=NA)
+                  names=deparse(as.character(mat[,unique(name)])), dispersion.fun=deparse(NA))
   #create CSbinned object
   csb=new("CSbinned", resolution=resolution, dispersion.type=dispersion.type,
           individual=mat, metadata=meta)
