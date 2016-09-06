@@ -7,82 +7,64 @@ functions {
 ////////////////////////////////////////////////////////////////
 data {
   //spline parameters
+  int<lower=1> Dsets; //number of datasets
+  int<lower=1,upper=Dsets> Decays; // number of different diagonal decays to model
+  int<lower=1,upper=Decays> XD[Dsets]; //XD[i]=j: dataset i has decay set j
   int Kdiag; //number of functions in spline base for diagonal decay
   //biases
-  int<lower=1> S; //number of cut sites
-  vector[S] cutsites; //cut site locations
+  int<lower=1> SD; //number of cut sites
+  vector[SD] cutsitesD; //cut site locations
   //distance bounds
   real<lower=0> dmin;
   real<lower=dmin> dmax;
-  //counts : explicit
-  int<lower=0> Nclose; //number of close counts modelled explicitly
-  int<lower=0> counts_close[Nclose]; //value of the count
-  int<lower=0> index_close[2,Nclose]; //indices of rsite pairs
-  vector<lower=dmin,upper=dmax>[Nclose] dist_close; //genomic distance between rsites
-  //
-  int<lower=0> Nfar; //number of far counts modelled explicitly
-  int<lower=0> counts_far[Nfar]; //value of the count
-  int<lower=0> index_far[2,Nfar]; //indices of rsite pairs
-  vector<lower=dmin,upper=dmax>[Nfar] dist_far; //genomic distance between rsites
-  //
-  int<lower=0> Nup; //number of upstream counts modelled explicitly
-  int<lower=0> counts_up[Nup]; //value of the count
-  int<lower=0> index_up[2,Nup]; //indices of rsite pairs
-  vector<lower=dmin,upper=dmax>[Nup] dist_up; //genomic distance between rsites
-  //
-  int<lower=0> Ndown; //number of downstream counts modelled explicitly
-  int<lower=0> counts_down[Ndown]; //value of the count
-  int<lower=0> index_down[2,Ndown]; //indices of rsite pairs
-  vector<lower=dmin,upper=dmax>[Ndown] dist_down; //genomic distance between rsites
-  //
+  //counts
+  int<lower=0> N; //number of counts modelled explicitly
+  int<lower=1,upper=N+1> cbegin[Dsets+1]; //cbegin[i]=j: dataset i starts at j
+  int<lower=1,upper=SD> cidx[2,N]; //indices of rsite pairs, referring to vector[SD] cutsitesD
+  vector<lower=dmin,upper=dmax>[N] dist; //genomic distance between rsites
   //estimated parameters
-  real eC;  //exposure for counts
-  vector[S] log_nu; //take nu and delta directly to avoid base reconstruction
-  vector[S] log_delta; 
-  vector[Kdiag] beta_diag_centered; //need to build spline base
+  real eC[Dsets];  //exposure for counts
+  vector[SD] log_nu; //take nu and delta directly to avoid base reconstruction
+  vector[SD] log_delta; 
+  vector[Dsets*Kdiag] beta_diag_centered; //need to build spline base
 }
 parameters {}
 model {}
 generated quantities {
   //diag
-  vector[Nclose] log_decay_close;
-  vector[Nfar] log_decay_far;
-  vector[Nup] log_decay_up;
-  vector[Ndown] log_decay_down;
+  vector[N] log_decay;
   //means
-  vector[Nclose] log_mean_cclose;
-  vector[Nfar] log_mean_cfar;
-  vector[Nup] log_mean_cup;
-  vector[Ndown] log_mean_cdown;
+  vector[N] log_mean_cclose;
+  vector[N] log_mean_cfar;
+  vector[N] log_mean_cup;
+  vector[N] log_mean_cdown;
   
   //decay: diagonal SCAM spline, dense
   {
-    matrix[Nclose+Nfar+Nup+Ndown,Kdiag] Xdiag;
-    vector[Nclose+Nfar+Nup+Ndown] log_decay;
+    matrix[N,Dsets*Kdiag] Xdiag;
     //design matrix
     {
-      vector[Nclose+Nfar+Nup+Ndown] tmpN;
-      tmpN[:Nclose] = dist_close;
-      tmpN[(Nclose+1):(Nclose+Nfar)] = dist_far;
-      tmpN[(Nclose+Nfar+1):(Nclose+Nfar+Nup)] = dist_up;
-      tmpN[(Nclose+Nfar+Nup+1):] = dist_down;
-      Xdiag = bspline(log(tmpN), Kdiag, splinedegree(), log(dmin), log(dmax));
+      matrix[N,Kdiag] tmpXdiag;
+      tmpXdiag = bspline(log(dist), Kdiag, splinedegree(), log(dmin), log(dmax));
+      Xdiag = rep_matrix(0, N, Dsets*Kdiag);
+      for (d in 1:Dsets) {
+        Xdiag[cbegin[d]:(cbegin[d+1]-1),((d-1)*Kdiag+1):(d*Kdiag)] = tmpXdiag[cbegin[d]:(cbegin[d+1]-1),:];
+      }
     }
     //decay
     log_decay = Xdiag * beta_diag_centered;
-    log_decay_close = log_decay[:Nclose];
-    log_decay_far = log_decay[(Nclose+1):(Nclose+Nfar)];
-    log_decay_up = log_decay[(Nclose+Nfar+1):(Nclose+Nfar+Nup)];
-    log_decay_down = log_decay[(Nclose+Nfar+Nup+1):];
   }
   
   //means
-  log_mean_cclose = eC + log_decay_close + (log_nu - log_delta)[index_close[1]] 
-                                         + (log_nu + log_delta)[index_close[2]];
-  log_mean_cfar   = eC + log_decay_far   + (log_nu + log_delta)[index_far[1]]   
-                                          + (log_nu - log_delta)[index_far[2]];
-  log_mean_cup    = eC + log_decay_up    + (log_nu + log_delta)[index_up[1]]    
-                                          + (log_nu + log_delta)[index_up[2]];
-  log_mean_cdown  = eC + log_decay_down  + (log_nu - log_delta)[index_down[1]]  
-                                          + (log_nu - log_delta)[index_down[2]];
+  log_mean_cclose = log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
+  log_mean_cfar   = log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
+  log_mean_cup    = log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
+  log_mean_cdown  = log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
+  //add exposures
+  for (d in 1:Dsets) {
+    log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)] = log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
+    log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)]   = log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
+    log_mean_cup[cbegin[d]:(cbegin[d+1]-1)]    = log_mean_cup[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
+    log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)]  = log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
+  }
 }

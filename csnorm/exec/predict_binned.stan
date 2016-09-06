@@ -56,7 +56,7 @@ generated quantities {
   matrix[B1,B2] ncounts; //number of possible counts in bin
   matrix[B1,B2] observed; //summed counts per bin
   matrix[B1,B2] expected; //posterior mean of negative binomial per bin
-  matrix[B1,B2] normalized; // (sum_i observed_i * decay_i / expected_i) / ncounts
+  matrix[B1,B2] decaymat; // average decay per bin
   
   //decay
   {
@@ -66,25 +66,20 @@ generated quantities {
     log_decay = Xdiag * beta_diag_centered;
   }
 
-  //observed and normalized
+  //observed
   observed = rep_matrix(0,B1,B2);
-  normalized = rep_matrix(0,B1,B2);
   for (i in 1:N) { //do not vectorize to avoid aliasing issues
     int b1;
     int b2;
     b1=cbins1[i];
     b2=cbins2[i];
     observed[b1,b2] = observed[b1,b2] + counts_close[i] + counts_far[i] + counts_up[i] + counts_down[i];
-    normalized[b1,b2] = normalized[b1,b2] + exp(-eC - log_nu1[cidx[1,i]] - log_nu2[cidx[2,i]])*(
-      counts_close[i]/exp(-log_delta1[cidx[1,i]]+log_delta2[cidx[2,i]])+
-      counts_far[i]/exp(  +log_delta1[cidx[1,i]]-log_delta2[cidx[2,i]])+
-      counts_up[i]/exp(   +log_delta1[cidx[1,i]]+log_delta2[cidx[2,i]])+
-      counts_down[i]/exp( -log_delta1[cidx[1,i]]-log_delta2[cidx[2,i]]) );
   }
   
-  //expected and ncounts
+  //expected, ncounts and decaymat
   ncounts = rep_matrix(0,B1,B2);
   expected = rep_matrix(0,B1,B2);
+  decaymat = rep_matrix(0,B1,B2);
   for (i in 1:S1) {
     real pos1;
     int k;
@@ -110,8 +105,9 @@ generated quantities {
         }
         expected[b1,b2] = expected[b1,b2] +
             exp(eC + log_nu1[i] + log_nu2[j] + log_decay[k])*2*cosh(log_delta1[i])*2*cosh(log_delta2[j]);
+        decaymat[b1,b2] = decaymat[b1,b2] + exp(4*log_decay[k]);
       }
     }
   }
-  normalized = normalized ./ ncounts;
+  decaymat = decaymat ./ ncounts;
 }

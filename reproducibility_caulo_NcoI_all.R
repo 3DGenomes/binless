@@ -23,7 +23,6 @@ cs=run_split_parallel(cs, square.size=square.size, coverage=coverage, bf_per_kb=
 cs=run_split_parallel_recovery(cs, "tmp/test", square.size=square.size, coverage=coverage, bf_per_kb=bf_per_kb,
                                bf_per_decade=5, distance_bins_per_decade=100, lambdas=c(0.01,1,100), verbose = F,
                                iter=10000, ncores=30, homogenize=F)
-cs@pred=csnorm_predict_all(cs, ncores=30)
 cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
 cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
 save(cs, file="data/caulo_NcoI_all_csnorm_optimized.RData")
@@ -57,7 +56,6 @@ foreach (lambda=c(0.01,1,100)) %dopar% {
   op$par$counts.sub=counts.sub
   cs@par=op$par
   cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, dmin=dmin, dmax=dmax))
-  cs@pred=csnorm_predict_all(cs,ncores=30,verbose=F)
   #cs=postprocess(cs, resolution=10000, ncores=10, verbose=F)
   #cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
   save(cs, file=paste0("data/caulo_NcoI_all_",sub,"pc_lambda",lambda,"_csnorm_optimized.RData"))
@@ -71,7 +69,6 @@ foreach (lambda=c(0.01,1,100)) %dopar% {
   dmax=cs@settings$circularize/2+0.01
   cs@settings$dmin=dmin
   cs@settings$dmax=dmax
-  cs@pred=csnorm_predict_all(cs,ncores=30,verbose=F)
   cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
   cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)
   save(cs, file=paste0("data/caulo_NcoI_all_",sub,"pc_lambda",lambda,"_csnorm_optimized.RData"))
@@ -89,7 +86,6 @@ foreach (lambda=c(0.01,1,100)) %dopar% {
 }
 foreach (lambda=c(0.01,1,100)) %dopar% {
   load(paste0("data/caulo_NcoI_all_gibbs1_lambda",lambda,"_csnorm_optimized.RData"))
-  cs@pred=csnorm_predict_all(cs,ncores=30,verbose=F)
   cs@binned=list()
   cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
   cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)

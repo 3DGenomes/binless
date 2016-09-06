@@ -14,12 +14,15 @@
 #' \code{\link{generate_fake_dataset}} follows model specification
 #'
 #' @section Normalization:
-#' \code{\link{run_split_parallel}}
+#' \code{\link{run_simplified}}
 #'
 #' @section Postprocessing:
-#' \code{\link{postprocess}}
-#' \code{\link{iterative_normalization}}
+#' \code{\link{bin_all_datasets}}
+#' \code{\link{group_datasets}}
+#' \code{\link{detect_interactions}}
+#' \code{\link{detect_differences}}
 #' \code{\link{thresholds_estimator}}
+#' \code{\link{generate_genomic_biases}}
 #'
 #' @useDynLib csnorm, .registration = TRUE
 #' @import rstan
@@ -87,16 +90,83 @@ setMethod("show",signature="CSdata",definition=function(object) {
   }
 })
 
+#' Class for one interaction detection
+#'
+#'
+#' @slot mat 
+#' @slot type 
+#' @slot threshold 
+#' @slot normal.approx 
+#' @slot ref 
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+setClass("CSinter",
+         slots = list(mat="data.table",
+                      type="character",
+                      threshold="numeric",
+                      normal.approx="numeric",
+                      ref="character"))
+setMethod("show",signature="CSinter",definition=function(object) {
+  if (object@type=="interactions") {
+    cat("        Significant interactions wrt expected") 
+  } else {
+    cat("        Significant differences wrt ", object@ref)
+  }
+  cat(" (threshold=", object@threshold,", normal.approx=",object@normal.approx,")\n")
+})
+
+#' Class for one binned matrix and its interaction detections
+#'
+#' @slot mat data.table. 
+#' @slot interactions list. 
+#' @slot type 
+#' @slot ice 
+#' @slot ice.iterations 
+#' @slot names 
+#' @slot dispersion.fun 
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+setClass("CSmatrix",
+         slots = list(mat="data.table",
+                      interactions="list",
+                      type="character",
+                      ice="logical",
+                      ice.iterations="numeric",
+                      names="character",
+                      dispersion.fun="character"))
+
+setMethod("show",signature="CSmatrix",definition=function(object) {
+  if (object@type=="all") {
+    cat("      * Individual") 
+  } else {
+    cat("      * Group [", object@type,"] (dispersion function: ", object@dispersion.fun,")")
+  }
+  if (object@ice==T) {
+    cat(" with ICE (", object@ice.iterations,"iterations)")
+  }
+  cat( " : ", object@names, "\n")
+  if (length(object@interactions)==0) {
+    cat("        No interactions computed")
+  } else {
+    lapply(object@interactions, show)
+  }
+  cat("\n")
+})
+
 #' Class to hold binned matrices at a given resolution
 #'
 #' @slot resolution numeric. Matrix resolution, in bases
-#' @slot range numeric. A named vector of begins and ends of the matrix, in bases
-#' @slot decay data.table. A table reporting the diagonal decay as fitted by CSnorm
-#' @slot alpha numeric. The dispersion for that resolution
-#' @slot raw data.table. The raw matrix at that resolution
-#' @slot mat data.table. The cut-site-normalized matrix at that resolution
-#' @slot ice data.table. The iteratively corrected matrix at that resolution
-#' @slot ice.iterations numeric. The number of iterations used for ICE
+#' @slot individual 
+#' @slot grouped 
+#' @slot dispersion.type numeric. How the dispersion was calculated
 #'
 #' @return
 #' @export
@@ -104,21 +174,15 @@ setMethod("show",signature="CSdata",definition=function(object) {
 #' @examples
 setClass("CSbinned",
          slots = list(resolution="numeric",
-                      range="numeric",
-                      decay="data.table",
-                      alpha="numeric",
-                      raw="data.table",
-                      mat="data.table",
-                      ice="data.table",
-                      ice.iterations="numeric"))
+                      dispersion.type="numeric",
+                      individual="data.table",
+                      grouped="list"))
 
 setMethod("show",signature="CSbinned",definition=function(object) {
-  cat("   At ", object@resolution/1000, " kb resolution: ", sep="")
-  if (object@mat[,.N]>0) cat("CS ")
-  if (object@ice[,.N]>0) cat("ICE(", object@ice.iterations, ") ", sep="")
-  if (object@raw[,.N]>0) cat("RAW ")
+  cat("   *** At", object@resolution/1000, "kb resolution (dispersion type", object@dispersion.type, "):\n")
+  lapply(object@grouped, show)
   cat("\n")
-})
+  })
 
 #' Class to hold cut-site normalization data
 #'
@@ -155,7 +219,7 @@ setMethod("show",signature="CSnorm",definition=function(object) {
   } else {
     cat(" Genome is linear\n", sep="")
   }
-  cat(" There are ", object@biases[,.N], " cut sites\n", sep="")
+  cat(" There are ", object@biases[,uniqueN(pos)], " unique cut sites\n", sep="")
   ncounts=object@counts[,sum((contact.close>0)+(contact.far>0)+(contact.up>0)+(contact.down>0))]
   cat(" and ", ncounts, " nonzero counts\n", sep="")
   nreads=object@counts[,sum(contact.close+contact.far+contact.up+contact.down)]
@@ -163,6 +227,8 @@ setMethod("show",signature="CSnorm",definition=function(object) {
   cat(" Reads density excl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
   nreads=nreads+object@biases[,sum(dangling.L+dangling.R+rejoined)]
   cat(" Reads density incl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
+  cat(" Experimental design matrix:\n")
+  show(merge(object@experiments[,.(name,condition,replicate,enzyme)],object@design,by="name"))
   if (length(object@par)==0) {
     cat(" Dataset not yet normalized\n")
   } else {
@@ -171,7 +237,7 @@ setMethod("show",signature="CSnorm",definition=function(object) {
     if (nbinned==0) {
       cat(" No binned matrix available")
     } else {
-      cat(" ", nbinned, " binned matrices available\n", sep="")
+      cat("\n ### ", nbinned, " resolution available\n\n", sep="")
       lapply(object@binned, show)
     }
   }

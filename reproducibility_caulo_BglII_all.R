@@ -26,7 +26,6 @@ foreach (replicate=c("BglIIr1","BglIIr2")) %dopar% {
   cs = run_simplified(cs, design=NULL, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=c(0.1,1,10),
                    ngibbs = 1, iter=10000, ncores=30)
   save(cs, file=paste0("data/caulo_",replicate,"_all_csnorm_optimized.RData"))
-  cs@pred=csnorm_predict_all(cs,ncores=30,verbose=F)
   cs@binned=list()
   cs=postprocess(cs, resolution=10000, ncores=30, verbose=F)
   cs@binned[[1]]=iterative_normalization(cs@binned[[1]], niterations=1)

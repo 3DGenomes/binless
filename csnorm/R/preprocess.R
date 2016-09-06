@@ -321,8 +321,8 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000) {
 #' @param outprefix character. Prefix to output intermediate files.
 #' @param condition character. WT, KO etc.
 #' @param replicate character. Replicate number
-#' @param name character. A name for the experiment. By default, it is condition and replicate
-#' @param enzyme character. HindIII, DpnII etc. For now, it is NULL and cannot be changed
+#' @param name character. A name for the experiment. By default, it is condition, enzyme and replicate
+#' @param enzyme character. HindIII, DpnII etc.
 #' @param experiment character. Hi-C Capture-C etc. For now it is Hi-C and cannot be changed
 #' @inheritParams read_tsv
 #' @inheritParams categorize_by_new_type
@@ -333,11 +333,10 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000) {
 #' @export
 #' 
 #' @examples
-read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "unspecified", experiment = "Hi-C",
-                            name = paste(condition, replicate), skip = 0L, nrows = -1L,
+read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "HindIII", experiment = "Hi-C",
+                            name = paste(condition, enzyme, replicate), skip = 0L, nrows = -1L,
                             circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1), maxlen = 600,
                             save.data=T) {
-  match.arg(enzyme)
   match.arg(experiment)
   message("*** READ")
   data=read_tsv(infile, skip=skip, nrows=nrows)
@@ -347,41 +346,79 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "u
   cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=circularize)
   dset_statistics(cs_data$biases,cs_data$counts)
   message("*** WRITE")
-  cs = new("CSdata", info=list(name=name, condition=condition, replicate=replicate,
+  csd = new("CSdata", info=list(name=name, condition=condition, replicate=replicate,
                                enzyme=enzyme, experiment=experiment,
                                dangling.L=deparse(dangling.L), dangling.R=deparse(dangling.R), maxlen=maxlen,
                                filename=infile),
                      settings=list(circularize=circularize),
                      data=data, biases=cs_data$biases, counts=cs_data$counts)
-  if (save.data==T) save(cs, file=paste0(outprefix,"_csdata_with_data.RData"))
-  cs@data=data.table()
-  save(cs, file=paste0(outprefix,"_csdata.RData"))
-  return(cs)
+  if (save.data==T) save(csd, file=paste0(outprefix,"_csdata_with_data.RData"))
+  csd@data=data.table()
+  save(csd, file=paste0(outprefix,"_csdata.RData"))
+  return(csd)
 }
 
-#' Merge one or more CSdata objects into a CSnorm object
+#' Merge one or more CSdata objects into a CSnorm object and set experimental design
 #'
 #' @param datasets list of CSdata objects
+#' @param different.decays character. If "none" (default), one decay is modelled
+#'   for all experiments. If "all", each experiment has its own decay. If
+#'   "enzyme", experiments with a different enzyme get their own decay. If
+#'   "condition", experiments with a different condition get their own decay.
+#'   Arguments can be abbreviated
 #'
 #' @return CSnorm object
 #' @export
 #'
 #' @examples
-merge_cs_norm_datasets = function(datasets) {
+merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enzyme","condition")) {
+  #compile table of experiments, sorted by id
   experiments = rbindlist(lapply(datasets, function(x) x@info))
+  experiments[,name:=ordered(name, levels=name)]
   setkey(experiments, name)
-  stopifnot(experiments[,.N]==experiments[,uniqueN(name)])
-  #
+  stopifnot(experiments[,.N]==experiments[,uniqueN(name)]) #id must be unique
+  #all experiments must have the same settings
   stopifnot(uniqueN(rbindlist(lapply(datasets, function(x) x@settings)))==1)
-  #
-  biases = lapply(datasets, function(x) x@biases)
+  #merge biases and counts into data tables, make IDs unique
+  biases = lapply(datasets, function(x) copy(x@biases))
+  counts = lapply(datasets, function(x) copy(x@counts))
   names(biases) <- sapply(datasets, function(x) x@info$name)
-  counts = lapply(datasets, function(x) x@counts)
   names(counts) <- sapply(datasets, function(x) x@info$name)
-  #
+  stopifnot(all(sapply(datasets, function(x) x@biases[,all(id==1:.N)])))
+  sizes=sapply(biases, function(x) x[,.N])
+  sizes=cumsum(sizes)
+  if (length(datasets)>1) {
+    for (i in 2:length(datasets)) {
+      biases[[i]][,id:=id+sizes[i-1]]
+      counts[[i]][,id1:=id1+sizes[i-1]]
+      counts[[i]][,id2:=id2+sizes[i-1]]
+    }
+  }
+  biases=rbindlist(biases, use.names=T, idcol="name")
+  counts=rbindlist(counts, use.names=T, idcol="name")
+  stopifnot(biases[,all(id==1:.N)])
+  biases[,name:=ordered(name,levels=experiments[,levels(name)])]
+  setkey(biases,name,id,pos)
+  counts[,name:=ordered(name,levels=experiments[,levels(name)])]
+  setkey(counts,name,id1,pos1,id2,pos2)
+  #design matrix
+  different.decays=match.arg(different.decays)
+  design=experiments[,.(name,enzyme,condition)]
+  design[,genomic:=as.integer(factor(enzyme))]
+  if (different.decays=="none") {
+    design[,decay:=1]
+  } else if (different.decays=="all") {
+    design[,decay:=.I]
+  } else if (different.decays=="enzyme") {
+    design[,decay:=as.integer(factor(enzyme))]
+  } else if (different.decays=="condition") {
+    design[,decay:=as.integer(factor(condition))]
+  }
+  design[,c("enzyme","condition"):=list(NULL,NULL)]
+  #return CSnorm object
   new("CSnorm", experiments=experiments,
-                design=data.table(),
+                design=design,
                 settings=datasets[[1]]@settings,
-                biases=rbindlist(biases, use.names=T, idcol="name"),
-                counts=rbindlist(counts, use.names=T, idcol="name"))
+                biases=biases, counts=counts)
 }
+
