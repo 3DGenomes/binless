@@ -103,13 +103,20 @@ cs=merge_cs_norm_datasets(list(csd1))
 cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=c(0.01,0.1,1,10,100),
                     ngibbs = 3, iter=10000, ncores=30)
 cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1, dispersion.type=1)
-mat1=detect_differences(cs@binned[[1]]@individual, ref="WT BglII 2", threshold=0.95, ncores=30, normal.approx=100)
+mat3=detect_differences(cs@binned[[3]]@individual, ref="WT BglII 2", threshold=0.95, ncores=30, normal.approx=100)
 cs=group_datasets(cs, resolution=20000, dispersion.type=3, type="enzyme", dispersion.fun=sum, ice=1, verbose=T)
 mat=detect_interactions(cs, resolution=10000, type="enzyme", dispersion.type=3, dispersion.fun=sum,
                                                 threshold=0.95, ncores=1, normal.approx=100)
 mat2=detect_differences(mat, ref="NcoI", threshold=0.95, ncores=1, normal.approx=100)
 
 
+mat=rbindlist(list(d1=mat1,d2=mat2,d3=mat3),idcol="disp.type")
+ggplot(mat[name!="WT BglII 2"])+
+  geom_raster(aes(begin1,begin2,fill=log(ratio)))+
+  geom_raster(aes(begin2,begin1,fill=log(ratio)))+
+  geom_point(aes(begin1,begin2,colour=`prob.gt.WT BglII 2`<0.5),data=mat[is.significant==T])+
+  scale_fill_gradient2(na.value = "white")+theme(legend.position = "none")+
+  facet_grid(name~disp.type)
 
 
 ggplot(cs@binned[[1]]@individual)+

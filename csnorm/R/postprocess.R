@@ -511,8 +511,8 @@ detect_differences = function(binned, ref, threshold=0.95, ncores=1, normal.appr
     #compute ratio matrix
     qmat[,ratio:=ifelse(alpha2>1,(beta2/beta1)*(alpha1/(alpha2-1)),NA)]
     qmat[,ratio.sd:=ifelse(alpha2>2,(beta2/beta1)*sqrt((alpha1*(alpha1+alpha2-1))/((alpha2-2)*(alpha2-1)^2)),NA)]
-    #remove extra columns
-    qmat[,c("alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2"):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
+    #remove extra columns and add name
+    qmat[,c("name","alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2"):=list(n,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
     qmat
   }
   #merge everything back, removing extra columns first
@@ -521,7 +521,7 @@ detect_differences = function(binned, ref, threshold=0.95, ncores=1, normal.appr
     mat[,c(matnames[grep(".gt.",matnames)],"detection.type","is.significant"):=list(NULL,NULL,NULL)]
     if ("ratio" %in% matnames) mat[,c("ratio","ratio.sd"):=list(NULL,NULL)]
   }
-  mat=merge(mat,qmat,all=T,by=c("bin1","bin2"))
+  mat=merge(mat,qmat,all=T,by=c("name","bin1","bin2"))
   return(mat)
 }
   
