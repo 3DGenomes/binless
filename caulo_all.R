@@ -9,7 +9,7 @@ setwd("/home/yannick/simulations/cs_norm")
 
 ### read caulobacter dataset and generate with different sampling depths
 
-a=examine_dataset("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate1_reads_int.tsv",
+a=examine_dataset("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_rifampicin_reads_int.tsv",
                   skip=0L,nrows=1000000)
 a=examine_dataset("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_NcoI_reads_int.tsv",
                   skip=0L,nrows=1000000)
@@ -22,6 +22,9 @@ csd2=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_Interact
 csd3=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate2_reads_int.tsv",
                       "data/caulo_BglIIr2_all", "WT", "2", enzyme="BglII", circularize=4042929, dangling.L=c(0,3,5),
                       dangling.R=c(3,0,-2), maxlen=600, save.data=T)
+csd4=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_rifampicin_reads_int.tsv",
+                      "data/caulo_BglII_rifampicin_all", "rifampicin", "1", enzyme="BglII", circularize=4042929, dangling.L=c(0,3,5),
+                      dangling.R=c(3,0,-2), maxlen=600, save.data=T)
 
 
 load("data/caulo_NcoI_all_csdata.RData")
@@ -30,22 +33,28 @@ load("data/caulo_BglIIr1_all_csdata.RData")
 csd2=csd
 load("data/caulo_BglIIr2_all_csdata.RData")
 csd3=csd
-cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="none")
-save(cs, file="data/caulo_csnorm.RData")
+load("data/caulo_BglII_rifampicin_all_csdata.RData")
+csd4=csd
+cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4), different.decays="none")
+save(cs, file="data/caulo_rif_csnorm.RData")
 
 
+for (i in 1:3) {
+  cs@binned[[i]]@metadata=data.table(type="all",raw=T,cs=T,ice=T,ice.iterations=1,
+                                     names=list(as.character(cs@binned[[i]]@individual[,unique(name)])), dispersion.fun=list(NA))
+}
 
 #normalize with gibbs sampler
 load("data/caulo_csnorm.RData")
 cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=c(0.01,0.1,1,10,100),
                ngibbs = 1, iter=10000, ncores=30)
-save(cs, file="data/caulo_csnorm_optimized.RData")
-load("data/caulo_csnorm_optimized.RData")
-cs=bin_all_datasets(cs, resolution=10000, ncores=30, verbose=T, ice=1, dispersion.type=2)
+save(cs, file="data/caulo_rif_csnorm_optimized.RData")
+load("data/caulo_rif_csnorm_optimized.RData")
+cs=bin_all_datasets(cs, resolution=10000, ncores=30, verbose=T, ice=1, dispersion.type=1)
 cs@binned[[2]]@individual=detect_interactions(cs, resolution=10000, type="all", dispersion.type=2, dispersion.fun=sum,
                         threshold=0.95, ncores=30, normal.approx=100)
-cs=group_datasets(cs, resolution=10000, dispersion.type=3, type="enzyme", dispersion.fun=sum, ice=1, verbose=T)
-mat=detect_interactions(cs, resolution=10000, type="enzyme", dispersion.type=3, dispersion.fun=sum,
+cs=group_datasets(cs, resolution=10000, dispersion.type=3, type="condition", dispersion.fun=sum, ice=1, verbose=T)
+mat=detect_interactions(cs, resolution=10000, type="condition", dispersion.type=1, dispersion.fun=sum,
                         threshold=0.95, ncores=1, normal.approx=100)
 #mat2=detect_differences(mat, ref="NcoI", threshold=0.95, ncores=1, normal.approx=100)
 save(cs, file="data/caulo_csnorm_optimized.RData")
