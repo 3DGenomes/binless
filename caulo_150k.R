@@ -24,14 +24,14 @@ csd3=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_Interact
 
 
 #zoom on a portion of the dataset
-load("data/caulo_BglIIr2_all_csdata_with_data.RData")
+load("data/caulo_BglII_rifampicin_all_csdata_with_data.RData")
 data=csd@data[re.closest1>=2000000&re.closest1<=2150000&re.closest2>=2000000&re.closest2<=2150000]
 cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
 csd = new("CSdata", info=csd@info, settings=list(circularize=-1),
           data=data, biases=cs_data$biases, counts=cs_data$counts)
-save(csd, file="data/caulo_BglIIr2_150k_csdata_with_data.RData")
+save(csd, file="data/caulo_BglII_rifampicin_150k_csdata_with_data.RData")
 csd@data=data.table()
-save(csd, file="data/caulo_BglIIr2_150k_csdata.RData")
+save(csd, file="data/caulo_BglII_rifampicin_150k_csdata.RData")
 csd2=csd
 
 
@@ -100,9 +100,11 @@ csd3=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="all")
 cs=merge_cs_norm_datasets(list(csd1))
 
-cs=csnorm:::run_simplified_gibbs(cs, bf_per_kb=0.25, lambda=1, ngibbs=2, iter=10000)
-cs=bin_all_datasets(cs, resolution=10000, ncores=10, verbose=T, ice=1, dispersion.type=3)
-cs=group_datasets(cs, resolution=10000, dispersion.type=3, type="enzyme", dispersion.fun=sum, ice=1, verbose=T)
+cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=c(0.01,0.1,1,10,100),
+                    ngibbs = 3, iter=10000, ncores=30)
+cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1, dispersion.type=1)
+mat1=detect_differences(cs@binned[[1]]@individual, ref="WT BglII 2", threshold=0.95, ncores=30, normal.approx=100)
+cs=group_datasets(cs, resolution=20000, dispersion.type=3, type="enzyme", dispersion.fun=sum, ice=1, verbose=T)
 mat=detect_interactions(cs, resolution=10000, type="enzyme", dispersion.type=3, dispersion.fun=sum,
                                                 threshold=0.95, ncores=1, normal.approx=100)
 mat2=detect_differences(mat, ref="NcoI", threshold=0.95, ncores=1, normal.approx=100)

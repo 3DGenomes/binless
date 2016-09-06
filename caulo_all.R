@@ -38,25 +38,19 @@ csd4=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4), different.decays="none")
 save(cs, file="data/caulo_rif_csnorm.RData")
 
-
-for (i in 1:3) {
-  cs@binned[[i]]@metadata=data.table(type="all",raw=T,cs=T,ice=T,ice.iterations=1,
-                                     names=list(as.character(cs@binned[[i]]@individual[,unique(name)])), dispersion.fun=list(NA))
-}
-
 #normalize with gibbs sampler
 load("data/caulo_csnorm.RData")
 cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=c(0.01,0.1,1,10,100),
                ngibbs = 1, iter=10000, ncores=30)
-save(cs, file="data/caulo_rif_csnorm_optimized.RData")
-load("data/caulo_rif_csnorm_optimized.RData")
-cs=bin_all_datasets(cs, resolution=10000, ncores=30, verbose=T, ice=1, dispersion.type=1)
+save(cs, file="data/caulo_csnorm_optimized.RData")
+load("data/caulo_csnorm_optimized.RData")
+cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1, dispersion.type=3)
 cs@binned[[2]]@individual=detect_interactions(cs, resolution=10000, type="all", dispersion.type=2, dispersion.fun=sum,
                         threshold=0.95, ncores=30, normal.approx=100)
-cs=group_datasets(cs, resolution=10000, dispersion.type=3, type="condition", dispersion.fun=sum, ice=1, verbose=T)
-mat=detect_interactions(cs, resolution=10000, type="condition", dispersion.type=1, dispersion.fun=sum,
+cs=group_datasets(cs, resolution=20000, dispersion.type=3, type="enzyme", dispersion.fun=sum, ice=1, verbose=T)
+mat=detect_interactions(cs, resolution=20000, type="condition", dispersion.type=1, dispersion.fun=sum,
                         threshold=0.95, ncores=1, normal.approx=100)
-#mat2=detect_differences(mat, ref="NcoI", threshold=0.95, ncores=1, normal.approx=100)
+mat3=detect_differences(cs@binned[[6]]@individual, ref="WT BglII 2", threshold=0.95, ncores=30, normal.approx=100)
 save(cs, file="data/caulo_csnorm_optimized.RData")
 
 
@@ -83,6 +77,7 @@ mat = foreach (j=c(1,2,3),.combine=rbind) %do% {
   get_matrices(cs, resolution=10000, type="all", dispersion.type=j, dispersion.fun=NA)[
     ,.(name,disp.type=j,begin1,begin2,normalized,normalized.sd,icelike,icelike.sd,observed, expected,is.significant,prob.gt.expected)]
 }
+mat=rbindlist(list(d1=mat1,d2=mat2,d3=mat3),idcol="disp.type")
 #icelike
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
@@ -97,6 +92,13 @@ ggplot(mat)+
   geom_raster(aes(begin2,begin1,fill=log(normalized.sd)))+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
   facet_grid(disp.type~name)
+#differences
+ggplot(mat[name!="BglII"])+
+  geom_raster(aes(begin1,begin2,fill=log(ratio)))+
+  geom_raster(aes(begin2,begin1,fill=log(ratio)))+
+  geom_point(aes(begin1,begin2,colour=prob.gt.BglII<0.5),data=mat[is.significant==T])+
+  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
+  facet_grid(name~disp.type)
 
 #nu and delta correlation
 nu = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
