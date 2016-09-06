@@ -389,7 +389,7 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
   mat[,c("icelike","icelike.sd"):=list(normalized*decaymat,normalized.sd*decaymat)]
   #create metadata
   meta=data.table(type="all",raw=T,cs=T,ice=(ice>0),ice.iterations=ifelse(ice>0,ice,NA),
-                  names=deparse(as.character(mat[,unique(name)])), dispersion.fun=deparse(NA))
+                  names=list(as.character(mat[,unique(name)])), dispersion.fun=deparse(NA))
   #create CSbinned object
   csb=new("CSbinned", resolution=resolution, dispersion.type=dispersion.type,
           individual=mat, metadata=meta)
@@ -417,8 +417,8 @@ group_datasets = function(cs, resolution, dispersion.type,
   csb=cs@binned[[csbi]]
   type=match.arg(type, several.ok=T)
   dispersion.fun=match.fun(dispersion.fun)
-  if (any(sapply(csb@metadata[,.I], function(x){csb@metadata[x,type]==type && csb@metadata[x,dispersion.fun]==deparse(dispersion.fun)}))) {
-    stop("Refusing to overwrite already existing ", type, " group matrices with dispersion function ",dispersion.fun,
+  if (any(sapply(csb@metadata[,.I], function(x){csb@metadata[x,type]==type && csb@metadata[x,dispersion.fun]==deparse(dispersion.fun,nlines=1)}))) {
+    stop("Refusing to overwrite already existing ", type, " group matrices with dispersion function ",deparse(dispersion.fun),
          ". Use them or remove them from the cs@binned[[",csbi,"]]@grouped list and @metadata table")
   }
   #
@@ -448,7 +448,7 @@ group_datasets = function(cs, resolution, dispersion.type,
   #store matrices
   csb@grouped=append(csb@grouped,list(mat))
   meta=data.table(type=paste(type),raw=T,cs=T,ice=(ice>0),ice.iterations=ifelse(ice>0,ice,NA),
-                  names=deparse(as.character(mat[,unique(name)])), dispersion.fun=deparse(dispersion.fun))
+                  names=list(as.character(mat[,unique(name)])), dispersion.fun=deparse(dispersion.fun,nlines=1))
   csb@metadata=rbind(csb@metadata,meta)
   cs@binned[[csbi]]=csb
   return(cs)
