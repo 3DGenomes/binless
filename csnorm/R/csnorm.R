@@ -90,17 +90,83 @@ setMethod("show",signature="CSdata",definition=function(object) {
   }
 })
 
+#' Class for one interaction detection
+#'
+#'
+#' @slot mat 
+#' @slot type 
+#' @slot threshold 
+#' @slot normal.approx 
+#' @slot ref 
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+setClass("CSinter",
+         slots = list(mat="data.table",
+                      type="character",
+                      threshold="numeric",
+                      normal.approx="numeric",
+                      ref="character"))
+setMethod("show",signature="CSinter",definition=function(object) {
+  if (object@type=="interactions") {
+    cat("        Significant interactions wrt expected") 
+  } else {
+    cat("        Significant differences wrt ", object@ref)
+  }
+  cat(" (threshold=", object@threshold,", normal.approx=",object@normal.approx,")\n")
+})
+
+#' Class for one binned matrix and its interaction detections
+#'
+#' @slot mat data.table. 
+#' @slot interactions list. 
+#' @slot type 
+#' @slot ice 
+#' @slot ice.iterations 
+#' @slot names 
+#' @slot dispersion.fun 
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+setClass("CSmatrix",
+         slots = list(mat="data.table",
+                      interactions="list",
+                      type="character",
+                      ice="logical",
+                      ice.iterations="numeric",
+                      names="character",
+                      dispersion.fun="character"))
+
+setMethod("show",signature="CSmatrix",definition=function(object) {
+  if (object@type=="all") {
+    cat("      * Individual") 
+  } else {
+    cat("      * Group [", object@type,"] (dispersion function: ", object@dispersion.fun,")")
+  }
+  if (object@ice==T) {
+    cat(" with ICE (", object@ice.iterations,"iterations)")
+  }
+  cat( " : ", object@names, "\n")
+  if (length(object@interactions)==0) {
+    cat("        No interactions computed")
+  } else {
+    lapply(object@interactions, show)
+  }
+  cat("\n")
+})
+
 #' Class to hold binned matrices at a given resolution
 #'
 #' @slot resolution numeric. Matrix resolution, in bases
+#' @slot individual 
+#' @slot grouped 
 #' @slot dispersion.type numeric. How the dispersion was calculated
-#' @slot range numeric. A named vector of begins and ends of the matrix, in bases
-#' @slot decay data.table. A table reporting the diagonal decay as fitted by CSnorm
-#' @slot alpha numeric. The dispersion for that resolution
-#' @slot raw data.table. The raw matrix at that resolution
-#' @slot mat data.table. The cut-site-normalized matrix at that resolution
-#' @slot ice data.table. The iteratively corrected matrix at that resolution
-#' @slot ice.iterations numeric. The number of iterations used for ICE
 #'
 #' @return
 #' @export
@@ -110,12 +176,12 @@ setClass("CSbinned",
          slots = list(resolution="numeric",
                       dispersion.type="numeric",
                       individual="data.table",
-                      grouped="list",
-                      metadata="data.table"))
+                      grouped="list"))
 
 setMethod("show",signature="CSbinned",definition=function(object) {
-  cat("   At", object@resolution/1000, "kb resolution (dispersion type ", object@dispersion.type, "):\n")
-  show(object@metadata)
+  cat("   *** At", object@resolution/1000, "kb resolution (dispersion type", object@dispersion.type, "):\n")
+  lapply(object@grouped, show)
+  cat("\n")
   })
 
 #' Class to hold cut-site normalization data
@@ -162,7 +228,7 @@ setMethod("show",signature="CSnorm",definition=function(object) {
   nreads=nreads+object@biases[,sum(dangling.L+dangling.R+rejoined)]
   cat(" Reads density incl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
   cat(" Experimental design matrix:\n")
-  show(cs@design)
+  show(merge(object@experiments[,.(name,condition,replicate,enzyme)],object@design,by="name"))
   if (length(object@par)==0) {
     cat(" Dataset not yet normalized\n")
   } else {
@@ -171,7 +237,7 @@ setMethod("show",signature="CSnorm",definition=function(object) {
     if (nbinned==0) {
       cat(" No binned matrix available")
     } else {
-      cat(" ", nbinned, " binned matrices available\n", sep="")
+      cat("\n ### ", nbinned, " resolution available\n\n", sep="")
       lapply(object@binned, show)
     }
   }

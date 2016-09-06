@@ -87,6 +87,7 @@ library(ggplot2)
 library(data.table)
 library(csnorm)
 library(foreach)
+library(doParallel)
 
 setwd("/home/yannick/simulations/cs_norm")
 
@@ -98,66 +99,34 @@ csd2=csd
 load("data/caulo_BglIIr2_150k_csdata.RData")
 csd3=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="all")
-cs=merge_cs_norm_datasets(list(csd1))
+#cs=merge_cs_norm_datasets(list(csd1))
 
 cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=c(0.01,0.1,1,10,100),
                     ngibbs = 3, iter=10000, ncores=30)
-cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1, dispersion.type=1)
-mat3=detect_differences(cs@binned[[3]]@individual, ref="WT BglII 2", threshold=0.95, ncores=30, normal.approx=100)
+cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1, dispersion.type=3)
+cs=detect_interactions(cs, resolution=20000, ncores=30, dispersion.type=3, type="all", dispersion.fun=NA)
+cs=detect_differences(cs, resolution=20000, ncores=30, dispersion.type=3, type="all", dispersion.fun=NA,
+                      ref="WT BglII 2", threshold=0.95, normal.approx=100)
 cs=group_datasets(cs, resolution=20000, dispersion.type=3, type="enzyme", dispersion.fun=sum, ice=1, verbose=T)
-mat=detect_interactions(cs, resolution=10000, type="enzyme", dispersion.type=3, dispersion.fun=sum,
-                                                threshold=0.95, ncores=1, normal.approx=100)
-mat2=detect_differences(mat, ref="NcoI", threshold=0.95, ncores=1, normal.approx=100)
+cs=detect_differences(cs, resolution=20000, ncores=30, dispersion.type=3, type="enzyme", dispersion.fun=sum,
+                      ref="BglII", threshold=0.95, normal.approx=100)
+
+get_matrices(cs, resolution=20000, dispersion.type=3, type="enzyme", dispersion.fun=sum)
+get_interactions(cs, interaction.type="interactions", resolution=20000, type="all", ref="expected", dispersion.type=3, dispersion.fun=NA,
+                 threshold=0.95, normal.approx=100)
+get_interactions(cs, interaction.type="differences", resolution=20000, type="all", ref="WT BglII 2", dispersion.type=3, dispersion.fun=NA,
+                 threshold=0.95, normal.approx=100)
+get_interactions(cs, interaction.type="differences", resolution=20000, type="enzyme", ref="BglII", dispersion.type=3, dispersion.fun=sum,
+                 threshold=0.95, normal.approx=100)
 
 
-mat=rbindlist(list(d1=mat1,d2=mat2,d3=mat3),idcol="disp.type")
+
 ggplot(mat[name!="WT BglII 2"])+
   geom_raster(aes(begin1,begin2,fill=log(ratio)))+
   geom_raster(aes(begin2,begin1,fill=log(ratio)))+
   geom_point(aes(begin1,begin2,colour=`prob.gt.WT BglII 2`<0.5),data=mat[is.significant==T])+
   scale_fill_gradient2(na.value = "white")+theme(legend.position = "none")+
   facet_grid(name~disp.type)
-
-
-ggplot(cs@binned[[1]]@individual)+
-  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
-  geom_raster(aes(begin2,begin1,fill=log(normalized)))+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~name)
-ggplot(cs@binned[[1]]@grouped)+
-  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
-  geom_raster(aes(begin2,begin1,fill=log(normalized)))+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~name)
-
-load("data/caulo_NcoI_150k_bfpkb0.25_lambda1_csnorm_optimized.RData")
-cst=cs
-load("data/caulo_NcoI_150k_bfpkb0.25_lambda1_csnorm_optimized_new.RData")
-c(cst@par$eRJ,cs@par$eRJ[1])
-c(cst@par$eDE,cs@par$eDE[1])
-c(cst@par$eC,cs@par$eC[1])
-#
-ggplot(data.table(id=1:length(cst@par$beta_nu), old=cst@par$beta_nu, new=cs@par$beta_nu[2,]))+
-  geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
-mean(cst@par$init$beta_nu)
-mean(init.op$beta_nu[2,])
-#
-ggplot(data.table(id=1:80, old=cst@par$log_nu, new=cs@par$log_nu[81:161]))+
-  geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
-mean(cst@par$log_nu)
-mean(cs@par$log_nu)
-#
-ggplot(data.table(id=1:21, old=cs@par$log_nu[81:101], new=cs@par$log_nu[102:122]))+
-  geom_line(aes(id,old),colour="red")+geom_line(aes(id,new),colour="green")
-#
-ggplot() +
-  geom_line(aes(dist,old),colour="red",data=data.table(dist=cst@counts[,distance], old=cst@par$log_decay, key="dist"))+
-  geom_line(aes(dist,new),colour="green",
-            data=data.table(dist=cs@counts[,distance], new=cs@par$log_decay,
-                            name=cs@counts[,name], key="dist")[name=="WT NcoI 1"])+scale_x_log10()
-
-mean(cst@par$log_nu)
-mean(cs@par$log_nu)
 
 
 
