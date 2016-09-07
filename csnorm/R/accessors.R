@@ -126,3 +126,36 @@ get_interactions = function(cs, type, resolution, group, dispersion.type,
     return(ret[name!=ref])
   }
 }
+
+#' Predict model parameters on a subset of the input data
+#'
+#' @param cs 
+#' @param ncounts 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_predicted_subset = function(cs, ncounts=100000) {
+  if (length(cs@par)==0) stop("You should first normalize the datasets")
+  counts=cs@counts[sample(.N,min(.N,ncounts))]
+  setkey(counts,name,id1,id2)
+  mat=csnorm_predict_all(cs, counts, verbose=F)
+  return(mat)
+}
+
+#' Predict genomic biases at evenly spaced positions across the genome
+#'
+#' @param cs 
+#' @param points_per_kb 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_genomic_biases = function(cs, points_per_kb=10) {
+  if (length(cs@par)==0) stop("You should first normalize the datasets")
+  csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=cs@par$beta_nu, beta_delta=cs@par$beta_delta,
+                                   bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 10)[
+                                     ,.(pos,log_nu,log_delta,dset=j)]
+}

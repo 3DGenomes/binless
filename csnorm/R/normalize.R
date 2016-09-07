@@ -247,8 +247,8 @@ csnorm_fit_extradiag = function(biases1, biases2, counts, dmin, dmax, bf_per_dec
 #' Predict expected values for each count given optimized model parameters
 #' 
 #' @param cs CSnorm object
+#' @param counts
 #' @param verbose
-#' @param ncores
 #'   
 #' @section Warning: Do not call this function to compute a binned matrix. It
 #'   should (almost) never be used and might be removed in the future.
@@ -258,14 +258,13 @@ csnorm_fit_extradiag = function(biases1, biases2, counts, dmin, dmax, bf_per_dec
 #' @export
 #' 
 #' @examples
-csnorm_predict_all = function(cs, verbose=T, ncores=1) {
+csnorm_predict_all = function(cs, counts, verbose=T) {
   biases=cs@biases
   par=cs@par
   dmin=cs@settings$dmin
   dmax=cs@settings$dmax
   Kdiag=round((log10(dmax)-log10(dmin))*cs@settings$bf_per_decade)
-  ncounts=cs@counts[,.N]
-  counts=cs@counts
+  ncounts=counts[,.N]
   cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
   design=cs@design
   data = list( Dsets=design[,.N], Decays=design[,uniqueN(decay)], XD=as.array(design[,decay]),
@@ -273,7 +272,8 @@ csnorm_predict_all = function(cs, verbose=T, ncores=1) {
                N=counts[,.N], cbegin=cbegin, cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
                eC=par$eC, log_nu=par$log_nu, log_delta=par$log_delta,
                beta_diag_centered=par$beta_diag_centered)
-  pred=as.data.table(optimizing(stanmodels$predict_all, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)$par)
+  capture.output(pred<-as.data.table(optimizing(stanmodels$predict_all, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)$par))
+  pred=cbind(counts,pred)
   return(pred)
 }
 
@@ -917,3 +917,5 @@ run_exact = function(cs, bf_per_kb=1, bf_per_decade=5, lambdas=c(0.1,1,10), ncor
     run_serial(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, lambda=lambda, iter=iter, subsampling.pc=subsampling.pc)
   return(cs)
 }
+
+
