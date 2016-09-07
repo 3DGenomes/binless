@@ -388,7 +388,7 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
   mat[,normalized.sd:=sqrt(dispersion+observed)/(dispersion+expected)]
   mat[,c("icelike","icelike.sd"):=list(normalized*decaymat,normalized.sd*decaymat)]
   #create CSmatrix and CSbinned object
-  csm=new("CSmatrix", mat=mat, type="all", ice=(ice>0), ice.iterations=ifelse(ice>0,ice,NA),
+  csm=new("CSmatrix", mat=mat, group="all", ice=(ice>0), ice.iterations=ifelse(ice>0,ice,NA),
           names=as.character(mat[,unique(name)]), dispersion.fun=deparse(NA))
   csb=new("CSbinned", resolution=resolution, dispersion.type=dispersion.type, grouped=list(csm),
           individual=copy(mat[,.(name,bin1,begin1,end1,bin2,begin2,end2,observed,expected,ncounts,decaymat,dispersion)]))
@@ -400,7 +400,7 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
 #'
 #' @param cs CSnorm object
 #' @param resolution,dispersion.type see \code{\link{bin_all_datasets}}, used to identify the input matrices.
-#' @param type The type of grouping to be performed. Any combination of the given arguments is possible.
+#' @param group The type of grouping to be performed. Any combination of the given arguments is possible.
 #' @param dispersion.fun function. How to treat dispersions. Any many-to-one mapping such as sum, min or mean.
 #' @inheritParams bin_all_datasets
 #'
@@ -409,28 +409,28 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
 #'
 #' @examples
 group_datasets = function(cs, resolution, dispersion.type,
-                          type=c("condition","replicate","enzyme","experiment"), dispersion.fun=sum, ice=-1, verbose=T) {
+                          group=c("condition","replicate","enzyme","experiment"), dispersion.fun=sum, ice=-1, verbose=T) {
   #fetch and check inputs
   experiments=cs@experiments
   csbi=get_cs_binned_idx(cs, resolution=resolution, dispersion.type=dispersion.type, raise=T)
   csb=cs@binned[[csbi]]
-  type=match.arg(type, several.ok=T)
+  group=match.arg(group, several.ok=T)
   dispersion.fun=match.fun(dispersion.fun)
-  if (get_cs_matrix_idx(csb, type, dispersion.fun, raise=F)>0) {
-    stop("Refusing to overwrite already existing ", type, " group matrices with dispersion function ",deparse(dispersion.fun),
+  if (get_cs_matrix_idx(csb, group, dispersion.fun, raise=F)>0) {
+    stop("Refusing to overwrite already existing ", group, " group matrices with dispersion function ",deparse(dispersion.fun),
          ". Use them or remove them from the cs@binned[[",csbi,"]]@grouped list and @metadata table")
   }
   #
   if (verbose==T) cat("*** creating groups\n")
-  groups=experiments[,.(name,group=.GRP,groupname=do.call(paste,mget(type))),by=type][,.(name,group,groupname)]
+  groups=experiments[,.(name,groupno=.GRP,groupname=do.call(paste,mget(group))),by=group][,.(name,groupno,groupname)]
   if (verbose==T) cat("*** merging matrices\n")
   mat=merge(csb@individual,groups,by="name",all=T)[,.(observed=sum(observed),expected=sum(expected),decaymat=mean(decaymat),
                                                       dispersion=dispersion.fun(dispersion)),
-                                                   by=c("group","groupname","bin1","bin2","begin1","end1","begin2","end2")]
+                                                   by=c("groupno","groupname","bin1","bin2","begin1","end1","begin2","end2")]
   setnames(mat,"groupname","name")
   setkey(mat,name,bin1,bin2)
-  stopifnot(mat[,uniqueN(group)==uniqueN(name)]) #otherwise need to change subsequent steps
-  mat[,group:=NULL]
+  stopifnot(mat[,uniqueN(groupno)==uniqueN(name)]) #otherwise need to change subsequent steps
+  mat[,groupno:=NULL]
   #ice
   if (ice>0) {
     cat("*** iterative normalization with ",ice," iterations\n")
@@ -446,7 +446,7 @@ group_datasets = function(cs, resolution, dispersion.type,
   mat[,normalized.sd:=sqrt(dispersion+observed)/(dispersion+expected)]
   mat[,c("icelike","icelike.sd"):=list(normalized*decaymat,normalized.sd*decaymat)]
   #store matrices
-  csm=new("CSmatrix", mat=mat, type=paste(type), ice=(ice>0), ice.iterations=ifelse(ice>0,ice,NA),
+  csm=new("CSmatrix", mat=mat, group=group, ice=(ice>0), ice.iterations=ifelse(ice>0,ice,NA),
           names=as.character(mat[,unique(name)]), dispersion.fun=deparse(dispersion.fun,nlines=1))
   csb@grouped=append(csb@grouped,list(csm))
   cs@binned[[csbi]]=csb
@@ -456,11 +456,9 @@ group_datasets = function(cs, resolution, dispersion.type,
 #' Detect significant interactions wrt expected
 #' 
 #' @param cs CSnorm object
-#' @param resolution,type,dispersion.type,dispersion.fun see
+#' @param resolution,group,dispersion.type,dispersion.fun see
 #'   \code{\link{bin_all_datasets}} and \code{\link{group_datasets}}, used to
 #'   identify the input matrices.
-#' @param type The type of grouping to be performed. Any combination of the
-#'   given arguments is possible.
 #' @param threshold significance threshold, between 0 and 1
 #' @param ncores number of cores used for parallelization
 #' @inheritParams call_interactions
@@ -470,11 +468,12 @@ group_datasets = function(cs, resolution, dispersion.type,
 #' @export
 #' 
 #' @examples
-detect_interactions = function(cs, resolution, type, dispersion.type, dispersion.fun, threshold=0.95, ncores=1, normal.approx=100){
+detect_interactions = function(cs, resolution, group, dispersion.type, dispersion.fun, threshold=0.95, ncores=1, normal.approx=100){
   #get CSmat object
-  idx=get_matrices_idx(cs, resolution, dispersion.type, type, dispersion.fun, raise=T)
-  csb=cs@binned[[idx[1]]]
-  csm=csb@grouped[[idx[2]]]
+  idx1=get_cs_binned_idx(cs, resolution, dispersion.type, raise=T)
+  csb=cs@binned[[idx1]]
+  idx2=get_cs_matrix_idx(csb, group, dispersion.fun, raise=T)
+  csm=csb@grouped[[idx2]]
   #check if interaction wasn't calculated already
   if (get_cs_interaction_idx(csm, type="interactions", threshold=threshold, normal.approx=normal.approx, ref="expected", raise=F)>0) {
     stop("Refusing to overwrite this already detected interaction")
@@ -488,8 +487,8 @@ detect_interactions = function(cs, resolution, type, dispersion.type, dispersion
   #store back
   csi=new("CSinter", mat=mat, type="interactions", threshold=threshold, normal.approx=normal.approx, ref="expected")
   csm@interactions=append(csm@interactions,list(csi))
-  csb@grouped[[idx[2]]]=csm
-  cs@binned[[idx[1]]]=csb
+  csb@grouped[[idx2]]=csm
+  cs@binned[[idx1]]=csb
   return(cs)
 }
 
@@ -505,10 +504,10 @@ detect_interactions = function(cs, resolution, type, dispersion.type, dispersion
 #' @export
 #' 
 #' @examples
-detect_differences = function(cs, resolution, type, dispersion.type, dispersion.fun, ref, threshold=0.95, ncores=1, normal.approx=100){
+detect_differences = function(cs, resolution, group, dispersion.type, dispersion.fun, ref, threshold=0.95, ncores=1, normal.approx=100){
   idx1=get_cs_binned_idx(cs, resolution, dispersion.type, raise=T)
   csb=cs@binned[[idx1]]
-  idx2=get_cs_matrix_idx(csb, type, dispersion.fun, raise=T)
+  idx2=get_cs_matrix_idx(csb, group, dispersion.fun, raise=T)
   csm=csb@grouped[[idx2]]
   #check if interaction wasn't calculated already
   if (get_cs_interaction_idx(csm, type="differences", threshold=threshold, normal.approx=normal.approx, ref="expected", raise=F)>0) {

@@ -123,7 +123,7 @@ setMethod("show",signature="CSinter",definition=function(object) {
 #'
 #' @slot mat data.table. 
 #' @slot interactions list. 
-#' @slot type 
+#' @slot group 
 #' @slot ice 
 #' @slot ice.iterations 
 #' @slot names 
@@ -137,24 +137,24 @@ setMethod("show",signature="CSinter",definition=function(object) {
 setClass("CSmatrix",
          slots = list(mat="data.table",
                       interactions="list",
-                      type="character",
+                      group="character",
                       ice="logical",
                       ice.iterations="numeric",
                       names="character",
                       dispersion.fun="character"))
 
 setMethod("show",signature="CSmatrix",definition=function(object) {
-  if (object@type=="all") {
+  if (length(object@group)==1 && object@group=="all") {
     cat("      * Individual") 
   } else {
-    cat("      * Group [", object@type,"] (dispersion function: ", object@dispersion.fun,")")
+    cat("      * Group [", object@group,"] (dispersion function: ", object@dispersion.fun,")")
   }
   if (object@ice==T) {
     cat(" with ICE (", object@ice.iterations,"iterations)")
   }
   cat( " : ", object@names, "\n")
   if (length(object@interactions)==0) {
-    cat("        No interactions computed")
+    cat("        No interactions computed\n")
   } else {
     lapply(object@interactions, show)
   }
@@ -233,6 +233,8 @@ setMethod("show",signature="CSnorm",definition=function(object) {
     cat(" Dataset not yet normalized\n")
   } else {
     cat(" Normalized dataset\n")
+    cat("  lambda_nu: ",cs@par$lambda_nu, "\n  lambda_delta: ",cs@par$lambda_delta, "\n  lambda_diag: ",cs@par$lambda_diag,"\n")
+    cat("  dispersion: ",cs@par$alpha,"\n")
     nbinned=length(object@binned)
     if (nbinned==0) {
       cat(" No binned matrix available")
