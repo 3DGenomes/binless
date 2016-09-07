@@ -234,6 +234,7 @@ setMethod("show",signature="CSnorm",definition=function(object) {
   } else {
     cat(" Normalized dataset\n")
     cat("  lambda_nu: ",cs@par$lambda_nu, "\n  lambda_delta: ",cs@par$lambda_delta, "\n  lambda_diag: ",cs@par$lambda_diag,"\n")
+    cat("  dispersion: ",cs@par$alpha,"\n")
     nbinned=length(object@binned)
     if (nbinned==0) {
       cat(" No binned matrix available")
