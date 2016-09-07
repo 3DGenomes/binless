@@ -144,7 +144,7 @@ setClass("CSmatrix",
                       dispersion.fun="character"))
 
 setMethod("show",signature="CSmatrix",definition=function(object) {
-  if (object@type=="all") {
+  if (length(object@type)==1 && object@type=="all") {
     cat("      * Individual") 
   } else {
     cat("      * Group [", object@type,"] (dispersion function: ", object@dispersion.fun,")")
