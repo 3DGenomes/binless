@@ -123,7 +123,7 @@ setMethod("show",signature="CSinter",definition=function(object) {
 #'
 #' @slot mat data.table. 
 #' @slot interactions list. 
-#' @slot type 
+#' @slot group 
 #' @slot ice 
 #' @slot ice.iterations 
 #' @slot names 
@@ -137,17 +137,17 @@ setMethod("show",signature="CSinter",definition=function(object) {
 setClass("CSmatrix",
          slots = list(mat="data.table",
                       interactions="list",
-                      type="character",
+                      group="character",
                       ice="logical",
                       ice.iterations="numeric",
                       names="character",
                       dispersion.fun="character"))
 
 setMethod("show",signature="CSmatrix",definition=function(object) {
-  if (length(object@type)==1 && object@type=="all") {
+  if (length(object@group)==1 && object@group=="all") {
     cat("      * Individual") 
   } else {
-    cat("      * Group [", object@type,"] (dispersion function: ", object@dispersion.fun,")")
+    cat("      * Group [", object@group,"] (dispersion function: ", object@dispersion.fun,")")
   }
   if (object@ice==T) {
     cat(" with ICE (", object@ice.iterations,"iterations)")
