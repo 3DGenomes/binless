@@ -115,8 +115,8 @@ csnorm_simplified_guess = function(biases, counts, design, lambda, dmin, dmax, b
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   Decays=design[,uniqueN(decay)]
   beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
-  op$par=c(list(lambda_nu=lambda, lambda_delta=lambda, beta_diag=beta_diag,
-                lambda_diag=array(1,dim=Decays), log_decay=rep(0,counts[,.N])),
+  op$par=c(list(lambda_nu=array(lambda,dim=data$Biases), lambda_delta=array(lambda,dim=data$Biases),
+                beta_diag=beta_diag, lambda_diag=array(1,dim=Decays), log_decay=rep(0,counts[,.N])),
            op$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta","log_nu","log_delta")])
   return(op)
 }
