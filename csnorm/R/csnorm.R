@@ -154,7 +154,7 @@ setMethod("show",signature="CSmatrix",definition=function(object) {
   }
   cat( " : ", object@names, "\n")
   if (length(object@interactions)==0) {
-    cat("        No interactions computed")
+    cat("        No interactions computed\n")
   } else {
     lapply(object@interactions, show)
   }

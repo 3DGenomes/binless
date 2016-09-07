@@ -472,9 +472,10 @@ group_datasets = function(cs, resolution, dispersion.type,
 #' @examples
 detect_interactions = function(cs, resolution, type, dispersion.type, dispersion.fun, threshold=0.95, ncores=1, normal.approx=100){
   #get CSmat object
-  idx=get_matrices_idx(cs, resolution, dispersion.type, type, dispersion.fun, raise=T)
-  csb=cs@binned[[idx[1]]]
-  csm=csb@grouped[[idx[2]]]
+  idx1=get_cs_binned_idx(cs, resolution, dispersion.type, raise=T)
+  csb=cs@binned[[idx1]]
+  idx2=get_cs_matrix_idx(csb, type, dispersion.fun, raise=T)
+  csm=csb@grouped[[idx2]]
   #check if interaction wasn't calculated already
   if (get_cs_interaction_idx(csm, type="interactions", threshold=threshold, normal.approx=normal.approx, ref="expected", raise=F)>0) {
     stop("Refusing to overwrite this already detected interaction")
@@ -488,8 +489,8 @@ detect_interactions = function(cs, resolution, type, dispersion.type, dispersion
   #store back
   csi=new("CSinter", mat=mat, type="interactions", threshold=threshold, normal.approx=normal.approx, ref="expected")
   csm@interactions=append(csm@interactions,list(csi))
-  csb@grouped[[idx[2]]]=csm
-  cs@binned[[idx[1]]]=csb
+  csb@grouped[[idx2]]=csm
+  cs@binned[[idx1]]=csb
   return(cs)
 }
 
