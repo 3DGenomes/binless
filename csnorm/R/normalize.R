@@ -875,6 +875,7 @@ run_serial = function(cs, bf_per_kb=1, bf_per_decade=5, lambda=1, iter=100000, s
   init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
     counts=cs@counts, biases=cs@biases, design=cs@design,
     bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, lambda=lambda, verbose=T, iter=iter)))
+  cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4])
   #main optimization, subsampled
   counts.sub=cs@counts[sample(.N,round(subsampling.pc/100*.N))]
   setkeyv(counts.sub,key(cs@counts))
@@ -882,12 +883,8 @@ run_serial = function(cs, bf_per_kb=1, bf_per_decade=5, lambda=1, iter=100000, s
     biases=cs@biases, counts = counts.sub, design=cs@design, dmin=dmin, dmax=dmax,
     bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter, verbose = T,
     init=init.op, weight=counts.sub[,.N,by=name]$N/cs@counts[,.N,by=name]$N)))
+  cs@diagnostics=list(out=output, runtime=a[1]+a[4])
   #report statistics
-  op$par$runtime=a[1]+a[4]
-  op$par$output=output
-  op$par$logp=op$value
-  init.op$runtime=init.a[1]+init.a[4]
-  init.op$output=init.output
   op$par$init=init.op
   op$par$value=op$value
   if (subsampling.pc<100) op$par$counts.sub=counts.sub
