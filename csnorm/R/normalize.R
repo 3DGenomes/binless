@@ -343,7 +343,7 @@ run_split_parallel_biases = function(counts, biases, begin, end, dmin, dmax, bf_
   extracted = get_cs_subset(counts, biases, begin1=begin, end1=end, fill.zeros=T, circularize=circularize)
   #initial values
   init.a=system.time(init.output <- capture.output(init.op <- run_split_parallel_initial_guess(
-    counts=extracted$counts, biases=extracted$biases1, bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax,
+    counts=extracted$counts, biases=extracted$biases1, design=cs@design, bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax,
     bf_per_decade=bf_per_decade, lambda=lambda, verbose=T, iter=iter)))
   #run fit
   a=system.time(output <- capture.output(op <- csnorm_fit(extracted$biases1, extracted$counts, dmin, dmax,
@@ -873,7 +873,7 @@ run_serial = function(cs, bf_per_kb=1, bf_per_decade=5, lambda=1, iter=100000, s
   setkey(cs@counts,name,id1,pos1,id2,pos2)
   #initial guess
   init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
-    counts=cs@counts, biases=cs@biases,
+    counts=cs@counts, biases=cs@biases, design=cs@design,
     bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, lambda=lambda, verbose=T, iter=iter)))
   #main optimization, subsampled
   counts.sub=cs@counts[sample(.N,round(subsampling.pc/100*.N))]
@@ -889,6 +889,7 @@ run_serial = function(cs, bf_per_kb=1, bf_per_decade=5, lambda=1, iter=100000, s
   init.op$runtime=init.a[1]+init.a[4]
   init.op$output=init.output
   op$par$init=init.op
+  op$par$value=op$value
   if (subsampling.pc<100) op$par$counts.sub=counts.sub
   cs@par=op$par
   cs
@@ -913,7 +914,7 @@ run_serial = function(cs, bf_per_kb=1, bf_per_decade=5, lambda=1, iter=100000, s
 run_exact = function(cs, bf_per_kb=1, bf_per_decade=5, lambdas=c(0.1,1,10), ncores=1, iter=100000, subsampling.pc=100) {
   cs@binned=list() #erase old binned datasets if available
   registerDoParallel(cores=ncores)
-  cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %dopar%
+  cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value<y@par$value){return(y)}else{return(x)}}) %dopar%
     run_serial(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, lambda=lambda, iter=iter, subsampling.pc=subsampling.pc)
   return(cs)
 }
