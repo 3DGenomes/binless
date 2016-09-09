@@ -4,7 +4,6 @@ NULL
 #' Fetch CSbinned indices from CSnorm object
 #'
 #' @param resolution 
-#' @param detection.type 
 #' @param raise boolean. If T raise an exception, otherwise return -1.
 #' @param cs CSnorm object
 #'
@@ -13,10 +12,10 @@ NULL
 #' @export
 #'
 #' @examples
-get_cs_binned_idx = function(cs, resolution, detection.type, raise=T) {
+get_cs_binned_idx = function(cs, resolution, raise=T) {
   if(length(cs@binned)>0) {
     for (i in 1:length(cs@binned)) {
-      if (cs@binned[[i]]@resolution==resolution && cs@binned[[i]]@detection.type==detection.type) return(i)
+      if (cs@binned[[i]]@resolution==resolution) return(i)
     }
   }
   if (raise==T) {
@@ -52,6 +51,7 @@ get_cs_matrix_idx = function(csb, group, raise=T) {
 #'
 #' @param csm 
 #' @param type 
+#' @param detection.type 
 #' @param threshold 
 #' @param ref 
 #' @param raise 
@@ -61,11 +61,11 @@ get_cs_matrix_idx = function(csb, group, raise=T) {
 #' @export
 #'
 #' @examples
-get_cs_interaction_idx = function(csm, type, threshold, ref, raise=T) {
+get_cs_interaction_idx = function(csm, type, detection.type, threshold, ref, raise=T) {
   if(length(csm@interactions)>0) {
     for (i in 1:length(csm@interactions)) {
-      if (csm@interactions[[i]]@type==type && csm@interactions[[i]]@threshold==threshold
-          && csm@interactions[[i]]@ref==ref) return(i)
+      if (csm@interactions[[i]]@detection.type==detection.type && csm@interactions[[i]]@type==type
+          && csm@interactions[[i]]@threshold==threshold && csm@interactions[[i]]@ref==ref) return(i)
     }
   }
   if (raise==T) {
@@ -82,14 +82,13 @@ get_cs_interaction_idx = function(csm, type, threshold, ref, raise=T) {
 #' @param resolution The resolution of the matrix, in bases
 #' @param group character. Either "all" to return individual matrices, or any of 
 #'   "condition", "replicate" or "enzyme" to return grouped matrices
-#' @param detection.type detection type, as provided to the binning and grouping funtions.
 #'   
 #' @return a data.table containing the binned matrices
 #' @export
 #' 
 #' @examples
-get_matrices = function(cs, resolution, group, detection.type) {
-  idx1=get_cs_binned_idx(cs, resolution, detection.type, raise=T)
+get_matrices = function(cs, resolution, group) {
+  idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
   idx2=get_cs_matrix_idx(csb, group, raise=T)
   return(csb@grouped[[idx2]]@mat)
@@ -108,12 +107,12 @@ get_matrices = function(cs, resolution, group, detection.type) {
 #' @examples
 get_interactions = function(cs, type, resolution, group, detection.type,
                             ref, threshold) {
-  idx1=get_cs_binned_idx(cs, resolution, detection.type, raise=T)
+  idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
   idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
   mat=csm@mat
-  idx3=get_cs_interaction_idx(csm, type, threshold, ref)
+  idx3=get_cs_interaction_idx(csm, type, detection.type, threshold, ref)
   int=csm@interactions[[idx3]]@mat
   ret=merge(mat,int,by=c("name","bin1","bin2","observed","expected","dispersion"))
   if (type=="interactions") {

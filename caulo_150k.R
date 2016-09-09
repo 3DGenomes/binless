@@ -70,8 +70,9 @@ save(cs, file="data/caulo_rif_500k_csnorm_optimized_gibbs.RData")
 load("data/caulo_rif_500k_csnorm_optimized_exact.RData")
 load("data/caulo_rif_500k_csnorm_optimized_gibbs.RData")
 
-cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1, detection.type=1)
-cs=detect_interactions(cs, resolution=20000, ncores=30, detection.type=1, group="all")
+cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1)
+cs=detect_interactions(cs, resolution=20000, ncores=30, group="all", detection.type=1)
+cs=detect_differences(cs, resolution=20000, ncores=30, group="all", detection.type=1, ref="expected")
 mat=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=1,
                  threshold=0.95)
 ggplot(mat)+
@@ -80,6 +81,7 @@ ggplot(mat)+
   geom_point(aes(begin1,begin2,colour=`prob.gt.expected`<0.5),data=mat[is.significant==T])+
   scale_fill_gradient(na.value = "white")+theme(legend.position = "none")+
   facet_grid(~name)
+
 
 mat2=get_predicted_subset(cs)
 setkey(mat,norm,name,distance)

@@ -97,6 +97,7 @@ setMethod("show",signature="CSdata",definition=function(object) {
 #' @slot type 
 #' @slot threshold 
 #' @slot ref 
+#' @slot detection.type numeric. detection method
 #'
 #' @return
 #' @keywords internal
@@ -106,6 +107,7 @@ setMethod("show",signature="CSdata",definition=function(object) {
 setClass("CSinter",
          slots = list(mat="data.table",
                       type="character",
+                      detection.type="numeric",
                       threshold="numeric",
                       ref="character"))
 setMethod("show",signature="CSinter",definition=function(object) {
@@ -114,7 +116,7 @@ setMethod("show",signature="CSinter",definition=function(object) {
   } else {
     cat("        Significant differences wrt ", object@ref)
   }
-  cat(" (threshold=", object@threshold,")\n")
+  cat(" (threshold=", object@threshold,", detection.type=", object@detection.type, ")\n")
 })
 
 #' Class for one binned matrix and its interaction detections
@@ -162,7 +164,6 @@ setMethod("show",signature="CSmatrix",definition=function(object) {
 #' @slot resolution numeric. Matrix resolution, in bases
 #' @slot individual 
 #' @slot grouped 
-#' @slot detection.type numeric. detection method
 #'
 #' @return
 #' @export
@@ -170,12 +171,11 @@ setMethod("show",signature="CSmatrix",definition=function(object) {
 #' @examples
 setClass("CSbinned",
          slots = list(resolution="numeric",
-                      detection.type="numeric",
                       individual="data.table",
                       grouped="list"))
 
 setMethod("show",signature="CSbinned",definition=function(object) {
-  cat("   *** At", object@resolution/1000, "kb resolution (detection type", object@detection.type, "):\n")
+  cat("   *** At", object@resolution/1000, "kb resolution:\n")
   lapply(object@grouped, show)
   cat("\n")
   })

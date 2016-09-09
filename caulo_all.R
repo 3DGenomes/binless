@@ -89,12 +89,12 @@ ggplot(mat)+geom_density(aes(log10(contact.close/exp(log_mean_cclose)),colour=na
 #there are three dispersion calculations in this beta version, you might want to try them all out.
 #You can optionally ask for computation of ICE-normalized matrices, for comparison.
 load("data/caulo_rif_csnorm_optimized.RData")
-cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1, detection.type=1)
+cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1)
 save(cs, file="data/caulo_rif_csnorm_optimized.RData")
 
 #To get the binned matrices, use the following command with the same arguments than those passed to bin_all_datasets
 #Since you did not do any grouping yet (see below), pass group="all".
-mat=get_matrices(cs, resolution=20000, group="all", detection.type=1)
+mat=get_matrices(cs, resolution=20000, group="all")
 #The mat data.table contains a number of matrices:
 #observed: the raw counts in each bin
 #expected and expected.sd: the expected number of counts, according to csnorm, along with their standard deviation
@@ -147,7 +147,7 @@ ggplot(mat)+
 
 #Datasets can be grouped (merged) to improve the quality of the matrices and the interaction detection power
 #for example, we can group datasets by condition and enzyme. For that purpose, pass group the corresponding groupings.
-cs=group_datasets(cs, resolution=20000, detection.type=1, group=c("condition", "enzyme"), ice=1, verbose=T)
+cs=group_datasets(cs, resolution=20000, group=c("condition", "enzyme"), ice=1, verbose=T)
 
 #Again, you can detect interactions in these grouped datasets, and plot the results
 cs=detect_interactions(cs, resolution=20000, group=c("condition", "enzyme"), detection.type=1,
