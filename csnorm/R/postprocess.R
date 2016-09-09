@@ -336,19 +336,17 @@ generate_genomic_biases = function(biases, beta_nu, beta_delta, bf_per_kb=1, poi
 #' @param ice integer. If positive, perform the optional Iterative Correction 
 #'   algorithm, useful for comparison purposes. The value determines the number
 #'   of iterations.
-#' @param dispersion.type integer. Type 1: original dispersion. Type 2: Fit same
-#'   dispersion to all bins. Type 3: Fit one dispersion and multiply by ncounts
-#'   to get that of a bin.
+#' @param detection.type integer. Type 1: original Type 2: new
 #' @param verbose
 #'   
 #' @return A CSnorm object containing an additional CSbinned object in cs@binned
 #' @export
 #' 
 #' @examples
-bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.type=c(1,2,3), verbose=T) {
-  stopifnot(length(dispersion.type)==1 && dispersion.type>=1 && dispersion.type<=3)
-  if (get_cs_binned_idx(cs,resolution,dispersion.type,raise=F)>0) {
-    stop("Refusing to overwrite already existing matrices at ", resolution/1000, "kb with dispersion type ",dispersion.type,
+bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, detection.type=c(1,2), verbose=T) {
+  stopifnot(length(detection.type)==1 && detection.type>=1 && detection.type<=2)
+  if (get_cs_binned_idx(cs,resolution,detection.type,raise=F)>0) {
+    stop("Refusing to overwrite already existing matrices at ", resolution/1000, "kb with detection type ",detection.type,
          ". Use them or remove them from the cs@binned list")
   }
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
@@ -377,11 +375,8 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
   mat[,begin2:=as.integer(as.character(bin2.begin))]
   mat[,end2:=as.integer(as.character(bin2.end))]
   #store dispersions
-  if (verbose==T) cat("*** Dispersion type ",dispersion.type,"\n")
-  mat[,dispersion:=switch(dispersion.type,
-                          cs@par$alpha,
-                          get_dispersions2(mat)$dispersion,
-                          get_dispersions(mat)$dispersion)]
+  if (verbose==T) cat("*** Detection type ",detection.type,"\n")
+  mat[,dispersion:=cs@par$alpha]
   #compute normalized matrices
   mat[,expected.sd:=sqrt(expected+expected^2/dispersion)] #negative binomial SD
   mat[,normalized:=(dispersion+observed)/(dispersion+expected)] #posterior predictive mean and SD
@@ -389,8 +384,8 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
   mat[,c("icelike","icelike.sd"):=list(normalized*decaymat,normalized.sd*decaymat)]
   #create CSmatrix and CSbinned object
   csm=new("CSmatrix", mat=mat, group="all", ice=(ice>0), ice.iterations=ifelse(ice>0,ice,NA),
-          names=as.character(mat[,unique(name)]), dispersion.fun=deparse(NA))
-  csb=new("CSbinned", resolution=resolution, dispersion.type=dispersion.type, grouped=list(csm),
+          names=as.character(mat[,unique(name)]))
+  csb=new("CSbinned", resolution=resolution, detection.type=detection.type, grouped=list(csm),
           individual=copy(mat[,.(name,bin1,begin1,end1,bin2,begin2,end2,observed,expected,ncounts,decaymat,dispersion)]))
   cs@binned=append(cs@binned,csb)
   cs
@@ -399,33 +394,31 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
 #' Group binned matrices of datasets
 #'
 #' @param cs CSnorm object
-#' @param resolution,dispersion.type see \code{\link{bin_all_datasets}}, used to identify the input matrices.
+#' @param resolution,detection.type see \code{\link{bin_all_datasets}}, used to identify the input matrices.
 #' @param group The type of grouping to be performed. Any combination of the given arguments is possible.
-#' @param dispersion.fun function. How to treat dispersions. Any many-to-one mapping such as sum, min or mean.
 #' @inheritParams bin_all_datasets
 #'
 #' @return CSnorm object
 #' @export
 #'
 #' @examples
-group_datasets = function(cs, resolution, dispersion.type,
-                          group=c("condition","replicate","enzyme","experiment"), dispersion.fun=sum, ice=-1, verbose=T) {
+group_datasets = function(cs, resolution, detection.type,
+                          group=c("condition","replicate","enzyme","experiment"), ice=-1, verbose=T) {
   #fetch and check inputs
   experiments=cs@experiments
-  csbi=get_cs_binned_idx(cs, resolution=resolution, dispersion.type=dispersion.type, raise=T)
+  csbi=get_cs_binned_idx(cs, resolution=resolution, detection.type=detection.type, raise=T)
   csb=cs@binned[[csbi]]
   group=match.arg(group, several.ok=T)
-  dispersion.fun=match.fun(dispersion.fun)
-  if (get_cs_matrix_idx(csb, group, dispersion.fun, raise=F)>0) {
-    stop("Refusing to overwrite already existing ", group, " group matrices with dispersion function ",deparse(dispersion.fun),
-         ". Use them or remove them from the cs@binned[[",csbi,"]]@grouped list and @metadata table")
+  if (get_cs_matrix_idx(csb, group, raise=F)>0) {
+    stop("Refusing to overwrite already existing ", group,
+         " group matrices. Use them or remove them from the cs@binned[[",csbi,
+         "]]@grouped list and @metadata table")
   }
   #
   if (verbose==T) cat("*** creating groups\n")
   groups=experiments[,.(name,groupno=.GRP,groupname=do.call(paste,mget(group))),by=group][,.(name,groupno,groupname)]
   if (verbose==T) cat("*** merging matrices\n")
-  mat=merge(csb@individual,groups,by="name",all=T)[,.(observed=sum(observed),expected=sum(expected),decaymat=mean(decaymat),
-                                                      dispersion=dispersion.fun(dispersion)),
+  mat=merge(csb@individual,groups,by="name",all=T)[,.(observed=sum(observed),expected=sum(expected),decaymat=mean(decaymat), dispersion=cs@par$alpha),
                                                    by=c("groupno","groupname","bin1","bin2","begin1","end1","begin2","end2")]
   setnames(mat,"groupname","name")
   setkey(mat,name,bin1,bin2)
@@ -447,7 +440,7 @@ group_datasets = function(cs, resolution, dispersion.type,
   mat[,c("icelike","icelike.sd"):=list(normalized*decaymat,normalized.sd*decaymat)]
   #store matrices
   csm=new("CSmatrix", mat=mat, group=group, ice=(ice>0), ice.iterations=ifelse(ice>0,ice,NA),
-          names=as.character(mat[,unique(name)]), dispersion.fun=deparse(dispersion.fun,nlines=1))
+          names=as.character(mat[,unique(name)]))
   csb@grouped=append(csb@grouped,list(csm))
   cs@binned[[csbi]]=csb
   return(cs)
@@ -456,7 +449,7 @@ group_datasets = function(cs, resolution, dispersion.type,
 #' Detect significant interactions wrt expected
 #' 
 #' @param cs CSnorm object
-#' @param resolution,group,dispersion.type,dispersion.fun see
+#' @param resolution,group,detection.type see
 #'   \code{\link{bin_all_datasets}} and \code{\link{group_datasets}}, used to
 #'   identify the input matrices.
 #' @param threshold significance threshold, between 0 and 1
@@ -468,11 +461,11 @@ group_datasets = function(cs, resolution, dispersion.type,
 #' @export
 #' 
 #' @examples
-detect_interactions = function(cs, resolution, group, dispersion.type, dispersion.fun, threshold=0.95, ncores=1, normal.approx=100){
+detect_interactions = function(cs, resolution, group, detection.type, threshold=0.95, ncores=1, normal.approx=100){
   #get CSmat object
-  idx1=get_cs_binned_idx(cs, resolution, dispersion.type, raise=T)
+  idx1=get_cs_binned_idx(cs, resolution, detection.type, raise=T)
   csb=cs@binned[[idx1]]
-  idx2=get_cs_matrix_idx(csb, group, dispersion.fun, raise=T)
+  idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
   #check if interaction wasn't calculated already
   if (get_cs_interaction_idx(csm, type="interactions", threshold=threshold, normal.approx=normal.approx, ref="expected", raise=F)>0) {
@@ -504,10 +497,10 @@ detect_interactions = function(cs, resolution, group, dispersion.type, dispersio
 #' @export
 #' 
 #' @examples
-detect_differences = function(cs, resolution, group, dispersion.type, dispersion.fun, ref, threshold=0.95, ncores=1, normal.approx=100){
-  idx1=get_cs_binned_idx(cs, resolution, dispersion.type, raise=T)
+detect_differences = function(cs, resolution, group, detection.type, ref, threshold=0.95, ncores=1, normal.approx=100){
+  idx1=get_cs_binned_idx(cs, resolution, detection.type, raise=T)
   csb=cs@binned[[idx1]]
-  idx2=get_cs_matrix_idx(csb, group, dispersion.fun, raise=T)
+  idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
   #check if interaction wasn't calculated already
   if (get_cs_interaction_idx(csm, type="differences", threshold=threshold, normal.approx=normal.approx, ref="expected", raise=F)>0) {

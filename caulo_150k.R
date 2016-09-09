@@ -67,10 +67,12 @@ cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=
                     ngibbs = 3, iter=10000, ncores=30)
 save(cs, file="data/caulo_rif_500k_csnorm_optimized_gibbs.RData")
 
+load("data/caulo_rif_500k_csnorm_optimized_exact.RData")
+load("data/caulo_rif_500k_csnorm_optimized_gibbs.RData")
 
-cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1, dispersion.type=1)
-cs=detect_interactions(cs, resolution=20000, ncores=30, dispersion.type=1, group="all", dispersion.fun=NA)
-mat=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", dispersion.type=1, dispersion.fun=NA,
+cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1, detection.type=1)
+cs=detect_interactions(cs, resolution=20000, ncores=30, detection.type=1, group="all")
+mat=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=1,
                  threshold=0.95, normal.approx=100)
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
@@ -78,6 +80,33 @@ ggplot(mat)+
   geom_point(aes(begin1,begin2,colour=`prob.gt.expected`<0.5),data=mat[is.significant==T])+
   scale_fill_gradient(na.value = "white")+theme(legend.position = "none")+
   facet_grid(~name)
+
+mat2=get_predicted_subset(cs)
+setkey(mat,norm,name,distance)
+ggplot(mat)+geom_line(aes(distance,exp(log_decay)),colour="red")+geom_point(aes(distance,contact.close/exp(log_mean_cclose-log_decay)),alpha=0.1)+
+  scale_y_log10()+scale_x_log10(limits=c(1e3,NA))+facet_grid(norm~name)
+ggplot(mat)+geom_line(aes(distance,exp(log_decay),colour=norm))+
+  scale_y_log10()+scale_x_log10(limits=c(1e3,NA))+facet_grid(~name)
+ggplot(mat[distance<300000])+geom_line(aes(distance,exp(log_decay)),colour="red")+geom_point(aes(distance,contact.close/exp(log_mean_cclose-log_decay)),alpha=0.1)+
+  scale_y_log10()+facet_grid(norm~name)
+
+
+
+
+counts=fill_zeros(cs@counts,cs@biases)
+setkey(counts,name,id1,id2)
+pred=csnorm:::csnorm_predict_all(cs, counts, verbose=F)
+bcounts=pred[name=="WT BglII 1"&pos1>=262840&pos2>=402840&pos1<=282840&pos2<=422840] #prob ~ 0.5
+bcounts=pred[name=="WT BglII 2"&pos1>=322840&pos2>=362840&pos1<=342840&pos2<=382840] #prob ~ 0
+data=list(N=4*bcounts[,.N], observed=bcounts[,c(contact.close,contact.down,contact.far,contact.up)],
+          log_expected=bcounts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha)
+c(mean(data$observed),mean(exp(data$log_expected)))
+fit=stan("detection.stan",data=data,init=0)
+my_sso <- launch_shinystan(fit)
+sm=stan_model("detection.stan")
+op=optimizing(sm, data=data, as_vector=F, hessian=T, iter=10000, verbose=F, init=0)
+#p(log_s>0)?
+pnorm(0,mean=op$par$log_s,sd=1/sqrt(-op$hessian[1,1]),lower.tail=F,log.p=F)
 
 
 cs=detect_differences(cs, resolution=20000, ncores=30, dispersion.type=3, type="all", dispersion.fun=NA,
@@ -93,6 +122,10 @@ get_interactions(cs, interaction.type="differences", resolution=20000, type="all
                  threshold=0.95, normal.approx=100)
 get_interactions(cs, interaction.type="differences", resolution=20000, type="enzyme", ref="BglII", dispersion.type=3, dispersion.fun=sum,
                  threshold=0.95, normal.approx=100)
+
+
+
+
 
 
 

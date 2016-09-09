@@ -89,12 +89,12 @@ ggplot(mat)+geom_density(aes(log10(contact.close/exp(log_mean_cclose)),colour=na
 #there are three dispersion calculations in this beta version, you might want to try them all out.
 #You can optionally ask for computation of ICE-normalized matrices, for comparison.
 load("data/caulo_rif_csnorm_optimized.RData")
-cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1, dispersion.type=1)
+cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1, detection.type=1)
 save(cs, file="data/caulo_rif_csnorm_optimized.RData")
 
 #To get the binned matrices, use the following command with the same arguments than those passed to bin_all_datasets
-#Since you did not do any grouping yet (see below), pass group="all" and dispersion.fun=NA.
-mat=get_matrices(cs, resolution=20000, group="all", dispersion.type=1, dispersion.fun=NA)
+#Since you did not do any grouping yet (see below), pass group="all".
+mat=get_matrices(cs, resolution=20000, group="all", detection.type=1)
 #The mat data.table contains a number of matrices:
 #observed: the raw counts in each bin
 #expected and expected.sd: the expected number of counts, according to csnorm, along with their standard deviation
@@ -121,16 +121,16 @@ ggplot(mat)+geom_density(aes(log10(normalized),colour=name))+facet_wrap(~name)
 
 ### Interaction calling 
 
-#To detect interactions, you need to specify an already binned dataset by providing resolution and dispersion.type.
-#Since you did not do any grouping yet (see below), pass group="all" and dispersion.fun=NA.
+#To detect interactions, you need to specify an already binned dataset by providing resolution and detection.type.
+#Since you did not do any grouping yet (see below), pass group="all".
 #The interaction detection is made at a 95% posterior confidence threshold
-cs=detect_interactions(cs, resolution=20000, group="all", dispersion.type=1, dispersion.fun=NA, threshold=0.95,
+cs=detect_interactions(cs, resolution=20000, group="all", detection.type=1, threshold=0.95,
                        normal.approx=100, ncores=30)
 
 #you can view the called interactions
-#since there was no grouping, pass group="all" and dispersion.fun=NA
+#since there was no grouping, pass group="all"
 #for simple interactions pass type="interactions" and ref="expected"
-mat=get_interactions(cs, type="interactions", resolution=20000, group="all", dispersion.type=1, dispersion.fun=NA,
+mat=get_interactions(cs, type="interactions", resolution=20000, group="all", detection.type=1,
                      threshold=0.95, normal.approx=100, ref="expected")
 
 #for example, we can plot the ice-like matrices with highlighted interactions in the upper left corner
@@ -148,14 +148,12 @@ ggplot(mat)+
 
 #Datasets can be grouped (merged) to improve the quality of the matrices and the interaction detection power
 #for example, we can group datasets by condition and enzyme. For that purpose, pass group the corresponding groupings.
-#For dispersion.type=1, use dispersion.fun=min
-#for dispersion.type=2 or 3, use dispersion.fun=sum
-cs=group_datasets(cs, resolution=20000, dispersion.type=1, group=c("condition", "enzyme"), dispersion.fun=min, ice=1, verbose=T)
+cs=group_datasets(cs, resolution=20000, detection.type=1, group=c("condition", "enzyme"), ice=1, verbose=T)
 
 #Again, you can detect interactions in these grouped datasets, and plot the results
-cs=detect_interactions(cs, resolution=20000, group=c("condition", "enzyme"), dispersion.type=1, dispersion.fun=min,
+cs=detect_interactions(cs, resolution=20000, group=c("condition", "enzyme"), detection.type=1,
                         threshold=0.95, normal.approx=100, ncores=30)
-mat=get_interactions(cs, type="interactions", resolution=20000, group=c("condition", "enzyme"), dispersion.type=1, dispersion.fun=min,
+mat=get_interactions(cs, type="interactions", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
                      threshold=0.95, normal.approx=100, ref="expected")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
@@ -169,12 +167,12 @@ ggplot(mat)+
 
 #you can call significant differences. It's just like calling interactions, but you need to specify a reference.
 #All other matrices will then be compared to that one.
-cs=detect_differences(cs, ref="WT BglII", resolution=20000, group=c("condition", "enzyme"), dispersion.type=1, dispersion.fun=min,
+cs=detect_differences(cs, ref="WT BglII", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
                       threshold=0.95, ncores=30, normal.approx=100)
 
 #the interactions can be retrieved as usual, with a few changes
 # specify type="differences" and ref as given in detect_differences
-mat=get_interactions(cs, type="differences", resolution=20000, group=c("condition", "enzyme"), dispersion.type=1, dispersion.fun=min,
+mat=get_interactions(cs, type="differences", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
                      threshold=0.95, normal.approx=100, ref="WT BglII")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
