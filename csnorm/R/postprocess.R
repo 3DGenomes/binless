@@ -144,30 +144,6 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
   return(binned)
 }
 
-#' Predict dispersions for a binned matrix
-#' @keywords internal
-#' @export
-#' 
-get_dispersions = function(binned, iter=10000) {
-  data=list(B=binned[,.N],observed=binned[,observed],expected=binned[,expected],ncounts=binned[,ncounts])
-  out <- capture.output(op <- optimizing(stanmodels$dispersions,
-                                         data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0, init_alpha=1e-5)$par)
-  return(op)
-}
-
-
-#' Predict dispersions for a binned matrix
-#' @keywords internal
-#' @export
-#' 
-get_dispersions2 = function(binned, iter=10000) {
-  data=list(B=binned[,.N],observed=binned[,observed],expected=binned[,expected])
-  out <- capture.output(op <- optimizing(stanmodels$dispersions2,
-                                         data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0, init_alpha=1e-5)$par)
-  return(op)
-}
-
-
 #' compute \eqn{p(\Gamma_2>\Gamma_1) = \int_{0}^{+\infty} dx p_{\Gamma_2}(x) \int_{0}^{x} dy p_{\Gamma_1}(y)}
 #' @keywords internal
 #' 
@@ -328,7 +304,7 @@ generate_genomic_biases = function(biases, beta_nu, beta_delta, bf_per_kb=1, poi
   return(dt)
 }
 
-#' Bin normalized datasets and compute dispersions at that resolution
+#' Bin normalized datasets
 #' 
 #' @param cs CSnorm object, optimized.
 #' @param resolution integer. The desired resolution of the matrix.
