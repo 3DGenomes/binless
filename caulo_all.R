@@ -124,14 +124,13 @@ ggplot(mat)+geom_density(aes(log10(normalized),colour=name))+facet_wrap(~name)
 #To detect interactions, you need to specify an already binned dataset by providing resolution and detection.type.
 #Since you did not do any grouping yet (see below), pass group="all".
 #The interaction detection is made at a 95% posterior confidence threshold
-cs=detect_interactions(cs, resolution=20000, group="all", detection.type=1, threshold=0.95,
-                       normal.approx=100, ncores=30)
+cs=detect_interactions(cs, resolution=20000, group="all", detection.type=1, threshold=0.95, ncores=30)
 
 #you can view the called interactions
 #since there was no grouping, pass group="all"
 #for simple interactions pass type="interactions" and ref="expected"
 mat=get_interactions(cs, type="interactions", resolution=20000, group="all", detection.type=1,
-                     threshold=0.95, normal.approx=100, ref="expected")
+                     threshold=0.95, ref="expected")
 
 #for example, we can plot the ice-like matrices with highlighted interactions in the upper left corner
 ggplot(mat)+
@@ -152,9 +151,9 @@ cs=group_datasets(cs, resolution=20000, detection.type=1, group=c("condition", "
 
 #Again, you can detect interactions in these grouped datasets, and plot the results
 cs=detect_interactions(cs, resolution=20000, group=c("condition", "enzyme"), detection.type=1,
-                        threshold=0.95, normal.approx=100, ncores=30)
+                        threshold=0.95, ncores=30)
 mat=get_interactions(cs, type="interactions", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
-                     threshold=0.95, normal.approx=100, ref="expected")
+                     threshold=0.95, ref="expected")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
@@ -168,12 +167,12 @@ ggplot(mat)+
 #you can call significant differences. It's just like calling interactions, but you need to specify a reference.
 #All other matrices will then be compared to that one.
 cs=detect_differences(cs, ref="WT BglII", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
-                      threshold=0.95, ncores=30, normal.approx=100)
+                      threshold=0.95, ncores=30)
 
 #the interactions can be retrieved as usual, with a few changes
 # specify type="differences" and ref as given in detect_differences
 mat=get_interactions(cs, type="differences", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
-                     threshold=0.95, normal.approx=100, ref="WT BglII")
+                     threshold=0.95, ref="WT BglII")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+

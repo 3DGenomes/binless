@@ -96,7 +96,6 @@ setMethod("show",signature="CSdata",definition=function(object) {
 #' @slot mat 
 #' @slot type 
 #' @slot threshold 
-#' @slot normal.approx 
 #' @slot ref 
 #'
 #' @return
@@ -108,7 +107,6 @@ setClass("CSinter",
          slots = list(mat="data.table",
                       type="character",
                       threshold="numeric",
-                      normal.approx="numeric",
                       ref="character"))
 setMethod("show",signature="CSinter",definition=function(object) {
   if (object@type=="interactions") {
@@ -116,7 +114,7 @@ setMethod("show",signature="CSinter",definition=function(object) {
   } else {
     cat("        Significant differences wrt ", object@ref)
   }
-  cat(" (threshold=", object@threshold,", normal.approx=",object@normal.approx,")\n")
+  cat(" (threshold=", object@threshold,")\n")
 })
 
 #' Class for one binned matrix and its interaction detections

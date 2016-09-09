@@ -73,7 +73,7 @@ load("data/caulo_rif_500k_csnorm_optimized_gibbs.RData")
 cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1, detection.type=1)
 cs=detect_interactions(cs, resolution=20000, ncores=30, detection.type=1, group="all")
 mat=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=1,
-                 threshold=0.95, normal.approx=100)
+                 threshold=0.95)
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+

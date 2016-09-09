@@ -437,24 +437,24 @@ group_datasets = function(cs, resolution, detection.type,
 #' @export
 #' 
 #' @examples
-detect_interactions = function(cs, resolution, group, detection.type, threshold=0.95, ncores=1, normal.approx=100){
+detect_interactions = function(cs, resolution, group, detection.type, threshold=0.95, ncores=1){
   #get CSmat object
   idx1=get_cs_binned_idx(cs, resolution, detection.type, raise=T)
   csb=cs@binned[[idx1]]
   idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
   #check if interaction wasn't calculated already
-  if (get_cs_interaction_idx(csm, type="interactions", threshold=threshold, normal.approx=normal.approx, ref="expected", raise=F)>0) {
+  if (get_cs_interaction_idx(csm, type="interactions", threshold=threshold, ref="expected", raise=F)>0) {
     stop("Refusing to overwrite this already detected interaction")
   }
   mat=copy(csm@mat[,.(name,bin1,bin2,observed,expected,dispersion)])
   #report gamma parameters
   mat[,c("alpha1","beta1"):=list(dispersion,dispersion)] #posterior
   mat[,c("alpha2","beta2"):=list(alpha1+observed,beta1+expected)] #posterior predictive
-  mat=call_interactions(mat,"expected",threshold=threshold,ncores=ncores,normal.approx=normal.approx)
+  mat=call_interactions(mat,"expected",threshold=threshold,ncores=ncores, normal.approx=100)
   mat[,c("alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2"):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
   #store back
-  csi=new("CSinter", mat=mat, type="interactions", threshold=threshold, normal.approx=normal.approx, ref="expected")
+  csi=new("CSinter", mat=mat, type="interactions", threshold=threshold, ref="expected")
   csm@interactions=append(csm@interactions,list(csi))
   csb@grouped[[idx2]]=csm
   cs@binned[[idx1]]=csb
@@ -473,13 +473,13 @@ detect_interactions = function(cs, resolution, group, detection.type, threshold=
 #' @export
 #' 
 #' @examples
-detect_differences = function(cs, resolution, group, detection.type, ref, threshold=0.95, ncores=1, normal.approx=100){
+detect_differences = function(cs, resolution, group, detection.type, ref, threshold=0.95, ncores=1){
   idx1=get_cs_binned_idx(cs, resolution, detection.type, raise=T)
   csb=cs@binned[[idx1]]
   idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
   #check if interaction wasn't calculated already
-  if (get_cs_interaction_idx(csm, type="differences", threshold=threshold, normal.approx=normal.approx, ref="expected", raise=F)>0) {
+  if (get_cs_interaction_idx(csm, type="differences", threshold=threshold, ref="expected", raise=F)>0) {
     stop("Refusing to overwrite this already detected interaction")
   }
   mat=copy(csm@mat[,.(name,bin1,bin2,observed,expected,dispersion)])
@@ -495,7 +495,7 @@ detect_differences = function(cs, resolution, group, detection.type, ref, thresh
     qmat=merge(refmat,qmat,all=T)
     qmat=qmat[!(is.na(alpha1)|is.na(beta1)|is.na(alpha2)|is.na(beta2))]
     #call interactions
-    qmat=call_interactions(qmat,ref,threshold=threshold,ncores=ncores,normal.approx=normal.approx)
+    qmat=call_interactions(qmat,ref,threshold=threshold,ncores=ncores)
     #compute ratio matrix
     qmat[,ratio:=ifelse(alpha2>1,(beta2/beta1)*(alpha1/(alpha2-1)),NA)]
     qmat[,ratio.sd:=ifelse(alpha2>2,(beta2/beta1)*sqrt((alpha1*(alpha1+alpha2-1))/((alpha2-2)*(alpha2-1)^2)),NA)]
@@ -511,7 +511,7 @@ detect_differences = function(cs, resolution, group, detection.type, ref, thresh
   }
   mat=merge(mat,qmat,all=T,by=c("name","bin1","bin2"))
   #add interaction to cs object
-  csi=new("CSinter", mat=mat, type="differences", threshold=threshold, normal.approx=normal.approx, ref=ref)
+  csi=new("CSinter", mat=mat, type="differences", threshold=threshold, ref=ref)
   csm@interactions=append(csm@interactions,list(csi))
   csb@grouped[[idx2]]=csm
   cs@binned[[idx1]]=csb
