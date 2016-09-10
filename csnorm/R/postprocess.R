@@ -278,6 +278,82 @@ thresholds_estimator = function(observed, expected, dispersion, threshold=0.95, 
 }
 
 
+#' Perform peak and differential detection (method 2)
+#'
+#' @param cs 
+#' @param ref 
+#' @param resolution 
+#' @param group 
+#' @param threshold 
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+detection_type_2 = function(cs, resolution, group, ref="expected", threshold=0.95, ncores=1) {
+  if (group=="all") {
+    names=cs@experiments[,unique(name)]
+    groups=data.table(name=names,groupname=names)
+  } else {
+    groups=cs@experiments[,.(name,groupname=do.call(paste,mget(group))),by=group][,.(name,groupname)] #we already know groupname is unique
+  }
+  setkey(groups,name)
+  if (ref != "expected" && !(ref %in% groups[,groupname])) stop("Reference group name not found! Valid names are: ",deparse(as.character(groups[,groupname])))
+  #retrieve bin borders
+  biases=cs@biases
+  counts=cs@counts
+  bins=seq(biases[,min(pos)-1],biases[,max(pos)+1+resolution],resolution)
+  counts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
+                                 cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
+  counts[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
+  biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
+  biases[,ibin:=as.integer(bin)-1]
+  chunks=CJ(biases[,min(ibin):max(ibin)],biases[,min(ibin):max(ibin)],groups[,unique(groupname)])[V1<=V2]
+  registerDoParallel(cores=ncores)
+  mat = foreach (i=chunks[,V1],j=chunks[,V2],n=chunks[,V3], .combine=rbind) %dopar% {
+    #get zero-filled portion of counts and predict model on it
+    names=groups[groupname==n,name]
+    cts=copy(counts[ibin1==i&ibin2==j])
+    biases1=copy(biases[ibin==i])
+    biases2=copy(biases[ibin==j])
+    if (biases1[,.N]>0 & biases2[,.N]>0) {
+      cts=fill_zeros(cts,biases1,biases2)
+      if (cts[,.N]>0) {
+        setkey(cts,name,id1,id2)
+        cts=csnorm_predict_all(cs, cts, verbose=F)[name%in%names] #inefficient, but works
+        biases1=biases1[name%in%names]
+        biases2=biases2[name%in%names]
+        #compute signal distribution
+        data=list(N=4*cts[,.N], observed=cts[,c(contact.close,contact.down,contact.far,contact.up)],
+                  log_expected=cts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha)
+        output=capture.output(op<-optimizing(csnorm:::stanmodels$detection, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
+        mat=data.table(name=n,bin1=biases1[1,bin],bin2=biases2[1,bin],log_s.mean=op$par$log_s,log_s.std=1/sqrt(-op$hessian[1,1]))
+        mat
+      }
+    }
+  }
+  counts[,c("bin1","bin2","ibin1","ibin2"):=list(NULL,NULL,NULL,NULL)]
+  biases[,c("bin","ibin"):=list(NULL,NULL)]
+  setkey(mat,name,bin1,bin2)
+  if (ref=="expected") {
+    mat[,prob.gt.expected:=pnorm(0,mean=log_s.mean,sd=log_s.std,lower.tail=F,log.p=F)]
+    mat[,is.significant:=prob.gt.expected > threshold | 1-prob.gt.expected > threshold]
+  } else {
+    refmat=mat[name==ref,.(bin1,bin2,ref.mean=log_s.mean,ref.sd=log_s.std)]
+    setkey(refmat,bin1,bin2)
+    mat=mat[name!=ref]
+    setkey(mat,name,bin1,bin2)
+    mat=merge(mat,refmat,all=T)
+    colname=paste0("prob.gt.",ref)
+    mat[,c(colname):=csnorm:::compute_normal_overlap(mu1=ref.mean,sd1=ref.sd,mu2=log_s.mean,sd2=log_s.std,ncores=ncores)]
+    mat[,c("ref.mean","ref.sd"):=list(NULL,NULL)]
+    mat[,is.significant:=get(colname)>threshold | 1-get(colname)>threshold]
+  }
+  mat[,c("log_s.mean","log_s.std","detection.type"):=list(NULL,NULL,"augmented")]
+  mat
+}
+
 #' Generate nu and delta genomic biases on evenly spaced points along the genome
 #'
 #' @param biases data.table.
@@ -451,9 +527,10 @@ detect_interactions = function(cs, resolution, group, detection.type=c(1,2), thr
     mat[,c("alpha1","beta1"):=list(dispersion,dispersion)] #posterior
     mat[,c("alpha2","beta2"):=list(alpha1+observed,beta1+expected)] #posterior predictive
     mat=call_interactions(mat,"expected",threshold=threshold,ncores=ncores, normal.approx=100)
-    mat[,c("alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2"):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
+    mat[,c("alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2","observed","expected","dispersion"
+           ):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
   } else {
-    stop("Not implemented")
+    mat=detection_type_2(cs, resolution=resolution, group=group, ref="expected", threshold=threshold, ncores=ncores)
   }
   #store back
   csi=new("CSinter", mat=mat, type="interactions", detection.type=detection.type, threshold=threshold, ref="expected")
@@ -505,18 +582,14 @@ detect_differences = function(cs, resolution, group, detection.type=c(1,2), ref,
       qmat[,ratio:=ifelse(alpha2>1,(beta2/beta1)*(alpha1/(alpha2-1)),NA)]
       qmat[,ratio.sd:=ifelse(alpha2>2,(beta2/beta1)*sqrt((alpha1*(alpha1+alpha2-1))/((alpha2-2)*(alpha2-1)^2)),NA)]
       #remove extra columns and add name
-      qmat[,c("name","alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2"):=list(n,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
+      qmat[,c("name","alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2"):=list(
+        n,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
       qmat
     }
-    #merge everything back, removing extra columns first
-    matnames=names(mat)
-    if ("is.significant" %in% matnames) {
-      mat[,c(matnames[grep(".gt.",matnames)],"detection.type","is.significant"):=list(NULL,NULL,NULL)]
-      if ("ratio" %in% matnames) mat[,c("ratio","ratio.sd"):=list(NULL,NULL)]
-    }
-    mat=merge(mat,qmat,all=T,by=c("name","bin1","bin2"))
+    #merge everything back
+    mat=merge(mat[,.(name,bin1,bin2)],qmat,all=T,by=c("name","bin1","bin2"))
   } else {
-    stop("Not implemented")
+    mat=detection_type_2(cs, resolution=resolution, group=group, ref=ref, threshold=threshold, ncores=ncores)
   }
   #add interaction to cs object
   csi=new("CSinter", mat=mat, type="differences", detection.type=detection.type, threshold=threshold, ref=ref)
