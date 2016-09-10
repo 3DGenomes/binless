@@ -309,27 +309,27 @@ detection_type_2 = function(cs, resolution, group, ref="expected", threshold=0.9
   counts[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
   biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
   biases[,ibin:=as.integer(bin)-1]
-  chunks=CJ(biases[,min(ibin):max(ibin)],biases[,min(ibin):max(ibin)],groups[,unique(groupname)])[V1<=V2]
+  chunks=CJ(biases[,min(ibin):max(ibin)],biases[,min(ibin):max(ibin)])[V1<=V2]
   registerDoParallel(cores=ncores)
-  mat = foreach (i=chunks[,V1],j=chunks[,V2],n=chunks[,V3], .combine=rbind) %dopar% {
+  mat = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
     #get zero-filled portion of counts and predict model on it
-    names=groups[groupname==n,name]
     cts=copy(counts[ibin1==i&ibin2==j])
-    biases1=copy(biases[ibin==i])
+    biases1=copy(biases[ibin==i]) #just needed to fill the counts matrix
     biases2=copy(biases[ibin==j])
     if (biases1[,.N]>0 & biases2[,.N]>0) {
-      cts=fill_zeros(cts,biases1,biases2)
+      cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize)
       if (cts[,.N]>0) {
         setkey(cts,name,id1,id2)
-        cts=csnorm_predict_all(cs, cts, verbose=F)[name%in%names] #inefficient, but works
-        biases1=biases1[name%in%names]
-        biases2=biases2[name%in%names]
+        cts=csnorm_predict_all(cs, cts, verbose=F)
+        cts=groups[cts]
+        setkey(cts,groupname,id1,id2)
+        cbegin=c(1,cts[,.(groupname,row=.I)][groupname!=shift(groupname),row],cts[,.N+1])
         #compute signal distribution
-        data=list(N=4*cts[,.N], observed=cts[,c(contact.close,contact.down,contact.far,contact.up)],
+        data=list(G=groups[,uniqueN(groupname)], N=4*cts[,.N], cbegin=cbegin, observed=cts[,c(contact.close,contact.down,contact.far,contact.up)],
                   log_expected=cts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha)
         output=capture.output(op<-optimizing(csnorm:::stanmodels$detection, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
-        mat=data.table(name=n,bin1=biases1[1,bin],bin2=biases2[1,bin],log_s.mean=op$par$log_s,log_s.std=1/sqrt(-op$hessian[1,1]))
-        mat
+        mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
+                       log_s.mean=op$par$log_s, log_s.std=as.vector(1/sqrt(-diag(op$hessian))))
       }
     }
   }
