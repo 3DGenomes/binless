@@ -225,7 +225,7 @@ csnorm_fit = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_de
                cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
                counts_close=counts[,contact.close], counts_far=counts[,contact.far],
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
-               weight=weight)
+               weight=as.array(weight))
   op=optimizing(stanmodels$fit, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
   op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
   return(op)
@@ -922,13 +922,12 @@ run_exact = function(cs, bf_per_kb=1, bf_per_decade=5, lambdas=c(0.1,1,10), ncor
 #' @param genomic.groups How many groups for nu and delta
 #' @param decay.groups How many groups for diagonal decay
 #' @param npoints Number of points per group to take (not guaranteed)
-#' @param ndraws Number of draws per data point
 #'
 #' @return
 #' @export
 #'
 #' @examples
-check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10, ndraws=100) {
+check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10) {
   if (length(cs@par)==0) stop("Must normalize the datasets first")
   #build bins
   dbins=c(0,10**seq(3,log10(cs@settings$dmax),length.out=decay.groups))
