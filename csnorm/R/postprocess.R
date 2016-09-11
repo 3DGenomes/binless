@@ -16,20 +16,26 @@ bin_counts = function(counts, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL) {
   if (is.null(b2)) b2=counts[,min(pos2)]-1
   if (is.null(e1)) e1=counts[,max(pos1)]-1
   if (is.null(e2)) e2=counts[,max(pos2)]-1
-  bins1=seq(b1,counts[,max(pos1)]+resolution,resolution)
-  bins2=seq(b2,counts[,max(pos2)]+resolution,resolution)
-  mcounts=melt(counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
-               variable.name = "category", value.name = "count")[count>0]
-  #
-  sub = mcounts[,.(pos1,pos2,bin1=cut2(pos1, bins1, oneval=F, onlycuts=T, digits=10),
-                   bin2=cut2(pos2, bins2, oneval=F, onlycuts=T, digits=10), category, count)
-                ][,.(N=sum(count)),by=c("bin1","bin2")]
-  #
-  sub[,begin1:=do.call(as.integer, tstrsplit(as.character(bin1), "[[,]")[2])]
-  sub[,end1:=do.call(as.integer, tstrsplit(as.character(bin1), "[],)]")[2])]
-  sub[,begin2:=do.call(as.integer, tstrsplit(as.character(bin2), "[[,]")[2])]
-  sub[,end2:=do.call(as.integer, tstrsplit(as.character(bin2), "[],)]")[2])]
-  #
+  if (counts[,uniqueN(name)]>1) {
+    sub = foreach (n=counts[,unique(name)], .combine=rbind) %do% {
+      mat=bin_counts(counts[name==n],resolution,b1=b1,b2=b2,e1=e1,e2=e2)
+      mat[,name:=n]
+    }
+  } else {
+    bins1=seq(b1,e1+resolution,resolution)
+    bins2=seq(b2,e2+resolution,resolution)
+    mcounts=melt(counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
+                 variable.name = "category", value.name = "count")[count>0]
+    #
+    sub = mcounts[,.(pos1,pos2,bin1=cut2(pos1, bins1, oneval=F, onlycuts=T, digits=10, minmax=F),
+                     bin2=cut2(pos2, bins2, oneval=F, onlycuts=T, digits=10, minmax=F), category, count)
+                  ][,.(N=sum(count)),by=c("bin1","bin2")]
+    #
+    sub[,begin1:=do.call(as.integer, tstrsplit(as.character(bin1), "[[,]")[2])]
+    sub[,end1:=do.call(as.integer, tstrsplit(as.character(bin1), "[],)]")[2])]
+    sub[,begin2:=do.call(as.integer, tstrsplit(as.character(bin2), "[[,]")[2])]
+    sub[,end2:=do.call(as.integer, tstrsplit(as.character(bin2), "[],)]")[2])]
+  }
   return(sub)
 }
 
