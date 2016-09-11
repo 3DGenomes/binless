@@ -38,7 +38,7 @@ get_cs_binned_idx = function(cs, resolution, raise=T) {
 #' @examples
 get_cs_matrix_idx = function(csb, group, raise=T) {
   for (i in 1:length(csb@grouped)) {
-    if (csb@grouped[[i]]@group==group) return(i)
+    if (all(csb@grouped[[i]]@group==group)) return(i)
   }
   if (raise==T) {
     stop("CSmatrix not found. You must first call group_datasets")
