@@ -72,16 +72,9 @@ cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=
                     ngibbs = 2, iter=10000, ncores=30)
 save(cs, file="data/caulo_rif_csnorm_optimized.RData")
 
-#Some diagnostics plots can be generated
-#You can plot the diagonal decay with some rescaled counts
-mat=get_predicted_subset(cs)
-setkey(mat,name,distance)
-ggplot(mat)+geom_line(aes(distance,exp(log_decay)),colour="red")+geom_point(aes(distance,contact.close/exp(log_mean_cclose-log_decay)),alpha=0.1)+
-  scale_y_log10()+scale_x_log10(limits=c(1e3,NA))+facet_wrap(~name)
-#make a density plot of the residuals
-ggplot(mat)+geom_density(aes(log10(contact.close/exp(log_mean_cclose)),colour=name))+facet_wrap(~name)
-#and plot the genomic biases
-
+#Some diagnostics plots can be generated. The function generates 4 plots and also returns a data table.
+#The p-values of most points reported should not be too extreme. If they are, then the fit went bad.
+plots=check_fit(cs)
 
 ### Binning at a given resolution
 

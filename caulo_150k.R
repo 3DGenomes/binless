@@ -73,25 +73,25 @@ load("data/caulo_rif_500k_csnorm_optimized_gibbs.RData")
 cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1)
 cs=detect_interactions(cs, resolution=20000, ncores=30, group="all", detection.type=2)
 cs=detect_differences(cs, resolution=20000, ncores=30, group="all", detection.type=2, ref="WT BglII 2")
-mat2=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=2,
-                 threshold=0.95)
+mat1=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=1, threshold=0.95)
+mat2=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=2, threshold=0.95)
 mat=rbindlist(list(detect1=mat1,detect2=mat2),use.names=T, idcol="method")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
   geom_point(aes(begin1,begin2,colour=`prob.gt.expected`<0.5),data=mat[is.significant==T])+
-  scale_fill_gradient(na.value = "white")+theme(legend.position = "none")+
+  scale_fill_gradient(na.value = "white",low="white",high="black")+theme(legend.position = "none")+
   facet_grid(method~name)
 
-mat2=get_interactions(cs, type="differences", resolution=20000, group="all", ref="WT BglII 2", detection.type=2,
-                      threshold=0.95)
+mat1=get_interactions(cs, type="differences", resolution=20000, group="all", ref="WT BglII 2", detection.type=1, threshold=0.95)
+mat2=get_interactions(cs, type="differences", resolution=20000, group="all", ref="WT BglII 2", detection.type=2, threshold=0.95)
 mat1[,c("ratio","ratio.sd"):=list(NULL,NULL)]
 mat=rbindlist(list(detect1=mat1,detect2=mat2),use.names=T, idcol="method")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
   geom_point(aes(begin1,begin2,colour=`prob.gt.WT BglII 2`<0.5),data=mat[is.significant==T])+
-  scale_fill_gradient(na.value = "white")+#theme(legend.position = "none")+
+  scale_fill_gradient(na.value = "white",low="white",high="black")+#theme(legend.position = "none")+
   facet_grid(method~name)
 
 mat2=get_predicted_subset(cs)

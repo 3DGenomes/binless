@@ -916,4 +916,56 @@ run_exact = function(cs, bf_per_kb=1, bf_per_decade=5, lambdas=c(0.1,1,10), ncor
   return(cs)
 }
 
+#' Verify model fit by computing posterior predictive quantities
+#'
+#' @param cs CSnorm object, normalized.
+#' @param genomic.groups How many groups for nu and delta
+#' @param decay.groups How many groups for diagonal decay
+#' @param npoints Number of points per group to take (not guaranteed)
+#' @param ndraws Number of draws per data point
+#'
+#' @return
+#' @export
+#'
+#' @examples
+check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10, ndraws=100) {
+  if (length(cs@par)==0) stop("Must normalize the datasets first")
+  #build bins
+  dbins=c(0,10**seq(3,log10(cs@settings$dmax),length.out=decay.groups))
+  gbins=cut2(c(cs@par$log_nu,cs@par$log_delta),g=genomic.groups,onlycuts=T)
+  #build counts matrix 
+  biases=copy(cs@biases[,.(name,id,pos)])
+  biases[,c("log_nu","log_delta"):=list(cs@par$log_nu,cs@par$log_delta)]
+  biases[,nubin:=cut(log_nu, gbins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
+  biases[,deltabin:=cut(log_delta, gbins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
+  biases[,c("log_nu","log_delta"):=list(NULL,NULL)]
+  biases=biases[,.SD[sample(.N,min(.N,npoints))],by=c("name","nubin","deltabin")]
+  counts=cs@counts[id1%in%biases[,id]&id2%in%biases[,id]]
+  counts=fill_zeros(counts,biases,circularize=cs@settings$circularize)
+  #filter by distance
+  counts[,dbin:=cut(distance, dbins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
+  counts=counts[,.SD[sample(.N,min(.N,npoints))],by=c("name","dbin")]
+  setkey(counts, name, id1, id2, pos1, pos2)
+  #predict values
+  counts=csnorm_predict_all(cs, counts, verbose=F)
+  counts=rbind(counts[,.(name,id1,id2,dbin,count=contact.close,mean=exp(log_mean_cclose))],
+               counts[,.(name,id1,id2,dbin,count=contact.far,mean=exp(log_mean_cfar))],
+               counts[,.(name,id1,id2,dbin,count=contact.up,mean=exp(log_mean_cup))],
+               counts[,.(name,id1,id2,dbin,count=contact.down,mean=exp(log_mean_cdown))])
+  biases[,pos:=NULL]
+  counts=merge(counts,biases,by.x=c("name","id1"),by.y=c("name","id"))
+  counts=merge(counts,biases,by.x=c("name","id2"),by.y=c("name","id"),suffixes=c("1","2"))
+  #compute p-values
+  counts[count>=mean,pval:=pnbinom(count,size=cs@par$alpha,mu=mean,lower.tail=F)]
+  counts[count<mean,pval:=pnbinom(count,size=cs@par$alpha,mu=mean,lower.tail=T)]
+  counts[,sd:=sqrt(mean+mean**2/cs@par$alpha)]
+  #graph p-values
+  p.all=ggplot(counts)+geom_histogram(aes(pval))+facet_wrap(~name)+xlab("model p-value")+ylab("frequency")
+  p.decay=ggplot(counts)+geom_jitter(aes(1,pval))+facet_grid(name~dbin)+ylab("model p-value")+xlab("diagonal decay bin")
+  p.nu=ggplot(counts)+geom_jitter(aes(1,pval))+facet_grid(name~nubin1)+ylab("model p-value")+xlab("nu bin")
+  p.delta=ggplot(counts)+geom_jitter(aes(1,pval))+facet_grid(name~deltabin1)+ylab("model p-value")+xlab("delta bin")
+  return(list(all=p.all,decay=p.decay,nu=p.nu,delta=p.delta,counts=counts))
+}
+
+
 
