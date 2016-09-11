@@ -764,7 +764,7 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
   cs@settings$dmin=dmin
   cs@settings$dmax=dmax
   #initial guess
-  init.a = system.time(init.output <- capture.output(init.op <- csnorm_simplified_guess(
+  init.a = system.time(init.output <- capture.output(init.op <- csnorm:::csnorm_simplified_guess(
     biases = cs@biases, counts = cs@counts, design = cs@design, lambda=lambda, dmin=dmin, dmax=dmax,
     groups = groups, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter)))
   cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4])
@@ -773,7 +773,13 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
   for (i in 1:ngibbs) {
     #fit diagonal decay given nu and delta
     if (fit.decay==T) {
-      a=system.time(output <- capture.output(op.diag <- csnorm_simplified_decay(
+      #make sure beta_diag is strictly increasing
+      for (d in 2:length(op$par$beta_diag)) {
+        if (abs(op$par$beta_diag[d]-op$par$beta_diag[d-1])<.Machine$double.eps) {
+          op$par$beta_diag[d:length(op$par$beta_diag)]=op$par$beta_diag[d:length(op$par$beta_diag)]+.Machine$double.eps
+        }
+      }
+      a=system.time(output <- capture.output(op.diag <- csnorm:::csnorm_simplified_decay(
         biases = cs@biases, counts = cs@counts, design=cs@design,
         log_nu = op$par$log_nu, log_delta = op$par$log_delta,
         dmin = dmin, dmax = dmax, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, groups = groups,
@@ -787,7 +793,7 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
     }
     #fit nu and delta given diagonal decay
     if (fit.genomic==T) {
-      a=system.time(output <- capture.output(op.gen <- csnorm_simplified_genomic(
+      a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_simplified_genomic(
         biases = cs@biases, counts = cs@counts, design = cs@design,
         log_decay = op$par$log_decay, log_nu = op$par$log_nu, log_delta = op$par$log_delta,
         groups = groups, bf_per_kb = bf_per_kb, iter = iter, init=op$par)))
