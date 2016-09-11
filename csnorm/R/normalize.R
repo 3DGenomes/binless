@@ -745,7 +745,7 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
 #' @export
 #' 
 run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambda=1,
-                                ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T) {
+                                ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, verbose=T) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -764,6 +764,7 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
   cs@settings$dmin=dmin
   cs@settings$dmax=dmax
   #initial guess
+  if (verbose==T) cat("Initial guess\n")
   init.a = system.time(init.output <- capture.output(init.op <- csnorm:::csnorm_simplified_guess(
     biases = cs@biases, counts = cs@counts, design = cs@design, lambda=lambda, dmin=dmin, dmax=dmax,
     groups = groups, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter)))
@@ -773,6 +774,7 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
   for (i in 1:ngibbs) {
     #fit diagonal decay given nu and delta
     if (fit.decay==T) {
+      if (verbose==T) cat("Gibbs",i,": Decay\n")
       #make sure beta_diag is strictly increasing
       for (d in 2:length(op$par$beta_diag)) {
         if (abs(op$par$beta_diag[d]-op$par$beta_diag[d-1])<.Machine$double.eps) {
@@ -793,6 +795,7 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
     }
     #fit nu and delta given diagonal decay
     if (fit.genomic==T) {
+      if (verbose==T) cat("Gibbs",i,": Genomic\n")
       a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_simplified_genomic(
         biases = cs@biases, counts = cs@counts, design = cs@design,
         log_decay = op$par$log_decay, log_nu = op$par$log_nu, log_delta = op$par$log_delta,
@@ -805,6 +808,7 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
     }
     if (fit.genomic==T & fit.decay==T) op$value=op.gen$value+op.diag$value
   }
+  if (verbose==T) cat("Done\n")
   op$par$runtime=sum(as.numeric(cs@diagnostics[grep("runtime",names(cs@diagnostics))]))
   op$par$output=output
   init.op$par$runtime=init.a[1]+init.a[4]
@@ -836,19 +840,20 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
 #' @param iter positive integer. Number of optimization steps for each stan
 #'   optimization call.
 #' @param ncores positive integer. Number of cores to parallelize on.
+#' @param verbose Display progress if TRUE
 #'   
 #' @return A csnorm object
 #' @export
 #' 
 #' @examples
 run_simplified = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=c(0.1,1,10),
-                          ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, ncores=1) {
+                          ngibbs = 3, iter=100000, ncores=1, verbose=T) {
   cs@binned=list() #erase old binned datasets if available
   registerDoParallel(cores=ncores)
   cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %dopar%
     run_simplified_gibbs(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
                          bins_per_bf=bins_per_bf, groups=groups, lambda=lambda, ngibbs = ngibbs,
-                         iter=iter, fit.decay=T, fit.genomic=T)
+                         iter=iter, fit.decay=T, fit.genomic=T, verbose=verbose)
   return(cs)
 }
 
