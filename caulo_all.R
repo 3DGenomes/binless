@@ -68,13 +68,16 @@ save(cs, file="data/caulo_rif_csnorm.RData")
 #in the last runtime.bias and runtime.decay, you see "Convergence detected". Otherwise, the normalization was not successful.
 #You might either want to increase ngibbs or iter, or both.
 load("data/caulo_rif_csnorm.RData")
-cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=10**seq(from=-2,to=0,length.out=5),
-                    ngibbs = 2, iter=10000, ncores=30)
+cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=10**seq(from=-1,to=1,length.out=5),
+                    ngibbs = 3, iter=10000, ncores=30, verbose=T)
 save(cs, file="data/caulo_rif_csnorm_optimized.RData")
 
 #Some diagnostics plots can be generated. The function generates 4 plots and also returns a data table.
 #The p-values of most points reported should not be too extreme. If they are, then the fit went bad.
-plots=check_fit(cs)
+check=check_fit(cs)
+#in particular, the following should be close to 0.05
+check$counts[pval<0.05,.N]/plots$counts[,.N]
+check$counts[pval>0.95,.N]/plots$counts[,.N]
 
 ### Binning at a given resolution
 
@@ -124,15 +127,13 @@ cs=detect_interactions(cs, resolution=20000, group="all", detection.type=1, thre
 #for simple interactions pass type="interactions" and ref="expected"
 mat=get_interactions(cs, type="interactions", resolution=20000, group="all", detection.type=1,
                      threshold=0.95, ref="expected")
-
 #for example, we can plot the ice-like matrices with highlighted interactions in the upper left corner
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=prob.gt.expected<0.5),data=mat[is.significant==T])+
+  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~name)
-
+  facet_grid(method~name)
 
 
 
@@ -150,7 +151,7 @@ mat=get_interactions(cs, type="interactions", resolution=20000, group=c("conditi
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=prob.gt.expected<0.5),data=mat[is.significant==T])+
+  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~name)
 
@@ -169,7 +170,7 @@ mat=get_interactions(cs, type="differences", resolution=20000, group=c("conditio
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=`prob.gt.WT BglII`<0.5),data=mat[is.significant==T])+
+  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~name)
 

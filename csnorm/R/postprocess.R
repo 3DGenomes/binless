@@ -345,6 +345,7 @@ detection_type_2 = function(cs, resolution, group, ref="expected", threshold=0.9
   if (ref=="expected") {
     mat[,prob.gt.expected:=pnorm(0,mean=log_s.mean,sd=log_s.std,lower.tail=F,log.p=F)]
     mat[,is.significant:=prob.gt.expected > threshold | 1-prob.gt.expected > threshold]
+    mat[,direction:=ifelse(0<log_s.mean,"enriched","depleted")]
   } else {
     refmat=mat[name==ref,.(bin1,bin2,ref.mean=log_s.mean,ref.sd=log_s.std)]
     setkey(refmat,bin1,bin2)
@@ -353,10 +354,101 @@ detection_type_2 = function(cs, resolution, group, ref="expected", threshold=0.9
     mat=merge(mat,refmat,all=T)
     colname=paste0("prob.gt.",ref)
     mat[,c(colname):=csnorm:::compute_normal_overlap(mu1=ref.mean,sd1=ref.sd,mu2=log_s.mean,sd2=log_s.std,ncores=ncores)]
-    mat[,c("ref.mean","ref.sd"):=list(NULL,NULL)]
     mat[,is.significant:=get(colname)>threshold | 1-get(colname)>threshold]
+    mat[,direction:=ifelse(ref.mean<log_s.mean,"enriched","depleted")]
+    mat[,c("ref.mean","ref.sd"):=list(NULL,NULL)]
   }
   mat[,c("log_s.mean","log_s.std","detection.type"):=list(NULL,NULL,"augmented")]
+  mat
+}
+
+#' Perform peak and differential detection (method 3: model comp)
+#'
+#' @param cs 
+#' @param ref 
+#' @param resolution 
+#' @param group 
+#' @param threshold on the Bayes factor K
+#' @param prior.odds 
+#' @param ncores 
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, prior.odds=1, ncores=1) {
+  if (group=="all") {
+    names=cs@experiments[,unique(name)]
+    groups=data.table(name=names,groupname=names)
+  } else {
+    groups=cs@experiments[,.(name,groupname=do.call(paste,mget(group))),by=group][,.(name,groupname)] #we already know groupname is unique
+  }
+  setkey(groups,name)
+  if (ref != "expected" && !(ref %in% groups[,groupname])) stop("Reference group name not found! Valid names are: ",deparse(as.character(groups[,groupname])))
+  #retrieve bin borders
+  biases=cs@biases
+  counts=cs@counts
+  bins=seq(biases[,min(pos)-1],biases[,max(pos)+1+resolution],resolution)
+  counts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
+                                 cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
+  counts[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
+  biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
+  biases[,ibin:=as.integer(bin)-1]
+  chunks=CJ(biases[,min(ibin):max(ibin)],biases[,min(ibin):max(ibin)])[V1<=V2]
+  registerDoParallel(cores=ncores)
+  mat = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
+    #get zero-filled portion of counts and predict model on it
+    cts=copy(counts[ibin1==i&ibin2==j])
+    biases1=copy(biases[ibin==i]) #just needed to fill the counts matrix
+    biases2=copy(biases[ibin==j])
+    if (biases1[,.N]>0 & biases2[,.N]>0) {
+      cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize)
+      if (cts[,.N]>0) {
+        setkey(cts,name,id1,id2)
+        cts=csnorm_predict_all(cs, cts, verbose=F)
+        cts=groups[cts]
+        setkey(cts,groupname,id1,id2)
+        cbegin=c(1,cts[,.(groupname,row=.I)][groupname!=shift(groupname),row],cts[,.N+1])
+        #compute each signal contribution separately
+        data=list(G=groups[,uniqueN(groupname)], N=4*cts[,.N], cbegin=cbegin, observed=cts[,c(contact.close,contact.down,contact.far,contact.up)],
+                  log_expected=cts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha, sigma=5)
+        output=capture.output(op<-optimizing(csnorm:::stanmodels$detection3, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
+        if (ref=="expected") {
+          mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
+                         logK=op$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op$hessian))))-op$par$lpdf0,
+                         direction=ifelse(0<op$par$log_s,"enriched","depleted"))
+        } else {
+          #compute grouped signal contributions
+          mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
+                         lpdms=op$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op$hessian)))), #log(p(D|Msignal))
+                         log_s.mean=op$par$log_s)
+          refcounts=cts[groupname==ref]
+          diffcounts=foreach(n=cts[groupname!=ref,unique(groupname)],.combine=rbind) %do% {
+            tmp=rbind(cts[groupname==n],refcounts)
+            tmp[,groupname:=n]
+          }
+          setkey(diffcounts,groupname,id1,id2)
+          cbegin=c(1,diffcounts[,.(groupname,row=.I)][groupname!=shift(groupname),row],diffcounts[,.N+1])
+          data=list(G=groups[groupname!=ref,uniqueN(groupname)], N=4*diffcounts[,.N], cbegin=cbegin,
+                    observed=diffcounts[,c(contact.close,contact.down,contact.far,contact.up)],
+                    log_expected=diffcounts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha, sigma=5)
+          output=capture.output(op2<-optimizing(csnorm:::stanmodels$detection3, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
+          lpdmref=mat[name==ref,lpdms]
+          logsref=mat[name==ref,log_s.mean]
+          mat=mat[name!=ref,.(name,bin1,bin2,lpdm2=lpdms+lpdmref,direction=ifelse(logsref<log_s.mean,"enriched","depleted"))]
+          mat2=data.table(name=cts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
+                         lpdms=op2$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op2$hessian)))))
+          mat=merge(mat,mat2,by=c("name","bin1","bin2"))
+          mat[,logK:=lpdm2-lpdms]
+          mat[,c("lpdm2","lpdms"):=list(NULL,NULL)]
+        }
+        mat[,c("is.significant","detection.type"):=list(logK > log(threshold),"model comp")]
+      }
+    }
+  }
+  counts[,c("bin1","bin2","ibin1","ibin2"):=list(NULL,NULL,NULL,NULL)]
+  biases[,c("bin","ibin"):=list(NULL,NULL)]
   mat
 }
 
@@ -515,8 +607,8 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
 #' @export
 #' 
 #' @examples
-detect_interactions = function(cs, resolution, group, detection.type=c(1,2), threshold=0.95, ncores=1){
-  stopifnot(length(detection.type)==1 && detection.type>=1 && detection.type<=2)
+detect_interactions = function(cs, resolution, group, detection.type=c(1,2,3), threshold=0.95, ncores=1){
+  stopifnot(length(detection.type)==1 && detection.type>=1 && detection.type<=3)
   #get CSmat object
   idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
@@ -533,10 +625,13 @@ detect_interactions = function(cs, resolution, group, detection.type=c(1,2), thr
     mat[,c("alpha1","beta1"):=list(dispersion,dispersion)] #posterior
     mat[,c("alpha2","beta2"):=list(alpha1+observed,beta1+expected)] #posterior predictive
     mat=call_interactions(mat,"expected",threshold=threshold,ncores=ncores, normal.approx=100)
+    mat[,direction:=ifelse(mean1<mean2,"enriched","depleted")]
     mat[,c("alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2","observed","expected","dispersion"
            ):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
-  } else {
+  } else if (detection.type==2) {
     mat=detection_type_2(cs, resolution=resolution, group=group, ref="expected", threshold=threshold, ncores=ncores)
+  } else {
+    mat=detection_type_3(cs, resolution=resolution, group=group, ref="expected", threshold=threshold, ncores=ncores)
   }
   #store back
   csi=new("CSinter", mat=mat, type="interactions", detection.type=detection.type, threshold=threshold, ref="expected")
@@ -558,8 +653,8 @@ detect_interactions = function(cs, resolution, group, detection.type=c(1,2), thr
 #' @export
 #' 
 #' @examples
-detect_differences = function(cs, resolution, group, detection.type=c(1,2), ref, threshold=0.95, ncores=1){
-  stopifnot(length(detection.type)==1 && detection.type>=1 && detection.type<=2)
+detect_differences = function(cs, resolution, group, detection.type=c(1,2,3), ref, threshold=0.95, ncores=1){
+  stopifnot(length(detection.type)==1 && detection.type>=1 && detection.type<=3)
   idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
   idx2=get_cs_matrix_idx(csb, group, raise=T)
@@ -584,6 +679,7 @@ detect_differences = function(cs, resolution, group, detection.type=c(1,2), ref,
       qmat=qmat[!(is.na(alpha1)|is.na(beta1)|is.na(alpha2)|is.na(beta2))]
       #call interactions
       qmat=call_interactions(qmat,ref,threshold=threshold,ncores=ncores)
+      qmat[,direction:=ifelse(mean1<mean2,"enriched","depleted")]
       #compute ratio matrix
       qmat[,ratio:=ifelse(alpha2>1,(beta2/beta1)*(alpha1/(alpha2-1)),NA)]
       qmat[,ratio.sd:=ifelse(alpha2>2,(beta2/beta1)*sqrt((alpha1*(alpha1+alpha2-1))/((alpha2-2)*(alpha2-1)^2)),NA)]
@@ -594,8 +690,10 @@ detect_differences = function(cs, resolution, group, detection.type=c(1,2), ref,
     }
     #merge everything back
     mat=merge(mat[,.(name,bin1,bin2)],qmat,all=T,by=c("name","bin1","bin2"))
-  } else {
+  } else if (detection.type==2) {
     mat=detection_type_2(cs, resolution=resolution, group=group, ref=ref, threshold=threshold, ncores=ncores)
+  } else {
+    mat=detection_type_3(cs, resolution=resolution, group=group, ref=ref, threshold=threshold, ncores=ncores)
   }
   #add interaction to cs object
   csi=new("CSinter", mat=mat, type="differences", detection.type=detection.type, threshold=threshold, ref=ref)
