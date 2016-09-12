@@ -19,6 +19,7 @@ fill_zeros = function(counts,biases,biases2=NULL,circularize=-1L) {
     foreach (i=runname, .combine=rbind) %do%
       fill_zeros(counts[name==i],biases[name==i],biases2[name==i],circularize=circularize)
   } else {
+    if (biases[,.N]==0 | biases2[,.N]==0) return(data.table())
     newcounts=CJ(biases[,paste(id,pos)],biases2[,paste(id,pos)])
     newcounts[,c("id1","pos1"):=tstrsplit(V1, " ")]
     newcounts[,c("id2","pos2"):=tstrsplit(V2, " ")]
