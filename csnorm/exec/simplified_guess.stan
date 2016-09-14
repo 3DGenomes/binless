@@ -197,4 +197,5 @@ model {
     beta_nu_diff[d] ~ double_exponential(0,10/(lfac*lambda));
     beta_delta_diff[d] ~ double_exponential(0,10/(lfac*lambda));
   }
+  alpha ~ cauchy(0,100);
 }

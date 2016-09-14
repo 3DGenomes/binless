@@ -111,7 +111,7 @@ csnorm_simplified_guess = function(biases, counts, design, lambda, dmin, dmax, b
             cutsitesD=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
             G=groups, counts_sum_left=ctsl, counts_sum_right=ctsr, log_decay_sum=log(ctso), lambda=lambda)
-  op=optimizing(stanmodels$simplified_guess, data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0)
+  op=optimizing(csnorm:::stanmodels$simplified_guess, data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0, init_alpha=1e-9)
   #add diagonal decay inits
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   Decays=design[,uniqueN(decay)]
@@ -154,7 +154,7 @@ csnorm_simplified_decay = function(biases, counts, design, log_nu, log_delta, dm
   data=list(Dsets=design[,.N], Decays=design[,uniqueN(decay)], XD=as.array(design[,decay]),
             Kdiag=Kdiag, dmin=dmin, dmax=dmax, N=csd[,.N], cbegin=cbegin,
             counts_sum=csd[,count], weight=csd[,weight], dist=csd[,mdist], log_genomic_sum=csd[,log(others)])
-  op=optimizing(stanmodels$simplified_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
+  op=optimizing(stanmodels$simplified_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, init_alpha=1e-9, ...)
   #make nice decay data table
   op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
   #rewrite log_decay as if it was calculated for each count
@@ -204,7 +204,7 @@ csnorm_simplified_genomic = function(biases, counts, design, log_decay, log_nu, 
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
             G=groups, counts_sum_left=ctsl, counts_sum_right=ctsr, log_decay_sum=log(ctso))
   optimizing(stanmodels$simplified_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
-             init=init, init_alpha=1e-5, ...)
+             init=init, init_alpha=1e-9, ...)
 }
 
 #' Single-cpu fitting
@@ -770,6 +770,12 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
     biases = cs@biases, counts = cs@counts, design = cs@design, lambda=lambda, dmin=dmin, dmax=dmax,
     groups = groups, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter)))
   cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4])
+  #abort silently if initial guess went wrong
+  if (length(grep("Line search failed",tail(init.output,1)))>0) {
+    init.op$par$value=.Machine$double.xmax
+    cs@par=init.op$par
+    return(cs)
+  }
   op=init.op
   #gibbs sampling
   for (i in 1:ngibbs) {
