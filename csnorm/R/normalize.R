@@ -84,7 +84,8 @@ get_cs_subset = function(counts, biases, begin1, end1, begin2=NULL, end2=NULL, f
 #' Single-cpu simplified initial guess
 #' @keywords internal
 #' 
-csnorm_simplified_guess = function(biases, counts, design, lambda, dmin, dmax, bf_per_kb=1, bf_per_decade=5, groups=10, iter=10000) {
+csnorm_simplified_guess = function(biases, counts, design, lambda, dmin, dmax, bf_per_kb=1, bf_per_decade=5, groups=10,
+                                   iter=10000, dispersion=10) {
   for (n in biases[,unique(name)]) {
     stopifnot(groups<=biases[name==n,.N-1])
     stopifnot(counts[name==n,.N]==biases[name==n,.N*(.N-1)/2]) #needs to be zero-filled
@@ -110,15 +111,15 @@ csnorm_simplified_guess = function(biases, counts, design, lambda, dmin, dmax, b
             Krow=Krow, SD=biases[,.N], bbegin=bbegin,
             cutsitesD=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            G=groups, counts_sum_left=ctsl, counts_sum_right=ctsr, log_decay_sum=log(ctso), lambda=lambda)
+            G=groups, counts_sum_left=ctsl, counts_sum_right=ctsr, log_decay_sum=log(ctso), lambda=lambda, alpha=dispersion)
   op=optimizing(csnorm:::stanmodels$simplified_guess, data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0, init_alpha=1e-9)
   #add diagonal decay inits
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   Decays=design[,uniqueN(decay)]
   beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
   op$par=c(list(lambda_nu=array(lambda,dim=data$Biases), lambda_delta=array(lambda,dim=data$Biases),
-                beta_diag=beta_diag, lambda_diag=array(1,dim=Decays), log_decay=rep(0,counts[,.N])),
-           op$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta","log_nu","log_delta")])
+                beta_diag=beta_diag, lambda_diag=array(1,dim=Decays), log_decay=rep(0,counts[,.N])), alpha=dispersion,
+           op$par[c("eC","eRJ","eDE","beta_nu","beta_delta","log_nu","log_delta")])
   return(op)
 }
 
@@ -127,7 +128,7 @@ csnorm_simplified_guess = function(biases, counts, design, lambda, dmin, dmax, b
 #' 
 csnorm_simplified_decay = function(biases, counts, design, log_nu, log_delta, dmin, dmax, 
                                    bf_per_decade=5, bins_per_bf=10, groups=10,
-                                   iter=10000, verbose=T, init=0, ...) {
+                                   iter=10000, verbose=T, init=0, dispersion=10, ...) {
   for (n in biases[,unique(name)]) {
     stopifnot(groups<=biases[name==n,.N-1])
     stopifnot(counts[name==n,.N]==biases[name==n,.N*(.N-1)/2]) #needs to be zero-filled
@@ -153,7 +154,8 @@ csnorm_simplified_decay = function(biases, counts, design, log_nu, log_delta, dm
   cbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
   data=list(Dsets=design[,.N], Decays=design[,uniqueN(decay)], XD=as.array(design[,decay]),
             Kdiag=Kdiag, dmin=dmin, dmax=dmax, N=csd[,.N], cbegin=cbegin,
-            counts_sum=csd[,count], weight=csd[,weight], dist=csd[,mdist], log_genomic_sum=csd[,log(others)])
+            counts_sum=csd[,count], weight=csd[,weight], dist=csd[,mdist], log_genomic_sum=csd[,log(others)],
+            alpha=dispersion)
   op=optimizing(stanmodels$simplified_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, init_alpha=1e-9, ...)
   #make nice decay data table
   op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
@@ -169,7 +171,7 @@ csnorm_simplified_decay = function(biases, counts, design, log_nu, log_delta, dm
 #' @keywords internal
 #' 
 csnorm_simplified_genomic = function(biases, counts, design, log_decay, log_nu, log_delta, bf_per_kb=1, groups=10,
-                                     iter=10000, verbose=T, init=0, ...) {
+                                     iter=10000, verbose=T, init=0, dispersion=10, ...) {
   for (n in biases[,unique(name)]) {
     stopifnot(groups<=biases[name==n,.N-1])
     stopifnot(counts[name==n,.N]==biases[name==n,.N*(.N-1)/2]) #needs to be zero-filled
@@ -202,10 +204,41 @@ csnorm_simplified_genomic = function(biases, counts, design, log_decay, log_nu, 
             Krow=Krow, SD=biases[,.N], bbegin=bbegin,
             cutsitesD=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            G=groups, counts_sum_left=ctsl, counts_sum_right=ctsr, log_decay_sum=log(ctso))
+            G=groups, counts_sum_left=ctsl, counts_sum_right=ctsr, log_decay_sum=log(ctso),
+            alpha=dispersion)
   optimizing(stanmodels$simplified_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
              init=init, init_alpha=1e-9, ...)
 }
+
+#' Single-cpu simplified fitting for exposures and dispersion
+#' @keywords internal
+#' 
+csnorm_simplified_dispersion = function(biases, counts, design, dmin, dmax, beta_nu, beta_delta, beta_diag,
+                                        lambda_nu, lambda_delta, lambda_diag,
+                                        bf_per_kb = 1, bf_per_decade=5, iter = 10000,
+                                        verbose=T, init=0, weight=array(1,dim=design[,.N]),...) {
+  Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
+  Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
+  bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
+  cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
+  data = list( Dsets=design[,.N], Biases=design[,uniqueN(genomic)], Decays=design[,uniqueN(decay)],
+               XB=as.array(design[,genomic]), XD=as.array(design[,decay]),
+               Krow=Krow, SD=biases[,.N], bbegin=bbegin,
+               cutsitesD=biases[,pos], rejoined=biases[,rejoined],
+               danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+               Kdiag=Kdiag, dmin=dmin, dmax=dmax,
+               N=counts[,.N], cbegin=cbegin,
+               cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
+               counts_close=counts[,contact.close], counts_far=counts[,contact.far],
+               counts_up=counts[,contact.up], counts_down=counts[,contact.down],
+               weight=as.array(weight), beta_nu=beta_nu, beta_delta=beta_delta, beta_diag=beta_diag,
+               lambda_nu=lambda_nu, lambda_delta=lambda_delta, lambda_diag=lambda_diag)
+  op=optimizing(stanmodels$simplified_dispersion, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
+                init=init, init_alpha=1e-9, ...)
+  op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
+  return(op)
+}
+
 
 #' Single-cpu fitting
 #' @keywords internal
@@ -746,15 +779,17 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
 #' @export
 #' 
 run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambda=1,
-                                ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, verbose=T) {
+                                ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, verbose=T, ncounts=100000) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
   #add settings
   cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, groups=groups,
                                     lambda=lambda, iter=iter))
-  #fill counts matrix
+  #fill counts matrix and take subset
   cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize)
+  subcounts = cs@counts[,.SD[(1:ncounts+as.integer(.N/2))],by=name]
+  if (subcounts[,uniqueN(c(contact.close,contact.far,contact.up,contact.down))]<2) stop("dataset too sparse, please increase ncounts")
   #report min/max distance
   dmin=0.99
   if (cs@settings$circularize>0) {
@@ -792,10 +827,10 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
         biases = cs@biases, counts = cs@counts, design=cs@design,
         log_nu = op$par$log_nu, log_delta = op$par$log_delta,
         dmin = dmin, dmax = dmax, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, groups = groups,
-        iter=iter, init=op$par)))
-      op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","beta_diag_centered","alpha",
+        iter=iter, init=op$par, dispersion=op$par$alpha)))
+      op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","beta_diag_centered",
                                                        "lambda_diag","log_decay","decay")],
-                                         op$par[c("eRJ","eDE","beta_nu","beta_delta",
+                                         op$par[c("eRJ","eDE","beta_nu","beta_delta", "alpha",
                                                   "lambda_nu","lambda_delta","log_nu","log_delta")]))
       cs@diagnostics[[paste0("out.decay",i)]]=output
       cs@diagnostics[[paste0("runtime.decay",i)]]=a[1]+a[4]
@@ -806,14 +841,24 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
       a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_simplified_genomic(
         biases = cs@biases, counts = cs@counts, design = cs@design,
         log_decay = op$par$log_decay, log_nu = op$par$log_nu, log_delta = op$par$log_delta,
-        groups = groups, bf_per_kb = bf_per_kb, iter = iter, init=op$par)))
-      op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag","log_decay","decay")],
-                                        op.gen$par[c("alpha","eC","eRJ","eDE","beta_nu","beta_delta",
+        groups = groups, bf_per_kb = bf_per_kb, iter = iter, init=op$par, dispersion=op$par$alpha)))
+      op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag","log_decay","decay", "alpha")],
+                                        op.gen$par[c("eC","eRJ","eDE","beta_nu","beta_delta",
                                                      "lambda_nu","lambda_delta","log_nu","log_delta")]))
       cs@diagnostics[[paste0("out.bias",i)]]=output
       cs@diagnostics[[paste0("runtime.bias",i)]]=a[1]+a[4]
     }
-    if (fit.genomic==T & fit.decay==T) op$value=op.gen$value+op.diag$value
+    #fit exposures and dispersion
+    a=system.time(output <- capture.output(op.disp <- csnorm:::csnorm_simplified_dispersion(
+      biases = cs@biases, counts = subcounts, design = cs@design,
+      dmin=dmin, dmax=dmax, beta_nu=op$par$beta_nu, beta_delta=op$par$beta_delta, beta_diag=op$par$beta_diag,
+      lambda_nu=op$par$lambda_nu, lambda_delta=op$par$lambda_delta, lambda_diag=op$par$lambda_diag,
+      bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter, init=op$par)))
+    op=list(value=op.disp$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag","log_decay","decay",
+                                                "beta_nu","beta_delta", "lambda_nu","lambda_delta","log_nu","log_delta")],
+                                      op.disp$par[c("eC","eRJ","eDE","alpha")]))
+    cs@diagnostics[[paste0("out.disp",i)]]=output
+    cs@diagnostics[[paste0("runtime.disp",i)]]=a[1]+a[4]
   }
   if (verbose==T) cat("Done\n")
   op$par$runtime=sum(as.numeric(cs@diagnostics[grep("runtime",names(cs@diagnostics))]))

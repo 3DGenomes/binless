@@ -26,6 +26,8 @@ data {
   matrix[SD,G] log_decay_sum;
   //stiffness
   real<lower=0> lambda;
+  //dispersion
+  real<lower=0> alpha;
 }
 transformed data {
   //bias spline, sparse (nu and delta have the same design)
@@ -100,8 +102,6 @@ parameters {
   //spline parameters
   vector[Krow-1] beta_nu[Biases];
   vector[Krow-1] beta_delta[Biases];
-  //dispersion
-  real<lower=0> alpha;
 }
 transformed parameters {
   //nu
@@ -197,5 +197,4 @@ model {
     beta_nu_diff[d] ~ double_exponential(0,10/(lfac*lambda));
     beta_delta_diff[d] ~ double_exponential(0,10/(lfac*lambda));
   }
-  alpha ~ cauchy(0,100);
 }
