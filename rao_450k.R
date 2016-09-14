@@ -9,77 +9,61 @@ setwd("/home/yannick/simulations/cs_norm")
 
 load("data/rao_HiCall_chrX_450k_csdata_with_data.RData")
 begin=73800000
-end=73900000
+end=73820000
 data=cs@data[re.closest1>=begin&re.closest1<=end&re.closest2>=begin&re.closest2<=end]
 cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
 csd = new("CSdata", info=cs@info, settings=list(circularize=-1),
           data=data, biases=cs_data$biases, counts=cs_data$counts)
-save(csd, file="data/rao_HiCall_chrX_100k_csdata_with_data.RData")
+save(csd, file="data/rao_HiCall_chrX_20k_csdata_with_data.RData")
 csd@data=data.table()
-save(csd, file="data/rao_HiCall_chrX_100k_csdata.RData")
+save(csd, file="data/rao_HiCall_chrX_20k_csdata.RData")
 csd2=csd
 
 
 
-load("data/rao_HiCall_chrX_100k_csdata.RData")
+load("data/rao_HiCall_chrX_20k_csdata.RData")
 csd1=csd
 cs=merge_cs_norm_datasets(list(csd1))
 
-run_serial(cs, bf_per_kb = 1, bf_per_decade = 5, lambda = 0.01, iter = 100000)
-cs=run_exact(cs, bf_per_kb = 1, bf_per_decade = 5, lambdas = 10**seq(from=-2,to=1,length.out=6), ncores = 30, iter = 100000)
 
-cs = run_simplified(cs, bf_per_kb=2, bf_per_decade=5, bins_per_bf=10, groups=100, lambdas=10**seq(from=-3,to=-1,length.out=5),
+cs=run_exact(cs, bf_per_kb = 5, bf_per_decade = 5, lambdas = 10**seq(from=-1,to=1,length.out=6), ncores = 30, iter = 100000)
+save(cs, file="data/rao_HiCall_chrX_20k_csnorm_optimized_exact_bpk5.RData")
+
+run_simplified_gibbs(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=10, groups=10, lambda=50,
+                    ngibbs = 3, iter=10000)
+cs = run_simplified(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=10**seq(from=-1,to=1,length.out=6),
                     ngibbs = 3, iter=10000, ncores=30)
-save(cs, file="data/rao_HiCall_chrX_450k_csnorm_optimized.RData")
+save(cs, file="data/rao_HiCall_chrX_20k_csnorm_optimized_gibbs_grp10_bpk5.RData")
 
-plots=check_fit(cs)
+load("data/rao_HiCall_chrX_20k_csnorm_optimized_gibbs_grp10_bpk5.RData")
+load("data/rao_HiCall_chrX_20k_csnorm_optimized_exact_bpk5.RData")
+plots.e=check_fit(cs)
 
 
 ### Binning at a given resolution
-
-#Once normalized, we generate binned matrices to perform the interaction detection. Here we choose to bin at 20kb resolution.
-#there are three dispersion calculations in this beta version, you might want to try them all out.
-#You can optionally ask for computation of ICE-normalized matrices, for comparison.
-cs=bin_all_datasets(cs, resolution=5000, ncores=30, verbose=T, ice=1)
-
-#To get the binned matrices, use the following command with the same arguments than those passed to bin_all_datasets
-#Since you did not do any grouping yet (see below), pass group="all".
-mat=get_matrices(cs, resolution=5000, group="all")
+cs=bin_all_datasets(cs, resolution=1000, ncores=30, verbose=T, ice=1)
+mat=get_matrices(cs, resolution=1000, group="all")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(observed)))+
   geom_raster(aes(begin2,begin1,fill=log(expected)))+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~name)
 
-#For that binning, we can also verify whether the normalization has been performed correctly, using a residual plot
-ggplot(mat)+geom_point(aes(expected,observed),alpha=0.1)+stat_function(fun=identity,colour="red")+facet_wrap(~name)+
-  scale_x_log10(limits=c(0.5,NA))+scale_y_log10(limits=c(0.5,NA))
-#or a density plot
-ggplot(mat)+geom_density(aes(log10(normalized),colour=name))+facet_wrap(~name)
-
-
-
-
 ### Interaction calling 
-
-#To detect interactions, you need to specify an already binned dataset by providing resolution and detection.type.
-#Since you did not do any grouping yet (see below), pass group="all".
-#The interaction detection is made at a 95% posterior confidence threshold
-cs=detect_interactions(cs, resolution=20000, group="all", detection.type=1, threshold=0.95, ncores=30)
-
-#you can view the called interactions
-#since there was no grouping, pass group="all"
-#for simple interactions pass type="interactions" and ref="expected"
-mat=get_interactions(cs, type="interactions", resolution=20000, group="all", detection.type=1,
+cs=detect_interactions(cs, resolution=5000, group="all", detection.type=1, threshold=0.95, ncores=30)
+cs=detect_interactions(cs, resolution=5000, group="all", detection.type=2, threshold=0.95, ncores=30)
+mat1=get_interactions(cs, type="interactions", resolution=5000, group="all", detection.type=1,
+                      threshold=0.95, ref="expected")
+mat2=get_interactions(cs, type="interactions", resolution=5000, group="all", detection.type=2,
                      threshold=0.95, ref="expected")
-
+mat=rbindlist(list(det1=mat1,det2=mat2),use.names=T,idcol="method")
 #for example, we can plot the ice-like matrices with highlighted interactions in the upper left corner
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
   geom_point(aes(begin1,begin2,colour=prob.gt.expected<0.5),data=mat[is.significant==T])+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~name)
+  facet_grid(method~name)
 
 
 
