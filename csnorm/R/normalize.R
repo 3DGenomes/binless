@@ -156,7 +156,8 @@ csnorm_simplified_decay = function(biases, counts, design, log_nu, log_delta, dm
             Kdiag=Kdiag, dmin=dmin, dmax=dmax, N=csd[,.N], cbegin=cbegin,
             counts_sum=csd[,count], weight=csd[,weight], dist=csd[,mdist], log_genomic_sum=csd[,log(others)],
             alpha=dispersion)
-  op=optimizing(stanmodels$simplified_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, init_alpha=1e-9, ...)
+  op=optimizing(stanmodels$simplified_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init,
+                init_alpha=1e-9, tol_rel_grad=0, ...)
   #make nice decay data table
   op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
   #rewrite log_decay as if it was calculated for each count
@@ -785,10 +786,14 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
   #add settings
   cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, groups=groups,
-                                    lambda=lambda, iter=iter))
+                                    lambda=lambda, iter=iter, ngibbs=ngibbs))
   #fill counts matrix and take subset
   cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize)
-  subcounts = cs@counts[,.SD[(1:ncounts+as.integer(.N/2))],by=name]
+  if (cs@counts[,.N] > ncounts*2+1) {
+    subcounts = cs@counts[,.SD[(1:ncounts+as.integer(.N/2))],by=name]
+  } else {
+    subcounts=counts
+  }
   if (subcounts[,uniqueN(c(contact.close,contact.far,contact.up,contact.down))]<2) stop("dataset too sparse, please increase ncounts")
   #report min/max distance
   dmin=0.99
