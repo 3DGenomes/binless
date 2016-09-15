@@ -8,3 +8,4 @@ csnorm/src/csnorm.so
 csnorm/src/include/models.hpp*
 csnorm/man/*
 .*.sw*
+*_cmdline.R
