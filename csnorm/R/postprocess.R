@@ -329,7 +329,7 @@ detection_type_2 = function(cs, resolution, group, ref="expected", threshold=0.9
         cts=csnorm_predict_all(cs, cts, verbose=F)
         cts=groups[cts]
         setkey(cts,groupname,id1,id2)
-        cbegin=c(1,cts[,.(groupname,row=.I)][groupname!=shift(groupname),row],cts[,.N+1])
+        if(cts[,.N]==1) {cbegin=c(1,2)} else {cbegin=c(1,cts[,.(groupname,row=.I)][groupname!=shift(groupname),row],cts[,.N+1])}
         #compute signal distribution
         data=list(G=groups[,uniqueN(groupname)], N=4*cts[,.N], cbegin=cbegin, observed=cts[,c(contact.close,contact.down,contact.far,contact.up)],
                   log_expected=cts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha)
@@ -409,7 +409,7 @@ detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, 
         cts=csnorm_predict_all(cs, cts, verbose=F)
         cts=groups[cts]
         setkey(cts,groupname,id1,id2)
-        cbegin=c(1,cts[,.(groupname,row=.I)][groupname!=shift(groupname),row],cts[,.N+1])
+        if(cts[,.N]==1) {cbegin=c(1,2)} else {cbegin=c(1,cts[,.(groupname,row=.I)][groupname!=shift(groupname),row],cts[,.N+1])}
         #compute each signal contribution separately
         data=list(G=groups[,uniqueN(groupname)], N=4*cts[,.N], cbegin=cbegin, observed=cts[,c(contact.close,contact.down,contact.far,contact.up)],
                   log_expected=cts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha, sigma=5)
@@ -429,7 +429,7 @@ detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, 
             tmp[,groupname:=n]
           }
           setkey(diffcounts,groupname,id1,id2)
-          cbegin=c(1,diffcounts[,.(groupname,row=.I)][groupname!=shift(groupname),row],diffcounts[,.N+1])
+          if(diffcounts[,.N]==1){cbegin=c(1,2)} else {cbegin=c(1,diffcounts[,.(groupname,row=.I)][groupname!=shift(groupname),row],diffcounts[,.N+1])}
           data=list(G=groups[groupname!=ref,uniqueN(groupname)], N=4*diffcounts[,.N], cbegin=cbegin,
                     observed=diffcounts[,c(contact.close,contact.down,contact.far,contact.up)],
                     log_expected=diffcounts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha, sigma=5)

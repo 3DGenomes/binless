@@ -300,11 +300,15 @@ csnorm_predict_all = function(cs, counts, verbose=T) {
   dmax=cs@settings$dmax
   Kdiag=round((log10(dmax)-log10(dmin))*cs@settings$bf_per_decade)
   ncounts=counts[,.N]
-  cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
+  if (counts[,.N]==1) {
+    cbegin=c(1,2)
+  } else {
+    cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
+  }
   design=cs@design
   data = list( Dsets=design[,.N], Decays=design[,uniqueN(decay)], XD=as.array(design[,decay]),
                Kdiag=Kdiag, SD=biases[,.N], cutsitesD=biases[,pos], dmin=dmin, dmax=dmax,
-               N=counts[,.N], cbegin=cbegin, cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
+               N=counts[,.N], cbegin=cbegin, cidx=t(data.matrix(counts[,.(id1,id2)])), dist=as.array(counts[,distance]),
                eC=par$eC, log_nu=par$log_nu, log_delta=par$log_delta,
                beta_diag_centered=par$beta_diag_centered)
   capture.output(pred<-as.data.table(optimizing(stanmodels$predict_all, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)$par))
@@ -817,17 +821,17 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
     return(cs)
   }
   op=init.op
+  #make sure beta_diag is strictly increasing
+  for (d in 2:length(op$par$beta_diag)) {
+    if (abs(op$par$beta_diag[d]-op$par$beta_diag[d-1])<10*.Machine$double.eps) {
+      op$par$beta_diag[d:length(op$par$beta_diag)]=op$par$beta_diag[d:length(op$par$beta_diag)]+10*.Machine$double.eps
+    }
+  }
   #gibbs sampling
   for (i in 1:ngibbs) {
     #fit diagonal decay given nu and delta
     if (fit.decay==T) {
       if (verbose==T) cat("Gibbs",i,": Decay\n")
-      #make sure beta_diag is strictly increasing
-      for (d in 2:length(op$par$beta_diag)) {
-        if (abs(op$par$beta_diag[d]-op$par$beta_diag[d-1])<.Machine$double.eps) {
-          op$par$beta_diag[d:length(op$par$beta_diag)]=op$par$beta_diag[d:length(op$par$beta_diag)]+.Machine$double.eps
-        }
-      }
       a=system.time(output <- capture.output(op.diag <- csnorm:::csnorm_simplified_decay(
         biases = cs@biases, counts = cs@counts, design=cs@design,
         log_nu = op$par$log_nu, log_delta = op$par$log_delta,
@@ -852,6 +856,12 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
                                                      "lambda_nu","lambda_delta","log_nu","log_delta")]))
       cs@diagnostics[[paste0("out.bias",i)]]=output
       cs@diagnostics[[paste0("runtime.bias",i)]]=a[1]+a[4]
+    }
+    #make sure beta_diag is strictly increasing
+    for (d in 2:length(op$par$beta_diag)) {
+      if (abs(op$par$beta_diag[d]-op$par$beta_diag[d-1])<10*.Machine$double.eps) {
+        op$par$beta_diag[d:length(op$par$beta_diag)]=op$par$beta_diag[d:length(op$par$beta_diag)]+10*.Machine$double.eps
+      }
     }
     #fit exposures and dispersion
     a=system.time(output <- capture.output(op.disp <- csnorm:::csnorm_simplified_dispersion(
