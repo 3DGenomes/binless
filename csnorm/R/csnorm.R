@@ -96,8 +96,8 @@ setMethod("show",signature="CSdata",definition=function(object) {
 #' @slot mat 
 #' @slot type 
 #' @slot threshold 
-#' @slot normal.approx 
 #' @slot ref 
+#' @slot detection.type numeric. detection method
 #'
 #' @return
 #' @keywords internal
@@ -107,8 +107,8 @@ setMethod("show",signature="CSdata",definition=function(object) {
 setClass("CSinter",
          slots = list(mat="data.table",
                       type="character",
+                      detection.type="numeric",
                       threshold="numeric",
-                      normal.approx="numeric",
                       ref="character"))
 setMethod("show",signature="CSinter",definition=function(object) {
   if (object@type=="interactions") {
@@ -116,7 +116,7 @@ setMethod("show",signature="CSinter",definition=function(object) {
   } else {
     cat("        Significant differences wrt ", object@ref)
   }
-  cat(" (threshold=", object@threshold,", normal.approx=",object@normal.approx,")\n")
+  cat(" (threshold=", object@threshold,", detection.type=", object@detection.type, ")\n")
 })
 
 #' Class for one binned matrix and its interaction detections
@@ -127,7 +127,6 @@ setMethod("show",signature="CSinter",definition=function(object) {
 #' @slot ice 
 #' @slot ice.iterations 
 #' @slot names 
-#' @slot dispersion.fun 
 #'
 #' @return
 #' @keywords internal
@@ -140,14 +139,13 @@ setClass("CSmatrix",
                       group="character",
                       ice="logical",
                       ice.iterations="numeric",
-                      names="character",
-                      dispersion.fun="character"))
+                      names="character"))
 
 setMethod("show",signature="CSmatrix",definition=function(object) {
   if (length(object@group)==1 && object@group=="all") {
     cat("      * Individual") 
   } else {
-    cat("      * Group [", object@group,"] (dispersion function: ", object@dispersion.fun,")")
+    cat("      * Group [", object@group,"]")
   }
   if (object@ice==T) {
     cat(" with ICE (", object@ice.iterations,"iterations)")
@@ -166,7 +164,6 @@ setMethod("show",signature="CSmatrix",definition=function(object) {
 #' @slot resolution numeric. Matrix resolution, in bases
 #' @slot individual 
 #' @slot grouped 
-#' @slot dispersion.type numeric. How the dispersion was calculated
 #'
 #' @return
 #' @export
@@ -174,12 +171,11 @@ setMethod("show",signature="CSmatrix",definition=function(object) {
 #' @examples
 setClass("CSbinned",
          slots = list(resolution="numeric",
-                      dispersion.type="numeric",
                       individual="data.table",
                       grouped="list"))
 
 setMethod("show",signature="CSbinned",definition=function(object) {
-  cat("   *** At", object@resolution/1000, "kb resolution (dispersion type", object@dispersion.type, "):\n")
+  cat("   *** At", object@resolution/1000, "kb resolution:\n")
   lapply(object@grouped, show)
   cat("\n")
   })

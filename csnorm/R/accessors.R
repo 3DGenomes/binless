@@ -4,7 +4,6 @@ NULL
 #' Fetch CSbinned indices from CSnorm object
 #'
 #' @param resolution 
-#' @param dispersion.type 
 #' @param raise boolean. If T raise an exception, otherwise return -1.
 #' @param cs CSnorm object
 #'
@@ -13,10 +12,10 @@ NULL
 #' @export
 #'
 #' @examples
-get_cs_binned_idx = function(cs, resolution, dispersion.type, raise=T) {
+get_cs_binned_idx = function(cs, resolution, raise=T) {
   if(length(cs@binned)>0) {
     for (i in 1:length(cs@binned)) {
-      if (cs@binned[[i]]@resolution==resolution && cs@binned[[i]]@dispersion.type==dispersion.type) return(i)
+      if (cs@binned[[i]]@resolution==resolution) return(i)
     }
   }
   if (raise==T) {
@@ -30,7 +29,6 @@ get_cs_binned_idx = function(cs, resolution, dispersion.type, raise=T) {
 #'
 #' @param csb CSbinned object
 #' @param group 
-#' @param dispersion.fun 
 #' @param raise boolean. If T raise an exception, otherwise return -1.
 #'
 #' @return CSmatrix object index
@@ -38,9 +36,9 @@ get_cs_binned_idx = function(cs, resolution, dispersion.type, raise=T) {
 #' @export
 #'
 #' @examples
-get_cs_matrix_idx = function(csb, group, dispersion.fun, raise=T) {
+get_cs_matrix_idx = function(csb, group, raise=T) {
   for (i in 1:length(csb@grouped)) {
-    if (csb@grouped[[i]]@group==group && csb@grouped[[i]]@dispersion.fun==deparse(dispersion.fun,nlines=1)) return(i)
+    if (all(csb@grouped[[i]]@group==group)) return(i)
   }
   if (raise==T) {
     stop("CSmatrix not found. You must first call group_datasets")
@@ -53,8 +51,8 @@ get_cs_matrix_idx = function(csb, group, dispersion.fun, raise=T) {
 #'
 #' @param csm 
 #' @param type 
+#' @param detection.type 
 #' @param threshold 
-#' @param normal.approx 
 #' @param ref 
 #' @param raise 
 #'
@@ -63,11 +61,11 @@ get_cs_matrix_idx = function(csb, group, dispersion.fun, raise=T) {
 #' @export
 #'
 #' @examples
-get_cs_interaction_idx = function(csm, type, threshold, normal.approx, ref, raise=T) {
+get_cs_interaction_idx = function(csm, type, detection.type, threshold, ref, raise=T) {
   if(length(csm@interactions)>0) {
     for (i in 1:length(csm@interactions)) {
-      if (csm@interactions[[i]]@type==type && csm@interactions[[i]]@threshold==threshold
-          && csm@interactions[[i]]@normal.approx==normal.approx && csm@interactions[[i]]@ref==ref) return(i)
+      if (csm@interactions[[i]]@detection.type==detection.type && csm@interactions[[i]]@type==type
+          && csm@interactions[[i]]@threshold==threshold && csm@interactions[[i]]@ref==ref) return(i)
     }
   }
   if (raise==T) {
@@ -84,17 +82,15 @@ get_cs_interaction_idx = function(csm, type, threshold, normal.approx, ref, rais
 #' @param resolution The resolution of the matrix, in bases
 #' @param group character. Either "all" to return individual matrices, or any of 
 #'   "condition", "replicate" or "enzyme" to return grouped matrices
-#' @param dispersion.type,dispersion.fun dispersion parameters, as provided to
-#'   the binning and grouping funtions.
 #'   
 #' @return a data.table containing the binned matrices
 #' @export
 #' 
 #' @examples
-get_matrices = function(cs, resolution, group, dispersion.type, dispersion.fun) {
-  idx1=get_cs_binned_idx(cs, resolution, dispersion.type, raise=T)
+get_matrices = function(cs, resolution, group) {
+  idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
-  idx2=get_cs_matrix_idx(csb, group, dispersion.fun, raise=T)
+  idx2=get_cs_matrix_idx(csb, group, raise=T)
   return(csb@grouped[[idx2]]@mat)
 }
 
@@ -105,24 +101,56 @@ get_matrices = function(cs, resolution, group, dispersion.type, dispersion.fun) 
 #' @inheritParams get_matrices
 #' @param ref character. The 
 #' @param threshold 
-#' @param normal.approx 
 #' @return a data.table containing the interactions
 #' @export
 #' 
 #' @examples
-get_interactions = function(cs, type, resolution, group, dispersion.type,
-                            dispersion.fun, ref, threshold, normal.approx) {
-  idx1=get_cs_binned_idx(cs, resolution, dispersion.type, raise=T)
+get_interactions = function(cs, type, resolution, group, detection.type,
+                            ref, threshold) {
+  idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
-  idx2=get_cs_matrix_idx(csb, group, dispersion.fun, raise=T)
+  idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
   mat=csm@mat
-  idx3=get_cs_interaction_idx(csm, type, threshold, normal.approx, ref)
+  idx3=get_cs_interaction_idx(csm, type, detection.type, threshold, ref)
   int=csm@interactions[[idx3]]@mat
-  ret=merge(mat,int,by=c("name","bin1","bin2","observed","expected","dispersion"))
+  ret=merge(mat,int,by=c("name","bin1","bin2"))
   if (type=="interactions") {
     return(ret)
   } else {
     return(ret[name!=ref])
   }
+}
+
+#' Predict model parameters on a subset of the input data
+#'
+#' @param cs 
+#' @param ncounts 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_predicted_subset = function(cs, ncounts=100000) {
+  if (length(cs@par)==0) stop("You should first normalize the datasets")
+  counts=cs@counts[sample(.N,min(.N,ncounts))]
+  setkey(counts,name,id1,id2)
+  mat=csnorm_predict_all(cs, counts, verbose=F)
+  return(mat)
+}
+
+#' Predict genomic biases at evenly spaced positions across the genome
+#'
+#' @param cs 
+#' @param points_per_kb 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_genomic_biases = function(cs, points_per_kb=10) {
+  if (length(cs@par)==0) stop("You should first normalize the datasets")
+  csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=cs@par$beta_nu, beta_delta=cs@par$beta_delta,
+                                   bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 10)[
+                                     ,.(pos,log_nu,log_delta,dset=j)]
 }

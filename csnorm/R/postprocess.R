@@ -16,20 +16,26 @@ bin_counts = function(counts, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL) {
   if (is.null(b2)) b2=counts[,min(pos2)]-1
   if (is.null(e1)) e1=counts[,max(pos1)]-1
   if (is.null(e2)) e2=counts[,max(pos2)]-1
-  bins1=seq(b1,counts[,max(pos1)]+resolution,resolution)
-  bins2=seq(b2,counts[,max(pos2)]+resolution,resolution)
-  mcounts=melt(counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
-               variable.name = "category", value.name = "count")[count>0]
-  #
-  sub = mcounts[,.(pos1,pos2,bin1=cut2(pos1, bins1, oneval=F, onlycuts=T, digits=10),
-                   bin2=cut2(pos2, bins2, oneval=F, onlycuts=T, digits=10), category, count)
-                ][,.(N=sum(count)),by=c("bin1","bin2")]
-  #
-  sub[,begin1:=do.call(as.integer, tstrsplit(as.character(bin1), "[[,]")[2])]
-  sub[,end1:=do.call(as.integer, tstrsplit(as.character(bin1), "[],)]")[2])]
-  sub[,begin2:=do.call(as.integer, tstrsplit(as.character(bin2), "[[,]")[2])]
-  sub[,end2:=do.call(as.integer, tstrsplit(as.character(bin2), "[],)]")[2])]
-  #
+  if (counts[,uniqueN(name)]>1) {
+    sub = foreach (n=counts[,unique(name)], .combine=rbind) %do% {
+      mat=bin_counts(counts[name==n],resolution,b1=b1,b2=b2,e1=e1,e2=e2)
+      mat[,name:=n]
+    }
+  } else {
+    bins1=seq(b1,e1+resolution,resolution)
+    bins2=seq(b2,e2+resolution,resolution)
+    mcounts=melt(counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
+                 variable.name = "category", value.name = "count")[count>0]
+    #
+    sub = mcounts[,.(pos1,pos2,bin1=cut2(pos1, bins1, oneval=F, onlycuts=T, digits=10, minmax=F),
+                     bin2=cut2(pos2, bins2, oneval=F, onlycuts=T, digits=10, minmax=F), category, count)
+                  ][,.(N=sum(count)),by=c("bin1","bin2")]
+    #
+    sub[,begin1:=do.call(as.integer, tstrsplit(as.character(bin1), "[[,]")[2])]
+    sub[,end1:=do.call(as.integer, tstrsplit(as.character(bin1), "[],)]")[2])]
+    sub[,begin2:=do.call(as.integer, tstrsplit(as.character(bin2), "[[,]")[2])]
+    sub[,end2:=do.call(as.integer, tstrsplit(as.character(bin2), "[],)]")[2])]
+  }
   return(sub)
 }
 
@@ -143,30 +149,6 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
   biases[,c("bin","ibin","chunk","log_nu","log_delta"):=list(NULL,NULL,NULL,NULL,NULL)]
   return(binned)
 }
-
-#' Predict dispersions for a binned matrix
-#' @keywords internal
-#' @export
-#' 
-get_dispersions = function(binned, iter=10000) {
-  data=list(B=binned[,.N],observed=binned[,observed],expected=binned[,expected],ncounts=binned[,ncounts])
-  out <- capture.output(op <- optimizing(stanmodels$dispersions,
-                                         data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0, init_alpha=1e-5)$par)
-  return(op)
-}
-
-
-#' Predict dispersions for a binned matrix
-#' @keywords internal
-#' @export
-#' 
-get_dispersions2 = function(binned, iter=10000) {
-  data=list(B=binned[,.N],observed=binned[,observed],expected=binned[,expected])
-  out <- capture.output(op <- optimizing(stanmodels$dispersions2,
-                                         data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0, init_alpha=1e-5)$par)
-  return(op)
-}
-
 
 #' compute \eqn{p(\Gamma_2>\Gamma_1) = \int_{0}^{+\infty} dx p_{\Gamma_2}(x) \int_{0}^{x} dy p_{\Gamma_1}(y)}
 #' @keywords internal
@@ -302,6 +284,180 @@ thresholds_estimator = function(observed, expected, dispersion, threshold=0.95, 
 }
 
 
+#' Perform peak and differential detection (method 2)
+#'
+#' @param cs 
+#' @param ref 
+#' @param resolution 
+#' @param group 
+#' @param threshold 
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+detection_type_2 = function(cs, resolution, group, ref="expected", threshold=0.95, ncores=1) {
+  if (group=="all") {
+    names=cs@experiments[,unique(name)]
+    groups=data.table(name=names,groupname=names)
+  } else {
+    groups=cs@experiments[,.(name,groupname=do.call(paste,mget(group))),by=group][,.(name,groupname)] #we already know groupname is unique
+  }
+  setkey(groups,name)
+  if (ref != "expected" && !(ref %in% groups[,groupname])) stop("Reference group name not found! Valid names are: ",deparse(as.character(groups[,groupname])))
+  #retrieve bin borders
+  biases=cs@biases
+  counts=cs@counts
+  bins=seq(biases[,min(pos)-1],biases[,max(pos)+1+resolution],resolution)
+  counts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
+                                 cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
+  counts[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
+  biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
+  biases[,ibin:=as.integer(bin)-1]
+  chunks=CJ(biases[,min(ibin):max(ibin)],biases[,min(ibin):max(ibin)])[V1<=V2]
+  registerDoParallel(cores=ncores)
+  mat = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
+    #get zero-filled portion of counts and predict model on it
+    cts=copy(counts[ibin1==i&ibin2==j])
+    biases1=copy(biases[ibin==i]) #just needed to fill the counts matrix
+    biases2=copy(biases[ibin==j])
+    if (biases1[,.N]>0 & biases2[,.N]>0) {
+      cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize)
+      if (cts[,.N]>0) {
+        setkey(cts,name,id1,id2)
+        cts=csnorm_predict_all(cs, cts, verbose=F)
+        cts=groups[cts]
+        setkey(cts,groupname,id1,id2)
+        if(cts[,.N]==1) {cbegin=c(1,2)} else {cbegin=c(1,cts[,.(groupname,row=.I)][groupname!=shift(groupname),row],cts[,.N+1])}
+        #compute signal distribution
+        data=list(G=groups[,uniqueN(groupname)], N=4*cts[,.N], cbegin=cbegin, observed=cts[,c(contact.close,contact.down,contact.far,contact.up)],
+                  log_expected=cts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha)
+        output=capture.output(op<-optimizing(csnorm:::stanmodels$detection, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
+        mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
+                       log_s.mean=op$par$log_s, log_s.std=as.vector(1/sqrt(-diag(op$hessian))))
+      }
+    }
+  }
+  counts[,c("bin1","bin2","ibin1","ibin2"):=list(NULL,NULL,NULL,NULL)]
+  biases[,c("bin","ibin"):=list(NULL,NULL)]
+  setkey(mat,name,bin1,bin2)
+  if (ref=="expected") {
+    mat[,prob.gt.expected:=pnorm(0,mean=log_s.mean,sd=log_s.std,lower.tail=F,log.p=F)]
+    mat[,is.significant:=prob.gt.expected > threshold | 1-prob.gt.expected > threshold]
+    mat[,direction:=ifelse(0<log_s.mean,"enriched","depleted")]
+  } else {
+    refmat=mat[name==ref,.(bin1,bin2,ref.mean=log_s.mean,ref.sd=log_s.std)]
+    setkey(refmat,bin1,bin2)
+    mat=mat[name!=ref]
+    setkey(mat,name,bin1,bin2)
+    mat=merge(mat,refmat,all=T)
+    colname=paste0("prob.gt.",ref)
+    mat[,c(colname):=csnorm:::compute_normal_overlap(mu1=ref.mean,sd1=ref.sd,mu2=log_s.mean,sd2=log_s.std,ncores=ncores)]
+    mat[,is.significant:=get(colname)>threshold | 1-get(colname)>threshold]
+    mat[,direction:=ifelse(ref.mean<log_s.mean,"enriched","depleted")]
+    mat[,c("ref.mean","ref.sd"):=list(NULL,NULL)]
+  }
+  mat[,c("log_s.mean","log_s.std","detection.type"):=list(NULL,NULL,"augmented")]
+  mat
+}
+
+#' Perform peak and differential detection (method 3: model comp)
+#'
+#' @param cs 
+#' @param ref 
+#' @param resolution 
+#' @param group 
+#' @param threshold on the Bayes factor K
+#' @param prior.odds 
+#' @param ncores 
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, prior.sd=5, ncores=1) {
+  if (group=="all") {
+    names=cs@experiments[,unique(name)]
+    groups=data.table(name=names,groupname=names)
+  } else {
+    groups=cs@experiments[,.(name,groupname=do.call(paste,mget(group))),by=group][,.(name,groupname)] #we already know groupname is unique
+  }
+  setkey(groups,name)
+  if (ref != "expected" && !(ref %in% groups[,groupname])) stop("Reference group name not found! Valid names are: ",deparse(as.character(groups[,groupname])))
+  #retrieve bin borders
+  biases=cs@biases
+  counts=cs@counts
+  bins=seq(biases[,min(pos)-1],biases[,max(pos)+1+resolution],resolution)
+  counts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
+                                 cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
+  counts[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
+  biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
+  biases[,ibin:=as.integer(bin)-1]
+  chunks=CJ(biases[,min(ibin):max(ibin)],biases[,min(ibin):max(ibin)])[V1<=V2]
+  registerDoParallel(cores=ncores)
+  mat = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
+    #get zero-filled portion of counts and predict model on it
+    cts=copy(counts[ibin1==i&ibin2==j])
+    biases1=copy(biases[ibin==i]) #just needed to fill the counts matrix
+    biases2=copy(biases[ibin==j])
+    if (biases1[,.N]>0 & biases2[,.N]>0) {
+      cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize)
+      if (cts[,.N]>0) {
+        setkey(cts,name,id1,id2)
+        cts=csnorm_predict_all(cs, cts, verbose=F)
+        cts=groups[cts]
+        setkey(cts,groupname,id1,id2)
+        if(cts[,.N]==1) {cbegin=c(1,2)} else {cbegin=c(1,cts[,.(groupname,row=.I)][groupname!=shift(groupname),row],cts[,.N+1])}
+        #compute each signal contribution separately
+        data=list(G=groups[,uniqueN(groupname)], N=4*cts[,.N], cbegin=cbegin, observed=cts[,c(contact.close,contact.down,contact.far,contact.up)],
+                  log_expected=cts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha, sigma=prior.sd)
+        output=capture.output(op<-optimizing(csnorm:::stanmodels$detection3, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
+        if (ref=="expected") {
+          mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
+                         K=exp(op$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op$hessian))))-op$par$lpdf0),
+                         direction=ifelse(0<op$par$log_s,"enriched","depleted"))
+          mat[,prob.gt.expected:=K/(1+K)]
+          mat[,K:=NULL]
+          mat[,c("is.significant","detection.type"):=list(prob.gt.expected > threshold,"model comp")]
+        } else {
+          #compute grouped signal contributions
+          mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
+                         lpdms=op$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op$hessian)))), #log(p(D|Msignal))
+                         log_s.mean=op$par$log_s)
+          refcounts=cts[groupname==ref]
+          diffcounts=foreach(n=cts[groupname!=ref,unique(groupname)],.combine=rbind) %do% {
+            tmp=rbind(cts[groupname==n],refcounts)
+            tmp[,groupname:=n]
+          }
+          setkey(diffcounts,groupname,id1,id2)
+          if(diffcounts[,.N]==1){cbegin=c(1,2)} else {cbegin=c(1,diffcounts[,.(groupname,row=.I)][groupname!=shift(groupname),row],diffcounts[,.N+1])}
+          data=list(G=groups[groupname!=ref,uniqueN(groupname)], N=4*diffcounts[,.N], cbegin=cbegin,
+                    observed=diffcounts[,c(contact.close,contact.down,contact.far,contact.up)],
+                    log_expected=diffcounts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha, sigma=prior.sd)
+          output=capture.output(op2<-optimizing(csnorm:::stanmodels$detection3, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
+          lpdmref=mat[name==ref,lpdms]
+          logsref=mat[name==ref,log_s.mean]
+          mat=mat[name!=ref,.(name,bin1,bin2,lpdm2=lpdms+lpdmref,direction=ifelse(logsref<log_s.mean,"enriched","depleted"))]
+          mat2=data.table(name=diffcounts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
+                         lpdms=op2$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op2$hessian)))))
+          mat=merge(mat,mat2,by=c("name","bin1","bin2"))
+          mat[,K:=exp(lpdm2-lpdms)]
+          mat[,c("lpdm2","lpdms"):=list(NULL,NULL)]
+          colname=paste0("prob.gt.",ref)
+          mat[,c(colname):=K/(1+K)]
+          mat[,K:=NULL]
+          mat[,c("is.significant","detection.type"):=list(get(colname) > threshold,"model comp")]
+        }
+      }
+    }
+  }
+  counts[,c("bin1","bin2","ibin1","ibin2"):=list(NULL,NULL,NULL,NULL)]
+  biases[,c("bin","ibin"):=list(NULL,NULL)]
+  mat
+}
+
 #' Generate nu and delta genomic biases on evenly spaced points along the genome
 #'
 #' @param biases data.table.
@@ -328,7 +484,7 @@ generate_genomic_biases = function(biases, beta_nu, beta_delta, bf_per_kb=1, poi
   return(dt)
 }
 
-#' Bin normalized datasets and compute dispersions at that resolution
+#' Bin normalized datasets
 #' 
 #' @param cs CSnorm object, optimized.
 #' @param resolution integer. The desired resolution of the matrix.
@@ -336,20 +492,16 @@ generate_genomic_biases = function(biases, beta_nu, beta_delta, bf_per_kb=1, poi
 #' @param ice integer. If positive, perform the optional Iterative Correction 
 #'   algorithm, useful for comparison purposes. The value determines the number
 #'   of iterations.
-#' @param dispersion.type integer. Type 1: original dispersion. Type 2: Fit same
-#'   dispersion to all bins. Type 3: Fit one dispersion and multiply by ncounts
-#'   to get that of a bin.
 #' @param verbose
 #'   
 #' @return A CSnorm object containing an additional CSbinned object in cs@binned
 #' @export
 #' 
 #' @examples
-bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.type=c(1,2,3), verbose=T) {
-  stopifnot(length(dispersion.type)==1 && dispersion.type>=1 && dispersion.type<=3)
-  if (get_cs_binned_idx(cs,resolution,dispersion.type,raise=F)>0) {
-    stop("Refusing to overwrite already existing matrices at ", resolution/1000, "kb with dispersion type ",dispersion.type,
-         ". Use them or remove them from the cs@binned list")
+bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, verbose=T) {
+  if (get_cs_binned_idx(cs,resolution,raise=F)>0) {
+    stop("Refusing to overwrite already existing matrices at ", resolution/1000,
+         "kb. Use them or remove them from the cs@binned list")
   }
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
   mat=csnorm_predict_binned(cs, resolution, ncores=ncores)
@@ -368,20 +520,15 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
   bin1.end=mat[,bin1]
   bin2.begin=mat[,bin2]
   bin2.end=mat[,bin2]
-  levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[[,]")[2][[1]]
-  levels(bin1.end) <- tstrsplit(as.character(levels(bin1.end)), "[[,)]")[2][[1]]
-  levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[[,]")[2][[1]]
-  levels(bin2.end) <- tstrsplit(as.character(levels(bin2.end)), "[[,)]")[2][[1]]
+  levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[][,)]")[[2]]
+  levels(bin1.end) <- tstrsplit(as.character(levels(bin1.end)), "[][,)]")[[3]]
+  levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[][,)]")[[2]]
+  levels(bin2.end) <- tstrsplit(as.character(levels(bin2.end)), "[][,)]")[[3]]
   mat[,begin1:=as.integer(as.character(bin1.begin))]
   mat[,end1:=as.integer(as.character(bin1.end))]
   mat[,begin2:=as.integer(as.character(bin2.begin))]
   mat[,end2:=as.integer(as.character(bin2.end))]
-  #store dispersions
-  if (verbose==T) cat("*** Dispersion type ",dispersion.type,"\n")
-  mat[,dispersion:=switch(dispersion.type,
-                          cs@par$alpha,
-                          get_dispersions2(mat)$dispersion,
-                          get_dispersions(mat)$dispersion)]
+  mat[,dispersion:=cs@par$alpha]
   #compute normalized matrices
   mat[,expected.sd:=sqrt(expected+expected^2/dispersion)] #negative binomial SD
   mat[,normalized:=(dispersion+observed)/(dispersion+expected)] #posterior predictive mean and SD
@@ -389,8 +536,8 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
   mat[,c("icelike","icelike.sd"):=list(normalized*decaymat,normalized.sd*decaymat)]
   #create CSmatrix and CSbinned object
   csm=new("CSmatrix", mat=mat, group="all", ice=(ice>0), ice.iterations=ifelse(ice>0,ice,NA),
-          names=as.character(mat[,unique(name)]), dispersion.fun=deparse(NA))
-  csb=new("CSbinned", resolution=resolution, dispersion.type=dispersion.type, grouped=list(csm),
+          names=as.character(mat[,unique(name)]))
+  csb=new("CSbinned", resolution=resolution, grouped=list(csm),
           individual=copy(mat[,.(name,bin1,begin1,end1,bin2,begin2,end2,observed,expected,ncounts,decaymat,dispersion)]))
   cs@binned=append(cs@binned,csb)
   cs
@@ -399,33 +546,30 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, dispersion.t
 #' Group binned matrices of datasets
 #'
 #' @param cs CSnorm object
-#' @param resolution,dispersion.type see \code{\link{bin_all_datasets}}, used to identify the input matrices.
+#' @param resolution see \code{\link{bin_all_datasets}}, used to identify the input matrices.
 #' @param group The type of grouping to be performed. Any combination of the given arguments is possible.
-#' @param dispersion.fun function. How to treat dispersions. Any many-to-one mapping such as sum, min or mean.
 #' @inheritParams bin_all_datasets
 #'
 #' @return CSnorm object
 #' @export
 #'
 #' @examples
-group_datasets = function(cs, resolution, dispersion.type,
-                          group=c("condition","replicate","enzyme","experiment"), dispersion.fun=sum, ice=-1, verbose=T) {
+group_datasets = function(cs, resolution, group=c("condition","replicate","enzyme","experiment"), ice=-1, verbose=T) {
   #fetch and check inputs
   experiments=cs@experiments
-  csbi=get_cs_binned_idx(cs, resolution=resolution, dispersion.type=dispersion.type, raise=T)
+  csbi=get_cs_binned_idx(cs, resolution=resolution, raise=T)
   csb=cs@binned[[csbi]]
   group=match.arg(group, several.ok=T)
-  dispersion.fun=match.fun(dispersion.fun)
-  if (get_cs_matrix_idx(csb, group, dispersion.fun, raise=F)>0) {
-    stop("Refusing to overwrite already existing ", group, " group matrices with dispersion function ",deparse(dispersion.fun),
-         ". Use them or remove them from the cs@binned[[",csbi,"]]@grouped list and @metadata table")
+  if (get_cs_matrix_idx(csb, group, raise=F)>0) {
+    stop("Refusing to overwrite already existing ", group,
+         " group matrices. Use them or remove them from the cs@binned[[",csbi,
+         "]]@grouped list and @metadata table")
   }
   #
   if (verbose==T) cat("*** creating groups\n")
   groups=experiments[,.(name,groupno=.GRP,groupname=do.call(paste,mget(group))),by=group][,.(name,groupno,groupname)]
   if (verbose==T) cat("*** merging matrices\n")
-  mat=merge(csb@individual,groups,by="name",all=T)[,.(observed=sum(observed),expected=sum(expected),decaymat=mean(decaymat),
-                                                      dispersion=dispersion.fun(dispersion)),
+  mat=merge(csb@individual,groups,by="name",all=T)[,.(observed=sum(observed),expected=sum(expected),decaymat=mean(decaymat), dispersion=cs@par$alpha),
                                                    by=c("groupno","groupname","bin1","bin2","begin1","end1","begin2","end2")]
   setnames(mat,"groupname","name")
   setkey(mat,name,bin1,bin2)
@@ -447,7 +591,7 @@ group_datasets = function(cs, resolution, dispersion.type,
   mat[,c("icelike","icelike.sd"):=list(normalized*decaymat,normalized.sd*decaymat)]
   #store matrices
   csm=new("CSmatrix", mat=mat, group=group, ice=(ice>0), ice.iterations=ifelse(ice>0,ice,NA),
-          names=as.character(mat[,unique(name)]), dispersion.fun=deparse(dispersion.fun,nlines=1))
+          names=as.character(mat[,unique(name)]))
   csb@grouped=append(csb@grouped,list(csm))
   cs@binned[[csbi]]=csb
   return(cs)
@@ -456,9 +600,10 @@ group_datasets = function(cs, resolution, dispersion.type,
 #' Detect significant interactions wrt expected
 #' 
 #' @param cs CSnorm object
-#' @param resolution,group,dispersion.type,dispersion.fun see
+#' @param resolution,group see
 #'   \code{\link{bin_all_datasets}} and \code{\link{group_datasets}}, used to
 #'   identify the input matrices.
+#' @param detection.type integer. Type 1: original Type 2: new
 #' @param threshold significance threshold, between 0 and 1
 #' @param ncores number of cores used for parallelization
 #' @inheritParams call_interactions
@@ -468,24 +613,34 @@ group_datasets = function(cs, resolution, dispersion.type,
 #' @export
 #' 
 #' @examples
-detect_interactions = function(cs, resolution, group, dispersion.type, dispersion.fun, threshold=0.95, ncores=1, normal.approx=100){
+detect_interactions = function(cs, resolution, group, detection.type=c(1,2,3), threshold=0.95, ncores=1){
+  stopifnot(length(detection.type)==1 && detection.type>=1 && detection.type<=3)
   #get CSmat object
-  idx1=get_cs_binned_idx(cs, resolution, dispersion.type, raise=T)
+  idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
-  idx2=get_cs_matrix_idx(csb, group, dispersion.fun, raise=T)
+  idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
   #check if interaction wasn't calculated already
-  if (get_cs_interaction_idx(csm, type="interactions", threshold=threshold, normal.approx=normal.approx, ref="expected", raise=F)>0) {
+  if (get_cs_interaction_idx(csm, type="interactions", detection.type=detection.type,
+                             threshold=threshold, ref="expected", raise=F)>0) {
     stop("Refusing to overwrite this already detected interaction")
   }
-  mat=copy(csm@mat[,.(name,bin1,bin2,observed,expected,dispersion)])
-  #report gamma parameters
-  mat[,c("alpha1","beta1"):=list(dispersion,dispersion)] #posterior
-  mat[,c("alpha2","beta2"):=list(alpha1+observed,beta1+expected)] #posterior predictive
-  mat=call_interactions(mat,"expected",threshold=threshold,ncores=ncores,normal.approx=normal.approx)
-  mat[,c("alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2"):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
+  if (detection.type==1) {
+    mat=copy(csm@mat[,.(name,bin1,bin2,observed,expected,dispersion)])
+    #report gamma parameters
+    mat[,c("alpha1","beta1"):=list(dispersion,dispersion)] #posterior
+    mat[,c("alpha2","beta2"):=list(alpha1+observed,beta1+expected)] #posterior predictive
+    mat=call_interactions(mat,"expected",threshold=threshold,ncores=ncores, normal.approx=100)
+    mat[,direction:=ifelse(mean1<mean2,"enriched","depleted")]
+    mat[,c("alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2","observed","expected","dispersion"
+           ):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
+  } else if (detection.type==2) {
+    mat=detection_type_2(cs, resolution=resolution, group=group, ref="expected", threshold=threshold, ncores=ncores)
+  } else {
+    mat=detection_type_3(cs, resolution=resolution, group=group, ref="expected", threshold=threshold, ncores=ncores)
+  }
   #store back
-  csi=new("CSinter", mat=mat, type="interactions", threshold=threshold, normal.approx=normal.approx, ref="expected")
+  csi=new("CSinter", mat=mat, type="interactions", detection.type=detection.type, threshold=threshold, ref="expected")
   csm@interactions=append(csm@interactions,list(csi))
   csb@grouped[[idx2]]=csm
   cs@binned[[idx1]]=csb
@@ -504,45 +659,50 @@ detect_interactions = function(cs, resolution, group, dispersion.type, dispersio
 #' @export
 #' 
 #' @examples
-detect_differences = function(cs, resolution, group, dispersion.type, dispersion.fun, ref, threshold=0.95, ncores=1, normal.approx=100){
-  idx1=get_cs_binned_idx(cs, resolution, dispersion.type, raise=T)
+detect_differences = function(cs, resolution, group, detection.type=c(1,2,3), ref, threshold=0.95, ncores=1){
+  stopifnot(length(detection.type)==1 && detection.type>=1 && detection.type<=3)
+  idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
-  idx2=get_cs_matrix_idx(csb, group, dispersion.fun, raise=T)
+  idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
   #check if interaction wasn't calculated already
-  if (get_cs_interaction_idx(csm, type="differences", threshold=threshold, normal.approx=normal.approx, ref="expected", raise=F)>0) {
+  if (get_cs_interaction_idx(csm, type="differences", detection.type=detection.type,
+                             threshold=threshold, ref="expected", raise=F)>0) {
     stop("Refusing to overwrite this already detected interaction")
   }
-  mat=copy(csm@mat[,.(name,bin1,bin2,observed,expected,dispersion)])
-  names=mat[,unique(name)]
-  if (!(ref %in% names)) stop("Group name not found! Valid names are: ",deparse(as.character(names)))
-  names=names[names!=ref]
-  refmat=mat[name==ref,.(bin1,bin2,alpha1=dispersion+observed,beta1=dispersion+expected)]
-  setkey(refmat,bin1,bin2)
-  qmat = foreach (n=names,.combine="rbind") %do% {
-    #merge parameters
-    qmat=mat[name==n,.(bin1,bin2,alpha2=dispersion+observed,beta2=dispersion+expected)]
-    setkey(qmat,bin1,bin2)
-    qmat=merge(refmat,qmat,all=T)
-    qmat=qmat[!(is.na(alpha1)|is.na(beta1)|is.na(alpha2)|is.na(beta2))]
-    #call interactions
-    qmat=call_interactions(qmat,ref,threshold=threshold,ncores=ncores,normal.approx=normal.approx)
-    #compute ratio matrix
-    qmat[,ratio:=ifelse(alpha2>1,(beta2/beta1)*(alpha1/(alpha2-1)),NA)]
-    qmat[,ratio.sd:=ifelse(alpha2>2,(beta2/beta1)*sqrt((alpha1*(alpha1+alpha2-1))/((alpha2-2)*(alpha2-1)^2)),NA)]
-    #remove extra columns and add name
-    qmat[,c("name","alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2"):=list(n,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
-    qmat
+  if (detection.type==1) {
+    mat=copy(csm@mat[,.(name,bin1,bin2,observed,expected,dispersion)])
+    names=mat[,unique(name)]
+    if (!(ref %in% names)) stop("Reference group name not found! Valid names are: ",deparse(as.character(names)))
+    names=names[names!=ref]
+    refmat=mat[name==ref,.(bin1,bin2,alpha1=dispersion+observed,beta1=dispersion+expected)]
+    setkey(refmat,bin1,bin2)
+    qmat = foreach (n=names,.combine="rbind") %do% {
+      #merge parameters
+      qmat=mat[name==n,.(bin1,bin2,alpha2=dispersion+observed,beta2=dispersion+expected)]
+      setkey(qmat,bin1,bin2)
+      qmat=merge(refmat,qmat,all=T)
+      qmat=qmat[!(is.na(alpha1)|is.na(beta1)|is.na(alpha2)|is.na(beta2))]
+      #call interactions
+      qmat=call_interactions(qmat,ref,threshold=threshold,ncores=ncores)
+      qmat[,direction:=ifelse(mean1<mean2,"enriched","depleted")]
+      #compute ratio matrix
+      qmat[,ratio:=ifelse(alpha2>1,(beta2/beta1)*(alpha1/(alpha2-1)),NA)]
+      qmat[,ratio.sd:=ifelse(alpha2>2,(beta2/beta1)*sqrt((alpha1*(alpha1+alpha2-1))/((alpha2-2)*(alpha2-1)^2)),NA)]
+      #remove extra columns and add name
+      qmat[,c("name","alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2"):=list(
+        n,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
+      qmat
+    }
+    #merge everything back
+    mat=merge(mat[,.(name,bin1,bin2)],qmat,all=T,by=c("name","bin1","bin2"))
+  } else if (detection.type==2) {
+    mat=detection_type_2(cs, resolution=resolution, group=group, ref=ref, threshold=threshold, ncores=ncores)
+  } else {
+    mat=detection_type_3(cs, resolution=resolution, group=group, ref=ref, threshold=threshold, ncores=ncores)
   }
-  #merge everything back, removing extra columns first
-  matnames=names(mat)
-  if ("is.significant" %in% matnames) {
-    mat[,c(matnames[grep(".gt.",matnames)],"detection.type","is.significant"):=list(NULL,NULL,NULL)]
-    if ("ratio" %in% matnames) mat[,c("ratio","ratio.sd"):=list(NULL,NULL)]
-  }
-  mat=merge(mat,qmat,all=T,by=c("name","bin1","bin2"))
   #add interaction to cs object
-  csi=new("CSinter", mat=mat, type="differences", threshold=threshold, normal.approx=normal.approx, ref=ref)
+  csi=new("CSinter", mat=mat, type="differences", detection.type=detection.type, threshold=threshold, ref=ref)
   csm@interactions=append(csm@interactions,list(csi))
   csb@grouped[[idx2]]=csm
   cs@binned[[idx1]]=csb

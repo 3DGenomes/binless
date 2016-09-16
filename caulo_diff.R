@@ -125,16 +125,47 @@ cs=detect_interactions(cs, resolution=20000, group="all", detection.type=1, thre
 #you can view the called interactions
 #since there was no grouping, pass group="all"
 #for simple interactions pass type="interactions" and ref="expected"
-mat=get_interactions(cs, type="interactions", resolution=20000, group="all", detection.type=1,
+mat1=get_interactions(cs, type="interactions", resolution=20000, group="all", detection.type=1,
                      threshold=0.95, ref="expected")
+mat3=get_interactions(cs, type="interactions", resolution=20000, group="all", detection.type=3,
+                     threshold=5, ref="expected")
+setnames(mat3,"logK","prob.gt.expected")
+mat=rbindlist(list(det1=mat1,det2=mat2,det3=mat3),use.names = T, idcol="method")
 #for example, we can plot the ice-like matrices with highlighted interactions in the upper left corner
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
+  geom_point(aes(begin1,begin2,colour=observed<expected),data=mat[is.significant==T])+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
   facet_grid(method~name)
 
+
+cs=detect_differences(cs, ref="WT BglII 2", resolution=20000, group="all", detection.type=2,
+                      threshold=0.95, ncores=30)
+cs=detect_differences(cs, ref="WT BglII 2", resolution=20000, group="all", detection.type=3,
+                      threshold=5, ncores=30)
+mat2=get_interactions(cs, type="differences", resolution=20000, group="all", detection.type=2,
+                      threshold=0.95, ref="WT BglII 2")
+mat3=get_interactions(cs, type="differences", resolution=20000, group="all", detection.type=3,
+                      threshold=5, ref="WT BglII 2")
+setnames(mat3,"logK","prob.gt.WT BglII 2")
+mat1[,c("ratio","ratio.sd"):=list(NULL,NULL)]
+dmat=rbindlist(list(det1=mat1,det2=mat2,det3=mat3),use.names = T, idcol="method")
+#for example, we can plot the ice-like matrices with highlighted interactions in the upper left corner
+ggplot(dmat)+
+  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
+  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
+  geom_point(aes(begin1,begin2,colour=direction),data=dmat[is.significant==T])+
+  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
+  facet_grid(method~name)
+
+
+ggplot(mat[begin2<=1e6&begin1<1e6])+
+  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
+  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
+  geom_point(aes(begin1,begin2,colour=prob.gt.expected<0.5),data=mat[begin2<=1e6&begin1<1e6&is.significant==T])+
+  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
+  facet_wrap(~name)
 
 
 ### Grouping of datasets
@@ -144,14 +175,14 @@ ggplot(mat)+
 cs=group_datasets(cs, resolution=20000, group=c("condition", "enzyme"), ice=1, verbose=T)
 
 #Again, you can detect interactions in these grouped datasets, and plot the results
-cs=detect_interactions(cs, resolution=20000, group=c("condition", "enzyme"), detection.type=1,
+cs=detect_interactions(cs, resolution=20000, group=c("condition", "enzyme"), detection.type=2,
                         threshold=0.95, ncores=30)
 mat=get_interactions(cs, type="interactions", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
                      threshold=0.95, ref="expected")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
+  geom_point(aes(begin1,begin2,colour=prob.gt.expected<0.5),data=mat[is.significant==T])+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~name)
 
@@ -170,7 +201,7 @@ mat=get_interactions(cs, type="differences", resolution=20000, group=c("conditio
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
+  geom_point(aes(begin1,begin2,colour=`prob.gt.WT BglII`<0.5),data=mat[is.significant==T])+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~name)
 

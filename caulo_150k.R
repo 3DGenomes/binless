@@ -2,6 +2,7 @@ library(ggplot2)
 library(data.table)
 library(csnorm)
 library(foreach)
+library(doParallel)
 
 setwd("/home/yannick/simulations/cs_norm")
 
@@ -21,90 +22,134 @@ csd2=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_Interact
 csd3=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate2_reads_int.tsv",
                       "data/caulo_BglIIr2_all", "WT", "2", enzyme="BglII", circularize=4042929, dangling.L=c(0,3,5),
                       dangling.R=c(3,0,-2), maxlen=600, save.data=T)
+csd4=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_rifampicin_reads_int.tsv",
+                      "data/caulo_BglII_rifampicin_all", "rifampicin", "1", enzyme="BglII", circularize=4042929, dangling.L=c(0,3,5),
+                      dangling.R=c(3,0,-2), maxlen=600, save.data=T)
 
 
 #zoom on a portion of the dataset
-load("data/caulo_BglII_rifampicin_all_csdata_with_data.RData")
-data=csd@data[re.closest1>=2000000&re.closest1<=2150000&re.closest2>=2000000&re.closest2<=2150000]
-cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
-csd = new("CSdata", info=csd@info, settings=list(circularize=-1),
-          data=data, biases=cs_data$biases, counts=cs_data$counts)
-save(csd, file="data/caulo_BglII_rifampicin_150k_csdata_with_data.RData")
-csd@data=data.table()
-save(csd, file="data/caulo_BglII_rifampicin_150k_csdata.RData")
-csd2=csd
+begin=250000
+end=750000
+begin=2000000
+end=2150000
+
+for (i in c("BglIIr1","BglIIr2","BglII_rifampicin")) {
+  load(paste0("data/caulo_",i,"_all_csdata_with_data.RData"))
+  data=csd@data[re.closest1>=begin&re.closest1<=end&re.closest2>=begin&re.closest2<=end]
+  cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
+  csd = new("CSdata", info=csd@info, settings=list(circularize=-1),
+            data=data, biases=cs_data$biases, counts=cs_data$counts)
+  save(csd, file=paste0("data/caulo_",i,"_500k_csdata_with_data.RData"))
+  csd@data=data.table()
+  save(csd, file=paste0("data/caulo_",i,"_500k_csdata.RData"))
+  csd2=csd
+}
 
 
-load("data/caulo_NcoI_150k_csdata.RData")
+load("data/caulo_BglIIr1_500k_csdata.RData")
 csd1=csd
-load("data/caulo_BglIIr1_150k_csdata.RData")
+load("data/caulo_BglIIr2_500k_csdata.RData")
 csd2=csd
-load("data/caulo_BglIIr2_150k_csdata.RData")
+load("data/caulo_BglII_rifampicin_500k_csdata.RData")
 csd3=csd
-cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="all")
-cs=merge_cs_norm_datasets(list(csd1))
-save(cs, file="data/caulo_150k_csnorm.RData")
+cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="none")
+save(cs, file="data/caulo_rif_500k_csnorm.RData")
 
 
 
 #normalize with serial sampler
-#registerDoParallel(cores=30)
-#foreach (bpk=bf_per_kb) %:% foreach (lambda=lambdas) %dopar% {
-load(paste0("data/caulo_150k_csnorm.RData"))
-cs@counts=fill_zeros(counts = cs@counts, biases = cs@biases)
-bf_per_decade=5
-dmin=1-0.01
-dmax=150000+0.01
-bpk=0.25
-lambda=1
-init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
-  counts=cs@counts, biases=cs@biases, design=cs@design, lambda=lambda,
-  bf_per_kb=bpk, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, verbose=F, iter=10000)))
-a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
-  biases=cs@biases, counts = cs@counts, design = cs@design, dmin=dmin, dmax=dmax,
-  bf_per_kb=bpk, bf_per_decade=bf_per_decade, iter=100000, verbose = F, init=init.op)))
-op$par$runtime=a[1]+a[4]
-op$par$output=output
-init.op$runtime=init.a[1]+init.a[4]
-init.op$output=init.output
-op$par$init=init.op
-op$par$value=op$value
-cs@par=op$par
-cs@settings = c(cs@settings, list(bf_per_kb=bpk, bf_per_decade=bf_per_decade, dmin=dmin, dmax=dmax))
-cs=bin_all_datasets(cs, resolution=10000, ncores=10, verbose=T, ice=1, dispersion.type=3)
-cs@binned[[1]]=group_datasets(cs@experiments, cs@binned[[1]], type="enzyme", dispersion.fun=sum, ice=1, verbose=T)
-cs@binned[[1]]@grouped[[1]]=detect_interactions(cs@binned[[1]]@grouped[[1]], threshold=0.95, ncores=1, normal.approx=100)
-cs@binned[[1]]@grouped[[2]]=detect_differences(cs@binned[[1]]@grouped[[1]], ref="NcoI", threshold=0.95, ncores=1, normal.approx=100)
+load("data/caulo_rif_500k_csnorm.RData")
+cs=run_exact(cs, bf_per_kb = 0.25, bf_per_decade = 5, lambdas = 10**seq(from=-2,to=1,length.out=6), ncores = 30, iter = 100000)
+save(cs, file="data/caulo_rif_500k_csnorm_optimized_exact.RData")
 
-save(cs, file=paste0("data/caulo_NcoI_150k_bfpkb",bpk,"_lambda",lambda,"_csnorm_optimized_new.RData"))
-#}
-
-
-
-
-#### run gibbs sampler
-library(ggplot2)
-library(data.table)
-library(csnorm)
-library(foreach)
-library(doParallel)
-
-setwd("/home/yannick/simulations/cs_norm")
-
-
-load("data/caulo_NcoI_150k_csdata.RData")
-csd1=csd
-load("data/caulo_BglIIr1_150k_csdata.RData")
-csd2=csd
-load("data/caulo_BglIIr2_150k_csdata.RData")
-csd3=csd
-cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="all")
-#cs=merge_cs_norm_datasets(list(csd1))
-
-cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=c(0.01,0.1,1,10,100),
+#normalize with gibbs sampler
+cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=10**seq(from=-2,to=1,length.out=6),
                     ngibbs = 3, iter=10000, ncores=30)
-cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1, dispersion.type=3)
-cs=detect_interactions(cs, resolution=20000, ncores=30, dispersion.type=3, type="all", dispersion.fun=NA)
+save(cs, file="data/caulo_BglII_rif_csnorm_optimized_gibbs3_bpk0.25_grp10.RData")
+
+for (d in 2:length(op$par$beta_diag)) {
+  if (abs(op$par$beta_diag[d]-op$par$beta_diag[d-1])<.Machine$double.eps) {
+    op$par$beta_diag[d:length(op$par$beta_diag)]=op$par$beta_diag[d:length(op$par$beta_diag)]+.Machine$double.eps
+  }
+}
+
+op.diag <- csnorm:::csnorm_simplified_decay(
+  biases = cs@biases, counts = cs@counts, design=cs@design,
+  log_nu = cs@par$log_nu, log_delta = cs@par$log_delta,
+  dmin = cs@settings$dmin, dmax = cs@settings$dmax, bf_per_decade = cs@settings$bf_per_decade,
+  bins_per_bf = cs@settings$bins_per_bf, groups = cs@settings$groups,
+  iter=10000, init=cs@par, dispersion=cs@par$alpha, verbose=T, tol_rel_grad=0)
+ggplot()+scale_x_log10()+scale_y_log10()+
+  geom_line(aes(dist,decay,colour="ori"),data=cs@par$decay)+
+  geom_line(aes(dist,decay,colour="new"),data=op.diag.old$par$decay)+
+  geom_line(aes(dist,decay,colour="last"),data=op.diag$par$decay)
+
+op.diag.old=op.diag
+
+load("data/caulo_rif_500k_csnorm_optimized_exact.RData")
+load("data/caulo_rif_500k_csnorm_optimized_gibbs.RData")
+
+cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1)
+cs=detect_interactions(cs, resolution=20000, ncores=30, group="all", detection.type=1, threshold=0.95)
+cs=detect_interactions(cs, resolution=20000, ncores=30, group="all", detection.type=2, threshold=0.95)
+cs=detect_interactions(cs, resolution=20000, ncores=30, group="all", detection.type=3, threshold=3)
+cs=detect_differences(cs, resolution=20000, ncores=30, group="all", detection.type=1, ref="WT BglII 2", threshold=0.95)
+cs=detect_differences(cs, resolution=20000, ncores=30, group="all", detection.type=2, ref="WT BglII 2", threshold=0.95)
+cs=detect_differences(cs, resolution=20000, ncores=30, group="all", detection.type=3, ref="WT BglII 2", threshold=3)
+
+mat1=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=1, threshold=0.95)
+mat2=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=2, threshold=0.95)
+mat3=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=3, threshold=3)
+setnames(mat3,"logK","prob.gt.expected")
+mat=rbindlist(list(detect1=mat1,detect2=mat2,detect3=mat3),use.names=T, idcol="method")
+ggplot(mat)+
+  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
+  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
+  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
+  scale_fill_gradient(na.value = "white",low="white",high="black")+theme(legend.position = "none")+
+  facet_grid(method~name)
+
+mat1=get_interactions(cs, type="differences", resolution=20000, group="all", ref="WT BglII 2", detection.type=1, threshold=0.95)
+mat2=get_interactions(cs, type="differences", resolution=20000, group="all", ref="WT BglII 2", detection.type=2, threshold=0.95)
+mat3=get_interactions(cs, type="differences", resolution=20000, group="all", ref="WT BglII 2", detection.type=3, threshold=3)
+setnames(mat3,"logK","prob.gt.WT BglII 2")
+mat1[,c("ratio","ratio.sd"):=list(NULL,NULL)]
+mat=rbindlist(list(detect1=mat1,detect2=mat2,detect3=mat3),use.names=T, idcol="method")
+ggplot(mat)+
+  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
+  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
+  geom_point(aes(begin1,begin2,colour=`prob.gt.WT BglII 2`<0.5),data=mat[is.significant==T])+
+  scale_fill_gradient(na.value = "white",low="white",high="black")+theme(legend.position = "none")+
+  facet_grid(method~name)
+
+mat2=get_predicted_subset(cs)
+setkey(mat,norm,name,distance)
+ggplot(mat)+geom_line(aes(distance,exp(log_decay)),colour="red")+geom_point(aes(distance,contact.close/exp(log_mean_cclose-log_decay)),alpha=0.1)+
+  scale_y_log10()+scale_x_log10(limits=c(1e3,NA))+facet_grid(norm~name)
+ggplot(mat)+geom_line(aes(distance,exp(log_decay),colour=norm))+
+  scale_y_log10()+scale_x_log10(limits=c(1e3,NA))+facet_grid(~name)
+ggplot(mat[distance<300000])+geom_line(aes(distance,exp(log_decay)),colour="red")+geom_point(aes(distance,contact.close/exp(log_mean_cclose-log_decay)),alpha=0.1)+
+  scale_y_log10()+facet_grid(norm~name)
+
+
+
+
+counts=fill_zeros(cs@counts,cs@biases)
+setkey(counts,name,id1,id2)
+pred=csnorm:::csnorm_predict_all(cs, counts, verbose=F)
+bcounts=pred[name=="WT BglII 1"&pos1>=262840&pos2>=402840&pos1<=282840&pos2<=422840] #prob ~ 0.5
+bcounts=pred[name=="WT BglII 2"&pos1>=322840&pos2>=362840&pos1<=342840&pos2<=382840] #prob ~ 0
+data=list(N=4*bcounts[,.N], observed=bcounts[,c(contact.close,contact.down,contact.far,contact.up)],
+          log_expected=bcounts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha)
+c(mean(data$observed),mean(exp(data$log_expected)))
+fit=stan("detection.stan",data=data,init=0)
+my_sso <- launch_shinystan(fit)
+sm=stan_model("detection.stan")
+op=optimizing(sm, data=data, as_vector=F, hessian=T, iter=10000, verbose=F, init=0)
+#p(log_s>0)?
+pnorm(0,mean=op$par$log_s,sd=1/sqrt(-op$hessian[1,1]),lower.tail=F,log.p=F)
+
+
 cs=detect_differences(cs, resolution=20000, ncores=30, dispersion.type=3, type="all", dispersion.fun=NA,
                       ref="WT BglII 2", threshold=0.95, normal.approx=100)
 cs=group_datasets(cs, resolution=20000, dispersion.type=3, type="enzyme", dispersion.fun=sum, ice=1, verbose=T)
@@ -118,6 +163,10 @@ get_interactions(cs, interaction.type="differences", resolution=20000, type="all
                  threshold=0.95, normal.approx=100)
 get_interactions(cs, interaction.type="differences", resolution=20000, type="enzyme", ref="BglII", dispersion.type=3, dispersion.fun=sum,
                  threshold=0.95, normal.approx=100)
+
+
+
+
 
 
 
