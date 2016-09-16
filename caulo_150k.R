@@ -65,33 +65,61 @@ save(cs, file="data/caulo_rif_500k_csnorm_optimized_exact.RData")
 #normalize with gibbs sampler
 cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=10**seq(from=-2,to=1,length.out=6),
                     ngibbs = 3, iter=10000, ncores=30)
-save(cs, file="data/caulo_rif_500k_csnorm_optimized_gibbs.RData")
+save(cs, file="data/caulo_BglII_rif_csnorm_optimized_gibbs3_bpk0.25_grp10.RData")
+
+for (d in 2:length(op$par$beta_diag)) {
+  if (abs(op$par$beta_diag[d]-op$par$beta_diag[d-1])<.Machine$double.eps) {
+    op$par$beta_diag[d:length(op$par$beta_diag)]=op$par$beta_diag[d:length(op$par$beta_diag)]+.Machine$double.eps
+  }
+}
+
+op.diag <- csnorm:::csnorm_simplified_decay(
+  biases = cs@biases, counts = cs@counts, design=cs@design,
+  log_nu = cs@par$log_nu, log_delta = cs@par$log_delta,
+  dmin = cs@settings$dmin, dmax = cs@settings$dmax, bf_per_decade = cs@settings$bf_per_decade,
+  bins_per_bf = cs@settings$bins_per_bf, groups = cs@settings$groups,
+  iter=10000, init=cs@par, dispersion=cs@par$alpha, verbose=T, tol_rel_grad=0)
+ggplot()+scale_x_log10()+scale_y_log10()+
+  geom_line(aes(dist,decay,colour="ori"),data=cs@par$decay)+
+  geom_line(aes(dist,decay,colour="new"),data=op.diag.old$par$decay)+
+  geom_line(aes(dist,decay,colour="last"),data=op.diag$par$decay)
+
+op.diag.old=op.diag
 
 load("data/caulo_rif_500k_csnorm_optimized_exact.RData")
 load("data/caulo_rif_500k_csnorm_optimized_gibbs.RData")
 
 cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1)
-cs=detect_interactions(cs, resolution=20000, ncores=30, group="all", detection.type=2)
-cs=detect_differences(cs, resolution=20000, ncores=30, group="all", detection.type=2, ref="WT BglII 2")
+cs=detect_interactions(cs, resolution=20000, ncores=30, group="all", detection.type=1, threshold=0.95)
+cs=detect_interactions(cs, resolution=20000, ncores=30, group="all", detection.type=2, threshold=0.95)
+cs=detect_interactions(cs, resolution=20000, ncores=30, group="all", detection.type=3, threshold=3)
+cs=detect_differences(cs, resolution=20000, ncores=30, group="all", detection.type=1, ref="WT BglII 2", threshold=0.95)
+cs=detect_differences(cs, resolution=20000, ncores=30, group="all", detection.type=2, ref="WT BglII 2", threshold=0.95)
+cs=detect_differences(cs, resolution=20000, ncores=30, group="all", detection.type=3, ref="WT BglII 2", threshold=3)
+
 mat1=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=1, threshold=0.95)
 mat2=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=2, threshold=0.95)
-mat=rbindlist(list(detect1=mat1,detect2=mat2),use.names=T, idcol="method")
+mat3=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=3, threshold=3)
+setnames(mat3,"logK","prob.gt.expected")
+mat=rbindlist(list(detect1=mat1,detect2=mat2,detect3=mat3),use.names=T, idcol="method")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=`prob.gt.expected`<0.5),data=mat[is.significant==T])+
+  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
   scale_fill_gradient(na.value = "white",low="white",high="black")+theme(legend.position = "none")+
   facet_grid(method~name)
 
 mat1=get_interactions(cs, type="differences", resolution=20000, group="all", ref="WT BglII 2", detection.type=1, threshold=0.95)
 mat2=get_interactions(cs, type="differences", resolution=20000, group="all", ref="WT BglII 2", detection.type=2, threshold=0.95)
+mat3=get_interactions(cs, type="differences", resolution=20000, group="all", ref="WT BglII 2", detection.type=3, threshold=3)
+setnames(mat3,"logK","prob.gt.WT BglII 2")
 mat1[,c("ratio","ratio.sd"):=list(NULL,NULL)]
-mat=rbindlist(list(detect1=mat1,detect2=mat2),use.names=T, idcol="method")
+mat=rbindlist(list(detect1=mat1,detect2=mat2,detect3=mat3),use.names=T, idcol="method")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
   geom_point(aes(begin1,begin2,colour=`prob.gt.WT BglII 2`<0.5),data=mat[is.significant==T])+
-  scale_fill_gradient(na.value = "white",low="white",high="black")+#theme(legend.position = "none")+
+  scale_fill_gradient(na.value = "white",low="white",high="black")+theme(legend.position = "none")+
   facet_grid(method~name)
 
 mat2=get_predicted_subset(cs)
