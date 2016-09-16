@@ -377,7 +377,7 @@ detection_type_2 = function(cs, resolution, group, ref="expected", threshold=0.9
 #' @export
 #'
 #' @examples
-detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, prior.odds=1, ncores=1) {
+detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, prior.sd=5, ncores=1) {
   if (group=="all") {
     names=cs@experiments[,unique(name)]
     groups=data.table(name=names,groupname=names)
@@ -412,12 +412,15 @@ detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, 
         if(cts[,.N]==1) {cbegin=c(1,2)} else {cbegin=c(1,cts[,.(groupname,row=.I)][groupname!=shift(groupname),row],cts[,.N+1])}
         #compute each signal contribution separately
         data=list(G=groups[,uniqueN(groupname)], N=4*cts[,.N], cbegin=cbegin, observed=cts[,c(contact.close,contact.down,contact.far,contact.up)],
-                  log_expected=cts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha, sigma=5)
+                  log_expected=cts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha, sigma=prior.sd)
         output=capture.output(op<-optimizing(csnorm:::stanmodels$detection3, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
         if (ref=="expected") {
           mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
-                         logK=op$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op$hessian))))-op$par$lpdf0,
+                         K=exp(op$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op$hessian))))-op$par$lpdf0),
                          direction=ifelse(0<op$par$log_s,"enriched","depleted"))
+          mat[,prob.gt.expected:=K/(1+K)]
+          mat[,K:=NULL]
+          mat[,c("is.significant","detection.type"):=list(prob.gt.expected > threshold,"model comp")]
         } else {
           #compute grouped signal contributions
           mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
@@ -432,7 +435,7 @@ detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, 
           if(diffcounts[,.N]==1){cbegin=c(1,2)} else {cbegin=c(1,diffcounts[,.(groupname,row=.I)][groupname!=shift(groupname),row],diffcounts[,.N+1])}
           data=list(G=groups[groupname!=ref,uniqueN(groupname)], N=4*diffcounts[,.N], cbegin=cbegin,
                     observed=diffcounts[,c(contact.close,contact.down,contact.far,contact.up)],
-                    log_expected=diffcounts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha, sigma=5)
+                    log_expected=diffcounts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha, sigma=prior.sd)
           output=capture.output(op2<-optimizing(csnorm:::stanmodels$detection3, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
           lpdmref=mat[name==ref,lpdms]
           logsref=mat[name==ref,log_s.mean]
@@ -440,10 +443,13 @@ detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, 
           mat2=data.table(name=diffcounts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
                          lpdms=op2$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op2$hessian)))))
           mat=merge(mat,mat2,by=c("name","bin1","bin2"))
-          mat[,logK:=lpdm2-lpdms]
+          mat[,K:=exp(lpdm2-lpdms)]
           mat[,c("lpdm2","lpdms"):=list(NULL,NULL)]
+          colname=paste0("prob.gt.",ref)
+          mat[,c(colname):=K/(1+K)]
+          mat[,K:=NULL]
+          mat[,c("is.significant","detection.type"):=list(get(colname) > threshold,"model comp")]
         }
-        mat[,c("is.significant","detection.type"):=list(logK > log(threshold),"model comp")]
       }
     }
   }
