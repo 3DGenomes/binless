@@ -437,7 +437,7 @@ detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, 
           lpdmref=mat[name==ref,lpdms]
           logsref=mat[name==ref,log_s.mean]
           mat=mat[name!=ref,.(name,bin1,bin2,lpdm2=lpdms+lpdmref,direction=ifelse(logsref<log_s.mean,"enriched","depleted"))]
-          mat2=data.table(name=cts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
+          mat2=data.table(name=diffcounts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
                          lpdms=op2$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op2$hessian)))))
           mat=merge(mat,mat2,by=c("name","bin1","bin2"))
           mat[,logK:=lpdm2-lpdms]
