@@ -157,7 +157,7 @@ csnorm_simplified_decay = function(biases, counts, design, log_nu, log_delta, dm
             counts_sum=csd[,count], weight=csd[,weight], dist=csd[,mdist], log_genomic_sum=csd[,log(others)],
             alpha=dispersion)
   op=optimizing(stanmodels$simplified_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init,
-                init_alpha=1e-9, tol_rel_grad=0, ...)
+                init_alpha=1e-9, tol_rel_grad=0, tol_rel_obj=1e3, ...)
   #make nice decay data table
   op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
   #rewrite log_decay as if it was calculated for each count
