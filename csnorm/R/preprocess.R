@@ -303,12 +303,15 @@ generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4
 #' @examples
 examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000) {
   data=read_tsv(infile, skip=skip, nrows=nrows)
-  pleft=ggplot(data[abs(rbegin1-re.closest1)<=window])+geom_histogram(aes(rbegin1-re.closest1,y=..count../sum(..count..)),binwidth=1)+
-    scale_x_continuous(breaks=-window:window)
-  pright=ggplot(data[abs(rbegin2-re.closest2)<=window])+geom_histogram(aes(rbegin2-re.closest2,y=..count../sum(..count..)),binwidth=1)+
-    scale_x_continuous(breaks=-window:window)
-  pdiag=ggplot(data[abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0])+geom_histogram(aes(rbegin2-rbegin1,y=..count../sum(..count..)),binwidth=10)
-  return(list(pleft=pleft,pright=pright,pdiag=pdiag))
+  dleft=data[abs(rbegin1-re.closest1)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0,
+             .(dist=rbegin1-re.closest1,cat="left")]
+  dright=data[abs(rbegin2-re.closest2)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0,
+             .(dist=rbegin2-re.closest2,cat="right")]
+  pdangling=ggplot(rbind(dleft,dright))+
+    geom_histogram(aes(dist),binwidth=1)+scale_x_continuous(breaks=-window:window)+facet_grid(~cat)
+  pdiag=ggplot(data[abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0])+
+    geom_histogram(aes(rbegin2-rbegin1),binwidth=10)
+  return(list(pdangling=pdangling,pdiag=pdiag,data=data))
 }
 
 
