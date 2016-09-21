@@ -395,27 +395,36 @@ detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, 
   counts[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
   biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
   biases[,ibin:=as.integer(bin)-1]
-  chunks=CJ(biases[,min(ibin):max(ibin)],biases[,min(ibin):max(ibin)])[V1<=V2]
+  #split across cores
+  stepsize=max(2,ceiling(length(bins)/(5*ncores)))
+  counts[,c("chunk1","chunk2"):=list(ibin1 %/% stepsize, ibin2 %/% stepsize)]
+  biases[,chunk:=ibin %/% stepsize]
+  chunks=CJ(biases[,min(chunk):max(chunk)],biases[,min(chunk):max(chunk)])[V1<=V2]
   registerDoParallel(cores=ncores)
   mat = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
     #get zero-filled portion of counts and predict model on it
-    cts=copy(counts[ibin1==i&ibin2==j])
-    biases1=copy(biases[ibin==i]) #just needed to fill the counts matrix
-    biases2=copy(biases[ibin==j])
+    cts=copy(counts[chunk1==i&chunk2==j])
+    biases1=copy(biases[chunk==i]) #just needed to fill the counts matrix
+    biases2=copy(biases[chunk==j])
     if (biases1[,.N]>0 & biases2[,.N]>0) {
       cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize)
       if (cts[,.N]>0) {
         setkey(cts,name,id1,id2)
         cts=csnorm_predict_all(cs, cts, verbose=F)
         cts=groups[cts]
-        setkey(cts,groupname,id1,id2)
-        if(cts[,.N]==1) {cbegin=c(1,2)} else {cbegin=c(1,cts[,.(groupname,row=.I)][groupname!=shift(groupname),row],cts[,.N+1])}
+        cts[,newid:=paste(groupname,ibin1,ibin2)]
+        cts=rbind(cts[,.(newid,groupname,ibin1,ibin2,bin1,bin2,count=contact.close,log_mean=log_mean_cclose)],
+                  cts[,.(newid,groupname,ibin1,ibin2,bin1,bin2,count=contact.far,log_mean=log_mean_cfar)],
+                  cts[,.(newid,groupname,ibin1,ibin2,bin1,bin2,count=contact.up,log_mean=log_mean_cup)],
+                  cts[,.(newid,groupname,ibin1,ibin2,bin1,bin2,count=contact.down,log_mean=log_mean_cdown)])
+        setkey(cts,newid)
+        if(cts[,.N]==1) {cbegin=c(1,2)} else {cbegin=c(1,cts[,.(newid,row=.I)][newid!=shift(newid),row],cts[,.N+1])}
         #compute each signal contribution separately
-        data=list(G=groups[,uniqueN(groupname)], N=4*cts[,.N], cbegin=cbegin, observed=cts[,c(contact.close,contact.down,contact.far,contact.up)],
-                  log_expected=cts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha, sigma=prior.sd)
+        data=list(G=length(cbegin)-1, N=cts[,.N], cbegin=cbegin, observed=cts[,count], log_expected=cts[,log_mean],
+                  alpha=cs@par$alpha, sigma=prior.sd)
         output=capture.output(op<-optimizing(csnorm:::stanmodels$detection3, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
         if (ref=="expected") {
-          mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
+          mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=cts[head(cbegin,-1),bin1], bin2=cts[head(cbegin,-1),bin2],
                          K=exp(op$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op$hessian))))-op$par$lpdf0),
                          direction=ifelse(0<op$par$log_s,"enriched","depleted"))
           mat[,prob.gt.expected:=K/(1+K)]
@@ -423,31 +432,32 @@ detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, 
           mat[,c("is.significant","detection.type"):=list(prob.gt.expected > threshold,"model comp")]
         } else {
           #compute grouped signal contributions
-          mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
+          mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=cts[head(cbegin,-1),bin1], bin2=cts[head(cbegin,-1),bin2],
                          lpdms=op$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op$hessian)))), #log(p(D|Msignal))
                          log_s.mean=op$par$log_s)
           refcounts=cts[groupname==ref]
           diffcounts=foreach(n=cts[groupname!=ref,unique(groupname)],.combine=rbind) %do% {
             tmp=rbind(cts[groupname==n],refcounts)
             tmp[,groupname:=n]
+            tmp[,newid:=paste(n,ibin1,ibin2)]
           }
-          setkey(diffcounts,groupname,id1,id2)
-          if(diffcounts[,.N]==1){cbegin=c(1,2)} else {cbegin=c(1,diffcounts[,.(groupname,row=.I)][groupname!=shift(groupname),row],diffcounts[,.N+1])}
-          data=list(G=groups[groupname!=ref,uniqueN(groupname)], N=4*diffcounts[,.N], cbegin=cbegin,
-                    observed=diffcounts[,c(contact.close,contact.down,contact.far,contact.up)],
-                    log_expected=diffcounts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha, sigma=prior.sd)
+          setkey(diffcounts,newid)
+          if(diffcounts[,.N]==1){cbegin=c(1,2)} else {cbegin=c(1,diffcounts[,.(newid,row=.I)][newid!=shift(newid),row],diffcounts[,.N+1])}
+          data=list(G=length(cbegin)-1, N=diffcounts[,.N], cbegin=cbegin,
+                    observed=diffcounts[,count], log_expected=diffcounts[,log_mean], alpha=cs@par$alpha, sigma=prior.sd)
           output=capture.output(op2<-optimizing(csnorm:::stanmodels$detection3, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
-          lpdmref=mat[name==ref,lpdms]
-          logsref=mat[name==ref,log_s.mean]
-          mat=mat[name!=ref,.(name,bin1,bin2,lpdm2=lpdms+lpdmref,direction=ifelse(logsref<log_s.mean,"enriched","depleted"))]
-          mat2=data.table(name=diffcounts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
-                         lpdms=op2$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op2$hessian)))))
+          refmat=mat[name==ref,.(bin1,bin2,lpdmref=lpdms,logsref=log_s.mean)]
+          mat=merge(mat[name!=ref],refmat,by=c("bin1","bin2"))
+          mat[,c("lpdm2","direction"):=list(lpdms+lpdmref,ifelse(logsref<log_s.mean,"enriched","depleted"))]
+          mat[,c("lpdms","lpdmref","logsref","log_s.mean"):=list(NULL,NULL,NULL,NULL)]
+          mat2=data.table(name=diffcounts[head(cbegin,-1),groupname],
+                          bin1=diffcounts[head(cbegin,-1),bin1], bin2=diffcounts[head(cbegin,-1),bin2],
+                          lpdms=op2$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op2$hessian)))))
           mat=merge(mat,mat2,by=c("name","bin1","bin2"))
           mat[,K:=exp(lpdm2-lpdms)]
-          mat[,c("lpdm2","lpdms"):=list(NULL,NULL)]
           colname=paste0("prob.gt.",ref)
           mat[,c(colname):=K/(1+K)]
-          mat[,K:=NULL]
+          mat[,c("lpdm2","lpdms","K"):=list(NULL,NULL,NULL)]
           mat[,c("is.significant","detection.type"):=list(get(colname) > threshold,"model comp")]
         }
       }

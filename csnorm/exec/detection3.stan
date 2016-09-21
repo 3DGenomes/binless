@@ -1,3 +1,6 @@
+////
+// Cut-site normalization: interaction detection through model comparison
+////
 data {
   int<lower=1> G; //number of groups
   int<lower=1> N; // Number of counts in this bin
