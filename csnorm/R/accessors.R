@@ -117,7 +117,9 @@ get_interactions = function(cs, type, resolution, group,
   if (type=="interactions") {
     return(ret)
   } else {
-    return(ret[name!=ref])
+    ret=merge(ret, mat[name==ref,.(bin1,bin2,ref.observed=observed,ref.expected=expected,
+                                   ref.normalized=normalized,ref.icelike=icelike)], by=c("bin1","bin2"))
+    return(ret)
   }
 }
 
