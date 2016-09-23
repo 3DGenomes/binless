@@ -150,234 +150,22 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
   return(binned)
 }
 
-#' compute \eqn{p(\Gamma_2>\Gamma_1) = \int_{0}^{+\infty} dx p_{\Gamma_2}(x) \int_{0}^{x} dy p_{\Gamma_1}(y)}
-#' @keywords internal
-#' 
-compute_gamma_overlap = function(alpha1,beta1,alpha2,beta2, bounds=5, ncores=1) {
-  registerDoParallel(cores=ncores)
-  foreach (a1=alpha1, b1=beta1, a2=alpha2, b2=beta2, .packages="stats", .combine=c) %dopar% {
-    #infinite integral does not work very well so truncate outer integral
-    mu1=a1/b1
-    mu2=a2/b2
-    sd1=sqrt(a1)/b1
-    sd2=sqrt(a2)/b2
-    xmin = max(0,min(mu1-bounds*sd1,mu2-bounds*sd2))
-    xmax = max(mu1+bounds*sd1,mu2+bounds*sd2)
-    a=integrate(function(x){exp(dgamma(x,a2,rate=b2,log=T)+pgamma(x,a1,rate=b1,log.p=T))},xmin,xmax, stop.on.error=F)
-    if (a$abs.error<=0 | a$message != "OK") {NA} else {a$value}
-  }
-}
-
-#' compute \eqn{p(\mathcal{N}_2>\mathcal{N}_1) = \int_{-infty}^{+infty} dx p_{\mathcal{N}_2}(x) \int_{-infty}^{x} dy p_{\mathcal{N}_1}(y)}
-#' @keywords internal
-#' 
-compute_normal_overlap = function(mu1,sd1,mu2,sd2, bounds=5, ncores=1) {
-  registerDoParallel(cores=ncores)
-  foreach (m1=mu1, s1=sd1, m2=mu2, s2=sd2, .packages="stats", .combine=c) %dopar% {
-    #infinite integral does not work very well so truncate outer integral
-    xmin = min(m1-bounds*s1,m2-bounds*s2)
-    xmax = max(m1+bounds*s1,m2+bounds*s2)
-    a=integrate(function(x){exp(dnorm(x,mean=(m2-m1)/s1,sd=s2/s1,log=T)+pnorm(x,mean=0,sd=1,log.p=T))},(xmin-m1)/s1,(xmax-m1)/s1)
-    if (a$abs.error<=0 | a$message != "OK") {NA} else {a$value}
-  }
-}
-
-#' Interaction calling
-#' 
-#' @param mat
-#' @param name character. Name of reference experiment. Used for naming
-#'   probability column "prob.gt.name".
-#' @param threshold significance threshold, between 0 and 1
-#' @param ncores number of cores used for parallelization
-#' @param normal.approx integer. Use normal approximation if dispersion is 
-#'   larger than this (should be larger than 10)
-#'   
-#' @return the matrix with called interactions
-#' @keywords internal
-#' @export
-#' 
-#' @examples
-call_interactions = function(mat, name, threshold=0.95, ncores=1, normal.approx=100) {
-  colname=paste0("prob.gt.",name)
-  mat[alpha1<normal.approx,c(colname,"detection.type"):=list(
-    compute_gamma_overlap(alpha1,beta1,alpha2,beta2,ncores=ncores),"gamma")]
-  mat[,c("mean1","sd1"):=list(alpha1/beta1, sqrt(alpha1)/beta1)]
-  mat[,c("mean2","sd2"):=list(alpha2/beta2, sqrt(alpha2)/beta2)]
-  mat[alpha1>=normal.approx,c(colname,"detection.type"):=list(
-    compute_normal_overlap(mean1,sd1, mean2, sd2, ncores=ncores),"normal")]
-  mat[,c(colname):=as.numeric(get(colname))]
-  mat[,is.significant:=get(colname)>threshold | 1-get(colname)>threshold]
-  if (mat[is.na(get(colname)),.N]>0) {
-    cat("Warning:",mat[is.na(get(colname)),.N],"out of ",mat[,.N], "calls could not be computed!\n")
-  }
-  return(mat)
-}
-
-#' estimates the values of the count or dispersion required to cross a given threshold
-#' 
-#' For illustration purposes. Has a border effect at high counts that can be safely ignored.
-#'
-#' @param observed,expected,dispersion,threshold floats used to generate the plots 
-#' @param counts.range scan counts in that range
-#' @param disp.range scan dispersion in that range
-#' @param compute whether to compute the values that meet the threshold or not. This step can fail if the ranges are set badly.
-#'
-#' @return a list of three plots
-#' @export
-#'
-#' @examples
-thresholds_estimator = function(observed, expected, dispersion, threshold=0.95, counts.range=c(expected/100,expected*100), disp.range=c(0,100*dispersion), compute=T) {
-  #plot gamma distributions
-  a1=dispersion
-  b1=dispersion/expected
-  a2=a1+observed
-  b2=b1+1
-  mu1=a1/b1
-  mu2=a2/b2
-  sd1=sqrt(a1)/b1
-  sd2=sqrt(a2)/b2
-  message("prior:     mean ",mu1, " sd ",sd1)
-  message("posterior: mean ",mu2, " sd ",sd2)
-  xmin = min(c(0,counts.range))
-  xmax = max(counts.range)
-  message("evaluation bounds: [",xmin,",",xmax,"]")
-  p1=ggplot(data.table(x=c(xmin,xmax)),aes(x))+
-    stat_function(fun=function(x){dgamma(x,a1,rate=b1)},aes(colour="prior"))+
-    stat_function(fun=function(x){dgamma(x,a2,rate=b2)},aes(colour="posterior"))+
-    scale_colour_manual("Gamma", values = c("blue", "red"))
-  #helper function  
-  gammaQuery=function(mu,theta,count){
-    alpha1=theta
-    alpha2=theta+count
-    beta1=theta/mu
-    beta2=beta1+1
-    return(function(x){exp(dgamma(x,alpha2,rate=beta2,log=T)+pgamma(x,alpha1,rate=beta1,log.p=T))})
-  }
-  #query counts
-  igammaQuery_c=function(x){integrate(gammaQuery(expected,dispersion,count=x),xmin,xmax)$value-threshold}
-  p2=ggplot(data.table(x=c(xmin,xmax),y=c(0,1)),aes(x))+
-    stat_function(fun=Vectorize(function(x){igammaQuery_c(x)+threshold}))+
-    geom_hline(aes(yintercept=threshold))+ geom_hline(aes(yintercept=1-threshold))+
-    labs(x="observed count", y="P(observed>expected)")
-  if (compute){
-    clo = uniroot(function(x){igammaQuery_c(x)+2*threshold-1},c(xmin,expected))$root
-    chi = uniroot(igammaQuery_c,c(expected,xmax))$root
-    message("At a threshold of ",threshold," significant counts are lower than ",clo," and higher than ",chi)
-    p2=p2+geom_vline(aes(xintercept=clo))+ geom_vline(aes(xintercept=chi))
-  }
-  #query dispersion
-  igammaQuery_theta=function(x){integrate(gammaQuery(expected,x,observed),xmin,xmax)$value-threshold}
-  p3=ggplot(data.table(x=disp.range,y=c(0,1)),aes(x))+
-    stat_function(fun=Vectorize(function(x){igammaQuery_theta(x)+threshold}))+
-    geom_hline(aes(yintercept=threshold))+geom_hline(aes(yintercept=1-threshold))+
-    labs(x="dispersion", y="P(observed>expected)")+scale_x_log10()
-  if (compute) {
-    dstar = uniroot(igammaQuery_theta,disp.range)$root
-    p3=p3+geom_vline(aes(xintercept=dstar))
-    if (observed > expected) {
-      message("At a threshold of ",threshold," the dispersion must be larger than ",dstar," to reach significance")
-    } else {
-      message("At a threshold of ",threshold," the dispersion must be smaller than ",dstar," to reach significance")
-    }
-  }
-  return(list(p1,p2,p3))
-}
-
-
-#' Perform peak and differential detection (method 2)
+#' Perform peak and differential detection through model comparison
 #'
 #' @param cs 
 #' @param ref 
 #' @param resolution 
 #' @param group 
-#' @param threshold 
-#'
-#' @return
-#' @keywords internal
-#' @export
-#'
-#' @examples
-detection_type_2 = function(cs, resolution, group, ref="expected", threshold=0.95, ncores=1) {
-  if (group=="all") {
-    names=cs@experiments[,unique(name)]
-    groups=data.table(name=names,groupname=names)
-  } else {
-    groups=cs@experiments[,.(name,groupname=do.call(paste,mget(group))),by=group][,.(name,groupname)] #we already know groupname is unique
-  }
-  setkey(groups,name)
-  if (ref != "expected" && !(ref %in% groups[,groupname])) stop("Reference group name not found! Valid names are: ",deparse(as.character(groups[,groupname])))
-  #retrieve bin borders
-  biases=cs@biases
-  counts=cs@counts
-  bins=seq(biases[,min(pos)-1],biases[,max(pos)+1+resolution],resolution)
-  counts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
-                                 cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
-  counts[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
-  biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
-  biases[,ibin:=as.integer(bin)-1]
-  chunks=CJ(biases[,min(ibin):max(ibin)],biases[,min(ibin):max(ibin)])[V1<=V2]
-  registerDoParallel(cores=ncores)
-  mat = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
-    #get zero-filled portion of counts and predict model on it
-    cts=copy(counts[ibin1==i&ibin2==j])
-    biases1=copy(biases[ibin==i]) #just needed to fill the counts matrix
-    biases2=copy(biases[ibin==j])
-    if (biases1[,.N]>0 & biases2[,.N]>0) {
-      cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize)
-      if (cts[,.N]>0) {
-        setkey(cts,name,id1,id2)
-        cts=csnorm_predict_all(cs, cts, verbose=F)
-        cts=groups[cts]
-        setkey(cts,groupname,id1,id2)
-        if(cts[,.N]==1) {cbegin=c(1,2)} else {cbegin=c(1,cts[,.(groupname,row=.I)][groupname!=shift(groupname),row],cts[,.N+1])}
-        #compute signal distribution
-        data=list(G=groups[,uniqueN(groupname)], N=4*cts[,.N], cbegin=cbegin, observed=cts[,c(contact.close,contact.down,contact.far,contact.up)],
-                  log_expected=cts[,c(log_mean_cclose,log_mean_cdown,log_mean_cfar,log_mean_cup)], alpha=cs@par$alpha)
-        output=capture.output(op<-optimizing(csnorm:::stanmodels$detection, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
-        mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=biases1[1,bin], bin2=biases2[1,bin],
-                       log_s.mean=op$par$log_s, log_s.std=as.vector(1/sqrt(-diag(op$hessian))))
-      }
-    }
-  }
-  counts[,c("bin1","bin2","ibin1","ibin2"):=list(NULL,NULL,NULL,NULL)]
-  biases[,c("bin","ibin"):=list(NULL,NULL)]
-  setkey(mat,name,bin1,bin2)
-  if (ref=="expected") {
-    mat[,prob.gt.expected:=pnorm(0,mean=log_s.mean,sd=log_s.std,lower.tail=F,log.p=F)]
-    mat[,is.significant:=prob.gt.expected > threshold | 1-prob.gt.expected > threshold]
-    mat[,direction:=ifelse(0<log_s.mean,"enriched","depleted")]
-  } else {
-    refmat=mat[name==ref,.(bin1,bin2,ref.mean=log_s.mean,ref.sd=log_s.std)]
-    setkey(refmat,bin1,bin2)
-    mat=mat[name!=ref]
-    setkey(mat,name,bin1,bin2)
-    mat=merge(mat,refmat,all=T)
-    colname=paste0("prob.gt.",ref)
-    mat[,c(colname):=csnorm:::compute_normal_overlap(mu1=ref.mean,sd1=ref.sd,mu2=log_s.mean,sd2=log_s.std,ncores=ncores)]
-    mat[,is.significant:=get(colname)>threshold | 1-get(colname)>threshold]
-    mat[,direction:=ifelse(ref.mean<log_s.mean,"enriched","depleted")]
-    mat[,c("ref.mean","ref.sd"):=list(NULL,NULL)]
-  }
-  mat[,c("log_s.mean","log_s.std","detection.type"):=list(NULL,NULL,"augmented")]
-  mat
-}
-
-#' Perform peak and differential detection (method 3: model comp)
-#'
-#' @param cs 
-#' @param ref 
-#' @param resolution 
-#' @param group 
-#' @param threshold on the Bayes factor K
-#' @param prior.odds 
+#' @param threshold on the probability K/(1+K) where K is the Bayes factor
 #' @param ncores 
+#' @param prior.sd 
 #'
 #' @return
 #' @keywords internal
 #' @export
 #'
 #' @examples
-detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, prior.sd=5, ncores=1) {
+detection_binned = function(cs, resolution, group, ref="expected", threshold=0.95, prior.sd=5, ncores=1) {
   if (group=="all") {
     names=cs@experiments[,unique(name)]
     groups=data.table(name=names,groupname=names)
@@ -426,15 +214,18 @@ detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, 
         if (ref=="expected") {
           mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=cts[head(cbegin,-1),bin1], bin2=cts[head(cbegin,-1),bin2],
                          K=exp(op$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op$hessian))))-op$par$lpdf0),
-                         direction=ifelse(0<op$par$log_s,"enriched","depleted"))
+                         direction=ifelse(0<op$par$log_s,"enriched","depleted"),
+                         signal=exp(op$par$log_s))
+          mat[,signal.sd:=sqrt(as.vector(1/(-diag(op$hessian))))*signal]
           mat[,prob.gt.expected:=K/(1+K)]
           mat[,K:=NULL]
-          mat[,c("is.significant","detection.type"):=list(prob.gt.expected > threshold,"model comp")]
+          mat[,is.significant:=prob.gt.expected > threshold]
         } else {
           #compute grouped signal contributions
           mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=cts[head(cbegin,-1),bin1], bin2=cts[head(cbegin,-1),bin2],
                          lpdms=op$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op$hessian)))), #log(p(D|Msignal))
-                         log_s.mean=op$par$log_s)
+                         log_s.mean=op$par$log_s, signal=exp(op$par$log_s))
+          mat[,signal.sd:=sqrt(as.vector(1/(-diag(op$hessian))))*signal]
           refcounts=cts[groupname==ref]
           diffcounts=foreach(n=cts[groupname!=ref,unique(groupname)],.combine=rbind) %do% {
             tmp=rbind(cts[groupname==n],refcounts)
@@ -446,7 +237,7 @@ detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, 
           data=list(G=length(cbegin)-1, N=diffcounts[,.N], cbegin=cbegin,
                     observed=diffcounts[,count], log_expected=diffcounts[,log_mean], alpha=cs@par$alpha, sigma=prior.sd)
           output=capture.output(op2<-optimizing(csnorm:::stanmodels$detection3, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
-          refmat=mat[name==ref,.(bin1,bin2,lpdmref=lpdms,logsref=log_s.mean)]
+          refmat=mat[name==ref,.(bin1,bin2,lpdmref=lpdms,logsref=log_s.mean,refsignal=signal,refsignal.sd=signal.sd)]
           mat=merge(mat[name!=ref],refmat,by=c("bin1","bin2"))
           mat[,c("lpdm2","direction"):=list(lpdms+lpdmref,ifelse(logsref<log_s.mean,"enriched","depleted"))]
           mat[,c("lpdms","lpdmref","logsref","log_s.mean"):=list(NULL,NULL,NULL,NULL)]
@@ -457,8 +248,9 @@ detection_type_3 = function(cs, resolution, group, ref="expected", threshold=5, 
           mat[,K:=exp(lpdm2-lpdms)]
           colname=paste0("prob.gt.",ref)
           mat[,c(colname):=K/(1+K)]
-          mat[,c("lpdm2","lpdms","K"):=list(NULL,NULL,NULL)]
-          mat[,c("is.significant","detection.type"):=list(get(colname) > threshold,"model comp")]
+          mat[,is.significant:=get(colname) > threshold]
+          mat[,c("signal","signal.sd"):=list(signal/refsignal,(signal.sd*refsignal-refsignal.sd*signal)/(signal*refsignal))]
+          mat[,c("lpdm2","lpdms","K","refsignal","refsignal.sd"):=list(NULL,NULL,NULL,NULL,NULL)]
         }
       }
     }
@@ -613,7 +405,6 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
 #' @param resolution,group see
 #'   \code{\link{bin_all_datasets}} and \code{\link{group_datasets}}, used to
 #'   identify the input matrices.
-#' @param detection.type integer. Type 1: original Type 2: new
 #' @param threshold significance threshold, between 0 and 1
 #' @param ncores number of cores used for parallelization
 #' @inheritParams call_interactions
@@ -623,34 +414,19 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
 #' @export
 #' 
 #' @examples
-detect_interactions = function(cs, resolution, group, detection.type=c(1,2,3), threshold=0.95, ncores=1){
-  stopifnot(length(detection.type)==1 && detection.type>=1 && detection.type<=3)
+detect_interactions = function(cs, resolution, group, threshold=0.95, ncores=1){
   #get CSmat object
   idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
   idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
   #check if interaction wasn't calculated already
-  if (get_cs_interaction_idx(csm, type="interactions", detection.type=detection.type,
-                             threshold=threshold, ref="expected", raise=F)>0) {
+  if (get_cs_interaction_idx(csm, type="interactions", threshold=threshold, ref="expected", raise=F)>0) {
     stop("Refusing to overwrite this already detected interaction")
   }
-  if (detection.type==1) {
-    mat=copy(csm@mat[,.(name,bin1,bin2,observed,expected,dispersion)])
-    #report gamma parameters
-    mat[,c("alpha1","beta1"):=list(dispersion,dispersion)] #posterior
-    mat[,c("alpha2","beta2"):=list(alpha1+observed,beta1+expected)] #posterior predictive
-    mat=call_interactions(mat,"expected",threshold=threshold,ncores=ncores, normal.approx=100)
-    mat[,direction:=ifelse(mean1<mean2,"enriched","depleted")]
-    mat[,c("alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2","observed","expected","dispersion"
-           ):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
-  } else if (detection.type==2) {
-    mat=detection_type_2(cs, resolution=resolution, group=group, ref="expected", threshold=threshold, ncores=ncores)
-  } else {
-    mat=detection_type_3(cs, resolution=resolution, group=group, ref="expected", threshold=threshold, ncores=ncores)
-  }
+  mat=detection_binned(cs, resolution=resolution, group=group, ref="expected", threshold=threshold, ncores=ncores)
   #store back
-  csi=new("CSinter", mat=mat, type="interactions", detection.type=detection.type, threshold=threshold, ref="expected")
+  csi=new("CSinter", mat=mat, type="interactions", threshold=threshold, ref="expected")
   csm@interactions=append(csm@interactions,list(csi))
   csb@grouped[[idx2]]=csm
   cs@binned[[idx1]]=csb
@@ -661,7 +437,6 @@ detect_interactions = function(cs, resolution, group, detection.type=c(1,2,3), t
 #' Detect significant differences with a reference
 #' 
 #' @param binned as returned by \code{\link{csnorm_predict_binned}}
-#' @param ref character. Detect differences between this group and all others
 #' @inheritParams call_interactions
 #'   
 #' @return the binned matrix with additional information relating to these
@@ -669,50 +444,18 @@ detect_interactions = function(cs, resolution, group, detection.type=c(1,2,3), t
 #' @export
 #' 
 #' @examples
-detect_differences = function(cs, resolution, group, detection.type=c(1,2,3), ref, threshold=0.95, ncores=1){
-  stopifnot(length(detection.type)==1 && detection.type>=1 && detection.type<=3)
+detect_differences = function(cs, resolution, group, ref, threshold=0.95, ncores=1){
   idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
   idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
   #check if interaction wasn't calculated already
-  if (get_cs_interaction_idx(csm, type="differences", detection.type=detection.type,
-                             threshold=threshold, ref="expected", raise=F)>0) {
+  if (get_cs_interaction_idx(csm, type="differences", threshold=threshold, ref="expected", raise=F)>0) {
     stop("Refusing to overwrite this already detected interaction")
   }
-  if (detection.type==1) {
-    mat=copy(csm@mat[,.(name,bin1,bin2,observed,expected,dispersion)])
-    names=mat[,unique(name)]
-    if (!(ref %in% names)) stop("Reference group name not found! Valid names are: ",deparse(as.character(names)))
-    names=names[names!=ref]
-    refmat=mat[name==ref,.(bin1,bin2,alpha1=dispersion+observed,beta1=dispersion+expected)]
-    setkey(refmat,bin1,bin2)
-    qmat = foreach (n=names,.combine="rbind") %do% {
-      #merge parameters
-      qmat=mat[name==n,.(bin1,bin2,alpha2=dispersion+observed,beta2=dispersion+expected)]
-      setkey(qmat,bin1,bin2)
-      qmat=merge(refmat,qmat,all=T)
-      qmat=qmat[!(is.na(alpha1)|is.na(beta1)|is.na(alpha2)|is.na(beta2))]
-      #call interactions
-      qmat=call_interactions(qmat,ref,threshold=threshold,ncores=ncores)
-      qmat[,direction:=ifelse(mean1<mean2,"enriched","depleted")]
-      #compute ratio matrix
-      qmat[,ratio:=ifelse(alpha2>1,(beta2/beta1)*(alpha1/(alpha2-1)),NA)]
-      qmat[,ratio.sd:=ifelse(alpha2>2,(beta2/beta1)*sqrt((alpha1*(alpha1+alpha2-1))/((alpha2-2)*(alpha2-1)^2)),NA)]
-      #remove extra columns and add name
-      qmat[,c("name","alpha1","alpha2","beta1","beta2","mean1","mean2","sd1","sd2"):=list(
-        n,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
-      qmat
-    }
-    #merge everything back
-    mat=merge(mat[,.(name,bin1,bin2)],qmat,all=T,by=c("name","bin1","bin2"))
-  } else if (detection.type==2) {
-    mat=detection_type_2(cs, resolution=resolution, group=group, ref=ref, threshold=threshold, ncores=ncores)
-  } else {
-    mat=detection_type_3(cs, resolution=resolution, group=group, ref=ref, threshold=threshold, ncores=ncores)
-  }
+  mat=detection_binned(cs, resolution=resolution, group=group, ref=ref, threshold=threshold, ncores=ncores)
   #add interaction to cs object
-  csi=new("CSinter", mat=mat, type="differences", detection.type=detection.type, threshold=threshold, ref=ref)
+  csi=new("CSinter", mat=mat, type="differences", threshold=threshold, ref=ref)
   csm@interactions=append(csm@interactions,list(csi))
   csb@grouped[[idx2]]=csm
   cs@binned[[idx1]]=csb

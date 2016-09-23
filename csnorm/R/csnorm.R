@@ -97,7 +97,6 @@ setMethod("show",signature="CSdata",definition=function(object) {
 #' @slot type 
 #' @slot threshold 
 #' @slot ref 
-#' @slot detection.type numeric. detection method
 #'
 #' @return
 #' @keywords internal
@@ -107,7 +106,6 @@ setMethod("show",signature="CSdata",definition=function(object) {
 setClass("CSinter",
          slots = list(mat="data.table",
                       type="character",
-                      detection.type="numeric",
                       threshold="numeric",
                       ref="character"))
 setMethod("show",signature="CSinter",definition=function(object) {
@@ -116,7 +114,7 @@ setMethod("show",signature="CSinter",definition=function(object) {
   } else {
     cat("        Significant differences wrt ", object@ref)
   }
-  cat(" (threshold=", object@threshold,", detection.type=", object@detection.type, ")\n")
+  cat(" (threshold=", object@threshold,")\n")
 })
 
 #' Class for one binned matrix and its interaction detections

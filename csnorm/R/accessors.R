@@ -51,7 +51,6 @@ get_cs_matrix_idx = function(csb, group, raise=T) {
 #'
 #' @param csm 
 #' @param type 
-#' @param detection.type 
 #' @param threshold 
 #' @param ref 
 #' @param raise 
@@ -61,10 +60,10 @@ get_cs_matrix_idx = function(csb, group, raise=T) {
 #' @export
 #'
 #' @examples
-get_cs_interaction_idx = function(csm, type, detection.type, threshold, ref, raise=T) {
+get_cs_interaction_idx = function(csm, type, threshold, ref, raise=T) {
   if(length(csm@interactions)>0) {
     for (i in 1:length(csm@interactions)) {
-      if (csm@interactions[[i]]@detection.type==detection.type && csm@interactions[[i]]@type==type
+      if (csm@interactions[[i]]@type==type
           && csm@interactions[[i]]@threshold==threshold && csm@interactions[[i]]@ref==ref) return(i)
     }
   }
@@ -105,14 +104,14 @@ get_matrices = function(cs, resolution, group) {
 #' @export
 #' 
 #' @examples
-get_interactions = function(cs, type, resolution, group, detection.type,
+get_interactions = function(cs, type, resolution, group,
                             ref, threshold) {
   idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
   idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
   mat=csm@mat
-  idx3=get_cs_interaction_idx(csm, type, detection.type, threshold, ref)
+  idx3=get_cs_interaction_idx(csm, type, threshold, ref)
   int=csm@interactions[[idx3]]@mat
   ret=merge(mat,int,by=c("name","bin1","bin2"))
   if (type=="interactions") {
