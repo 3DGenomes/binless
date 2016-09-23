@@ -316,6 +316,23 @@ csnorm_predict_all = function(cs, counts, verbose=T) {
   return(pred)
 }
 
+#' Fill in a large matrix with predicted values
+#' @keywords internal
+#'
+csnorm_predict_all_parallel = function(cs, counts, verbose=T, ncores=1) {
+  nchunks=min(10*ncores,counts[,.N,by=name][,N]) #ensure at least 1 of each per parallel prediction
+  counts[,chunk:=.I]
+  counts[,chunk:=chunk-min(chunk),by=name]
+  counts[,chunk:=as.integer(chunk/((max(chunk)+1)/nchunks)),by=name]
+  registerDoParallel(cores = ncores)
+  counts = foreach (i=0:(nchunks-1), .combine=rbind) %dopar%
+    csnorm_predict_all(cs,counts[chunk==i],verbose=verbose)
+  counts[,chunk:=NULL]
+  counts
+}
+
+
+
 #' Split a chromosome into subsets for parallelization
 #' @keywords internal
 #'
