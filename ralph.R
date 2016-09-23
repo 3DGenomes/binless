@@ -27,19 +27,17 @@ ggplot(binned)+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~name,scales="free")
 
-
-load("data/ralph_EScell_Sox2_10Mb_csdata_with_data.RData")
-begin=34500000
-end=35000000
-data=csd@data[re.closest1>=begin&re.closest1<=end&re.closest2>=begin&re.closest2<=end]
-cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
-csd = new("CSdata", info=csd@info, settings=list(circularize=-1),
-          data=data, biases=cs_data$biases, counts=cs_data$counts)
-save(csd, file="data/ralph_EScell_Sox2_0.5Mb_csdata_with_data.RData")
-csd@data=data.table()
-save(csd, file="data/ralph_EScell_Sox2_0.5Mb_csdata.RData")
-csd2=csd
-
+for (cell in c("ES","B")) {
+  load(paste0("data/ralph_",cell,"cell_Sox2_10Mb_csdata_with_data.RData"))
+  begin=33000000
+  end=36000000
+  data=csd@data[re.closest1>=begin&re.closest1<=end&re.closest2>=begin&re.closest2<=end]
+  cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
+  csd = new("CSdata", info=csd@info, settings=list(circularize=-1),
+            data=data, biases=cs_data$biases, counts=cs_data$counts)
+  csd@data=data.table()
+  save(csd, file=paste0("data/ralph_",cell,"cell_Sox2_3Mb_csdata.RData"))
+}
 
 
 load("data/ralph_EScell_Sox2_0.5Mb_csdata.RData")
