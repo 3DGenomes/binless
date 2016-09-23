@@ -318,6 +318,7 @@ csnorm_predict_all = function(cs, counts, verbose=T) {
 
 #' Fill in a large matrix with predicted values
 #' @keywords internal
+#' @export
 #'
 csnorm_predict_all_parallel = function(cs, counts, verbose=T, ncores=1) {
   nchunks=min(10*ncores,counts[,.N,by=name][,N]) #ensure at least 1 of each per parallel prediction
@@ -330,8 +331,6 @@ csnorm_predict_all_parallel = function(cs, counts, verbose=T, ncores=1) {
   counts[,chunk:=NULL]
   counts
 }
-
-
 
 #' Split a chromosome into subsets for parallelization
 #' @keywords internal
@@ -813,7 +812,7 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
   if (cs@counts[,.N] > ncounts*2+1) {
     subcounts = cs@counts[,.SD[(1:ncounts+as.integer(.N/2))],by=name]
   } else {
-    subcounts=counts
+    subcounts=cs@counts
   }
   if (subcounts[,uniqueN(c(contact.close,contact.far,contact.up,contact.down))]<2) stop("dataset too sparse, please increase ncounts")
   #report min/max distance
