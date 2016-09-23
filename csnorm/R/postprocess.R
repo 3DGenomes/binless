@@ -83,7 +83,7 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
   counts=cs@counts
   bins=seq(biases[,min(pos)-1],biases[,max(pos)+1+resolution],resolution)
   counts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
-                                    cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
+                                 cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
   counts[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
   biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
   biases[,ibin:=as.integer(bin)-1]
@@ -461,4 +461,53 @@ detect_differences = function(cs, resolution, group, ref, threshold=0.95, ncores
   cs@binned[[idx1]]=csb
   return(cs)
 }
-  
+
+#' Binless interaction detection
+#'
+#' @param cs 
+#' @param group 
+#' @param ncores 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+detect_binless_interactions = function(cs, group, ncores=1) {
+  #predict means
+  counts=csnorm_predict_all_parallel(cs,cs@counts,verbose=F,ncores=ncores)
+  counts=rbind(counts[,.(name,id1,id2,pos1,pos2,distance,count=contact.close,log_mean=log_mean_cclose)],
+               counts[,.(name,id1,id2,pos1,pos2,distance,count=contact.far,log_mean=log_mean_cfar)],
+               counts[,.(name,id1,id2,pos1,pos2,distance,count=contact.up,log_mean=log_mean_cup)],
+               counts[,.(name,id1,id2,pos1,pos2,distance,count=contact.down,log_mean=log_mean_cdown)])
+  counts[,di:=(pos2+pos1)/2]
+  #add group information
+  if (group=="all") {
+    names=cs@experiments[,unique(name)]
+    groups=data.table(name=names,groupname=names)
+  } else {
+    groups=cs@experiments[,.(name,groupname=do.call(paste,mget(group))),by=group][,.(name,groupname)] #we already know groupname is unique
+  }
+  setkey(groups,name)
+  counts=merge(counts,groups,by="name")
+  #create prediction array
+  predicted=counts[,seq(min(pos1),max(pos2),length.out=100)]
+  predicted=CJ(groups[,unique(groupname)],predicted,predicted)[V3>V2]
+  setnames(predicted,c("groupname","pos1","pos2"))
+  predicted[,di:=(pos2+pos1)/2]
+  if (cs@settings$circularize>0) {
+    predicted[,distance:=pmin(abs(pos2-pos1), cs@settings$circularize+1-abs(pos2-pos1))]
+  } else {
+    predicted[,distance:=abs(pos2-pos1)]
+  }
+  #fit and predict signal contribution in each dataset
+  for (n in groups[,unique(groupname)]) {
+    fit=bam(formula = count ~ offset(log_mean) + te(di, log(distance), bs="ps", k=15)+0,
+            family = negbin(theta=cs@par$alpha), data=counts[groupname==n], nthreads=ncores, discrete=F)
+    sig=predict(fit,counts[groupname==n],type="terms",se.fit=F, terms=NULL,newdata.guaranteed=T)
+    counts[groupname==n,signal:=exp(sig[,1])]
+    sig=predict(fit,predicted[groupname==n][,.(pos1,pos2,log_mean=1,distance,di)],type="terms",se.fit=F, terms=NULL,
+                    newdata.guaranteed=T)
+    predicted[groupname==n,signal:=exp(sig[,1])]
+  }
+  return(list(counts=counts,predicted=predicted))
+}

@@ -32,6 +32,7 @@
 #' @import matrixStats
 #' @import ggplot2
 #' @import methods
+#' @import mgcv
 #' @importFrom Hmisc cut2
 #' @importFrom dplyr ntile
 #'

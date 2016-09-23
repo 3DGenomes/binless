@@ -55,6 +55,7 @@ csd3=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="none")
 save(cs, file="data/caulo_rif_500k_csnorm.RData")
 
+load("data/caulo_BglII_rif_500k_csnorm_optimized.RData")
 
 
 #normalize with serial sampler
@@ -64,7 +65,7 @@ save(cs, file="data/caulo_rif_500k_csnorm_optimized_exact.RData")
 
 #normalize with gibbs sampler
 cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=10**seq(from=-2,to=1,length.out=6),
-                    ngibbs = 3, iter=10000, ncores=30)
+                    ngibbs = 5, iter=10000, ncores=30)
 save(cs, file="data/caulo_BglII_rif_csnorm_optimized_gibbs3_bpk0.25_grp10.RData")
 
 for (d in 2:length(op$par$beta_diag)) {
@@ -90,24 +91,27 @@ load("data/caulo_rif_500k_csnorm_optimized_exact.RData")
 load("data/caulo_rif_500k_csnorm_optimized_gibbs.RData")
 
 cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1)
-cs=detect_interactions(cs, resolution=20000, ncores=30, group="all", detection.type=1, threshold=0.95)
-cs=detect_interactions(cs, resolution=20000, ncores=30, group="all", detection.type=2, threshold=0.95)
-cs=detect_interactions(cs, resolution=20000, ncores=30, group="all", detection.type=3, threshold=3)
-cs=detect_differences(cs, resolution=20000, ncores=30, group="all", detection.type=1, ref="WT BglII 2", threshold=0.95)
-cs=detect_differences(cs, resolution=20000, ncores=30, group="all", detection.type=2, ref="WT BglII 2", threshold=0.95)
-cs=detect_differences(cs, resolution=20000, ncores=30, group="all", detection.type=3, ref="WT BglII 2", threshold=3)
+cs=detect_interactions(cs, resolution=20000, ncores=30, group="all", threshold=0.95)
+cs=detect_differences(cs, resolution=20000, ncores=30, group="all", ref="WT BglII 2", threshold=0.95)
 
-mat1=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=1, threshold=0.95)
-mat2=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=2, threshold=0.95)
-mat3=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", detection.type=3, threshold=3)
-setnames(mat3,"logK","prob.gt.expected")
-mat=rbindlist(list(detect1=mat1,detect2=mat2,detect3=mat3),use.names=T, idcol="method")
+mat=get_interactions(cs, type="interactions", resolution=20000, group="all", ref="expected", threshold=0.95)
 ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
-  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
+  geom_raster(aes(begin1,begin2,fill=log(normalized)))+
+  geom_raster(aes(begin2,begin1,fill=log(normalized)))+
   geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
   scale_fill_gradient(na.value = "white",low="white",high="black")+theme(legend.position = "none")+
-  facet_grid(method~name)
+  facet_wrap(~name)
+ggsave(filename = "images/caulo_BglII_rif_500k_interactions_20k.png", width=12, height=4)
+
+int=detect_binless_interactions(cs, group="all", ncores=30)
+counts=int$counts
+predicted=int$predicted
+ggplot() + 
+  geom_raster(aes(x=pos1,y=pos2,fill=log(signal)),data=predicted)+
+  geom_point(aes(pos2,pos1,colour=log(signal)),data=counts)+
+  facet_wrap(~groupname)+
+  scale_colour_gradient2(limits=c(-1,1))+scale_fill_gradient2(limits=c(-1,1))
+ggsave(filename = "images/caulo_BglII_rif_500k_interactions_binless.png", width=12, height=4)
 
 mat1=get_interactions(cs, type="differences", resolution=20000, group="all", ref="WT BglII 2", detection.type=1, threshold=0.95)
 mat2=get_interactions(cs, type="differences", resolution=20000, group="all", ref="WT BglII 2", detection.type=2, threshold=0.95)
