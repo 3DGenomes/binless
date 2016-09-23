@@ -87,18 +87,10 @@ ggplot(mat)+
   facet_wrap(~name)
 
 ### Interaction calling 
-cs=detect_interactions(cs, resolution=10000, group="all", detection.type=1, threshold=0.95, ncores=30)
-cs=detect_interactions(cs, resolution=10000, group="all", detection.type=2, threshold=0.95, ncores=30)
-cs=detect_interactions(cs, resolution=10000, group="all", detection.type=3, threshold=3, ncores=30)
-mat1=get_interactions(cs, type="interactions", resolution=10000, group="all", detection.type=1,
-                      threshold=0.95, ref="expected")
-mat2=get_interactions(cs, type="interactions", resolution=10000, group="all", detection.type=2,
-                     threshold=0.95, ref="expected")
-mat3=get_interactions(cs, type="interactions", resolution=10000, group="all", detection.type=3,
-                      threshold=3, ref="expected")
-mat=rbindlist(list(det1=mat1,det2=mat2),use.names=T,idcol="method")
+cs=detect_interactions(cs, resolution=20000, group="all", threshold=0.95, ncores=30)
+mat=get_interactions(cs, type="interactions", resolution=20000, group="all", threshold=0.95, ref="expected")
 #for example, we can plot the ice-like matrices with highlighted interactions in the upper left corner
-ggplot(mat1)+
+ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
   geom_point(aes(begin1,begin2,colour=prob.gt.expected<0.5),data=mat1[is.significant==T])+
