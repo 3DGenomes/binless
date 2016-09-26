@@ -472,7 +472,7 @@ detect_differences = function(cs, resolution, group, ref, threshold=0.95, ncores
 #' @export
 #'
 #' @examples
-detect_binless_interactions = function(cs, group, ncores=1) {
+detect_binless_interactions = function(cs, group, ncores=1, k=10) {
   #predict means
   counts=csnorm_predict_all_parallel(cs,cs@counts,verbose=F,ncores=ncores)
   counts=rbind(counts[,.(name,id1,id2,pos1,pos2,distance,count=contact.close,log_mean=log_mean_cclose)],
@@ -501,7 +501,7 @@ detect_binless_interactions = function(cs, group, ncores=1) {
   }
   #fit and predict signal contribution in each dataset
   for (n in groups[,unique(groupname)]) {
-    fit=bam(formula = count ~ offset(log_mean) + te(di, log(distance), bs="ps", k=15)+0,
+    fit=bam(formula = count ~ offset(log_mean) + te(di, log(distance), bs="ps", k=k)+0,
             family = negbin(theta=cs@par$alpha), data=counts[groupname==n], nthreads=ncores, discrete=F)
     sig=predict(fit,counts[groupname==n],type="terms",se.fit=F, terms=NULL,newdata.guaranteed=T)
     counts[groupname==n,signal:=exp(sig[,1])]
