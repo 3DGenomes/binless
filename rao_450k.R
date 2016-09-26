@@ -39,14 +39,16 @@ load("data/rao_HiCall_chrX_20k_csnorm_optimized_gibbs_grp10_bpk5.RData")
 load("data/rao_HiCall_chrX_20k_csnorm_optimized_exact_bpk5.RData")
 plots.e=check_fit(cs)
 
+load("data/rao_HiCall_chrX_450k_csnorm_optimized_bpk4_grp10.Rdata")
+
 
 ### Binning at a given resolution
-cs=bin_all_datasets(cs, resolution=1000, ncores=30, verbose=T, ice=1)
+cs=bin_all_datasets(cs, resolution=1000, ncores=30, verbose=T, ice=100)
 mat=get_matrices(cs, resolution=1000, group="all")
 ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(observed)))+
-  geom_raster(aes(begin2,begin1,fill=log(expected)))+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
+  geom_raster(aes(begin1,begin2,fill=observed))+
+  geom_raster(aes(begin2,begin1,fill=observed))+
+  scale_fill_gradient(low="white", high="black", na.value = "white", limits=c(0,20))+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~name)
 
 ### Interaction calling 
