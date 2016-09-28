@@ -501,8 +501,32 @@ detect_binless_interactions = function(cs, group, ncores=1, k=10) {
   }
   #fit and predict signal contribution in each dataset
   for (n in groups[,unique(groupname)]) {
-    fit=bam(formula = count ~ offset(log_mean) + te(di, log(distance), bs="ps", k=k)+0,
-            family = negbin(theta=cs@par$alpha), data=counts[groupname==n], nthreads=ncores, discrete=F)
+    #build tensor spline base
+    basis.di=counts[name==n,bs(di,df=20,intercept=T)]
+    basis.dist=counts[name==n,bs(log(distance),df=20,intercept=T)]
+    X = foreach(i=1:ncol(basis.dist),.combine=cbind) %:% foreach (j=1:ncol(basis.di), .combine=cbind) %do%
+      matrix(basis.dist[,i] * basis.di[,j], nrow=counts[name==n,.N], ncol=1)
+    cgrid=counts[name==n,.(di,distance)]
+    cgrid=melt(cbind(cgrid,X),id.vars=c("di" ,"distance"))
+    ggplot(cgrid[variable=="V400"])+geom_point(aes(di,log(distance),colour=value))
+    #
+    fit=fusedlasso2d(counts[name==n,count-exp(log_mean)], X=X, dim1=20, dim2=20, verbose=T) #fit on square grid, wasteful!
+    cgrid=counts[name==n,.(pos1,pos2)]
+    cgrid=melt(cbind(cgrid,X %*% coef(fit,nlam=5)$beta),id.vars=c("pos1" ,"pos2"))
+    cgrid=rbind(counts[name==n,.(pos1,pos2,variable=-1,value=count-exp(log_mean))],cgrid)
+    ggplot(cgrid)+geom_point(aes(pos1,pos2,colour=value))+facet_wrap(~variable)+scale_colour_gradient2(limits=c(-100,100))
+    #
+    pred.di=predicted[groupname==n,bs(di,df=20,intercept=T)]
+    pred.dist=predicted[groupname==n,bs(log(distance),df=20,intercept=T)]
+    Xpred = foreach(i=1:ncol(pred.dist),.combine=cbind) %:% foreach (j=1:ncol(pred.di), .combine=cbind) %do%
+      matrix(pred.dist[,i] * pred.di[,j], nrow=predicted[groupname==n,.N], ncol=1)
+    cgrid=predicted[groupname==n,.(pos1,pos2)]
+    cgrid=melt(cbind(cgrid,Xpred %*% coef(fit,nlam=9)$beta),id.vars=c("pos1" ,"pos2"))
+    ggplot(cgrid)+geom_raster(aes(pos1,pos2,fill=value))+facet_wrap(~variable)+scale_fill_gradient2(limits=c(-100,100))
+    #
+    cgrid=predicted[groupname==n,.(pos1,pos2,pred=Xpred %*% coef(fit,lambda=sqrt(counts[name==n,.N]*log(20*20)))$beta[,1])]
+    ggplot(cgrid)+geom_raster(aes(pos1,pos2,fill=pred))+scale_fill_gradient2(limits=c(-50,50))
+    #
     sig=predict(fit,counts[groupname==n],type="terms",se.fit=F, terms=NULL,newdata.guaranteed=T)
     counts[groupname==n,signal:=exp(sig[,1])]
     sig=predict(fit,predicted[groupname==n][,.(pos1,pos2,log_mean=1,distance,di)],type="terms",se.fit=F, terms=NULL,
