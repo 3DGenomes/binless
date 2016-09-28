@@ -11,34 +11,8 @@ setwd("/home/yannick/simulations/cs_norm")
 
 #generate 3 plots to determine dangling.L, dangling.R and maxlen respectively (fread warning can be ignored)
 #with this Caulobacter dataset, we can start with dangling.L=c(0,3,5) dangling.R=c(3,0,-2) maxlen=600
-a=examine_dataset("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_NcoI_reads_int.tsv",
-                  skip=0L,nrows=1000000)
-a=examine_dataset("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate2_reads_int.tsv",
-                  skip=0L,nrows=1000000)
 a=examine_dataset("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_rifampicin_reads_int.tsv",
                   skip=0L,nrows=1000000)
-a=examine_dataset("/scratch/rao/mapped/HIC005_both_filled_map_chr19.tsv",
-                  skip=1L,nrows=1000000)
-a=examine_dataset("/scratch/ralph/HiC/3_Mapped/Bcell_Sox2_10Mb_both_filled_map.tsv",
-                  skip=0L,nrows=1000000)
-a=examine_dataset("dlx2_new_OH_rs_int.tsv",skip=1L,nrows=1000000)
-a=examine_dataset("OH_rs_int_sub10M.tsv",skip=20L,nrows=1000000)
-
-
-a$pdangling
-chisq.test(c(a$data[(rbegin1-re.closest1)==3&strand1==1,.N],
-             a$data[(rbegin2-re.closest2)==0&strand2==0,.N]))
-chisq.test(c(a$data[(rbegin1-re.closest1)==0&abs(rbegin2-rbegin1)<1000&strand1==1&strand2==0,.N],
-             a$data[(rbegin2-re.closest2)==3&abs(rbegin2-rbegin1)<1000&strand1==1&strand2==0,.N]))
-chisq.test(c(a$data[(rbegin1-re.closest1)==4&abs(rbegin2-rbegin1)<1000&strand1==1&strand2==0,.N],
-             a$data[(rbegin2-re.closest2)==-1&abs(rbegin2-rbegin1)<1000&strand1==1&strand2==0,.N]))
-dleft=a$data[abs(rbegin1-re.closest1)<=15&strand1==1,
-           .(dist=rbegin1-re.closest1,cat="left",close=abs(rbegin2-rbegin1)<1000,strand=strand2==0)]
-dright=a$data[abs(rbegin2-re.closest2)<=15&strand2==0,
-            .(dist=rbegin2-re.closest2,cat="right",close=abs(rbegin2-rbegin1)<1000,strand=strand1==1)]
-ggplot(rbind(dleft,dright))+
-  geom_histogram(aes(dist,fill=paste(close,strand)),binwidth=1)+scale_x_continuous(breaks=-15:15)+
-  facet_grid(~cat)#+coord_cartesian(ylim=c(0,1e3))
 
 #Create the CSdata objects that contain each dataset, using the just-determined parameters
 #Don't forget to set circularize to the genome length if and only if it is a circular genome
@@ -110,7 +84,7 @@ check$counts[pval>0.95,.N]/plots$counts[,.N]
 #Once normalized, we generate binned matrices to perform the interaction detection. Here we choose to bin at 20kb resolution.
 #there are three dispersion calculations in this beta version, you might want to try them all out.
 #You can optionally ask for computation of ICE-normalized matrices, for comparison.
-load("data/caulo_BglII_rif_csnorm_optimized.RData")
+load("data/caulo_rif_csnorm_optimized.RData")
 cs=bin_all_datasets(cs, resolution=20000, ncores=30, verbose=T, ice=1)
 save(cs, file="data/caulo_rif_csnorm_optimized.RData")
 
@@ -126,12 +100,10 @@ mat=get_matrices(cs, resolution=20000, group="all")
 #icelike and icelike.sd: A "normalized" matrix with diagonal decay, useful to compare with ICEd matrices, among others
 
 #for example, we can plot the ICE-like matrix in the upper corner, with corresponding error bars in the lower corner
-ggplot(mat[name=="rifampicin BglII 1",.(begin1,begin2,no=-log(),obs=pmin(observed,5000))])+
-  geom_raster(aes(begin1,begin2,fill=obs))+
-  geom_raster(aes(begin2,begin1,fill=obs))+
-  geom_point(aes(begin1,begin2,colour=col),data=mat[is.significant==T&name=="rifampicin BglII 1"])+scale_colour_gradient2()+
-  #scale_fill_gradient2()+theme(legend.position = "none")+theme_bw()+theme(legend.position = "none")
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")#+
+ggplot(mat)+
+  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
+  geom_raster(aes(begin2,begin1,fill=log(icelike.sd)))+
+  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~name)
 
 #For that binning, we can also verify whether the normalization has been performed correctly, using a residual plot
@@ -148,41 +120,52 @@ ggplot(mat)+geom_density(aes(log10(normalized),colour=name))+facet_wrap(~name)
 #To detect interactions, you need to specify an already binned dataset by providing resolution and detection.type.
 #Since you did not do any grouping yet (see below), pass group="all".
 #The interaction detection is made at a 95% posterior confidence threshold
-cs=detect_interactions(cs, resolution=20000, group="all", threshold=0.95, ncores=30)
+cs=detect_interactions(cs, resolution=20000, group="all", detection.type=1, threshold=0.95, ncores=30)
 
 #you can view the called interactions
 #since there was no grouping, pass group="all"
 #for simple interactions pass type="interactions" and ref="expected"
-mat=get_interactions(cs, type="interactions", resolution=20000, group="all",
+mat1=get_interactions(cs, type="interactions", resolution=20000, group="all", detection.type=1,
                      threshold=0.95, ref="expected")
-mat=get_interactions(cs, type="differences", resolution=20000, group="all", threshold=0.95, ref="WT BglII 2")
+mat3=get_interactions(cs, type="interactions", resolution=20000, group="all", detection.type=3,
+                     threshold=5, ref="expected")
+setnames(mat3,"logK","prob.gt.expected")
+mat=rbindlist(list(det1=mat1,det2=mat2,det3=mat3),use.names = T, idcol="method")
 #for example, we can plot the ice-like matrices with highlighted interactions in the upper left corner
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
+  geom_point(aes(begin1,begin2,colour=observed<expected),data=mat[is.significant==T])+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_grid(~name)
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(signal)))+
-  geom_raster(aes(begin2,begin1,fill=log(signal)))+
-  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
-  scale_fill_gradient2()+facet_grid(~name)
+  facet_grid(method~name)
 
-cs=detect_differences(cs, ref="WT BglII 2", resolution=20000, group="all", threshold=0.95, ncores=30)
-dmat=get_interactions(cs, type="differences", resolution=20000, group="all",
-                     threshold=0.95, ref="WT BglII 2")
+
+cs=detect_differences(cs, ref="WT BglII 2", resolution=20000, group="all", detection.type=2,
+                      threshold=0.95, ncores=30)
+cs=detect_differences(cs, ref="WT BglII 2", resolution=20000, group="all", detection.type=3,
+                      threshold=5, ncores=30)
+mat2=get_interactions(cs, type="differences", resolution=20000, group="all", detection.type=2,
+                      threshold=0.95, ref="WT BglII 2")
+mat3=get_interactions(cs, type="differences", resolution=20000, group="all", detection.type=3,
+                      threshold=5, ref="WT BglII 2")
+setnames(mat3,"logK","prob.gt.WT BglII 2")
+mat1[,c("ratio","ratio.sd"):=list(NULL,NULL)]
+dmat=rbindlist(list(det1=mat1,det2=mat2,det3=mat3),use.names = T, idcol="method")
+#for example, we can plot the ice-like matrices with highlighted interactions in the upper left corner
 ggplot(dmat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
   geom_point(aes(begin1,begin2,colour=direction),data=dmat[is.significant==T])+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_grid(~name)
-ggplot(dmat)+
-  geom_raster(aes(begin1,begin2,fill=log(signal)))+
-  geom_raster(aes(begin2,begin1,fill=log(signal)))+
-  geom_point(aes(begin1,begin2,colour=direction),data=dmat[is.significant==T])+
-  scale_fill_gradient2()+facet_grid(~name)
+  facet_grid(method~name)
+
+
+ggplot(mat[begin2<=1e6&begin1<1e6])+
+  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
+  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
+  geom_point(aes(begin1,begin2,colour=prob.gt.expected<0.5),data=mat[begin2<=1e6&begin1<1e6&is.significant==T])+
+  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
+  facet_wrap(~name)
 
 
 ### Grouping of datasets
@@ -192,14 +175,14 @@ ggplot(dmat)+
 cs=group_datasets(cs, resolution=20000, group=c("condition", "enzyme"), ice=1, verbose=T)
 
 #Again, you can detect interactions in these grouped datasets, and plot the results
-cs=detect_interactions(cs, resolution=20000, group=c("condition", "enzyme"), detection.type=1,
+cs=detect_interactions(cs, resolution=20000, group=c("condition", "enzyme"), detection.type=2,
                         threshold=0.95, ncores=30)
 mat=get_interactions(cs, type="interactions", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
                      threshold=0.95, ref="expected")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
+  geom_point(aes(begin1,begin2,colour=prob.gt.expected<0.5),data=mat[is.significant==T])+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~name)
 
@@ -218,7 +201,7 @@ mat=get_interactions(cs, type="differences", resolution=20000, group=c("conditio
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
+  geom_point(aes(begin1,begin2,colour=`prob.gt.WT BglII`<0.5),data=mat[is.significant==T])+
   scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
   facet_wrap(~name)
 
