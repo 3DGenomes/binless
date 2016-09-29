@@ -54,7 +54,10 @@ read_tsv = function(fname, nrows=-1L, skip=0L) {
   setnames(data,"idx","re.closest2.idx")
   #
   cat("sort by begins\n")
-  setkey(data,rbegin1,rbegin2)
+  setkey(data,rbegin1,rbegin2,strand1,strand2)
+  #
+  cat("remove duplicates\n")
+  data=unique(data)
   return(data)
 }
 
