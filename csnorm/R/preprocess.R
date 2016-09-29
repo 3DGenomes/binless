@@ -22,7 +22,7 @@ read_tsv = function(fname, nrows=-1L, skip=0L) {
   data[,chr1:=NULL]
   data[,chr2:=NULL]
   #
-  message("put read2 always downstream of read1")
+  cat("put read2 always downstream of read1\n")
   bdata=data[begin1>begin2]
   setnames(bdata, c("begin1","strand1", "length1", "re.up1","re.dn1",
                     "begin2","strand2", "length2", "re.up2","re.dn2"),
@@ -30,17 +30,17 @@ read_tsv = function(fname, nrows=-1L, skip=0L) {
              "begin1","strand1", "length1", "re.up1","re.dn1"))
   data = rbind(data[begin1<=begin2],bdata)
   #
-  message("set rbegin and rend")
+  cat("set rbegin and rend\n")
   data[strand1==0,c("rbegin1","rend1"):=list(begin1,begin1-length1+1)]
   data[strand1==1,c("rbegin1","rend1"):=list(begin1,begin1+length1-1)]
   data[strand2==0,c("rbegin2","rend2"):=list(begin2,begin2-length2+1)]
   data[strand2==1,c("rbegin2","rend2"):=list(begin2,begin2+length2-1)]
   #
-  message("find each read's closest restriction site")
+  cat("find each read's closest restriction site\n")
   data[,re.closest1:=ifelse(rbegin1-re.up1 < re.dn1-rbegin1,re.up1,re.dn1)]
   data[,re.closest2:=ifelse(rbegin2-re.up2 < re.dn2-rbegin2,re.up2,re.dn2)]
   #
-  message("number it")
+  cat("number it\n")
   rsites=data.table(pos=data[,unique(c(re.closest1,re.closest2))])
   setkey(rsites, pos)
   rsites[,idx:=.I]
@@ -53,7 +53,7 @@ read_tsv = function(fname, nrows=-1L, skip=0L) {
   setnames(data,"pos","re.closest2")
   setnames(data,"idx","re.closest2.idx")
   #
-  message("sort by begins")
+  cat("sort by begins\n")
   setkey(data,rbegin1,rbegin2)
   return(data)
 }
@@ -95,20 +95,20 @@ get_subset = function(data, b1, e1, b2=NULL, e2=NULL) {
 categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0,4), dangling.R = c(3,-1)) {
   sub[,category:="other"]
   #careful: order is important because attribution criteria overlap
-  message("Contacts")
+  cat("Contacts\n")
   sub[re.closest1.idx != re.closest2.idx & re.dn1 != re.dn2,
       category:=ifelse(strand1==1 & re.dn1 - rbegin1 < maxlen & strand2==1 & re.dn2 - rbegin2 < maxlen, "contact up",
                        ifelse(strand1==1 & re.dn1 - rbegin1 < maxlen & strand2==0 & rbegin2 - re.up2 < maxlen & rbegin2-rbegin1 >= maxlen, "contact far", #necessary to not overwrite DE
                               ifelse(strand1==0 & rbegin1 - re.up1 < maxlen & strand2==1 & re.dn2 - rbegin2 < maxlen, "contact close",
                                      ifelse(strand1==0 & rbegin1 - re.up1 < maxlen & strand2==0 & rbegin2 - re.up2 < maxlen, "contact down", "other"))))]
-  message("Random")
+  cat("Random\n")
   sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & re.dn1 == re.dn2, category:="random"]
-  message("Rejoined")
+  cat("Rejoined\n")
   sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & re.dn1 <= re.up2, category:="rejoined"]
   #sub[re.closest1.idx != re.closest2.idx & rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0, category:="random"]
-  message("Self Circle")
+  cat("Self Circle\n")
   sub[re.dn1 == re.dn2 & strand1==0 & strand2==1 & rbegin1 - re.up1 < maxlen & re.dn2 - rbegin2 < maxlen, category:="self circle"]
-  message("Dangling L/R")
+  cat("Dangling L/R\n")
   sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & ((rbegin1 - re.closest1) %in% dangling.L), category:="dangling L"]
   sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & ((rbegin2 - re.closest2) %in% dangling.R), category:="dangling R"]
   return(sub)
@@ -130,13 +130,13 @@ categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0,4), dangling
 #' @examples
 prepare_for_sparse_cs_norm = function(data, both=F, circularize=-1) {
   #get counts that are not other, random or self circle
-  message("Sum up counts and biases")
+  cat("Sum up counts and biases\n")
   enrich = data[!(category %in% c("other","random", "self circle")), .N,
                 keyby=c("re.closest1","re.closest2", "category")]
   enrich[,category:=gsub(" ", ".", category)]
   #
   #dangling ends: attribute to cut site
-  message("Reattribute biases to proper rsites")
+  cat("Reattribute biases to proper rsites\n")
   enrich[category=="dangling.L", re.closest2:=re.closest1]
   enrich[category=="dangling.R", re.closest1:=re.closest2]
   #rejoined ends: attribute to rsite in the middle
@@ -150,7 +150,7 @@ prepare_for_sparse_cs_norm = function(data, both=F, circularize=-1) {
   enrich=enrich[,.(N=sum(N)),by=c("re.closest1","re.closest2","category")]
   #
   #get rsites that a) have counts on them and b) have at least one dangling/rejoined end.
-  #message("RSites list")
+  #cat("RSites list\n")
   #rsites.count=enrich[category %in% c("contact.close", "contact.down", "contact.far", "contact.up"),
   #                    unique(c(re.closest1,re.closest2))]
   #rsites.bias=enrich[category %in% c("dangling.L", "dangling.R", "rejoined"),
@@ -161,11 +161,11 @@ prepare_for_sparse_cs_norm = function(data, both=F, circularize=-1) {
   rsites[,id:=.I]
   #
   #attribute restriction site IDs
-  message("Add Rsite info")
+  cat("Add Rsite info\n")
   enrich = merge(enrich, rsites, by.x="re.closest1", by.y="re.pos")
   enrich = merge(enrich, rsites, by.x="re.closest2", by.y="re.pos", suffixes=c("1", "2"))
   #
-  message("Produce bias list")
+  cat("Produce bias list\n")
   X=dcast.data.table(enrich[id1 == id2 & category %in% c("dangling.L", "dangling.R", "rejoined"),
                             .(id=id1, pos=re.closest1, category, N)],
                      ...~category, value.var="N", fun.aggregate = sum)
@@ -173,7 +173,7 @@ prepare_for_sparse_cs_norm = function(data, both=F, circularize=-1) {
   setkey(X,id)
   stopifnot(all(X[,id==.I])) #IDs must start at one and have no gaps, for current stan implementation
   #
-  message("Produce count list")
+  cat("Produce count list\n")
   Y=dcast.data.table(enrich[id1 != id2 
                             & category %in% c("contact.close", "contact.down", "contact.far", "contact.up"),
                             .(id1,id2,pos1=re.closest1,pos2=re.closest2,category,N)],
@@ -183,7 +183,7 @@ prepare_for_sparse_cs_norm = function(data, both=F, circularize=-1) {
   if (circularize>0) Y[,distance:=pmin(distance,circularize-distance+1)]
   #
   if (both == T) {
-    message("Merge them")
+    cat("Merge them\n")
     Ymelt = melt(Y, id.vars = c("id1","pos1", "id2", "pos2", "distance"), variable.name = "category", value.name = "N")
     XY = merge(Ymelt, X, by.x=c("id1","pos1"), by.y=c("id","pos"))
     XY = merge(XY, X, by.x=c("id2","pos2"), by.y=c("id","pos"), suffixes=c(".1", ".2"))
@@ -308,9 +308,11 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000) {
   dright=data[abs(rbegin2-re.closest2)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0,
              .(dist=rbegin2-re.closest2,cat="right")]
   pdangling=ggplot(rbind(dleft,dright))+
-    geom_histogram(aes(dist),binwidth=1)+scale_x_continuous(breaks=-window:window)+facet_grid(~cat)
+    geom_histogram(aes(dist),binwidth=1)+scale_x_continuous(breaks=-window:window)+facet_grid(~cat)+
+    xlab("distance from cut site")+ylab("number of reads")
   pdiag=ggplot(data[abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0])+
-    geom_histogram(aes(rbegin2-rbegin1),binwidth=10)
+    geom_histogram(aes(rbegin2-rbegin1),binwidth=10)+
+    xlab("sonication fragment size")+ylab("number of reads")
   return(list(pdangling=pdangling,pdiag=pdiag,data=data))
 }
 
@@ -341,14 +343,14 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "H
                             circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1), maxlen = 600,
                             save.data=T) {
   match.arg(experiment)
-  message("*** READ")
+  cat("*** READ\n")
   data=read_tsv(infile, skip=skip, nrows=nrows)
-  message("*** CATEGORIZE")
+  cat("*** CATEGORIZE\n")
   data = categorize_by_new_type(data, dangling.L = dangling.L, dangling.R = dangling.R, maxlen = maxlen)
-  message("*** BIASES AND COUNTS")
+  cat("*** BIASES AND COUNTS\n")
   cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=circularize)
   dset_statistics(cs_data$biases,cs_data$counts)
-  message("*** WRITE")
+  cat("*** WRITE\n")
   csd = new("CSdata", info=list(name=name, condition=condition, replicate=replicate,
                                enzyme=enzyme, experiment=experiment,
                                dangling.L=deparse(dangling.L), dangling.R=deparse(dangling.R), maxlen=maxlen,
