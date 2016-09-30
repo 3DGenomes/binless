@@ -10,56 +10,37 @@ setwd("/home/yannick/simulations/cs_norm")
 ### Preprocessing
 
 #generate 3 plots to determine dangling.L, dangling.R and maxlen respectively (fread warning can be ignored)
-#with this Caulobacter dataset, we can start with dangling.L=c(0,3,5) dangling.R=c(3,0,-2) maxlen=600
+#with this Caulobacter dataset, we can start with dangling.L=0 dangling.R=3 maxlen=600
 a=examine_dataset("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_NcoI_reads_int.tsv",
                   skip=0L,nrows=1000000)
-a=examine_dataset("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate2_reads_int.tsv",
-                  skip=0L,nrows=1000000)
-a=examine_dataset("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_rifampicin_reads_int.tsv",
-                  skip=0L,nrows=1000000)
-a=examine_dataset("/scratch/rao/mapped/HIC005_both_filled_map_chr19.tsv",
-                  skip=1L,nrows=1000000)
-a=examine_dataset("/scratch/ralph/HiC/3_Mapped/Bcell_Sox2_10Mb_both_filled_map.tsv",
-                  skip=0L,nrows=1000000)
-a=examine_dataset("dlx2_new_OH_rs_int.tsv",skip=1L,nrows=1000000)
-a=examine_dataset("OH_rs_int_sub10M.tsv",skip=20L,nrows=1000000)
+#Since the cut site is palindromic, it is expected that the peaks have the same height. You can test this hypothesis.
+chisq.test(c(a$data[(rbegin1-re.closest1)==0&strand1==1,.N],
+             a$data[(rbegin2-re.closest2)==3&strand2==0,.N]))
 
 
-a$pdangling
-chisq.test(c(a$data[(rbegin1-re.closest1)==3&strand1==1,.N],
-             a$data[(rbegin2-re.closest2)==0&strand2==0,.N]))
-chisq.test(c(a$data[(rbegin1-re.closest1)==0&abs(rbegin2-rbegin1)<1000&strand1==1&strand2==0,.N],
-             a$data[(rbegin2-re.closest2)==3&abs(rbegin2-rbegin1)<1000&strand1==1&strand2==0,.N]))
-chisq.test(c(a$data[(rbegin1-re.closest1)==4&abs(rbegin2-rbegin1)<1000&strand1==1&strand2==0,.N],
-             a$data[(rbegin2-re.closest2)==-1&abs(rbegin2-rbegin1)<1000&strand1==1&strand2==0,.N]))
-dleft=a$data[abs(rbegin1-re.closest1)<=15&strand1==1,
-           .(dist=rbegin1-re.closest1,cat="left",close=abs(rbegin2-rbegin1)<1000,strand=strand2==0)]
-dright=a$data[abs(rbegin2-re.closest2)<=15&strand2==0,
-            .(dist=rbegin2-re.closest2,cat="right",close=abs(rbegin2-rbegin1)<1000,strand=strand1==1)]
-ggplot(rbind(dleft,dright))+
-  geom_histogram(aes(dist,fill=paste(close,strand)),binwidth=1)+scale_x_continuous(breaks=-15:15)+
-  facet_grid(~cat)#+coord_cartesian(ylim=c(0,1e3))
 
 #Create the CSdata objects that contain each dataset, using the just-determined parameters
 #Don't forget to set circularize to the genome length if and only if it is a circular genome
 #be sure to correctly set the condition, replicate and enzyme fields.
-#save.data=T is only needed if you plan to take a smaller portion of the data. You could also filter the tsv file beforehand for that.
+#save.data=T is only needed if you plan to take a smaller portion of the data, or if you want to visualize the raw reads.
+#You could also filter the tsv file beforehand for that.
 #two outputs will be created for a given prefix: prefix_csdata.RData and if save.data==T, prefix_csdata_with_data.RData.
 #they contain the respective CSdata objects
 csd1=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_NcoI_reads_int.tsv",
-                      "data/caulo_NcoI_all", "WT", "1", enzyme="NcoI", circularize=4042929, dangling.L=c(0,3,5),
-                      dangling.R=c(3,0,-2), maxlen=600, save.data=T)
-csd2=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate1_reads_int.tsv",
-                      "data/caulo_BglIIr1_all", "WT", "1", enzyme="BglII", circularize=4042929, dangling.L=c(0,3,5),
-                      dangling.R=c(3,0,-2), maxlen=600, save.data=T)
-csd3=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate2_reads_int.tsv",
-                      "data/caulo_BglIIr2_all", "WT", "2", enzyme="BglII", circularize=4042929, dangling.L=c(0,3,5),
-                      dangling.R=c(3,0,-2), maxlen=600, save.data=T)
-csd4=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_rifampicin_reads_int.tsv",
-                      "data/caulo_BglII_rifampicin_all", "rifampicin", "1", enzyme="BglII", circularize=4042929, dangling.L=c(0,3,5),
-                      dangling.R=c(3,0,-2), maxlen=600, save.data=T)
+                      "data/caulo_NcoI_all", "WT", "1", enzyme="NcoI", circularize=4042929, dangling.L=c(0),
+                      dangling.R=c(3), maxlen=600, save.data=T)
 
+#We can plot a particular region of interest
+#to save memory, only the CSdata object that does not contain the raw reads is returned.
+#We therefore need to load it
+load("data/caulo_NcoI_all_csdata_with_data.RData")
+data=get_raw_reads(csd@data, 1080000, 1100000)
+plot_binned(data, resolution=1000, b1=1081000, e1=1099000)
+plot_raw(data, b1=1081000, e1=1099000)
 
+plot_binned(data, resolution=1000, b1=1089000, e1=1092000)
+plot_binned(data, resolution=100, b1=1089000, e1=1092000)
+plot_raw(data, b1=1089000, e1=1094000)
 
 ### Normalization
 

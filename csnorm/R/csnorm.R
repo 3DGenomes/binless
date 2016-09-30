@@ -21,7 +21,6 @@
 #' \code{\link{group_datasets}}
 #' \code{\link{detect_interactions}}
 #' \code{\link{detect_differences}}
-#' \code{\link{thresholds_estimator}}
 #' \code{\link{generate_genomic_biases}}
 #'
 #' @useDynLib csnorm, .registration = TRUE

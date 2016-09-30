@@ -61,18 +61,17 @@ read_tsv = function(fname, nrows=-1L, skip=0L) {
   return(data)
 }
 
-#' Get subset of reads
+#' Get subset of raw reads
 #'
-#' @param data 
+#' @param data reads data.table containing the raw reads
 #' @param b1,e1 begin / end of read range you want
 #' @param b2,e2 (optional) if provided, give extradiagonal portion 
 #'
-#' @return data.table
-#' @keywords internal
+#' @return reads data.table subset
 #' @export
 #'
 #' @examples
-get_subset = function(data, b1, e1, b2=NULL, e2=NULL) {
+get_raw_reads = function(data, b1, e1, b2=NULL, e2=NULL) {
   if (is.null(b2)) b2=b1
   if (is.null(e2)) e2=e1
   stopifnot(e1>b1)
@@ -80,6 +79,126 @@ get_subset = function(data, b1, e1, b2=NULL, e2=NULL) {
   stopifnot(b2>=b1)
   return(data[begin1>=b1 & begin1+length1<=e1 & begin2>=b2 & begin2+length2<=e2])
 }
+
+#' Bin a reads data.table into a matrix of a given resolution
+#'
+#' @return a data.table representing the binned data
+#' @keywords internal
+#'
+#' @examples
+
+bin_data = function(data, resolution, b1=NULL, b2=NULL) {
+  if (is.null(b1)) b1=data[,min(begin1)]-1
+  if (is.null(b2)) b2=data[,min(begin2)]-1
+  bins1=seq(b1,data[,max(begin1)]+resolution,resolution)
+  bins2=seq(b2,data[,max(begin2)]+resolution,resolution)
+  #
+  sub = data[,.(begin1,begin2,bin1=cut2(begin1, bins1, oneval=F, onlycuts=T, digits=10),
+                bin2=cut2(begin2, bins2, oneval=F, onlycuts=T, digits=10))
+             ][,.N,by=c("bin1","bin2")]
+  #
+  sub[,begin1:=do.call(as.integer, tstrsplit(as.character(bin1), "[[,]")[2])]
+  sub[,end1:=do.call(as.integer, tstrsplit(as.character(bin1), "[],)]")[2])]
+  sub[,begin2:=do.call(as.integer, tstrsplit(as.character(bin2), "[[,]")[2])]
+  sub[,end2:=do.call(as.integer, tstrsplit(as.character(bin2), "[],)]")[2])]
+  return(sub)
+}
+
+#' Plot reads in binned form at a given resolution
+#'
+#' @param dt a reads data.table containing the parsed tsv reads
+#' @param resolution the requested resolution, in base pairs
+#' @param b1,e1 the begin and end of the range requested 
+#' @param b2,e2 optional, if you want an outer-diagonal section 
+#' @param diagonal logical, default FALSE. Should the diagonal be indicated? 
+#' @param rsites logical, default FALSE. Should restriction sites be indicated?
+#'
+#' @return
+#' @export
+#'
+#' @examples
+plot_binned = function(dt, resolution, b1, e1, b2=NULL, e2=NULL, diagonal=F, rsites=F) {
+  if (is.null(b2)) b2=b1
+  if (is.null(e2)) e2=e1
+  binned = bin_data(dt, resolution, b1=b1, b2=b2)
+  #
+  p=ggplot(binned, aes(begin1,begin2, fill=log(N)))+geom_raster()+
+    coord_cartesian(xlim=c(b1,e1),ylim=c(b2,e2))+
+    scale_fill_gradient(low="white", high="black")
+  if (diagonal) p = p+stat_function(fun=function(x){x})
+  if (rsites) {
+    rsites1=dt[,unique(c(re.up1,re.dn2))]
+    rsites1=rsites1[rsites1>=b1&rsites1<=e1]
+    rsites2=dt[,unique(c(re.up2,re.dn2))]
+    rsites2=rsites2[rsites2>=b1&rsites2<=e1]
+    p = p + geom_vline(xintercept=rsites1) + geom_hline(yintercept=rsites2)
+  }
+  print(p)
+}
+
+#' Plot raw reads
+#'
+#' @inheritParams plot_binned
+#'
+#' @return
+#' @export
+#'
+#' @examples
+plot_raw = function(dt, b1, e1, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
+  faceted = (!is.null(b2)) & (!is.null(e2)) & b2>=e1 & diagonal==T #show 3 viewpoints simultaneously
+  if (length(faceted)!=1) faceted=F #happens if b2 is NULL
+  #get subset of data, add facet info
+  if (faceted==F) {
+    sub = get_raw_reads(dt, b1, e1, b2, e2)
+    if (is.null(b2)) b2=b1
+    if (is.null(e2)) e2=e1
+    #plot
+    p=ggplot(sub[,.SD[sample(.N,min(.N,100000))],,by=c("strand1","strand2")])
+    p=p+geom_segment(aes(x=rbegin1, y=rbegin2, xend=rend1, yend=rend2, colour=category),
+                     arrow=arrow(type="closed", length=unit(0.005,"npc")))
+    if (diagonal==T) p = p+stat_function(fun=function(x){x})
+    if (rsites==T) {
+      #rsite positions
+      rsites.all=sub[,unique(c(re.up1,re.up2,re.dn1,re.dn2))]
+      rsites1=rsites.all[rsites.all>=b1&rsites.all<=e1]
+      p = p + geom_vline(xintercept=rsites1)
+      rsites2=rsites.all[rsites.all>=b2&rsites.all<=e2]
+      p = p + geom_hline(yintercept=rsites2)
+    }
+    p=p+xlim(b1,e1)+ylim(b2,e2)
+  } else {
+    sub1 = get_raw_reads(dt, b1, e1)
+    sub1[,c("xfac","yfac"):=list(1,0)]
+    sub2 = get_raw_reads(dt, b2, e2)
+    sub2[,c("xfac","yfac"):=list(0,1)]
+    sub3 = get_raw_reads(dt, b1, e1, b2, e2)
+    sub3[,c("xfac","yfac"):=list(0,0)]
+    sub=rbind(sub1,sub2,sub3)
+    #plot
+    p=ggplot(sub[,.SD[sample(.N,min(.N,100000))],,by=c("strand1","strand2")])
+    p=p+geom_segment(aes(x=rbegin1, y=rbegin2, xend=rend1, yend=rend2, colour=category),
+                     arrow=arrow(type="closed", length=unit(0.005,"npc")))
+    #diagonal
+    diag.data = data.table(x=c(b1,b2), y=c(b1,b2), xend=c(e1,e2), yend=c(e1,e2), xfac=c(1,0), yfac=c(0,1))
+    p = p+geom_segment(aes(x=x, y=y, xend=xend, yend=yend), data=diag.data)
+    #rsites
+    if (rsites==T) {
+      rsites.all=sub[,unique(c(re.up1,re.up2,re.dn1,re.dn2))]
+      rsites1=rsites.all[rsites.all>=b1&rsites.all<=e1]
+      rsites2=rsites.all[rsites.all>=b2&rsites.all<=e2]
+      rsite.data.x = data.table(z=c(rsites1,rsites1,rsites2),
+                                xfac=c(rep(c(1,0),each=length(rsites1)), rep(0,length(rsites2))),
+                                yfac=c(rep(0,length(rsites1)*2), rep(1,length(rsites2))))
+      rsite.data.y = data.table(z=c(rsites2,rsites2,rsites1),
+                                yfac=c(rep(c(1,0),each=length(rsites2)), rep(0,length(rsites1))),
+                                xfac=c(rep(0,length(rsites2)*2), rep(1,length(rsites1))))
+      p = p + geom_vline(aes(xintercept=z), rsite.data.x) + geom_hline(aes(yintercept=z), rsite.data.y)
+    }
+    p=p+facet_grid(xfac~yfac, scales = "free", space="free") + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  }
+  print(p)
+}
+
 
 #' Add category label to reads
 #' 
@@ -91,8 +210,8 @@ get_subset = function(data, b1, e1, b2=NULL, e2=NULL) {
 #' @param dangling.L,dangling.R vectors of integers. Offset from cut site for
 #'   reads to be considered dangling ends (Left or Right respectively)
 #'   
-#' @return The same data.table, with an additional "category"column
-#' @export
+#' @return The same data.table, with an additional "category" column
+#' @keywords internal
 #' 
 #' @examples
 categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0,4), dangling.R = c(3,-1)) {
@@ -128,7 +247,7 @@ categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0,4), dangling
 #'   
 #' @return A list containing biases and counts, two data tables representing the
 #'   total number of reads of different categories at each cut site.
-#' @export
+#' @keywords internal
 #' 
 #' @examples
 prepare_for_sparse_cs_norm = function(data, both=F, circularize=-1) {
@@ -202,33 +321,33 @@ prepare_for_sparse_cs_norm = function(data, both=F, circularize=-1) {
 #' Print general statistics on the output of \code{\link{prepare_for_sparse_cs_norm}}
 #'
 #' @param biases,counts 
+#' @keywords internal
 #'
-#' @export
 dset_statistics = function(biases,counts){
-  message("Mean counts")
-  message("   Rejoined  : ", biases[,mean(rejoined)])
-  message("   Dangling L: ", biases[,mean(dangling.L)])
-  message("   Dangling R: ", biases[,mean(dangling.R)])
-  message("   C. close  : ", counts[,mean(contact.close)])
-  message("   C. far    : ", counts[,mean(contact.far)])
-  message("   C. up     : ", counts[,mean(contact.up)])
-  message("   C. down   : ", counts[,mean(contact.down)])
-  message("Median counts")
-  message("   Rejoined  : ", biases[,median(rejoined)])
-  message("   Dangling L: ", biases[,median(dangling.L)])
-  message("   Dangling R: ", biases[,median(dangling.R)])
-  message("   C. close  : ", counts[,median(contact.close)])
-  message("   C. far    : ", counts[,median(contact.far)])
-  message("   C. up     : ", counts[,median(contact.up)])
-  message("   C. down   : ", counts[,median(contact.down)])
-  message("Percent of zero counts")
-  message("   Rejoined  : ", biases[rejoined==0,.N]/biases[,.N]*100)
-  message("   Dangling L: ", biases[dangling.L==0,.N]/biases[,.N]*100)
-  message("   Dangling R: ", biases[dangling.R==0,.N]/biases[,.N]*100)
-  message("   C. close  : ", counts[contact.close==0,.N]/counts[,.N]*100)
-  message("   C. far    : ", counts[contact.far==0,.N]/counts[,.N]*100)
-  message("   C. up     : ", counts[contact.up==0,.N]/counts[,.N]*100)
-  message("   C. down   : ", counts[contact.down==0,.N]/counts[,.N]*100)
+  cat("Mean counts\n")
+  cat("   Rejoined  : ", biases[,mean(rejoined)],"\n")
+  cat("   Dangling L: ", biases[,mean(dangling.L)],"\n")
+  cat("   Dangling R: ", biases[,mean(dangling.R)],"\n")
+  cat("   C. close  : ", counts[,mean(contact.close)],"\n")
+  cat("   C. far    : ", counts[,mean(contact.far)],"\n")
+  cat("   C. up     : ", counts[,mean(contact.up)],"\n")
+  cat("   C. down   : ", counts[,mean(contact.down)],"\n")
+  cat("Median counts\n")
+  cat("   Rejoined  : ", biases[,median(rejoined)],"\n")
+  cat("   Dangling L: ", biases[,median(dangling.L)],"\n")
+  cat("   Dangling R: ", biases[,median(dangling.R)],"\n")
+  cat("   C. close  : ", counts[,median(contact.close)],"\n")
+  cat("   C. far    : ", counts[,median(contact.far)],"\n")
+  cat("   C. up     : ", counts[,median(contact.up)],"\n")
+  cat("   C. down   : ", counts[,median(contact.down)],"\n")
+  cat("Percent of zero counts\n")
+  cat("   Rejoined  : ", biases[rejoined==0,.N]/biases[,.N]*100,"\n")
+  cat("   Dangling L: ", biases[dangling.L==0,.N]/biases[,.N]*100,"\n")
+  cat("   Dangling R: ", biases[dangling.R==0,.N]/biases[,.N]*100,"\n")
+  cat("   C. close  : ", counts[contact.close==0,.N]/counts[,.N]*100,"\n")
+  cat("   C. far    : ", counts[contact.far==0,.N]/counts[,.N]*100,"\n")
+  cat("   C. up     : ", counts[contact.up==0,.N]/counts[,.N]*100,"\n")
+  cat("   C. down   : ", counts[contact.down==0,.N]/counts[,.N]*100,"\n")
 }
 
 #' Generate a fake dataset that follows the cut site normalization model's specifications
@@ -293,19 +412,24 @@ generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4
 }
 
 #' Diagnostic plots to determine dangling.L, dangling.R and maxlen arguments
-#'
+#' 
 #' @param infile A tadbit .tsv file
 #' @param skip see \code{\link[data.table]{fread}}
 #' @param nrows number of rows to read, default all.
 #' @param window how many bases to plot around cut site
 #' @param maxlen how many bases to plot off-diagonal
-#'
-#' @return Three plots, pleft and pright to determine dangling.L and dangling.R, and pdiag for maxlen
+#' @param skip.fbm boolean. If TRUE (default), skip fragment-based IDs, 
+#'   containing # and ~. Otherwise keep them.
+#'   
+#' @return Two plots, pdangling to determine dangling.L and dangling.R, and
+#'   pdiag for maxlen. Also returns data, the reads data table used for the
+#'   plots.
 #' @export
-#'
+#' 
 #' @examples
-examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000) {
+examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000, skip.fbm=T) {
   data=read_tsv(infile, skip=skip, nrows=nrows)
+  if (skip.fbm == T) data = data[!grepl("[#~]",id)]
   dleft=data[abs(rbegin1-re.closest1)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0,
              .(dist=rbegin1-re.closest1,cat="left")]
   dright=data[abs(rbegin2-re.closest2)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0,

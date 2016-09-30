@@ -1,44 +1,6 @@
 #' @include csnorm.R
 NULL
 
-#' Bin a counts data.table into a matrix of a given resolution
-#'
-#' @param counts data.table as returned by \code{\link{prepare_for_sparse_cs_norm}}
-#' @param resolution positive integer.
-#' @param b1,b2,e1,e2 Begins and ends of the portion of the data to bin. If NULL replace by min/max value. 
-#'
-#' @return a data.table representing the binned data
-#' @export
-#'
-#' @examples
-bin_counts = function(counts, resolution, b1=NULL, b2=NULL, e1=NULL, e2=NULL) {
-  if (is.null(b1)) b1=counts[,min(pos1)]-1
-  if (is.null(b2)) b2=counts[,min(pos2)]-1
-  if (is.null(e1)) e1=counts[,max(pos1)]-1
-  if (is.null(e2)) e2=counts[,max(pos2)]-1
-  if (counts[,uniqueN(name)]>1) {
-    sub = foreach (n=counts[,unique(name)], .combine=rbind) %do% {
-      mat=bin_counts(counts[name==n],resolution,b1=b1,b2=b2,e1=e1,e2=e2)
-      mat[,name:=n]
-    }
-  } else {
-    bins1=seq(b1,e1+resolution,resolution)
-    bins2=seq(b2,e2+resolution,resolution)
-    mcounts=melt(counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
-                 variable.name = "category", value.name = "count")[count>0]
-    #
-    sub = mcounts[,.(pos1,pos2,bin1=cut2(pos1, bins1, oneval=F, onlycuts=T, digits=10, minmax=F),
-                     bin2=cut2(pos2, bins2, oneval=F, onlycuts=T, digits=10, minmax=F), category, count)
-                  ][,.(N=sum(count)),by=c("bin1","bin2")]
-    #
-    sub[,begin1:=do.call(as.integer, tstrsplit(as.character(bin1), "[[,]")[2])]
-    sub[,end1:=do.call(as.integer, tstrsplit(as.character(bin1), "[],)]")[2])]
-    sub[,begin2:=do.call(as.integer, tstrsplit(as.character(bin2), "[[,]")[2])]
-    sub[,end2:=do.call(as.integer, tstrsplit(as.character(bin2), "[],)]")[2])]
-  }
-  return(sub)
-}
-
 #' Apply the ICE algorithm to a binned matrix
 #'
 #' @param csb a CSbinned object
