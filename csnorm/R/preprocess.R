@@ -209,12 +209,13 @@ plot_raw = function(dt, b1, e1, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
 #'   fragment. Fragments above this threshold will be categorized as "other".
 #' @param dangling.L,dangling.R vectors of integers. Offset from cut site for
 #'   reads to be considered dangling ends (Left or Right respectively)
+#' @param read.len integer. The length of a full read, used for dangling ends (temporary)
 #'   
 #' @return The same data.table, with an additional "category" column
 #' @keywords internal
 #' 
 #' @examples
-categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0,4), dangling.R = c(3,-1)) {
+categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0,4), dangling.R = c(3,-1), read.len=40) {
   sub[,category:="other"]
   #careful: order is important because attribution criteria overlap
   cat("Contacts\n")
@@ -231,8 +232,8 @@ categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0,4), dangling
   cat("Self Circle\n")
   sub[re.dn1 == re.dn2 & strand1==0 & strand2==1 & rbegin1 - re.up1 < maxlen & re.dn2 - rbegin2 < maxlen, category:="self circle"]
   cat("Dangling L/R\n")
-  sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & ((rbegin1 - re.closest1) %in% dangling.L), category:="dangling L"]
-  sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & ((rbegin2 - re.closest2) %in% dangling.R), category:="dangling R"]
+  sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & ((rbegin1 - re.closest1) %in% dangling.L) & length1==read.len, category:="dangling L"]
+  sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & ((rbegin2 - re.closest2) %in% dangling.R) & length2==read.len, category:="dangling R"]
   return(sub)
 }
 
@@ -427,12 +428,12 @@ generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4
 #' @export
 #' 
 #' @examples
-examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000, skip.fbm=T) {
+examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000, skip.fbm=T, read.len=40) {
   data=read_tsv(infile, skip=skip, nrows=nrows)
   if (skip.fbm == T) data = data[!grepl("[#~]",id)]
-  dleft=data[abs(rbegin1-re.closest1)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0,
+  dleft=data[abs(rbegin1-re.closest1)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0&length1==read.len,
              .(dist=rbegin1-re.closest1,cat="left")]
-  dright=data[abs(rbegin2-re.closest2)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0,
+  dright=data[abs(rbegin2-re.closest2)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0&length2==read.len,
              .(dist=rbegin2-re.closest2,cat="right")]
   pdangling=ggplot(rbind(dleft,dright))+
     geom_histogram(aes(dist),binwidth=1)+scale_x_continuous(breaks=-window:window)+facet_grid(~cat)+
@@ -468,12 +469,12 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000, s
 read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "HindIII", experiment = "Hi-C",
                             name = paste(condition, enzyme, replicate), skip = 0L, nrows = -1L,
                             circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1), maxlen = 600,
-                            save.data=T) {
+                            read.len=40, save.data=T) {
   match.arg(experiment)
   cat("*** READ\n")
   data=read_tsv(infile, skip=skip, nrows=nrows)
   cat("*** CATEGORIZE\n")
-  data = categorize_by_new_type(data, dangling.L = dangling.L, dangling.R = dangling.R, maxlen = maxlen)
+  data = categorize_by_new_type(data, dangling.L = dangling.L, dangling.R = dangling.R, maxlen = maxlen, read.len=read.len)
   cat("*** BIASES AND COUNTS\n")
   cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=circularize)
   dset_statistics(cs_data$biases,cs_data$counts)
