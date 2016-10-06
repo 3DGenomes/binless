@@ -24,6 +24,8 @@ data {
   vector[N] log_genomic_sum;
   //dispersion
   real<lower=0> alpha;
+  //length scales
+  real<lower=0> lambda_diag[Decays];
 }
 transformed data {
   //diagonal SCAM spline, dense
@@ -64,8 +66,6 @@ parameters {
   real eC[Dsets];
   //spline parameters
   positive_ordered[Kdiag-1] beta_diag[Decays];
-  //length scales
-  real<lower=0> lambda_diag[Decays];
 }
 transformed parameters {
   //diag

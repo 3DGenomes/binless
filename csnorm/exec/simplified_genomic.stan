@@ -26,6 +26,9 @@ data {
   matrix[SD,G] log_decay_sum;
   //dispersion
   real<lower=0> alpha;
+  //stiffnesses
+  real<lower=0> lambda_nu[Biases];
+  real<lower=0> lambda_delta[Biases];
 }
 transformed data {
   //bias spline, sparse (nu and delta have the same design)
@@ -100,9 +103,6 @@ parameters {
   //spline parameters
   vector[Krow-1] beta_nu[Biases];
   vector[Krow-1] beta_delta[Biases];
-  //stiffnesses
-  real<lower=0> lambda_nu[Biases];
-  real<lower=0> lambda_delta[Biases];
 }
 transformed parameters {
   //nu

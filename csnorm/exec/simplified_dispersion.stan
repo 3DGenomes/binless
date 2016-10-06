@@ -38,10 +38,6 @@ data {
   vector[Krow-1] beta_nu[Biases];
   vector[Krow-1] beta_delta[Biases];
   positive_ordered[Kdiag-1] beta_diag[Decays];
-  //parameters: length scales
-  real<lower=0> lambda_nu[Biases];
-  real<lower=0> lambda_delta[Biases];
-  real<lower=0> lambda_diag[Decays];
 }
 transformed data {
   //bias spline, sparse (nu and delta have the same design)
@@ -54,6 +50,16 @@ transformed data {
   row_vector[Kdiag] pdiagD[Dsets];
   //scaling factor for genomic lambdas
   real lfac;
+  //nu
+  vector[SD] log_nu; // log(nu)
+  vector[Krow-2] beta_nu_diff[Dsets]; //2nd order difference on beta_nu_aug
+  //delta
+  vector[SD] log_delta; // log(delta)
+  vector[Krow-2] beta_delta_diff[Dsets]; //2nd order difference on beta_delta_aug
+  //diag
+  vector[N] ldec;
+  vector[Dsets*Kdiag] beta_diag_centered;
+  vector[Kdiag-2] beta_diag_diff[Dsets];
   
   //Bias GAM spline, sparse
   {
@@ -118,37 +124,8 @@ transformed data {
   
   //scaling factor for genomic lambdas
   lfac = 30000*Krow/(max(cutsitesD)-min(cutsitesD));
-}
-parameters {
-  //exposures
-  real eC[Dsets];
-  real eRJ[Dsets];
-  real eDE[Dsets];
-  //dispersion
-  real<lower=0> alpha;
-}
-transformed parameters {
-  //nu
-  vector[SD] log_nu; // log(nu)
-  vector[Krow-2] beta_nu_diff[Dsets]; //2nd order difference on beta_nu_aug
-  //delta
-  vector[SD] log_delta; // log(delta)
-  vector[Krow-2] beta_delta_diff[Dsets]; //2nd order difference on beta_delta_aug
-  //diag
-  vector[N] log_decay;
-  vector[Dsets*Kdiag] beta_diag_centered;
-  vector[Kdiag-2] beta_diag_diff[Dsets];
-  //means
-  vector[SD] log_mean_DL;
-  vector[SD] log_mean_DR;
-  vector[SD] log_mean_RJ;
-  //
-  vector[N] log_mean_cclose;
-  vector[N] log_mean_cfar;
-  vector[N] log_mean_cup;
-  vector[N] log_mean_cdown;
   
-  //nu
+    //nu
   {
     vector[Dsets*Krow] beta_nu_centered;
     for (d in 1:Dsets) {
@@ -190,7 +167,31 @@ transformed parameters {
     beta_diag_centered[((d-1)*Kdiag+1):(d*Kdiag)] = tmp;
     beta_diag_diff[d] = tmp[:(Kdiag-2)]-2*tmp[2:(Kdiag-1)]+tmp[3:];
   }
-  log_decay = Xdiag * beta_diag_centered;
+  ldec = Xdiag * beta_diag_centered;
+
+}
+parameters {
+  //exposures
+  real eC[Dsets];
+  real eRJ[Dsets];
+  real eDE[Dsets];
+  //dispersion
+  real<lower=0> alpha;
+  //length scales
+  real<lower=0> lambda_nu[Biases];
+  real<lower=0> lambda_delta[Biases];
+  real<lower=0> lambda_diag[Decays];
+}
+transformed parameters {
+  //means
+  vector[SD] log_mean_DL;
+  vector[SD] log_mean_DR;
+  vector[SD] log_mean_RJ;
+  //
+  vector[N] log_mean_cclose;
+  vector[N] log_mean_cfar;
+  vector[N] log_mean_cup;
+  vector[N] log_mean_cdown;
     
   //means
   {
@@ -199,10 +200,10 @@ transformed parameters {
     log_mean_DL = log_nu + log_delta;
     log_mean_DR = log_nu - log_delta;
     //exact counts  
-    log_mean_cclose = log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
-    log_mean_cfar   = log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
-    log_mean_cup    = log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
-    log_mean_cdown  = log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
+    log_mean_cclose = ldec + (log_nu - log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
+    log_mean_cfar   = ldec + (log_nu + log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
+    log_mean_cup    = ldec + (log_nu + log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
+    log_mean_cdown  = ldec + (log_nu - log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
     //add exposures
     for (d in 1:Dsets) {
       log_mean_RJ[bbegin[d]:(bbegin[d+1]-1)]     = log_mean_RJ[bbegin[d]:(bbegin[d+1]-1)] + eRJ[d];
@@ -247,3 +248,8 @@ model {
   lambda_delta ~ cauchy(0,0.1);
   lambda_diag ~ cauchy(0,0.1);
 }
+generated quantities {
+  vector[N] log_decay;
+  log_decay = ldec;
+}
+
