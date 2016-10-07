@@ -972,7 +972,7 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
   cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4], op.init=init.op)
   #abort silently if initial guess went wrong
   if (length(grep("Line search failed",tail(init.output,1)))>0) {
-    init.op$par$value=.Machine$double.xmax
+    init.op$par$value=-.Machine$double.xmax
     cs@par=init.op$par
     return(cs)
   }
