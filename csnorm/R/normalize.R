@@ -934,19 +934,21 @@ run_split_parallel = function(cs, design=NULL, square.size=100000, coverage=4, c
 
 #' Run approximate gibbs sampler on with a single starting condition
 #' @inheritParams run_simplified
-#' @param fit.decay,fit.genomic boolean. Whether to fit diagonal decay or
+#' @param fit.decay,fit.genomic boolean. Whether to fit diagonal decay or 
 #'   genomic biases. Set to FALSE only for diagnostics.
-#' @keywords internal
+#' @param init either a single value, taken as the initial genomic lambda, or a
+#'   whole list of parameters (typically a previous cs@par), corresponding to
+#'   initial values of all parameters.
 #' @export
 #' 
-run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambda=1,
+run_simplified_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10,
                                 ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, verbose=T, ncounts=100000) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
   #add settings
   cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, groups=groups,
-                                    lambda=lambda, iter=iter, ngibbs=ngibbs))
+                                    iter=iter, ngibbs=ngibbs))
   #fill counts matrix and take subset
   cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize)
   if (cs@counts[,.N] > ncounts*2+1) {
@@ -965,17 +967,23 @@ run_simplified_gibbs = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10
   cs@settings$dmin=dmin
   cs@settings$dmax=dmax
   #initial guess
-  if (verbose==T) cat("Initial guess\n")
-  init.a = system.time(init.output <- capture.output(init.op <- csnorm:::csnorm_simplified_guess(
-    biases = cs@biases, counts = cs@counts, design = cs@design, lambda=lambda, dmin=dmin, dmax=dmax,
-    groups = groups, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter)))
-  cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4], op.init=init.op)
-  #abort silently if initial guess went wrong
-  if (length(grep("Line search failed",tail(init.output,1)))>0) {
-    init.op$par$value=-.Machine$double.xmax
-    cs@par=init.op$par
-    return(cs)
+  if (length(init)==1) {
+    if (verbose==T) cat("Initial guess\n")
+    init.a = system.time(init.output <- capture.output(init.op <- csnorm:::csnorm_simplified_guess(
+      biases = cs@biases, counts = cs@counts, design = cs@design, lambda=init[[1]], dmin=dmin, dmax=dmax,
+      groups = groups, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter)))
+    #abort silently if initial guess went wrong
+    if (length(grep("Line search failed",tail(init.output,1)))>0) {
+      init.op$par$value=-.Machine$double.xmax
+      cs@par=init.op$par
+      return(cs)
+    }
+  } else {
+    init.a = system.time(NULL)
+    init.output = ""
+    init.op = list(par=init,value=NA)
   }
+  cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4], op.init=init.op)
   op=init.op
   #make sure beta_diag is strictly increasing
   for (d in 2:length(op$par$beta_diag)) {
@@ -1081,7 +1089,7 @@ run_simplified = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, grou
   registerDoParallel(cores=ncores)
   cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %dopar%
     run_simplified_gibbs(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
-                         bins_per_bf=bins_per_bf, groups=groups, lambda=lambda, ngibbs = ngibbs,
+                         bins_per_bf=bins_per_bf, groups=groups, init=lambda, ngibbs = ngibbs,
                          iter=iter, fit.decay=T, fit.genomic=T, verbose=verbose)
   return(cs)
 }
