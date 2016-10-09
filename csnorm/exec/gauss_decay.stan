@@ -17,11 +17,9 @@ data {
   //count sums
   int<lower=1> N;
   int<lower=1,upper=N+1> cbegin[Dsets+1]; //cbegin[i]=j: dataset i starts at j
-  int<lower=0> counts_sum[N];
-  vector<lower=0>[N] weight;
+  vector[N] kappa_hat;
+  vector<lower=0>[N] sdl;
   vector<lower=0>[N] dist;
-  //genomic bias sums
-  vector[N] log_genomic_sum;
   //dispersion
   real<lower=0> alpha;
   //length scales
@@ -66,6 +64,8 @@ parameters {
   real eC[Dsets];
   //spline parameters
   positive_ordered[Kdiag-1] beta_diag[Decays];
+  //normal sd nuisance
+  real<lower=0> sigma;
 }
 transformed parameters {
   //diag
@@ -92,14 +92,14 @@ transformed parameters {
   //means
   {
     //exact counts  
-    log_mean_counts  = log_decay + log_genomic_sum;
     for (d in 1:Dsets) log_mean_counts[cbegin[d]:(cbegin[d+1]-1)] = log_mean_counts[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
+    log_mean_counts  = log_decay + log_mean_counts;
   }
 }
 model {
   //// likelihoods
   //counts
-  for (i in 1:N) target += weight[i] * neg_binomial_2_log_lpmf(counts_sum[i] | log_mean_counts[i], alpha);
+  kappa_hat ~ normal(log_mean_counts, sdl*sigma);
   
   //// prior
   for (d in 1:Dsets) beta_diag_diff[d] ~ normal(0,1/lambda_diag[XD[d]]);

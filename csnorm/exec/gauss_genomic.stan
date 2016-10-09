@@ -1,5 +1,5 @@
 ////
-// Cut-site normalization model: simplified fit for nu and delta
+// Cut-site normalization model: normal approximation for nu and delta
 ////
 functions {
   #include "common_functions.stan"
@@ -18,11 +18,12 @@ data {
   int<lower=0> rejoined[SD];
   int<lower=0> danglingL[SD];
   int<lower=0> danglingR[SD];
-  //count sums
-  int<lower=0> counts_sum_left[SD];
-  int<lower=0> counts_sum_right[SD];
-  //decay sums
-  vector[SD] log_decay_sum;
+  //reduced count sums
+  vector[SD] eta_hat_L;
+  vector[SD] eta_hat_R;
+  //standard deviations
+  vector<lower=0>[SD] sd_L;
+  vector<lower=0>[SD] sd_R;
   //dispersion
   real<lower=0> alpha;
   //stiffnesses
@@ -82,6 +83,8 @@ parameters {
   //spline parameters
   vector[Krow-1] beta_nu[Biases];
   vector[Krow-1] beta_delta[Biases];
+  //gaussain sd nuisance
+  real<lower=0> sigma;
 }
 transformed parameters {
   //nu
@@ -143,8 +146,8 @@ transformed parameters {
       counts_exposure[bbegin[d]:(bbegin[d+1]-1)] = rep_vector(eC[d],bbegin[d+1]-bbegin[d]);
     }
     //exact counts  
-    log_mean_cleft  = log_decay_sum + counts_exposure + log_nu + log_delta;
-    log_mean_cright = log_decay_sum + counts_exposure + log_nu - log_delta;
+    log_mean_cleft  = counts_exposure + log_nu + log_delta;
+    log_mean_cright = counts_exposure + log_nu - log_delta;
   }
 }
 model {
@@ -157,14 +160,8 @@ model {
   //counts
   //grouping reduces the number of likelihoods from S-1 to G, so reweighting is
   //needed for a proper estimation of the lambdas
-  for (d in 1:Dsets) {
-    int weight;
-    weight = bbegin[d+1]-bbegin[d]-1; #there are N-1 cutsites grouped here
-    target += weight * neg_binomial_2_log_lpmf(
-        counts_sum_left[bbegin[d]:(bbegin[d+1]-1)] | log_mean_cleft[bbegin[d]:(bbegin[d+1]-1)], alpha);
-      target += weight * neg_binomial_2_log_lpmf(
-        counts_sum_right[bbegin[d]:(bbegin[d+1]-1)] | log_mean_cright[bbegin[d]:(bbegin[d+1]-1)], alpha);
-  }
+  eta_hat_L ~ normal(log_mean_cleft, sd_L*sigma);
+  eta_hat_R ~ normal(log_mean_cright, sd_R*sigma);
   
   //// prior
   log_nu ~ cauchy(0, 1); //give high probability to [0.5:2]

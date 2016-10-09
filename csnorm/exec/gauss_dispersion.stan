@@ -33,7 +33,6 @@ data {
   int<lower=0> counts_far[N];
   int<lower=0> counts_up[N];
   int<lower=0> counts_down[N];
-  real<lower=0> weight[Dsets]; //in case of subsampling
   //parameters: spline
   vector[Krow-1] beta_nu[Biases];
   vector[Krow-1] beta_delta[Biases];
@@ -225,10 +224,10 @@ model {
   
   //counts: Close, Far, Up, Down
   for (d in 1:Dsets) {
-    target += weight[d]*neg_binomial_2_log_lpmf(counts_close[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)], alpha);
-    target += weight[d]*neg_binomial_2_log_lpmf(counts_far[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)], alpha);
-    target += weight[d]*neg_binomial_2_log_lpmf(counts_up[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cup[cbegin[d]:(cbegin[d+1]-1)], alpha);
-    target += weight[d]*neg_binomial_2_log_lpmf(counts_down[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)], alpha);
+    counts_close[cbegin[d]:(cbegin[d+1]-1)] ~ neg_binomial_2_log(log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)], alpha);
+    counts_far[cbegin[d]:(cbegin[d+1]-1)]   ~ neg_binomial_2_log(log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)], alpha);
+    counts_up[cbegin[d]:(cbegin[d+1]-1)]    ~ neg_binomial_2_log(log_mean_cup[cbegin[d]:(cbegin[d+1]-1)], alpha);
+    counts_down[cbegin[d]:(cbegin[d+1]-1)]  ~ neg_binomial_2_log(log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)], alpha);
   }
   
   //// Priors
