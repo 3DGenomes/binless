@@ -83,8 +83,6 @@ parameters {
   //spline parameters
   vector[Krow-1] beta_nu[Biases];
   vector[Krow-1] beta_delta[Biases];
-  //gaussain sd nuisance
-  real<lower=0> sigma;
 }
 transformed parameters {
   //nu
@@ -160,8 +158,8 @@ model {
   //counts
   //grouping reduces the number of likelihoods from S-1 to G, so reweighting is
   //needed for a proper estimation of the lambdas
-  eta_hat_L ~ normal(log_mean_cleft, sd_L*sigma);
-  eta_hat_R ~ normal(log_mean_cright, sd_R*sigma);
+  eta_hat_L ~ normal(log_mean_cleft, sd_L);
+  eta_hat_R ~ normal(log_mean_cright, sd_R);
   
   //// prior
   log_nu ~ cauchy(0, 1); //give high probability to [0.5:2]

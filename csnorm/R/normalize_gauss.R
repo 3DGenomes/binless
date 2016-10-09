@@ -8,7 +8,7 @@ csnorm_gauss_guess = function(biases, counts, design, lambda, dmin, dmax, bf_per
                                    iter=10000, dispersion=10, ...) {
   nBiases=design[,uniqueN(genomic)]
   init=list(log_nu=array(0,dim=biases[,.N]), log_delta=array(0,dim=biases[,.N]),
-            log_decay=array(0,dim=counts[,.N]), eC=array(0,dim=design[,.N]), sigma=1,
+            log_decay=array(0,dim=counts[,.N]), eC=array(0,dim=design[,.N]),
             alpha=dispersion, lambda_nu=array(lambda,dim=nBiases), lambda_delta=array(lambda,dim=nBiases))
   op=csnorm_gauss_genomic(biases, counts, design, init, bf_per_kb=bf_per_kb, iter=iter, ...)
   #add diagonal decay inits
@@ -17,7 +17,7 @@ csnorm_gauss_guess = function(biases, counts, design, lambda, dmin, dmax, bf_per
   beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
   op$par=c(list(beta_diag=beta_diag, lambda_diag=array(1,dim=Decays), log_decay=rep(0,counts[,.N]),
            alpha=dispersion, lambda_nu=init$lambda_nu, lambda_delta=init$lambda_delta),
-           op$par[c("eC","eRJ","eDE","beta_nu","beta_delta","log_nu","log_delta","sigma")])
+           op$par[c("eC","eRJ","eDE","beta_nu","beta_delta","log_nu","log_delta")])
   return(op)
 }
 
@@ -217,7 +217,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
         init=op$par, dmin = dmin, dmax = dmax,
         bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, iter=iter)))
       op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","beta_diag_centered",
-                                                       "log_decay","decay", "sigma")],
+                                                       "log_decay","decay")],
                                          op$par[c("eRJ","eDE","beta_nu","beta_delta", "alpha","lambda_diag",
                                                   "lambda_nu","lambda_delta","log_nu","log_delta")]))
       cs@diagnostics[[paste0("out.decay",i)]]=output
@@ -233,7 +233,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
       op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag",
                                                  "log_decay","decay", "alpha","lambda_nu","lambda_delta")],
                                         op.gen$par[c("eC","eRJ","eDE","beta_nu","beta_delta",
-                                                     "log_nu","log_delta", "sigma")]))
+                                                     "log_nu","log_delta")]))
       cs@diagnostics[[paste0("out.bias",i)]]=output
       cs@diagnostics[[paste0("runtime.bias",i)]]=a[1]+a[4]
       cs@diagnostics[[paste0("op.bias",i)]]=op.gen
@@ -250,7 +250,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
       biases = cs@biases, counts = subcounts, design = cs@design, init=op$par,
       dmin=dmin, dmax=dmax, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter)))
     op=list(value=op.disp$value, par=c(op$par[c("beta_diag","beta_diag_centered","log_decay","decay",
-                                                "beta_nu","beta_delta","log_nu","log_delta","sigma")],
+                                                "beta_nu","beta_delta","log_nu","log_delta")],
                                       op.disp$par[c("eC","eRJ","eDE","alpha",
                                                     "lambda_nu","lambda_delta", "lambda_diag")]))
     cs@diagnostics[[paste0("out.disp",i)]]=output

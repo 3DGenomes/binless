@@ -62,8 +62,6 @@ parameters {
   real eC[Dsets];
   //spline parameters
   positive_ordered[Kdiag-1] beta_diag[Decays];
-  //normal sd nuisance
-  real<lower=0> sigma;
 }
 transformed parameters {
   //diag
@@ -97,7 +95,7 @@ transformed parameters {
 model {
   //// likelihoods
   //counts
-  kappa_hat ~ normal(log_mean_counts, sdl*sigma);
+  kappa_hat ~ normal(log_mean_counts, sdl);
   
   //// prior
   for (d in 1:Dsets) beta_diag_diff[d] ~ normal(0,1/lambda_diag[XD[d]]);
