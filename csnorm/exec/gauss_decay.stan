@@ -29,8 +29,6 @@ transformed data {
   //diagonal SCAM spline, dense
   matrix[N,Dsets*Kdiag] Xdiag;
   row_vector[Kdiag] pdiagD[Dsets];
-  row_vector[N] diag_weights;
-  diag_weights = weight';
   
   //diagonal SCAM spline, dense
   {
@@ -50,7 +48,7 @@ transformed data {
       {
         row_vector[sz] dw;
         row_vector[Kdiag] pdiag;
-        dw = diag_weights[cbegin[d]:(cbegin[d+1]-1)];
+        dw = rep_row_vector(1, sz);
         dw = dw/mean(dw);
         pdiag = dw * Xdiag[cbegin[d]:(cbegin[d+1]-1),((d-1)*Kdiag+1):(d*Kdiag)];
         pdiagD[d] = pdiag / (pdiag * rep_vector(1,Kdiag));
@@ -92,7 +90,7 @@ transformed parameters {
   //means
   {
     //exact counts  
-    for (d in 1:Dsets) log_mean_counts[cbegin[d]:(cbegin[d+1]-1)] = log_mean_counts[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
+    for (d in 1:Dsets) log_mean_counts[cbegin[d]:(cbegin[d+1]-1)] = rep_vector(eC[d],cbegin[d+1]-cbegin[d]);
     log_mean_counts  = log_decay + log_mean_counts;
   }
 }
