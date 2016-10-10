@@ -67,7 +67,8 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
   op=optimizing(stanmodels$gauss_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init,
                 init_alpha=1e-9, tol_rel_grad=0, tol_rel_obj=1e3, ...)
   #make nice decay data table
-  op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
+  op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), kappa_hat=data$kappa_hat,
+                          sdl=data$sdl, key="dist")
   #rewrite log_decay as if it was calculated for each count
   csd[,log_decay:=op$par$log_decay]
   csub=counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=5))]
@@ -187,7 +188,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
     if (verbose==T) cat("Initial guess\n")
     init.a = system.time(init.output <- capture.output(init.op <- csnorm:::csnorm_gauss_guess(
       biases = cs@biases, counts = cs@counts, design = cs@design, lambda=init[[1]], dmin=dmin, dmax=dmax,
-      bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter, dispersion=1)))
+      bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter, dispersion=10)))
     #abort silently if initial guess went wrong
     if (length(grep("Line search failed",tail(init.output,1)))>0) {
       init.op$par$value=-.Machine$double.xmax
