@@ -32,38 +32,38 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
   #add bias informations to counts
   setkey(counts, id1, id2)
   csub=copy(counts)
-  csub[,decay:=exp(init$log_decay)]
+  csub[,log_decay:=init$log_decay]
   bsub=biases[,.(id)]
-  bsub[,c("nu","delta"):=list(exp(init$log_nu),exp(init$log_delta))]
-  csub=merge(bsub[,.(id1=id,nu,delta)],csub,by="id1",all.x=F,all.y=T)
-  csub=merge(bsub[,.(id2=id,nu,delta)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-  csub=merge(design[,.(name,eeC=exp(init$eC[decay]))], csub, by="name",all.x=F,all.y=T)
+  bsub[,c("log_nu","log_delta"):=list(init$log_nu,init$log_delta)]
+  csub=merge(bsub[,.(id1=id,log_nu,log_delta)],csub,by="id1",all.x=F,all.y=T)
+  csub=merge(bsub[,.(id2=id,log_nu,log_delta)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
+  csub=merge(design[,.(name,eC=init$eC[decay])], csub, by="name",all.x=F,all.y=T)
   #add z-score and sd variables
-  csub[,mu.base:=eeC*nu1*nu2*decay]
-  csub[,c("mu.far","mu.down","mu.close","mu.up"):=list(mu.base*delta1/delta2,
-                                                       mu.base/(delta1*delta2),
-                                                       mu.base*delta2/delta1,
-                                                       mu.base*delta1*delta2)]
-  csub[,c("kappaij","mu.base"):=list(log(eeC*decay),NULL)]
-  csub=rbind(csub[,.(name,id1,id2,distance,kappaij,count=contact.far,mu=mu.far)],
-             csub[,.(name,id1,id2,distance,kappaij,count=contact.down,mu=mu.down)],
-             csub[,.(name,id1,id2,distance,kappaij,count=contact.up,mu=mu.up)],
-             csub[,.(name,id1,id2,distance,kappaij,count=contact.close,mu=mu.close)])
-  csub[,c("z","var"):=list(count/mu-1,(mu+mu^2/init$alpha)/mu^2)]
+  csub[,log_mu.base:=eC + log_nu1 + log_nu2 + log_decay]
+  csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_delta1-log_delta2,
+                                                           log_mu.base-log_delta1-log_delta2,
+                                                           log_mu.base+log_delta2-log_delta1,
+                                                           log_mu.base+log_delta1+log_delta2)]
+  csub[,c("kappaij","log_mu.base"):=list(eC+log_decay,NULL)]
+  csub=rbind(csub[,.(name,id1,id2,distance,kappaij,count=contact.far,mu=exp(lmu.far))],
+             csub[,.(name,id1,id2,distance,kappaij,count=contact.down,mu=exp(lmu.down))],
+             csub[,.(name,id1,id2,distance,kappaij,count=contact.up,mu=exp(lmu.up))],
+             csub[,.(name,id1,id2,distance,kappaij,count=contact.close,mu=exp(lmu.close))])
+  csub[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
   #bin distances
   stepsz=1/(bins_per_bf*bf_per_decade)
   dbins=10**seq(log10(dmin),log10(dmax)+stepsz,stepsz)
   csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=5)]
   #collect all counts in these bins
-  csd = csub[,.(mdist=exp(mean(log(distance))), kappahatl=sum((z+kappaij)/var)/sum(1/var), sdl=1/sqrt(sum(1/var))),
-             keyby=c("name", "dbin")]
+  csd = csub[,.(mdist=exp(mean(log(distance))), kappahatl=sum((z+kappaij)/var)/sum(1/var),
+                sdl=1/sqrt(sum(1/var)), weight=.N), keyby=c("name", "dbin")]
   #run optimization
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   cbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
   data=list(Dsets=design[,.N], Decays=design[,uniqueN(decay)], XD=as.array(design[,decay]),
             Kdiag=Kdiag, dmin=dmin, dmax=dmax, N=csd[,.N], cbegin=cbegin,
             kappa_hat=csd[,kappahatl], sdl=csd[,sdl], dist=csd[,mdist],
-            alpha=init$alpha, lambda_diag=init$lambda_diag)
+            alpha=init$alpha, lambda_diag=init$lambda_diag, weight=csd[,weight])
   op=optimizing(stanmodels$gauss_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init,
                 init_alpha=1e-9, tol_rel_grad=0, tol_rel_obj=1e3, ...)
   #make nice decay data table
@@ -107,8 +107,8 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
   cts[,c("varL","varR"):=list(1/muL+1/init$alpha,1/muR+1/init$alpha)]
   cts=cts[,.(etaLhat=sum((L/muL-1+etaL)/varL)/sum(1/varL),
              etaRhat=sum((R/muR-1+etaR)/varR)/sum(1/varR),
-             sdL=1/sqrt(sum(1/varL)),
-             sdR=1/sqrt(sum(1/varR))),keyby=id]
+             sdL=sqrt(2)/sqrt(sum(1/varL)),
+             sdR=sqrt(2)/sqrt(sum(1/varR))),keyby=id]
   stopifnot(cts[,.N]==biases[,.N])
   #run optimization
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])

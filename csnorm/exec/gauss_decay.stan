@@ -24,6 +24,8 @@ data {
   real<lower=0> alpha;
   //length scales
   real<lower=0> lambda_diag[Decays];
+  //weight for spline centering
+  vector<lower=0>[N] weight;
 }
 transformed data {
   //diagonal SCAM spline, dense
@@ -48,7 +50,7 @@ transformed data {
       {
         row_vector[sz] dw;
         row_vector[Kdiag] pdiag;
-        dw = rep_row_vector(1, sz);
+        dw = weight[cbegin[d]:(cbegin[d+1]-1)]';
         dw = dw/mean(dw);
         pdiag = dw * Xdiag[cbegin[d]:(cbegin[d+1]-1),((d-1)*Kdiag+1):(d*Kdiag)];
         pdiagD[d] = pdiag / (pdiag * rep_vector(1,Kdiag));
