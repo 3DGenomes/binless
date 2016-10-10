@@ -127,12 +127,12 @@ csnorm_predict_all_parallel = function(cs, counts, verbose=T, ncores=1) {
 #' @keywords internal
 #' @export
 #' 
-run_serial = function(cs, bf_per_kb=1, bf_per_decade=5, lambda=1, iter=100000, subsampling.pc=100) {
+run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=5, iter=100000, subsampling.pc=100) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
   #add settings
-  cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, lambda=lambda, iter=iter))
+  cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter))
   #fill counts matrix
   cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize)
   #report min/max distance
@@ -147,10 +147,22 @@ run_serial = function(cs, bf_per_kb=1, bf_per_decade=5, lambda=1, iter=100000, s
   setkey(cs@biases,name,id,pos)
   setkey(cs@counts,name,id1,pos1,id2,pos2)
   #initial guess
-  init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
-    counts=cs@counts, biases=cs@biases, design=cs@design,
-    bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, lambda=lambda, verbose=T, iter=iter)))
-  cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4])
+  if (length(init)==1) {
+    init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
+      counts=cs@counts, biases=cs@biases, design=cs@design,
+      bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, lambda=init[[1]], verbose=T, iter=iter)))
+    #abort silently if initial guess went wrong
+    if (length(grep("Line search failed",tail(init.output,1)))>0) {
+      init.op$par$value=-.Machine$double.xmax
+      cs@par=init.op$par
+      return(cs)
+    }
+  } else {
+    init.a = system.time(NULL)
+    init.output = ""
+    init.op = list(par=init,value=NA)
+  }
+  cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4], op.init=init.op)
   #main optimization, subsampled
   counts.sub=cs@counts[sample(.N,round(subsampling.pc/100*.N))]
   setkeyv(counts.sub,key(cs@counts))
@@ -158,7 +170,7 @@ run_serial = function(cs, bf_per_kb=1, bf_per_decade=5, lambda=1, iter=100000, s
     biases=cs@biases, counts = counts.sub, design=cs@design, dmin=dmin, dmax=dmax,
     bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter, verbose = T,
     init=init.op, weight=counts.sub[,.N,by=name]$N/cs@counts[,.N,by=name]$N)))
-  cs@diagnostics=list(out=output, runtime=a[1]+a[4])
+  cs@diagnostics=list(out=output, runtime=a[1]+a[4], op=op)
   #report statistics
   op$par$init=init.op
   op$par$value=op$value
@@ -185,7 +197,7 @@ run_exact = function(cs, bf_per_kb=1, bf_per_decade=5, lambdas=c(0.1,1,10), ncor
   cs@binned=list() #erase old binned datasets if available
   registerDoParallel(cores=ncores)
   cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value<y@par$value){return(y)}else{return(x)}}) %dopar%
-    run_serial(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, lambda=lambda, iter=iter, subsampling.pc=subsampling.pc)
+    run_serial(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, init=lambda, iter=iter, subsampling.pc=subsampling.pc)
   return(cs)
 }
 
