@@ -162,12 +162,8 @@ model {
   eta_hat_R ~ normal(log_mean_cright, sd_R);
   
   //// prior
-  log_nu ~ cauchy(0, 1); //give high probability to [0.5:2]
-  log_delta ~ cauchy(0,1);
   for (d in 1:Dsets) {
     beta_nu_diff[d] ~ normal(0,1/(lfac*lambda_nu[XB[d]]));
     beta_delta_diff[d] ~ normal(0,1/(lfac*lambda_delta[XB[d]]));
-    beta_nu_diff[d] ~ double_exponential(0,10/(lfac*lambda_nu[XB[d]]));
-    beta_delta_diff[d] ~ double_exponential(0,10/(lfac*lambda_delta[XB[d]]));
   }
 }

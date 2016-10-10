@@ -96,7 +96,7 @@ model {
   beta_diag_diff ~ normal(0, 1/lambda_diag);
 
   //cauchy hyperprior
-  lambda_diag ~ cauchy(0,0.1);
+  lambda_diag ~ cauchy(0,1);
 }
 generated quantities {
   real deviance;

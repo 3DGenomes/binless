@@ -238,14 +238,11 @@ model {
     beta_nu_diff[d] ~ normal(0, 1/(lfac*lambda_nu[XB[d]]));
     beta_delta_diff[d] ~ normal(0, 1/(lfac*lambda_delta[XB[d]]));
     beta_diag_diff[d] ~ normal(0, 1/lambda_diag[XD[d]]);
-    //weak lasso on bias splines (non-bayesian)
-    beta_nu_diff[d] ~ double_exponential(0,10/(lfac*lambda_nu[XB[d]]));
-    beta_delta_diff[d] ~ double_exponential(0,10/(lfac*lambda_delta[XB[d]]));
   }
   //cauchy hyperprior
-  lambda_nu ~ cauchy(0,0.1);
-  lambda_delta ~ cauchy(0,0.1);
-  lambda_diag ~ cauchy(0,0.1);
+  lambda_nu ~ cauchy(0,1);
+  lambda_delta ~ cauchy(0,1);
+  lambda_diag ~ cauchy(0,1);
 }
 generated quantities {
   vector[N] log_decay;
