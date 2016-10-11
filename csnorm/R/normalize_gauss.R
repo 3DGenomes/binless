@@ -5,7 +5,7 @@ NULL
 #' @keywords internal
 #' 
 csnorm_gauss_guess = function(biases, counts, design, lambda, dmin, dmax, bf_per_kb=1, bf_per_decade=5,
-                                   iter=10000, dispersion=10, ...) {
+                              iter=10000, dispersion=10, ...) {
   nBiases=design[,uniqueN(genomic)]
   init=list(log_nu=array(0,dim=biases[,.N]), log_delta=array(0,dim=biases[,.N]),
             log_decay=array(0,dim=counts[,.N]), eC=array(0,dim=design[,.N]),
@@ -16,7 +16,7 @@ csnorm_gauss_guess = function(biases, counts, design, lambda, dmin, dmax, bf_per
   Decays=design[,uniqueN(decay)]
   beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
   op$par=c(list(beta_diag=beta_diag, lambda_diag=array(1,dim=Decays), log_decay=rep(0,counts[,.N]),
-           alpha=dispersion, lambda_nu=init$lambda_nu, lambda_delta=init$lambda_delta),
+                alpha=dispersion, lambda_nu=init$lambda_nu, lambda_delta=init$lambda_delta),
            op$par[c("eC","eRJ","eDE","beta_nu","beta_delta","log_nu","log_delta")])
   return(op)
 }
@@ -37,7 +37,7 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
   bsub[,c("log_nu","log_delta"):=list(init$log_nu,init$log_delta)]
   csub=merge(bsub[,.(id1=id,log_nu,log_delta)],csub,by="id1",all.x=F,all.y=T)
   csub=merge(bsub[,.(id2=id,log_nu,log_delta)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-  csub=merge(design[,.(name,eC=init$eC[decay])], csub, by="name",all.x=F,all.y=T)
+  csub=merge(cbind(design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
   #add z-score and sd variables
   csub[,log_mu.base:=eC + log_nu1 + log_nu2 + log_decay]
   csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_delta1-log_delta2,
@@ -67,10 +67,14 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
   op=optimizing(stanmodels$gauss_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init,
                 init_alpha=1e-9, tol_rel_grad=0, tol_rel_obj=1e3, ...)
   #make nice decay data table
-  op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), kappa_hat=data$kappa_hat,
-                          sdl=data$sdl, key="dist")
-  #rewrite log_decay as if it was calculated for each count
   csd[,log_decay:=op$par$log_decay]
+  dmat=csd[,.(name, dist=mdist, log_decay, kappahatl, std=sdl)]
+  dmat=merge(cbind(design[,.(name)],eC=init$eC), dmat, by="name",all.x=F,all.y=T)
+  dmat[,z:=kappahatl-eC-log_decay]
+  dmat=dmat[,.(name,dist,log_decay,z,std)]
+  setkey(dmat,name,dist)
+  op$par$decay=dmat 
+  #rewrite log_decay as if it was calculated for each count
   csub=counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=5))]
   a=csd[csub,.(id1,id2,log_decay),on=key(csd)]
   setkeyv(a,key(counts))
@@ -87,24 +91,28 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
   }
   #add bias informations to counts
   csub=copy(counts)
-  csub[,decay:=exp(init$log_decay)]
+  csub[,log_decay:=init$log_decay]
   bsub=biases[,.(id)]
-  bsub[,c("nu","delta"):=list(exp(init$log_nu),exp(init$log_delta))]
-  csub=merge(bsub[,.(id1=id,nu,delta)],csub,by="id1",all.x=F,all.y=T)
-  csub=merge(bsub[,.(id2=id,nu,delta)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-  csub=merge(design[,.(name,eeC=exp(init$eC[decay]))], csub, by="name",all.x=F,all.y=T)
+  bsub[,c("log_nu","log_delta"):=list(init$log_nu,init$log_delta)]
+  csub=merge(bsub[,.(id1=id,log_nu,log_delta)],csub,by="id1",all.x=F,all.y=T)
+  csub=merge(bsub[,.(id2=id,log_nu,log_delta)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
+  csub=merge(cbind(design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
   #compute means
-  csub[,mu.base:=eeC*nu1*nu2*decay]
-  csub[,c("mu.far","mu.down","mu.close","mu.up"):=list(mu.base*delta1/delta2,
-                                                       mu.base/(delta1*delta2),
-                                                       mu.base*delta2/delta1,
-                                                       mu.base*delta1*delta2)]
-  csub[,mu.base:=NULL]
+  csub[,lmu.base:=eC + log_nu1 + log_nu2 + log_decay]
+  csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(lmu.base + log_delta1 - log_delta2,
+                                                           lmu.base - log_delta1 - log_delta2,
+                                                           lmu.base - log_delta1 + log_delta2,
+                                                           lmu.base + log_delta1 + log_delta2)]
+  csub[,lmu.base:=NULL]
   #collect all counts on left/right side
-  cts=rbind(csub[,.(id=id1,R=contact.close, L=contact.far,  muR=mu.close, muL=mu.far,  etaL=log(eeC*nu1*delta1), etaR=log(eeC*nu1/delta1))],
-            csub[,.(id=id1,R=contact.down,  L=contact.up,   muR=mu.down,  muL=mu.up,   etaL=log(eeC*nu1*delta1), etaR=log(eeC*nu1/delta1))],
-            csub[,.(id=id2,R=contact.far,   L=contact.close,muR=mu.far,   muL=mu.close,etaL=log(eeC*nu2*delta2), etaR=log(eeC*nu2/delta2))],
-            csub[,.(id=id2,R=contact.down,  L=contact.up,   muR=mu.down,  muL=mu.up,   etaL=log(eeC*nu2*delta2), etaR=log(eeC*nu2/delta2))])
+  cts=rbind(csub[,.(id=id1,R=contact.close, L=contact.far,  muR=exp(lmu.close), muL=exp(lmu.far),
+                    etaL=eC + log_nu1 + log_delta1, etaR=eC + log_nu1 - log_delta1)],
+            csub[,.(id=id1,R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
+                    etaL=eC + log_nu1 + log_delta1, etaR=eC + log_nu1 - log_delta1)],
+            csub[,.(id=id2,R=contact.far,   L=contact.close,muR=exp(lmu.far),   muL=exp(lmu.close),
+                    etaL=eC + log_nu2 + log_delta2, etaR=eC + log_nu2 - log_delta2)],
+            csub[,.(id=id2,R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
+                    etaL=eC + log_nu2 + log_delta2, etaR=eC + log_nu2 - log_delta2)])
   cts[,c("varL","varR"):=list(1/muL+1/init$alpha,1/muR+1/init$alpha)]
   cts=cts[,.(etaLhat=sum((L/muL-1+etaL)/varL)/sum(1/varL),
              etaRhat=sum((R/muR-1+etaR)/varR)/sum(1/varR),
@@ -120,16 +128,32 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
             eta_hat_L=cts[,etaLhat], eta_hat_R=cts[,etaRhat], sd_L=cts[,sdL], sd_R=cts[,sdR],
             alpha=init$alpha, lambda_nu=init$lambda_nu, lambda_delta=init$lambda_delta)
-  optimizing(stanmodels$gauss_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
-             init=init, init_alpha=1e-9, ...)
+  op=optimizing(csnorm:::stanmodels$gauss_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=T,
+                init=init, init_alpha=1e-9)
+  op=optimizing(stanmodels$gauss_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
+                init=init, init_alpha=1e-9, ...)
+  #make nice output table
+  bout=cbind(biases,as.data.table(list(log_nu=op$par$log_nu,log_delta=op$par$log_delta)))
+  bout=merge(cbind(design[,.(name)],eC=op$par$eC,eRJ=op$par$eRJ,eDE=op$par$eDE), bout, by="name",all.x=F,all.y=T)
+  bout=merge(cts,bout,by="id",all=T)
+  bout[,c("mu.DL","mu.DR","mu.RJ","lmu.L","lmu.R"):=list(
+    exp(eDE+log_nu+log_delta),exp(eDE+log_nu-log_delta),exp(eRJ+log_nu),
+    eC+log_nu+log_delta,eC+log_nu-log_delta)]
+  bout=rbind(bout[,.(cat="dangling L", name, id, pos, log_nu, log_delta, z=dangling.L/mu.DL-1, std=sqrt(1/mu.DL+1/init$alpha))],
+             bout[,.(cat="dangling R", name, id, pos, log_nu, log_delta, z=dangling.R/mu.DR-1, std=sqrt(1/mu.DR+1/init$alpha))],
+             bout[,.(cat="rejoined", name, id, pos, log_nu, log_delta, z=rejoined/mu.RJ-1, std=sqrt(1/mu.RJ+1/init$alpha))],
+             bout[,.(cat="contact L", name, id, pos, log_nu, log_delta, z=etaLhat-lmu.L, std=sdL)],
+             bout[,.(cat="contact R", name, id, pos, log_nu, log_delta, z=etaRhat-lmu.R, std=sdR)])
+  op$par$biases=bout
+  op
 }
 
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
 #' 
 csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
-                                        bf_per_kb = 1, bf_per_decade=5, iter = 10000,
-                                        verbose=T, ...) {
+                                   bf_per_kb = 1, bf_per_decade=5, iter = 10000,
+                                   verbose=T, ...) {
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
@@ -159,7 +183,7 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
 #' @export
 #' 
 run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10,
-                                ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, verbose=T, ncounts=100000) {
+                           ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, verbose=T, ncounts=100000) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -220,7 +244,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
       op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","beta_diag_centered",
                                                        "log_decay","decay")],
                                          op$par[c("eRJ","eDE","beta_nu","beta_delta", "alpha","lambda_diag",
-                                                  "lambda_nu","lambda_delta","log_nu","log_delta")]))
+                                                  "lambda_nu","lambda_delta","log_nu","log_delta","biases")]))
       cs@diagnostics[[paste0("out.decay",i)]]=output
       cs@diagnostics[[paste0("runtime.decay",i)]]=a[1]+a[4]
       cs@diagnostics[[paste0("op.decay",i)]]=op.diag
@@ -234,7 +258,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
       op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag",
                                                  "log_decay","decay", "alpha","lambda_nu","lambda_delta")],
                                         op.gen$par[c("eC","eRJ","eDE","beta_nu","beta_delta",
-                                                     "log_nu","log_delta")]))
+                                                     "log_nu","log_delta","biases")]))
       cs@diagnostics[[paste0("out.bias",i)]]=output
       cs@diagnostics[[paste0("runtime.bias",i)]]=a[1]+a[4]
       cs@diagnostics[[paste0("op.bias",i)]]=op.gen
@@ -251,9 +275,9 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
       biases = cs@biases, counts = subcounts, design = cs@design, init=op$par,
       dmin=dmin, dmax=dmax, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter)))
     op=list(value=op.disp$value, par=c(op$par[c("beta_diag","beta_diag_centered","log_decay","decay",
-                                                "beta_nu","beta_delta","log_nu","log_delta")],
-                                      op.disp$par[c("eC","eRJ","eDE","alpha",
-                                                    "lambda_nu","lambda_delta", "lambda_diag")]))
+                                                "beta_nu","beta_delta","log_nu","log_delta","biases")],
+                                       op.disp$par[c("eC","eRJ","eDE","alpha",
+                                                     "lambda_nu","lambda_delta", "lambda_diag")]))
     cs@diagnostics[[paste0("out.disp",i)]]=output
     cs@diagnostics[[paste0("runtime.disp",i)]]=a[1]+a[4]
     cs@diagnostics[[paste0("op.disp",i)]]=op.disp
@@ -295,13 +319,13 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
 #' 
 #' @examples
 run_gauss = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, lambdas=c(0.1,1,10),
-                          ngibbs = 3, iter=100000, ncores=1, verbose=T) {
+                     ngibbs = 3, iter=100000, ncores=1, verbose=T) {
   cs@binned=list() #erase old binned datasets if available
   registerDoParallel(cores=ncores)
   cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %dopar%
     run_gauss_gibbs(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
-                         bins_per_bf=bins_per_bf, init=lambda, ngibbs = ngibbs,
-                         iter=iter, fit.decay=T, fit.genomic=T, verbose=verbose)
+                    bins_per_bf=bins_per_bf, init=lambda, ngibbs = ngibbs,
+                    iter=iter, fit.decay=T, fit.genomic=T, verbose=verbose)
   return(cs)
 }
 
