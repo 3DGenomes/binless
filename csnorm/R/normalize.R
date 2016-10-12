@@ -64,7 +64,8 @@ csnorm_fit = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_de
                counts_close=counts[,contact.close], counts_far=counts[,contact.far],
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
                weight=as.array(weight))
-  op=optimizing(stanmodels$fit, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
+  op=optimizing(stanmodels$fit, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init,
+                init_alpha=1e-9, tol_rel_grad=0, tol_rel_obj=1e3, ...)
   op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
   return(op)
 }
