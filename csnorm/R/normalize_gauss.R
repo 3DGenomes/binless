@@ -128,8 +128,6 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
             eta_hat_L=cts[,etaLhat], eta_hat_R=cts[,etaRhat], sd_L=cts[,sdL], sd_R=cts[,sdR],
             alpha=init$alpha, lambda_nu=init$lambda_nu, lambda_delta=init$lambda_delta)
-  op=optimizing(csnorm:::stanmodels$gauss_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=T,
-                init=init, init_alpha=1e-9)
   op=optimizing(stanmodels$gauss_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
                 init=init, init_alpha=1e-9, ...)
   #make nice output table
@@ -153,7 +151,7 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
 #' 
 csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
                                    bf_per_kb = 1, bf_per_decade=5, iter = 10000,
-                                   verbose=T, ...) {
+                                   weight=array(1,dim=design[,.N]), verbose=T, ...) {
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
@@ -168,7 +166,7 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
                cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
                counts_close=counts[,contact.close], counts_far=counts[,contact.far],
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
-               beta_nu=init$beta_nu, beta_delta=init$beta_delta, beta_diag=init$beta_diag)
+               weight=as.array(weight), beta_nu=init$beta_nu, beta_delta=init$beta_delta, beta_diag=init$beta_diag)
   op=optimizing(stanmodels$gauss_dispersion, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
                 init=init, init_alpha=1e-9, ...)
   op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
@@ -183,7 +181,7 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
 #' @export
 #' 
 run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10,
-                           ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, verbose=T, ncounts=100000) {
+                           ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, fit.disp=T, verbose=T, ncounts=100000) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -198,6 +196,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
     subcounts=cs@counts
   }
   if (subcounts[,uniqueN(c(contact.close,contact.far,contact.up,contact.down))]<2) stop("dataset too sparse, please increase ncounts")
+  subcounts.weight=cs@counts[,.N]/subcounts[,.N]
   #report min/max distance
   dmin=0.99
   if (cs@settings$circularize>0) {
@@ -269,18 +268,21 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
         op$par$beta_diag[d:length(op$par$beta_diag)]=op$par$beta_diag[d:length(op$par$beta_diag)]+10*.Machine$double.eps
       }
     }
-    #fit exposures, lambdas and dispersion
-    if (verbose==T) cat("Gibbs",i,": Remaining parameters\n")
-    a=system.time(output <- capture.output(op.disp <- csnorm:::csnorm_gauss_dispersion(
-      biases = cs@biases, counts = subcounts, design = cs@design, init=op$par,
-      dmin=dmin, dmax=dmax, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter)))
-    op=list(value=op.disp$value, par=c(op$par[c("beta_diag","beta_diag_centered","log_decay","decay",
-                                                "beta_nu","beta_delta","log_nu","log_delta","biases")],
-                                       op.disp$par[c("eC","eRJ","eDE","alpha",
-                                                     "lambda_nu","lambda_delta", "lambda_diag")]))
-    cs@diagnostics[[paste0("out.disp",i)]]=output
-    cs@diagnostics[[paste0("runtime.disp",i)]]=a[1]+a[4]
-    cs@diagnostics[[paste0("op.disp",i)]]=op.disp
+    if (fit.disp==T) {
+      #fit exposures, lambdas and dispersion
+      if (verbose==T) cat("Gibbs",i,": Remaining parameters\n")
+      a=system.time(output <- capture.output(op.disp <- csnorm:::csnorm_gauss_dispersion(
+        biases = cs@biases, counts = subcounts, design = cs@design, init=op$par,
+        dmin=dmin, dmax=dmax, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter,
+        weight=subcounts.weight)))
+      op=list(value=op.disp$value, par=c(op$par[c("beta_diag","beta_diag_centered","log_decay","decay",
+                                                  "beta_nu","beta_delta","log_nu","log_delta","biases")],
+                                         op.disp$par[c("eC","eRJ","eDE","alpha",
+                                                       "lambda_nu","lambda_delta", "lambda_diag")]))
+      cs@diagnostics[[paste0("out.disp",i)]]=output
+      cs@diagnostics[[paste0("runtime.disp",i)]]=a[1]+a[4]
+      cs@diagnostics[[paste0("op.disp",i)]]=op.disp
+    }
   }
   if (verbose==T) cat("Done\n")
   op$par$runtime=sum(as.numeric(cs@diagnostics[grep("runtime",names(cs@diagnostics))]))
@@ -325,7 +327,7 @@ run_gauss = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, lambdas=c
   cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %dopar%
     run_gauss_gibbs(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
                     bins_per_bf=bins_per_bf, init=lambda, ngibbs = ngibbs,
-                    iter=iter, fit.decay=T, fit.genomic=T, verbose=verbose)
+                    iter=iter, fit.decay=T, fit.genomic=T, fit.disp=T, verbose=verbose)
   return(cs)
 }
 
