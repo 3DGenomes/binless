@@ -65,7 +65,7 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
             kappa_hat=csd[,kappahatl], sdl=csd[,sdl], dist=csd[,mdist],
             alpha=init$alpha, lambda_diag=init$lambda_diag, weight=csd[,weight])
   op=optimizing(stanmodels$gauss_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init,
-                init_alpha=1e-9, tol_rel_grad=0, tol_rel_obj=1e3, ...)
+                init_alpha=1e-5, ...)
   #make nice decay data table
   csd[,log_decay:=op$par$log_decay]
   dmat=csd[,.(name, dist=mdist, log_decay, kappahatl, std=sdl)]
@@ -129,7 +129,7 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
             eta_hat_L=cts[,etaLhat], eta_hat_R=cts[,etaRhat], sd_L=cts[,sdL], sd_R=cts[,sdR],
             alpha=init$alpha, lambda_nu=init$lambda_nu, lambda_delta=init$lambda_delta)
   op=optimizing(stanmodels$gauss_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
-                init=init, init_alpha=1e-9, ...)
+                init=init, init_alpha=1e-5, ...)
   #make nice output table
   bout=cbind(biases,as.data.table(list(log_nu=op$par$log_nu,log_delta=op$par$log_delta)))
   bout=merge(cbind(design[,.(name)],eC=op$par$eC,eRJ=op$par$eRJ,eDE=op$par$eDE), bout, by="name",all.x=F,all.y=T)
@@ -168,7 +168,7 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
                weight=as.array(weight), beta_nu=init$beta_nu, beta_delta=init$beta_delta, beta_diag=init$beta_diag)
   op=optimizing(stanmodels$gauss_dispersion, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
-                init=init, init_alpha=1e-9, ...)
+                init=init, init_alpha=1e-5, ...)
   op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
   return(op)
 }

@@ -34,7 +34,8 @@ csnorm_simplified_guess = function(biases, counts, design, lambda, dmin, dmax, b
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
             G=groups, counts_sum_left=ctsl, counts_sum_right=ctsr, log_decay_sum=log(ctso),
             lambda_nu=array(lambda,dim=nBiases), lambda_delta=array(lambda,dim=nBiases), alpha=dispersion)
-  op=optimizing(csnorm:::stanmodels$simplified_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=T, init=0, init_alpha=1e-9)
+  op=optimizing(csnorm:::stanmodels$simplified_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=T,
+                init=0, init_alpha=1e-5)
   #add diagonal decay inits
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   Decays=design[,uniqueN(decay)]
@@ -79,7 +80,7 @@ csnorm_simplified_decay = function(biases, counts, design, log_nu, log_delta, dm
             counts_sum=csd[,count], weight=csd[,weight], dist=csd[,mdist], log_genomic_sum=csd[,log(others)],
             alpha=dispersion, lambda_diag=lambda_diag)
   op=optimizing(stanmodels$simplified_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init,
-                init_alpha=1e-9, tol_rel_grad=0, tol_rel_obj=1e3, ...)
+                init_alpha=1e-5, ...)
   #make nice decay data table
   op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
   #rewrite log_decay as if it was calculated for each count
@@ -131,7 +132,7 @@ csnorm_simplified_genomic = function(biases, counts, design, log_decay, log_nu, 
             G=groups, counts_sum_left=ctsl, counts_sum_right=ctsr, log_decay_sum=log(ctso),
             alpha=dispersion, lambda_nu=lambda_nu, lambda_delta=lambda_delta)
   optimizing(stanmodels$simplified_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
-             init=init, init_alpha=1e-9, ...)
+             init=init, init_alpha=1e-5, ...)
 }
 
 #' Single-cpu simplified fitting for exposures and dispersion
@@ -156,7 +157,7 @@ csnorm_simplified_dispersion = function(biases, counts, design, dmin, dmax, beta
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
                weight=as.array(weight), beta_nu=beta_nu, beta_delta=beta_delta, beta_diag=beta_diag)
   op=optimizing(stanmodels$simplified_dispersion, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
-                init=init, init_alpha=1e-9, ...)
+                init=init, init_alpha=1e-5, ...)
   op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
   return(op)
 }
