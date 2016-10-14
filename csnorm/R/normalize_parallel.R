@@ -78,7 +78,7 @@ run_split_parallel_squares = function(biases, square.size, coverage, diag.only=F
 #' @keywords internal
 #' @export
 #' 
-run_split_parallel_initial_guess = function(counts, biases, design, bf_per_kb, dmin, dmax, bf_per_decade, lambda, verbose, iter) {
+run_split_parallel_initial_guess = function(counts, biases, design, bf_per_kb, dmin, dmax, bf_per_decade, lambda, verbose, iter, ...) {
   #compute column sums
   cs1=counts[,.(R=sum(contact.close+contact.down),L=sum(contact.far+contact.up)),by=c("name","id1")][,.(name,id=id1,L,R)]
   cs2=counts[,.(R=sum(contact.far+contact.down),L=sum(contact.close+contact.up)),by=c("name","id2")][,.(name,id=id2,L,R)]
@@ -95,7 +95,7 @@ run_split_parallel_initial_guess = function(counts, biases, design, bf_per_kb, d
             counts_sum_left=sums[,L], counts_sum_right=sums[,R],
             lambda_nu=lambda, lambda_delta=lambda)
   op=optimizing(stanmodels$guess, data=data,
-                as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0)
+                as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0, ...)
   #return initial guesses
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   Decays=design[,uniqueN(decay)]

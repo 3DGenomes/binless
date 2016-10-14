@@ -64,8 +64,8 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
             Kdiag=Kdiag, dmin=dmin, dmax=dmax, N=csd[,.N], cbegin=cbegin,
             kappa_hat=csd[,kappahatl], sdl=csd[,sdl], dist=csd[,mdist],
             alpha=init$alpha, lambda_diag=init$lambda_diag, weight=csd[,weight])
-  op=optimizing(stanmodels$gauss_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init,
-                init_alpha=1e-5, ...)
+  op=optimizing(stanmodels$gauss_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
+                init=init, ...)
   #make nice decay data table
   csd[,log_decay:=op$par$log_decay]
   dmat=csd[,.(name, dist=mdist, log_decay, kappahatl, std=sdl)]
@@ -129,7 +129,7 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
             eta_hat_L=cts[,etaLhat], eta_hat_R=cts[,etaRhat], sd_L=cts[,sdL], sd_R=cts[,sdR],
             alpha=init$alpha, lambda_nu=init$lambda_nu, lambda_delta=init$lambda_delta)
   op=optimizing(stanmodels$gauss_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
-                init=init, init_alpha=1e-5, ...)
+                init=init, ...)
   #make nice output table
   bout=cbind(biases,as.data.table(list(log_nu=op$par$log_nu,log_delta=op$par$log_delta)))
   bout=merge(cbind(design[,.(name)],eC=op$par$eC,eRJ=op$par$eRJ,eDE=op$par$eDE), bout, by="name",all.x=F,all.y=T)
@@ -168,7 +168,7 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
                weight=as.array(weight), beta_nu=init$beta_nu, beta_delta=init$beta_delta, beta_diag=init$beta_diag)
   op=optimizing(stanmodels$gauss_dispersion, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
-                init=init, init_alpha=1e-5, ...)
+                init=init, ...)
   op$par$decay=data.table(dist=data$dist, decay=exp(op$par$log_decay), key="dist")
   return(op)
 }
@@ -181,7 +181,8 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
 #' @export
 #' 
 run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10,
-                           ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, fit.disp=T, verbose=T, ncounts=100000) {
+                           ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, fit.disp=T,
+                           verbose=T, ncounts=100000, init_alpha=1e-5) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -211,7 +212,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
     if (verbose==T) cat("Initial guess\n")
     init.a = system.time(init.output <- capture.output(init.op <- csnorm:::csnorm_gauss_guess(
       biases = cs@biases, counts = cs@counts, design = cs@design, lambda=init[[1]], dmin=dmin, dmax=dmax,
-      bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter, dispersion=10)))
+      bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter, dispersion=10, init_alpha=init_alpha)))
     #abort silently if initial guess went wrong
     if (length(grep("Line search failed",tail(init.output,1)))>0) {
       init.op$par$value=-.Machine$double.xmax
@@ -239,7 +240,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
       a=system.time(output <- capture.output(op.diag <- csnorm:::csnorm_gauss_decay(
         biases = cs@biases, counts = cs@counts, design=cs@design,
         init=op$par, dmin = dmin, dmax = dmax,
-        bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, iter=iter)))
+        bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, iter=iter, init_alpha=init_alpha)))
       op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","beta_diag_centered",
                                                        "log_decay","decay")],
                                          op$par[c("eRJ","eDE","beta_nu","beta_delta", "alpha","lambda_diag",
@@ -253,7 +254,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
       if (verbose==T) cat("Gibbs",i,": Genomic\n")
       a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_gauss_genomic(
         biases = cs@biases, counts = cs@counts, design = cs@design,
-        init = op$par, bf_per_kb = bf_per_kb, iter = iter)))
+        init = op$par, bf_per_kb = bf_per_kb, iter = iter, init_alpha=init_alpha)))
       op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag",
                                                  "log_decay","decay", "alpha","lambda_nu","lambda_delta")],
                                         op.gen$par[c("eC","eRJ","eDE","beta_nu","beta_delta",
@@ -274,7 +275,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
       a=system.time(output <- capture.output(op.disp <- csnorm:::csnorm_gauss_dispersion(
         biases = cs@biases, counts = subcounts, design = cs@design, init=op$par,
         dmin=dmin, dmax=dmax, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter,
-        weight=subcounts.weight)))
+        weight=subcounts.weight, init_alpha=init_alpha)))
       op=list(value=op.disp$value, par=c(op$par[c("beta_diag","beta_diag_centered","log_decay","decay",
                                                   "beta_nu","beta_delta","log_nu","log_delta","biases")],
                                          op.disp$par[c("eC","eRJ","eDE","alpha",
@@ -315,19 +316,21 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
 #'   optimization call.
 #' @param ncores positive integer. Number of cores to parallelize on.
 #' @param verbose Display progress if TRUE
+#' @param init_alpha positive numeric, default 1e-5. Initial step size of LBFGS line search.
 #'   
 #' @return A csnorm object
 #' @export
 #' 
 #' @examples
 run_gauss = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, lambdas=c(0.1,1,10),
-                     ngibbs = 3, iter=100000, ncores=1, verbose=T) {
+                     ngibbs = 3, iter=100000, ncores=1, verbose=T, init_alpha=1e-5) {
   cs@binned=list() #erase old binned datasets if available
   registerDoParallel(cores=ncores)
   cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %dopar%
     run_gauss_gibbs(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
                     bins_per_bf=bins_per_bf, init=lambda, ngibbs = ngibbs,
-                    iter=iter, fit.decay=T, fit.genomic=T, fit.disp=T, verbose=verbose)
+                    iter=iter, fit.decay=T, fit.genomic=T, fit.disp=T,
+                    verbose=verbose, init_alpha=1e-5)
   return(cs)
 }
 
