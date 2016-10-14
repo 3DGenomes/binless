@@ -217,6 +217,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
     if (length(grep("Line search failed",tail(init.output,1)))>0) {
       init.op$par$value=-.Machine$double.xmax
       cs@par=init.op$par
+      cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4], op.init=init.op)
       return(cs)
     }
   } else {
