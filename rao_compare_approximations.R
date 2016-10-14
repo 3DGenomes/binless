@@ -7,64 +7,80 @@ library(doParallel)
 setwd("/home/yannick/simulations/cs_norm")
 
 
-### read caulobacter dataset and generate with different sampling depths
+### subsample
+begin=73780165
+#end=73899917 #100k
+end=73861120 #60k
+load("data/rao_HiCall_chrX_450k_csdata_with_data.RData")
+data=csd@data[re.closest1>=begin&re.closest1<=end&re.closest2>=begin&re.closest2<=end]
+cs_data = csnorm:::prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
+csd = new("CSdata", info=csd@info, settings=list(circularize=-1),
+          data=data, biases=cs_data$biases, counts=cs_data$counts)
+csd@data=data.table()
+save(csd, file="data/rao_HiCall_chrX_60k_csdata.RData")
 
 
 #normalize with serial sampler
-load("data/rao_HiCall_chrX_450k_csdata.RData")
+load("data/rao_HiCall_chrX_60k_csdata.RData")
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-cs=run_exact(cs, bf_per_kb = 1, bf_per_decade = 5, lambdas = 10**seq(from=-1,to=1,length.out=6), ncores = 30, iter = 100000)
-cs=run_serial(cs, bf_per_kb = 0.25, bf_per_decade = 5, init=cs@par, iter = 100000)
-save(cs, file="data/rao_HiCall_chrX_450k_csnorm_optimized_exact.RData")
-
-for (lambda in c(round(10**seq(from=-3,to=0,length.out=8),digits=3),3.000,7.000)) {
-  try(load(paste0("data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss_",lambda,".RData")))
-  cat(lambda," ",cs@par$value," ",cs@par$alpha,"\n")
-}
+cs=run_exact(cs, bf_per_kb = 5, bf_per_decade = 5, lambdas = 10**seq(from=-1,to=1,length.out=6), ncores = 30, iter = 100000)
+cs=run_serial(cs, bf_per_kb = 5, bf_per_decade = 5, init=lambda, iter = 1000000)
+save(cs, file="data/rao_HiCall_chrX_60k_csnorm_optimized_exact.RData")
 
 #normalize with gibbs sampler
-load("data/rao_HiCall_chrX_450k_csdata.RData")
+load("data/rao_HiCall_chrX_20k_csdata.RData")
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
 cs = run_simplified(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=100, groups=10, lambdas=10**seq(from=-3,to=0,length.out=8),
                     ngibbs = 20, iter=10000, ncores=30)
 cs = run_simplified_gibbs(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=100, groups=10, init=cs@par,
                           ngibbs = 20, iter=10000)
-save(cs, file="data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_quantile_group10_initexact.RData")
+save(cs, file="data/rao_HiCall_chrX_20k_csnorm_optimized_gibbs_simplified_initexact.RData")
 
 #normalize with gauss sampler
-load("data/rao_HiCall_chrX_450k_csdata.RData")
+load("data/rao_HiCall_chrX_60k_csdata.RData")
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-cs = run_gauss(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=100, lambdas=10**seq(from=-3,to=0,length.out=8),
-               ngibbs = 3, iter=10000, ncores=30)
-cs = run_gauss_gibbs(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=100, init=1,
+cs = run_gauss(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=100, lambdas=10**seq(from=-2,to=2,length.out=10),
+               ngibbs = 20, iter=10000, ncores=30)
+cs = run_gauss_gibbs(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=100, init=cs@par, fit.disp=T,
                      ngibbs = 5, iter=10000)
-save(cs, file="data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss_initexact.RData")
+save(cs, file="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss_redo.RData")
 
-nu=rbind(data.table(pos=cs@biases[,pos],method="1",nu=exp(op.1$par$log_nu),delta=exp(op.1$par$log_delta)),
-         data.table(pos=cs@biases[,pos],method="10",nu=exp(op.10$par$log_nu),delta=exp(op.10$par$log_delta)),
-         data.table(pos=cs@biases[,pos],method="gauss",nu=exp(op.gauss$par$log_nu),delta=exp(op.gauss$par$log_delta)))
-ggplot(nu)+geom_line(aes(pos,nu,colour=method))
-ggplot(nu)+geom_line(aes(pos,delta,colour=method))
+
+
+prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_exact_lambda"
+#prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified_lambda"
+#prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss_lambda"
+registerDoParallel(cores=10)
+info=foreach (lambda=10**seq(from=-3,to=1,length.out=10),.combine=rbind, .errorhandling='remove') %dopar% {
+  load(paste0(prefix,lambda,".RData"))
+  out=cs@diagnostics$out
+  #out=cs@diagnostics$out.bias20
+  #out=cs@diagnostics$out.decay20
+  #out=cs@diagnostics$out.disp20
+  data.table(lambda=lambda,lambda.nu=cs@par$lambda_nu,disp.own=cs@par$alpha,val.own=cs@par$value,out=tail(out,1))
+}
+info[order(val.own)]
+
+
 
 #plots
-dsets=c("data/rao_HiCall_chrX_450k_csnorm_optimized_exact.RData",
-        #"data/rao_HiCall_chrX_450k_csnorm_optimized_exact_initgauss.RData",
-        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_quantile_group10.RData",
-        #"data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_quantile_group10_initexact.RData",
-        #"data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_quantile_group1.RData",
-        #"data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_quantile_group1_initexact.RData",
-        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss.RData",
-        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss_initexact.RData")
-
+dsets=c("data/rao_HiCall_chrX_60k_csnorm_optimized_exact.RData",
+        "data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified.RData",
+        "data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss.RData")
 names=c("exact",
-        #"exactig",
-        "group10",
-        #"group10i",
-        #"group1",
-        #"group1i",
-        "gauss",
-        "gaussi")
+        "simplified",
+        "gauss")
 
+dsets=c("data/rao_HiCall_chrX_450k_csnorm_optimized_exact.RData",
+        "data/rao_HiCall_chrX_450k_csnorm_optimized_exact_initgauss.RData",
+        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_simplified_initexact.RData",
+        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss_initexact.RData",
+        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss_initexact_1e6.RData")
+names=c("exact",
+        "exactg",
+        "simplifiedi",
+        "gaussi5",
+        "gaussi6")
 
 
 #nu and delta
@@ -74,15 +90,37 @@ nu = foreach(i=dsets,j=names,.combine=rbind) %do% {
 }
 ggplot(nu)+geom_line(aes(pos,nu,colour=method))+geom_point(aes(pos,nu),colour="red",data=nu[method=="exact"])
 ggplot(nu)+geom_line(aes(pos,delta,colour=method))+geom_point(aes(pos,delta),colour="red",data=nu[method=="exact"])
+#
+ggplot(merge(nu[method=="exact",.(pos,nuref=nu,deltaref=delta)],nu[method!="exact"],by="pos"))+
+  geom_point(aes(nuref,nu,colour=method))+stat_function(fun=identity)
+ggplot(merge(nu[method=="exact",.(pos,nuref=nu,deltaref=delta)],nu[method!="exact"],by="pos"))+
+  geom_point(aes(deltaref,delta,colour=method))+stat_function(fun=identity)
 
-
+#nu with points
 load(dsets[3])
-ggplot(cs@par$biases[id<100])+geom_line(aes(pos,log_nu),colour="red")+
+ggplot(cs@par$biases[id>130])+geom_line(aes(pos,log_nu))+
   geom_pointrange(aes(x=pos,y=log_nu+z,ymin=log_nu+z-std,ymax=log_nu+z+std,colour=cat))
-ggplot(cs@par$biases)+geom_line(aes(pos,log_delta),colour="red")+
-  geom_pointrange(aes(x=pos,y=log_delta+z,ymin=log_delta+z-std,ymax=log_delta+z+std,colour=cat),alpha=0.1)+
-  scale_x_log10()
 
+#beta nu
+a=data.table(bnu=cs@par$beta_nu[1,])
+a[,id:=.I]
+a[,pos:=seq(cs@biases[,min(pos)],cs@biases[,max(pos)],length.out=.N)]
+ggplot(a)+geom_point(aes(id,bnu))
+ggplot(nu)+geom_line(aes(pos,log(nu),colour=method))+geom_line(aes(pos,bnu),data=a)
+
+#logp with gibbs step
+load(dsets[2])
+logp = foreach(i=0:20, .combine=rbind) %do% {
+  if (i==0) {
+    data.table(step=i,leg="bias",value=cs@diagnostics$op.init$value)
+  } else {
+    a=foreach (leg=c("decay","bias","disp"),.combine=rbind) %do% {
+      data.table(step=i,leg=leg,value=cs@diagnostics[[paste0("op.",leg,i)]]$value)
+    }
+    rbind(a,data.table(step=i,leg="lnu",value=log(cs@diagnostics[[paste0("op.",leg,i)]]$par$lambda_nu)))
+  }
+}
+ggplot(logp)+geom_line(aes(step,value))+facet_wrap(~leg, scales="free")
 
 #nu and delta with gibbs step
 load(dsets[3])
@@ -96,7 +134,11 @@ ggplot(nu)+geom_line(aes(pos,delta))+facet_grid(round~.)
 #decay
 decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
   load(i)
-  cs@par$decay[,.(method=j,dist,decay)]
+  if ("decay" %in% names(cs@par$decay)) {
+    cs@par$decay[,.(method=j,dist,decay)]
+  } else {
+    cs@par$decay[,.(method=j,dist,decay=exp(log_decay))]
+  }
 }
 ggplot(decay)+geom_line(aes(dist,decay,colour=method))+scale_x_log10()+scale_y_log10()
 ggplot(decay)+geom_line(aes(dist,decay*dist^0.5,colour=method))+scale_x_log10()+scale_y_log10()
@@ -116,42 +158,33 @@ params = foreach(i=dsets,j=names,.combine=rbind) %do% {
 params
 
 #parameters with gibbs step
-dset=dsets[3]
-ref=dsets[3]
+dset=dsets[2]
+ref=dsets[1]
 nsteps=20
 load(ref)
 refparams=data.table(method="ref",step=0:nsteps,leg="ref",eC=cs@par$eC,alpha=cs@par$alpha,
                      lambda_nu=cs@par$lambda_nu,log_nu38=cs@par$log_nu[38],
                      lambda_delta=cs@par$lambda_delta,lambda_diag=cs@par$lambda_diag,value=cs@par$value)
+dset="data/rao_HiCall_chrX_60k_csnorm_optimized_exact_lambda0.001.RData"
+dset="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified_lambda10.RData"
+dset="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss_lambda0.0599484250318941.RData"
 load(dset)
-params = rbind(params,
-               foreach(i=0:nsteps,.combine=rbind) %do% {
+params = foreach(i=0:nsteps,.combine=rbind) %do% {
                  if (i==0) {
                    params=data.table(method="10",step=0,leg="init",eC=cs@diagnostics$op.init$par$eC, alpha=cs@diagnostics$op.init$par$alpha,
                                      lambda_nu=cs@diagnostics$op.init$par$lambda_nu, log_nu38=cs@diagnostics$op.init$par$log_nu[38],
                                      beta_diag5=cs@diagnostics$op.init$par$beta_diag[5], lambda_delta=cs@diagnostics$op.init$par$lambda_delta,
-                                     lambda_diag=cs@diagnostics$op.init$par$lambda_diag, value=cs@diagnostics$op.init$value)
+                                     lambda_diag=cs@diagnostics$op.init$par$lambda_diag, value=cs@diagnostics$op.init$value, out=tail(cs@diagnostics$out.init,1))
                  } else {
-                   stepname=paste0("decay",i)
-                   op=cs@diagnostics[[paste0("op.",stepname)]]
-                   a1=as.data.table(c(list(method="10",step=i,leg="decay", log_nu38=op$par$log_nu[38], beta_diag5=op$par$beta_diag[5]),
-                                      op$par[c("eC","alpha","lambda_nu","lambda_delta", "lambda_diag")],
-                                      list(value=op$value)))
-                   #
-                   stepname=paste0("bias",i)
-                   op=cs@diagnostics[[paste0("op.",stepname)]]
-                   a2=as.data.table(c(list(method="10",step=i+0.3,leg="bias", log_nu38=op$par$log_nu[38], beta_diag5=op$par$beta_diag[5]),
-                                      op$par[c("eC","alpha","lambda_nu","lambda_delta", "lambda_diag")],
-                                      list(value=op$value)))
-                   #
-                   stepname=paste0("disp",i)
-                   op=cs@diagnostics[[paste0("op.",stepname)]]
-                   a3=as.data.table(c(list(method="10",step=i+0.6,leg="disp", log_nu38=op$par$log_nu[38], beta_diag5=op$par$beta_diag[5]),
-                                      op$par[c("eC","alpha","lambda_nu","lambda_delta", "lambda_diag")],
-                                      list(value=op$value)))
-                   rbind(a1,a2,a3,fill=T)
+                   foreach (leg=c("decay","bias","disp"), inc=(c(0,0.3,0.6)),.combine=function(...){rbind(...,fill=T)}) %do% {
+                     stepname=paste0(leg,i)
+                     op=cs@diagnostics[[paste0("op.",stepname)]]
+                     as.data.table(c(list(method="10",step=i+inc,leg=leg, log_nu38=op$par$log_nu[38], beta_diag5=op$par$beta_diag[5]),
+                                        op$par[c("eC","alpha","lambda_nu","lambda_delta", "lambda_diag")],
+                                        list(value=op$value, out=tail(cs@diagnostics[[paste0("out.",stepname)]],1))))
+                   }
                  }
-               })
+}
 
 #eC
 ggplot(params)+geom_line(aes(step,eC))+geom_point(aes(step,eC,colour=leg))+
@@ -163,8 +196,8 @@ ggplot(params)+geom_line(aes(step,lambda_nu))+geom_point(aes(step,lambda_nu,colo
 ggplot(params)+geom_line(aes(step,log_nu38))+geom_point(aes(step,log_nu38,colour=leg))+
   geom_hline(aes(yintercept=log_nu38),data=refparams,colour="red")
 #value
-ggplot(params)+geom_line(aes(step,value))+geom_point(aes(step,value,colour=leg))+
-  geom_hline(aes(yintercept=value),data=refparams,colour="red")
+ggplot(params[!(leg%in%c("ref","init"))])+geom_line(aes(step,value))+
+  geom_point(aes(step,value,colour=out))+facet_wrap(~leg, scales = "free")
 #alpha
 ggplot(params)+geom_line(aes(step,alpha))+geom_point(aes(step,alpha,colour=leg))+
   geom_hline(aes(yintercept=alpha),data=refparams,colour="red")
@@ -193,48 +226,62 @@ beta = foreach(i=dsets,j=names,.combine=rbind) %do% {
 ggplot(beta)+geom_line(aes(id,beta_diag,colour=method))
 #
 
-
-
-
-#normalize with serial sampler
-load("data/old/rao_HiCall_chrX_450k_csdata.RData")
-cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-cs=run_exact(cs, bf_per_kb = 1, bf_per_decade = 5, lambdas = 10**seq(from=-2,to=0,length.out=6), ncores = 30, iter = 100000)
-save(cs, file="data/old/rao_HiCall_chrX_450k_csnorm_optimized_exact.RData")
-
-#normalize with gibbs sampler
-load("data/old/rao_HiCall_chrX_450k_csdata.RData")
-cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-cs = run_simplified(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=10**seq(from=-2,to=0,length.out=6),
-                    ngibbs = 5, iter=10000, ncores=30)
-save(cs, file="data/old/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_quantile_group10.RData")
-
-#normalize with gibbs sampler
-load("data/old/rao_HiCall_chrX_450k_csdata.RData")
-cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-cs = run_simplified(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=1, lambdas=10**seq(from=-2,to=0,length.out=6),
-                    ngibbs = 5, iter=10000, ncores=30)
-save(cs, file="data/old/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_quantile_group1.RData")
-
-
-
-
-#plots
-dsets=c("data/old/rao_HiCall_chrX_450k_csnorm_optimized_exact.RData",
-        "data/old/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_quantile_group10.RData",
-        "data/old/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_quantile_group1.RData")
-names=c("exact","group10","group1")
-nu = foreach(i=dsets,j=names,.combine=rbind) %do% {
-  load(i)
-  data.table(pos=cs@biases[,pos],nu=exp(cs@par$log_nu),delta=exp(cs@par$log_delta),method=j)
+for (i in 1:20) {
+  cat(i,"decay",tail(cs@diagnostics[[paste0("out.decay",i)]],1),"\n")
+  #cat(i,"bias",tail(cs@diagnostics[[paste0("out.bias",i)]],1),"\n")
+  #cat(i,"disp",tail(cs@diagnostics[[paste0("out.disp",i)]],1),"\n")
 }
-ggplot(nu)+geom_line(aes(pos,nu,colour=method))
-ggplot(nu)+geom_line(aes(pos,delta,colour=method))
-#
-decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
-  load(i)
-  cs@par$decay[,.(method=j,dist,decay)]
+
+#prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_exact_lambda"
+#prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified_lambda"
+#prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss_lambda"
+registerDoParallel(cores=10)
+params=foreach (lambda=10**seq(from=-3,to=1,length.out=10),.combine=rbind, .errorhandling='remove') %dopar% {
+  load(paste0(prefix,lambda,".RData"))
+  params = foreach(i=0:nsteps,.combine=rbind) %do% {
+    if (i==0) {
+      params=data.table(method="10",step=0,leg="init",runtime=cs@diagnostics$runtime.init,eC=cs@diagnostics$op.init$par$eC, alpha=cs@diagnostics$op.init$par$alpha,
+                        lambda_nu=cs@diagnostics$op.init$par$lambda_nu, log_nu38=cs@diagnostics$op.init$par$log_nu[38],
+                        beta_diag5=cs@diagnostics$op.init$par$beta_diag[5], lambda_delta=cs@diagnostics$op.init$par$lambda_delta,
+                        lambda_diag=cs@diagnostics$op.init$par$lambda_diag, value=cs@diagnostics$op.init$value, out=tail(cs@diagnostics$out.init,1))
+    } else {
+      foreach (leg=c("decay","bias","disp"), inc=(c(0,0.3,0.6)),.combine=function(...){rbind(...,fill=T)}) %do% {
+        stepname=paste0(leg,i)
+        op=cs@diagnostics[[paste0("op.",stepname)]]
+        as.data.table(c(list(method="10",step=i+inc,leg=leg,log_nu38=op$par$log_nu[38], beta_diag5=op$par$beta_diag[5]),
+                        op$par[c("eC","alpha","lambda_nu","lambda_delta", "lambda_diag")],
+                        list(value=op$value, out=tail(cs@diagnostics[[paste0("out.",stepname)]],1),
+                             runtime=cs@diagnostics[[paste0("runtime.",stepname)]])))
+      }
+    }
+  }
+  params[,lambda:=lambda]
+  params
 }
-ggplot(decay)+geom_line(aes(dist,decay,colour=method))+scale_x_log10()+scale_y_log10()
+#value
+ggplot(params[!(leg%in%c("ref","init"))])+geom_line(aes(step,value))+
+  geom_point(aes(step,value,colour=out))+facet_grid(leg~lambda, scales = "free")
+#dispersion
+ggplot(params[!(leg%in%c("ref","init"))])+geom_line(aes(step,value))+
+  geom_point(aes(step,alpha,colour=out))+facet_grid(leg~lambda, scales = "free")
+#lambda_nu
+ggplot(params[!(leg%in%c("ref","init"))])+geom_line(aes(step,value))+
+  geom_point(aes(step,alpha,colour=out))+facet_grid(leg~lambda, scales = "free")
+#runtime
+ggplot(params[!(leg%in%c("ref","init"))])+geom_line(aes(step,runtime))+
+  geom_point(aes(step,runtime,colour=out))+facet_grid(leg~lambda, scales = "free")
+
+
+
+
+#'notes:
+#' 60k:
+#'  - lambda from 1e-3 to 10
+#'  - exact has explicit convergence or real line search problems for small lambdas
+#'  - simplified has explicit convergence or line search error with convergence (biases)
+#'  - gauss has explicit convergence or line search error with convergence (dispersion)
+#'  => Inconclusive because optimum is at large lambda, and variance for nu bias becomes huge.
+#'     Might be necessary to introduce a prior on lambda.   
+
 
 
