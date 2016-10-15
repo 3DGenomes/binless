@@ -47,11 +47,11 @@ save(cs, file="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss_redo.RData"
 
 
 
-prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_exact_lambda"
-#prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified_lambda"
-#prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss_lambda"
+prefix="data/rao_HiCall_chrX_450k_csnorm_optimized_exact_lambda"
+#prefix="data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_simplified_lambda"
+#prefix="data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss_lambda"
 registerDoParallel(cores=10)
-info=foreach (lambda=10**seq(from=-3,to=1,length.out=10),.combine=rbind, .errorhandling='remove') %dopar% {
+info=foreach (lambda=10**seq(from=-4,to=-2,length.out=10),.combine=rbind, .errorhandling='remove') %dopar% {
   load(paste0(prefix,lambda,".RData"))
   out=cs@diagnostics$out
   #out=cs@diagnostics$out.bias20
@@ -61,26 +61,38 @@ info=foreach (lambda=10**seq(from=-3,to=1,length.out=10),.combine=rbind, .errorh
 }
 info[order(val.own)]
 
+prefix="data/rao_HiCall_chrX_450k_csnorm_optimized_exact_lambda"
+#prefix="data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_simplified_lambda"
+#prefix="data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss_lambda"
+registerDoParallel(cores=30)
+info=foreach (i=Sys.glob(paste0(prefix,"*.RData")),.combine=rbind, .errorhandling='remove') %dopar% {
+  load(i)
+  out=cs@diagnostics$out
+  #out=cs@diagnostics$out.bias20
+  #out=cs@diagnostics$out.decay20
+  #out=cs@diagnostics$out.disp20
+  data.table(fname=i,lambda.nu=cs@par$lambda_nu,disp.own=cs@par$alpha,val.own=cs@par$value,out=tail(out,1))
+}
+info[order(val.own)]
 
 
 #plots
-dsets=c("data/rao_HiCall_chrX_60k_csnorm_optimized_exact.RData",
-        "data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified.RData",
-        "data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss.RData")
+dsets=c("data/rao_HiCall_chrX_450k_csnorm_optimized_exact.RData",
+        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_simplified.RData",
+        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss.RData")
 names=c("exact",
         "simplified",
         "gauss")
 
-dsets=c("data/rao_HiCall_chrX_450k_csnorm_optimized_exact.RData",
-        "data/rao_HiCall_chrX_450k_csnorm_optimized_exact_initgauss.RData",
-        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_simplified_initexact.RData",
-        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss_initexact.RData",
-        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss_initexact_1e6.RData")
+dsets=c("data/rao_HiCall_chrX_60k_csnorm_optimized_exact.RData",
+        "data/rao_HiCall_chrX_60k_csnorm_optimized_exact_extension.RData",
+        "data/rao_HiCall_chrX_60k_csnorm_optimized_exact_initgauss.RData",
+        "data/rao_HiCall_chrX_60k_csnorm_optimized_exact_initsimplified.RData")
 names=c("exact",
-        "exactg",
-        "simplifiedi",
-        "gaussi5",
-        "gaussi6")
+        "exacte",
+        "exactig",
+        "exactis")
+
 
 
 #nu and delta
@@ -166,8 +178,8 @@ refparams=data.table(method="ref",step=0:nsteps,leg="ref",eC=cs@par$eC,alpha=cs@
                      lambda_nu=cs@par$lambda_nu,log_nu38=cs@par$log_nu[38],
                      lambda_delta=cs@par$lambda_delta,lambda_diag=cs@par$lambda_diag,value=cs@par$value)
 dset="data/rao_HiCall_chrX_60k_csnorm_optimized_exact_lambda0.001.RData"
-dset="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified_lambda10.RData"
-dset="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss_lambda0.0599484250318941.RData"
+dset="data/rao_HiCall_chrX_100k_csnorm_optimized_gibbs_simplified_lambda100.RData"
+dset="data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss_lambda100.RData"
 load(dset)
 params = foreach(i=0:nsteps,.combine=rbind) %do% {
                  if (i==0) {
@@ -234,9 +246,9 @@ for (i in 1:20) {
 
 #prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_exact_lambda"
 #prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified_lambda"
-#prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss_lambda"
+prefix="data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss_lambda"
 registerDoParallel(cores=10)
-params=foreach (lambda=10**seq(from=-3,to=1,length.out=10),.combine=rbind, .errorhandling='remove') %dopar% {
+params=foreach (lambda=10**seq(from=-2,to=2,length.out=10),.combine=rbind, .errorhandling='remove') %dopar% {
   load(paste0(prefix,lambda,".RData"))
   params = foreach(i=0:nsteps,.combine=rbind) %do% {
     if (i==0) {
@@ -276,12 +288,28 @@ ggplot(params[!(leg%in%c("ref","init"))])+geom_line(aes(step,runtime))+
 
 #'notes:
 #' 60k:
-#'  - lambda from 1e-3 to 10
-#'  - exact has explicit convergence or real line search problems for small lambdas
-#'  - simplified has explicit convergence or line search error with convergence (biases)
-#'  - gauss has explicit convergence or line search error with convergence (dispersion)
+#'  - lambda from 1e-3 to 1e1
+#'  - exact has explicit convergence or real line search problems for small lambdas. Optimum at large lambda
+#'  - simplified has explicit convergence or line search error with convergence (biases). Optimum at small lambda
+#'  - gauss has explicit convergence or line search error with convergence (dispersion). Optimum at large lambda
 #'  => Inconclusive because optimum is at large lambda, and variance for nu bias becomes huge.
-#'     Might be necessary to introduce a prior on lambda.   
+#'     Might be necessary to introduce a prior on lambda.
+#'    NOTE: extending a run does not work properly
+#'     
+#' 100k:
+#'  - lambda from 1e-2 to 1e2
+#'  - exact has converged
+#'  - simplified converges everywhere but shows line search errors for large lambdas (biases)
+#'  - gauss converges except a few line search errors (to be examined)
+#'  => Same as 60k case
+#'  
+#' 450k:
+#'  - lambda from 1e-2 to 1e2
+#'  - exact converges for lambda around 0.08
+#'  - simplified converges at lambda around 2e-4
+#'  - half of gauss fail (to be examined)
+#'  - extending to 1e-4 - 1e-2 is impossible (no good init_alpha)
+#'  - 
 
 
 
