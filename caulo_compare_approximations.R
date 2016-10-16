@@ -98,12 +98,19 @@ nu = foreach(i=dsets,j=names,.combine=rbind) %do% {
   data.table(pos=cs@biases[,pos],nu=exp(cs@par$log_nu),delta=exp(cs@par$log_delta),method=j)
 }
 ggplot(nu)+geom_line(aes(pos,nu,colour=method))+geom_point(aes(pos,nu),colour="red",data=nu[method=="exact"])
+ggsave(filename = "images/caulo_NcoI_500k_nu_bias.pdf", width=10, height=7)
 ggplot(nu)+geom_line(aes(pos,delta,colour=method))+geom_point(aes(pos,delta),colour="red",data=nu[method=="exact"])
+ggsave(filename = "images/caulo_NcoI_500k_delta_bias.pdf", width=10, height=7)
 #
 ggplot(merge(nu[method=="exact",.(pos,nuref=nu,deltaref=delta)],nu[method!="exact"],by="pos"))+
   geom_point(aes(nuref,nu,colour=method))+stat_function(fun=identity)
 ggplot(merge(nu[method=="exact",.(pos,nuref=nu,deltaref=delta)],nu[method!="exact"],by="pos"))+
   geom_point(aes(deltaref,delta,colour=method))+stat_function(fun=identity)
+#
+cor.test(nu[method=="exact",log(nu)],nu[method=="simplified",log(nu)])
+cor.test(nu[method=="exact",log(nu)],nu[method=="gauss",log(nu)])
+cor.test(nu[method=="exact",log(delta)],nu[method=="simplified",log(delta)])
+cor.test(nu[method=="exact",log(delta)],nu[method=="gauss",log(delta)])
 
 #decay
 decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
@@ -115,6 +122,13 @@ decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
   }
 }
 ggplot(decay)+geom_line(aes(dist,decay,colour=method))+scale_x_log10()+scale_y_log10()
+#
+decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
+  load(i)
+  data.table(dist=cs@counts[,distance], log_decay=cs@par$log_decay, method=j)
+}
+cor.test(decay[method=="exact",log_decay],decay[method=="simplified",log_decay])
+cor.test(decay[method=="exact",log_decay],decay[method=="gauss",log_decay])
 
 
 #parameters
