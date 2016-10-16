@@ -148,10 +148,11 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=5, iter=100000, subsa
   setkey(cs@counts,name,id1,pos1,id2,pos2)
   #initial guess
   if (length(init)==1) {
-    init.a=system.time(init.output <- capture.output(init.op <- csnorm:::run_split_parallel_initial_guess(
+    init.a=system.time(init.output <- capture.output(init.par <- csnorm:::run_split_parallel_initial_guess(
       counts=cs@counts, biases=cs@biases, design=cs@design,
       bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, lambda=init[[1]],
       verbose=T, iter=iter, init_alpha=init_alpha)))
+    init.op=list(par=init$par)
     #abort silently if initial guess went wrong
     if (length(grep("Line search failed",tail(init.output,1)))>0) {
       init.op$par$value=-.Machine$double.xmax
@@ -171,7 +172,7 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=5, iter=100000, subsa
   a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
     biases=cs@biases, counts = counts.sub, design=cs@design, dmin=dmin, dmax=dmax,
     bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter, verbose = T,
-    init=init.op, weight=counts.sub[,.N,by=name]$N/cs@counts[,.N,by=name]$N, init_alpha=init_alpha)))
+    init=init.op$par, weight=counts.sub[,.N,by=name]$N/cs@counts[,.N,by=name]$N, init_alpha=init_alpha)))
   cs@diagnostics=list(out=output, runtime=a[1]+a[4], op=op)
   #report statistics
   op$par$init=init.op
