@@ -187,9 +187,9 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=5, iter=100000, subsa
 #' Will run the exact model of normalization (on one cpu for each lambda 
 #' provided) and returns the most likely model and predicted quantities. Useful
 #' for comparison purposes. If you don't know what to use, try 
-#' \code{\link{run_simplified}}.
+#' \code{\link{run_gauss}}.
 #' 
-#' @inheritParams run_simplified
+#' @inheritParams run_gauss
 #' @param subsampling.pc numeric. Percentage of the data used to do the calculations (default 100).
 #'   
 #' @return A csnorm object
@@ -197,12 +197,15 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=5, iter=100000, subsa
 #' 
 #' @examples
 run_exact = function(cs, bf_per_kb=1, bf_per_decade=5, lambdas=c(0.1,1,10), ncores=1, iter=100000,
-                     subsampling.pc=100, init_alpha=1e-5) {
+                     subsampling.pc=100, init_alpha=1e-5, prefix=NULL) {
   cs@binned=list() #erase old binned datasets if available
   registerDoParallel(cores=ncores)
-  cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value<y@par$value){return(y)}else{return(x)}}) %dopar%
+  cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value<y@par$value){return(y)}else{return(x)}}) %dopar% {
     run_serial(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, init=lambda, iter=iter,
                subsampling.pc=subsampling.pc, init_alpha=init_alpha)
+    if (!is.null(prefix)) save(cs, file=paste0(prefix,"_lambda",lambda,".RData"))
+    cs
+  }
   return(cs)
 }
 
@@ -255,3 +258,25 @@ check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10) {
   p.delta=ggplot(counts)+geom_jitter(aes(1,pval))+facet_grid(name~deltabin1)+ylab("model p-value")+xlab("delta bin")
   return(list(all=p.all,decay=p.decay,nu=p.nu,delta=p.delta,counts=counts))
 }
+
+
+#' Recover failed or aborted normalization
+#' 
+#' Will look for files of the form prefix_lambdaxxx.RData and return the
+#' simulation with the largest log-likelihood. Nothing else will be checked so
+#' make sure these input files correspond to a run with the exact same
+#' parameters up to the initial condition.
+#' 
+#' @param prefix character. As provided to \code{\link{run_gauss}} or
+#'   \code{\link{run_exact}}.
+#'   
+#' @return A CSnorm object
+#' @export
+#' 
+#' @examples
+recover_normalization = function(prefix) {
+  foreach (i=Sys.glob(paste0(prefix,"_lambda*.RData")),
+           .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %do%
+    load(i)
+}
+

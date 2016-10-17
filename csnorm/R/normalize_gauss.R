@@ -303,7 +303,8 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
 
 #' Cut-site normalization (simplified gibbs sampling)
 #' 
-#' Alternates two approximations to the exact model, fitting the diagonal decay and nu/delta.
+#' Alternates two approximations to the exact model, fitting the diagonal decay
+#' and nu/delta.
 #' 
 #' @param cs CSnorm object as returned by \code{\link{merge_cs_norm_datasets}}
 #' @param bf_per_kb positive numeric. Number of cubic spline basis functions per
@@ -312,30 +313,38 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
 #' @param bf_per_decade positive numeric. Number of cubic spline basis functions
 #'   per distance decade (in bases), for diagonal decay. Default parameter 
 #'   should suffice.
-#' @param bins_per_bf positive integer. Number of distance bins to split basis
-#'   functions into. Must be sufficiently small so that the diagonal decay is
+#' @param bins_per_bf positive integer. Number of distance bins to split basis 
+#'   functions into. Must be sufficiently small so that the diagonal decay is 
 #'   approximately constant in that bin.
-#' @param lambdas positive numeric. Length scales to try out as initial condition.
+#' @param lambdas positive numeric. Length scales to try out as initial
+#'   condition.
 #' @param ngibbs positive integer. Number of gibbs sampling iterations.
-#' @param iter positive integer. Number of optimization steps for each stan
+#' @param iter positive integer. Number of optimization steps for each stan 
 #'   optimization call.
 #' @param ncores positive integer. Number of cores to parallelize on.
 #' @param verbose Display progress if TRUE
-#' @param init_alpha positive numeric, default 1e-5. Initial step size of LBFGS line search.
+#' @param init_alpha positive numeric, default 1e-5. Initial step size of LBFGS
+#'   line search.
+#' @prefix character. If given, will save individual optimizations to files of
+#'   form prefix_lambdaxxx.RData, where xxx is a float corresponding to the
+#'   initial value of lambda. Useful in conjunction with \code{\link{recover_normalization}}
 #'   
 #' @return A csnorm object
 #' @export
 #' 
 #' @examples
 run_gauss = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, lambdas=c(0.1,1,10),
-                     ngibbs = 3, iter=100000, ncores=1, verbose=T, init_alpha=1e-5) {
+                     ngibbs = 3, iter=100000, ncores=1, verbose=T, init_alpha=1e-5, prefix=NULL) {
   cs@binned=list() #erase old binned datasets if available
   registerDoParallel(cores=ncores)
-  cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %dopar%
-    run_gauss_gibbs(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
-                    bins_per_bf=bins_per_bf, init=lambda, ngibbs = ngibbs,
-                    iter=iter, fit.decay=T, fit.genomic=T, fit.disp=T,
-                    verbose=verbose, init_alpha=1e-5)
+  cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %dopar% {
+    cs = run_gauss_gibbs(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
+                         bins_per_bf=bins_per_bf, init=lambda, ngibbs = ngibbs,
+                         iter=iter, fit.decay=T, fit.genomic=T, fit.disp=T,
+                         verbose=verbose, init_alpha=1e-5)
+    if (!is.null(prefix)) save(cs, file=paste0(prefix,"_lambda",lambda,".RData"))
+    cs
+  }
   return(cs)
 }
 
