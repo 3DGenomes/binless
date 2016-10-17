@@ -36,8 +36,8 @@ for (i in c("BglIIr1","BglIIr2","BglII_rifampicin")) {
 load("data/caulo_NcoI_500k_csdata.RData")
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
 cs=run_exact(cs, bf_per_kb = 1, bf_per_decade = 5, lambdas = 10**seq(from=-1,to=1,length.out=6), ncores = 30, iter = 100000)
-cs=run_serial(cs, bf_per_kb = 0.25, bf_per_decade = 5, init=cs@par, iter = 100000)
-save(cs, file="data/caulo_NcoI_500k_csnorm_optimized_exact.RData")
+cs=run_serial(cs, bf_per_kb = 1, bf_per_decade = 5, init=cs@par, iter = 100000)
+save(cs, file="data/caulo_NcoI_500k_csnorm_optimized_exact_initgauss.RData")
 
 prefix="data/caulo_NcoI_500k_csnorm_optimized_exact_lambda"
 #prefix="data/caulo_NcoI_500k_csnorm_optimized_gibbs_simplified_lambda"
@@ -76,11 +76,10 @@ ggplot(nu)+geom_line(aes(pos,delta,colour=method))
 
 #plots
 dsets=c("data/caulo_NcoI_500k_csnorm_optimized_exact.RData",
-        "data/caulo_NcoI_500k_csnorm_optimized_gibbs_simplified.RData",
-        "data/caulo_NcoI_500k_csnorm_optimized_gibbs_gauss.RData")
+        "data/caulo_NcoI_500k_csnorm_optimized_gibbs_gauss_initexact.RData")
 names=c("exact",
-        "simplified",
-        "gauss")
+        #"simplified",
+        "approximation")
 
 dsets=c("data/caulo_NcoI_500k_csnorm_optimized_exact.RData",
         "data/caulo_NcoI_500k_csnorm_optimized_gibbs_simplified_initexact.RData",
@@ -97,20 +96,22 @@ nu = foreach(i=dsets,j=names,.combine=rbind) %do% {
   load(i)
   data.table(pos=cs@biases[,pos],nu=exp(cs@par$log_nu),delta=exp(cs@par$log_delta),method=j)
 }
-ggplot(nu)+geom_line(aes(pos,nu,colour=method))+geom_point(aes(pos,nu),colour="red",data=nu[method=="exact"])
+ggplot(nu)+geom_line(aes(pos,nu,colour=method))
 ggsave(filename = "images/caulo_NcoI_500k_nu_bias.pdf", width=10, height=7)
-ggplot(nu)+geom_line(aes(pos,delta,colour=method))+geom_point(aes(pos,delta),colour="red",data=nu[method=="exact"])
+ggplot(nu)+geom_line(aes(pos,delta,colour=method))
 ggsave(filename = "images/caulo_NcoI_500k_delta_bias.pdf", width=10, height=7)
 #
 ggplot(merge(nu[method=="exact",.(pos,nuref=nu,deltaref=delta)],nu[method!="exact"],by="pos"))+
   geom_point(aes(nuref,nu,colour=method))+stat_function(fun=identity)
+ggsave(filename = "images/caulo_NcoI_500k_nu_bias_correlation.pdf", width=10, height=7)
 ggplot(merge(nu[method=="exact",.(pos,nuref=nu,deltaref=delta)],nu[method!="exact"],by="pos"))+
   geom_point(aes(deltaref,delta,colour=method))+stat_function(fun=identity)
+ggsave(filename = "images/caulo_NcoI_500k_delta_bias_correlation.pdf", width=10, height=7)
 #
 cor.test(nu[method=="exact",log(nu)],nu[method=="simplified",log(nu)])
-cor.test(nu[method=="exact",log(nu)],nu[method=="gauss",log(nu)])
+cor.test(nu[method=="exact",log(nu)],nu[method=="approximation",log(nu)])
 cor.test(nu[method=="exact",log(delta)],nu[method=="simplified",log(delta)])
-cor.test(nu[method=="exact",log(delta)],nu[method=="gauss",log(delta)])
+cor.test(nu[method=="exact",log(delta)],nu[method=="approximation",log(delta)])
 
 #decay
 decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
@@ -122,6 +123,7 @@ decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
   }
 }
 ggplot(decay)+geom_line(aes(dist,decay,colour=method))+scale_x_log10()+scale_y_log10()
+ggsave(filename = "images/caulo_NcoI_500k_diagonal_decay.pdf", width=10, height=7)
 #
 decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
   load(i)

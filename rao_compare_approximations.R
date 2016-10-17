@@ -47,12 +47,12 @@ save(cs, file="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss_redo.RData"
 
 
 
-prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_exact_lambda"
+prefix="data/rao_HiCall_chrX_450k_csnorm_optimized_exact_lambda"
 #prefix="data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_simplified_lambda"
 #prefix="data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss_lambda"
 registerDoParallel(cores=10)
-info=foreach (lambda=10**seq(from=-4,to=-2,length.out=10),.combine=rbind, .errorhandling='remove') %dopar% {
-  load(paste0(prefix,lambda,".RData"))
+info=foreach (lambda=10**seq(from=-2,to=-2,length.out=10),.combine=rbind, .errorhandling='remove') %dopar% {
+  load(paste0(prefix,lambda,"_.RData"))
   out=cs@diagnostics$out
   #out=cs@diagnostics$out.bias20
   #out=cs@diagnostics$out.decay20
@@ -61,7 +61,7 @@ info=foreach (lambda=10**seq(from=-4,to=-2,length.out=10),.combine=rbind, .error
 }
 info[order(val.own)]
 
-prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_exact_lambda"
+prefix="data/rao_HiCall_chrX_450k_csnorm_optimized_exact"
 #prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified_lambda"
 #prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss_lambda"
 registerDoParallel(cores=30)
@@ -76,23 +76,31 @@ info=foreach (i=Sys.glob(paste0(prefix,"*.RData")),.combine=rbind, .errorhandlin
 info[order(val.own)]
 
 
+load("data/rao_HiCall_chrX_450k_csnorm_optimized_exact_initgauss_lambda100.RData")
+cs=run_serial(cs, bf_per_kb = 5, bf_per_decade = 5, init=cs@par, iter = 10000, init_alpha = 1e-3)
+
+
 #plots
-dsets=c("data/rao_HiCall_chrX_60k_csnorm_optimized_exact.RData",
-        "data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified.RData",
-        "data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss.RData")
+dsets=c("data/rao_HiCall_chrX_450k_csnorm_optimized_exact_initgauss.RData",
+        #"data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified.RData",
+        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss.RData")
 names=c("exact",
-        "simplified",
+        #"simplified",
+        "approximation")
+
+dsets=c("data/rao_HiCall_chrX_450k_csnorm_optimized_exact.RData",
+        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_simplified_initexact.RData",
+        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss_initexact.RData")
+names=c("exact",
+        "simplifiedie",
+        "gaussie")
+
+dsets=c("data/rao_HiCall_chrX_450k_csnorm_optimized_exact_initgauss.RData",
+        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_simplified_initgauss.RData",
+        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss.RData")
+names=c("exactig",
+        "simplifiedig",
         "gauss")
-
-dsets=c("data/rao_HiCall_chrX_60k_csnorm_optimized_exact.RData",
-        "data/rao_HiCall_chrX_60k_csnorm_optimized_exact_extension.RData",
-        "data/rao_HiCall_chrX_60k_csnorm_optimized_exact_initgauss.RData",
-        "data/rao_HiCall_chrX_60k_csnorm_optimized_exact_initsimplified.RData")
-names=c("exact",
-        "exacte",
-        "exactig",
-        "exactis")
-
 
 
 #nu and delta
@@ -100,22 +108,22 @@ nu = foreach(i=dsets,j=names,.combine=rbind) %do% {
   load(i)
   data.table(pos=cs@biases[,pos],nu=exp(cs@par$log_nu),delta=exp(cs@par$log_delta),method=j)
 }
-ggplot(nu)+geom_line(aes(pos,nu,colour=method))+geom_point(aes(pos,nu),colour="red",data=nu[method=="exact"])
-ggsave(filename = "images/rao_HiCall_chrX_60k_nu_bias.pdf", width=10, height=7)
-ggplot(nu)+geom_line(aes(pos,delta,colour=method))+geom_point(aes(pos,delta),colour="red",data=nu[method=="exact"])
-ggsave(filename = "images/rao_HiCall_chrX_60k_delta_bias.pdf", width=10, height=7)
+ggplot(nu)+geom_line(aes(pos,nu,colour=method))
+ggsave(filename = "images/rao_HiCall_chrX_450k_nu_bias.pdf", width=10, height=7)
+ggplot(nu)+geom_line(aes(pos,delta,colour=method))
+ggsave(filename = "images/rao_HiCall_chrX_450k_delta_bias.pdf", width=10, height=7)
 #
 ggplot(merge(nu[method=="exact",.(pos,nuref=nu,deltaref=delta)],nu[method!="exact"],by="pos"))+
   geom_point(aes(nuref,nu,colour=method))+stat_function(fun=identity)
-ggsave(filename = "images/rao_HiCall_chrX_60k_nu_bias_correlation.pdf", width=10, height=7)
+ggsave(filename = "images/rao_HiCall_chrX_450k_nu_bias_correlation.pdf", width=10, height=7)
 ggplot(merge(nu[method=="exact",.(pos,nuref=nu,deltaref=delta)],nu[method!="exact"],by="pos"))+
   geom_point(aes(deltaref,delta,colour=method))+stat_function(fun=identity)
-ggsave(filename = "images/rao_HiCall_chrX_60k_delta_bias_correlation.pdf", width=10, height=7)
+ggsave(filename = "images/rao_HiCall_chrX_450k_delta_bias_correlation.pdf", width=10, height=7)
 #
 cor.test(nu[method=="exact",log(nu)],nu[method=="simplified",log(nu)])
-cor.test(nu[method=="exact",log(nu)],nu[method=="gauss",log(nu)])
+cor.test(nu[method=="exact",log(nu)],nu[method=="approximation",log(nu)])
 cor.test(nu[method=="exact",log(delta)],nu[method=="simplified",log(delta)])
-cor.test(nu[method=="exact",log(delta)],nu[method=="gauss",log(delta)])
+cor.test(nu[method=="exact",log(delta)],nu[method=="approximation",log(delta)])
 
 #nu with points
 load(dsets[3])
@@ -161,9 +169,9 @@ decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
     cs@par$decay[,.(method=j,dist,decay=exp(log_decay))]
   }
 }
-ggplot(decay[,.SD[sample(.N,min(.N,10000))],by=method])+
+ggplot(decay[,.SD[sample(.N,min(.N,100000))],by=method])+
   geom_line(aes(dist,decay,colour=method))+scale_x_log10()+scale_y_log10()
-ggsave(filename="images/rao_HiCall_chrX_60k_diagonal_decay.pdf", width=10, height=7)
+ggsave(filename="images/rao_HiCall_chrX_450k_diagonal_decay.pdf", width=10, height=7)
 #
 decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
   load(i)
@@ -263,8 +271,8 @@ for (i in 1:20) {
 }
 
 #prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_exact_lambda"
-prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified_lambda"
-#prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss_lambda"
+#prefix="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified_lambda"
+prefix="data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss_lambda"
 registerDoParallel(cores=10)
 params=foreach (lambda=10**seq(from=-2,to=2,length.out=10),.combine=rbind, .errorhandling='remove') %dopar% {
   load(paste0(prefix,lambda,".RData"))
@@ -300,6 +308,30 @@ ggplot(params[!(leg%in%c("ref","init"))])+geom_line(aes(step,value))+
 #runtime
 ggplot(params[!(leg%in%c("ref","init"))])+geom_line(aes(step,runtime))+
   geom_point(aes(step,runtime,colour=out))+facet_grid(leg~lambda, scales = "free")
+
+
+#parameters
+dsets=c("data/rao_HiCall_chrX_450k_csnorm_optimized_exact.RData",
+        "data/rao_HiCall_chrX_450k_csnorm_optimized_exact_initgauss.RData")
+names=c("exact",
+        "exactig")
+dsets=c("data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss.RData",
+        "data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss_initexact.RData")
+names=c("gauss",
+        "gaussie")
+dsets=c("data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_simplified.RData",
+        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_simplified_initexact.RData",
+        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_simplified_initgauss.RData")
+names=c("simplified",
+        "simplifiedie",
+        "simplifiedig")
+params = foreach(i=dsets,j=names,.combine=rbind) %do% {
+  load(i)
+  data.table(method=j,eC=cs@par$eC,alpha=cs@par$alpha,lambda_nu=cs@par$lambda_nu,
+             lambda_delta=cs@par$lambda_delta,lambda_diag=cs@par$lambda_diag,value=cs@par$value)
+}
+params
+
 
 
 
