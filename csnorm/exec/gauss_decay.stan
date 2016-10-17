@@ -17,22 +17,20 @@ data {
   //count sums
   int<lower=1> N;
   int<lower=1,upper=N+1> cbegin[Dsets+1]; //cbegin[i]=j: dataset i starts at j
-  int<lower=0> counts_sum[N];
-  vector<lower=0>[N] weight;
+  vector[N] kappa_hat;
+  vector<lower=0>[N] sdl;
   vector<lower=0>[N] dist;
-  //genomic bias sums
-  vector[N] log_genomic_sum;
   //dispersion
   real<lower=0> alpha;
   //length scales
   real<lower=0> lambda_diag[Decays];
+  //weight for spline centering
+  vector<lower=0>[N] weight;
 }
 transformed data {
   //diagonal SCAM spline, dense
   matrix[N,Dsets*Kdiag] Xdiag;
   row_vector[Kdiag] pdiagD[Dsets];
-  row_vector[N] diag_weights;
-  diag_weights = weight';
   
   //diagonal SCAM spline, dense
   {
@@ -52,7 +50,7 @@ transformed data {
       {
         row_vector[sz] dw;
         row_vector[Kdiag] pdiag;
-        dw = diag_weights[cbegin[d]:(cbegin[d+1]-1)];
+        dw = weight[cbegin[d]:(cbegin[d+1]-1)]';
         dw = dw/mean(dw);
         pdiag = dw * Xdiag[cbegin[d]:(cbegin[d+1]-1),((d-1)*Kdiag+1):(d*Kdiag)];
         pdiagD[d] = pdiag / (pdiag * rep_vector(1,Kdiag));
@@ -92,14 +90,14 @@ transformed parameters {
   //means
   {
     //exact counts  
-    log_mean_counts  = log_decay + log_genomic_sum;
-    for (d in 1:Dsets) log_mean_counts[cbegin[d]:(cbegin[d+1]-1)] = log_mean_counts[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
+    for (d in 1:Dsets) log_mean_counts[cbegin[d]:(cbegin[d+1]-1)] = rep_vector(eC[d],cbegin[d+1]-cbegin[d]);
+    log_mean_counts  = log_decay + log_mean_counts;
   }
 }
 model {
   //// likelihoods
   //counts
-  for (i in 1:N) target += weight[i] * neg_binomial_2_log_lpmf(counts_sum[i] | log_mean_counts[i], alpha);
+  kappa_hat ~ normal(log_mean_counts, sdl);
   
   //// prior
   for (d in 1:Dsets) beta_diag_diff[d] ~ normal(0,1/lambda_diag[XD[d]]);

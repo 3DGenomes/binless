@@ -1,5 +1,5 @@
 ////
-// Cut-site normalization model: simplified fit for nu and delta
+// Cut-site normalization model: normal approximation for nu and delta
 ////
 functions {
   #include "common_functions.stan"
@@ -18,16 +18,17 @@ data {
   int<lower=0> rejoined[SD];
   int<lower=0> danglingL[SD];
   int<lower=0> danglingR[SD];
-  //count sums
-  int<lower=1> G; //number of count batches
-  int<lower=0> counts_sum_left[SD,G];
-  int<lower=0> counts_sum_right[SD,G];
-  //decay sums
-  matrix[SD,G] log_decay_sum;
-  //stiffness
-  real<lower=0> lambda;
+  //reduced count sums
+  vector[SD] eta_hat_L;
+  vector[SD] eta_hat_R;
+  //standard deviations
+  vector<lower=0>[SD] sd_L;
+  vector<lower=0>[SD] sd_R;
   //dispersion
   real<lower=0> alpha;
+  //stiffnesses
+  real<lower=0> lambda_nu[Biases];
+  real<lower=0> lambda_delta[Biases];
 }
 transformed data {
   //bias spline, sparse (nu and delta have the same design)
@@ -37,11 +38,6 @@ transformed data {
   row_vector[Krow] prowD[Dsets];
   //scaling factor for genomic lambdas
   real lfac;
-  //vectorized counts
-  int csl[SD*G];
-  int csr[SD*G];
-  //weight, needed to avoid integer division
-  real weight[Dsets];
 
   //Bias GAM spline, sparse
   {
@@ -78,21 +74,6 @@ transformed data {
   //scaling factor
   lfac = 30000*Krow/(max(cutsitesD)-min(cutsitesD));
   
-  //vectorized counts
-  //need to transpose to be consistent with to_vector(matrix)
-  {
-    int begin;
-    begin=1;
-    for (i in 1:G) {
-      csl[begin:(begin+SD-1)] = counts_sum_left[,i];
-      csr[begin:(begin+SD-1)] = counts_sum_right[,i];
-      begin=begin+SD;
-    }
-  }
-  for (i in 1:Dsets) {
-    weight[i] = bbegin[i+1]-bbegin[i]-1;
-    weight[i] = weight[i]/G;
-  }
 }
 parameters {
   //exposures
@@ -115,8 +96,8 @@ transformed parameters {
   vector[SD] log_mean_DR;
   vector[SD] log_mean_RJ;
   //
-  vector[SD*G] log_mean_cleft;
-  vector[SD*G] log_mean_cright;
+  vector[SD] log_mean_cleft;
+  vector[SD] log_mean_cright;
 
   //nu
   {
@@ -163,8 +144,8 @@ transformed parameters {
       counts_exposure[bbegin[d]:(bbegin[d+1]-1)] = rep_vector(eC[d],bbegin[d+1]-bbegin[d]);
     }
     //exact counts  
-    log_mean_cleft  = to_vector(log_decay_sum + rep_matrix(counts_exposure + log_nu + log_delta, G));
-    log_mean_cright = to_vector(log_decay_sum + rep_matrix(counts_exposure + log_nu - log_delta, G));
+    log_mean_cleft  = counts_exposure + log_nu + log_delta;
+    log_mean_cright = counts_exposure + log_nu - log_delta;
   }
 }
 model {
@@ -177,24 +158,12 @@ model {
   //counts
   //grouping reduces the number of likelihoods from S-1 to G, so reweighting is
   //needed for a proper estimation of the lambdas
-  for (d in 1:Dsets) {
-    for (i in 1:G) {
-      int gbegin;
-      gbegin = (i-1)*SD;
-      target += weight[d] * neg_binomial_2_log_lpmf(
-        csl[(gbegin+bbegin[d]):(gbegin+bbegin[d+1]-1)] | log_mean_cleft[(gbegin+bbegin[d]):(gbegin+bbegin[d+1]-1)], alpha);
-      target += weight[d] * neg_binomial_2_log_lpmf(
-        csr[(gbegin+bbegin[d]):(gbegin+bbegin[d+1]-1)] | log_mean_cright[(gbegin+bbegin[d]):(gbegin+bbegin[d+1]-1)], alpha);
-    }
-  }
+  eta_hat_L ~ normal(log_mean_cleft, sd_L);
+  eta_hat_R ~ normal(log_mean_cright, sd_R);
   
   //// prior
-  log_nu ~ cauchy(0, 1); //give high probability to [0.5:2]
-  log_delta ~ cauchy(0,1);
   for (d in 1:Dsets) {
-    beta_nu_diff[d] ~ normal(0,1/(lfac*lambda));
-    beta_delta_diff[d] ~ normal(0,1/(lfac*lambda));
-    beta_nu_diff[d] ~ double_exponential(0,10/(lfac*lambda));
-    beta_delta_diff[d] ~ double_exponential(0,10/(lfac*lambda));
+    beta_nu_diff[d] ~ normal(0,1/(lfac*lambda_nu[XB[d]]));
+    beta_delta_diff[d] ~ normal(0,1/(lfac*lambda_delta[XB[d]]));
   }
 }

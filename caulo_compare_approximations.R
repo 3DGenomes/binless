@@ -1,0 +1,143 @@
+library(ggplot2)
+library(data.table)
+library(csnorm)
+library(foreach)
+library(doParallel)
+
+setwd("/home/yannick/simulations/cs_norm")
+
+
+### read caulobacter dataset and generate with different sampling depths
+
+a=examine_dataset("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate1_reads_int.tsv",
+                  skip=0L,nrows=1000000)
+
+#zoom on a portion of the dataset
+begin=500000
+end=1000000
+begin=2000000
+end=2150000
+begin=73800287
+end=73861120
+for (i in c("BglIIr1","BglIIr2","BglII_rifampicin")) {
+  load(paste0("data/caulo_",i,"_all_csdata_with_data.RData"))
+  data=csd@data[re.closest1>=begin&re.closest1<=end&re.closest2>=begin&re.closest2<=end]
+  cs_data = csnorm:::prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
+  csd = new("CSdata", info=csd@info, settings=list(circularize=-1),
+            data=data, biases=cs_data$biases, counts=cs_data$counts)
+  save(csd, file=paste0("data/caulo_",i,"_500k_csdata_with_data.RData"))
+  csd@data=data.table()
+  save(csd, file=paste0("data/caulo_",i,"_500k_csdata.RData"))
+  csd2=csd
+}
+
+
+#normalize with serial sampler
+load("data/caulo_NcoI_500k_csdata.RData")
+cs=merge_cs_norm_datasets(list(csd), different.decays="none")
+cs=run_exact(cs, bf_per_kb = 1, bf_per_decade = 5, lambdas = 10**seq(from=-1,to=1,length.out=6), ncores = 30, iter = 100000)
+cs=run_serial(cs, bf_per_kb = 1, bf_per_decade = 5, init=cs@par, iter = 100000)
+save(cs, file="data/caulo_NcoI_500k_csnorm_optimized_exact_initgauss.RData")
+
+prefix="data/caulo_NcoI_500k_csnorm_optimized_exact_lambda"
+#prefix="data/caulo_NcoI_500k_csnorm_optimized_gibbs_simplified_lambda"
+#prefix="data/caulo_NcoI_500k_csnorm_optimized_gibbs_gauss_lambda"
+registerDoParallel(cores=10)
+info=foreach (lambda=10**seq(from=-2,to=2,length.out=10),.combine=rbind, .errorhandling='remove') %dopar% {
+  load(paste0(prefix,lambda,".RData"))
+  data.table(lambda=lambda,disp.own=cs@par$alpha,val.own=cs@par$value)
+}
+info[order(val.own)]
+
+#normalize with gibbs sampler
+load("data/caulo_NcoI_500k_csdata.RData")
+cs=merge_cs_norm_datasets(list(csd), different.decays="none")
+cs = run_simplified(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=10**seq(from=-1,to=1,length.out=6),
+                    ngibbs = 20, iter=10000, ncores=30)
+cs = run_simplified_gibbs(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, init=cs@par,
+                    ngibbs = 20, iter=10000)
+save(cs, file="data/caulo_NcoI_500k_csnorm_optimized_gibbs_simplified_initexact.RData")
+
+#normalize with gauss sampler
+load("data/caulo_NcoI_500k_csdata.RData")
+cs=merge_cs_norm_datasets(list(csd), different.decays="none")
+cs = run_gauss(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=100, lambdas=10**seq(from=-1,to=1,length.out=6),
+                    ngibbs = 20, iter=10000, ncores=30)
+cs = run_gauss_gibbs(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=100, init=cs@par,
+               ngibbs = 20, iter=10000)
+save(cs, file="data/caulo_NcoI_500k_csnorm_optimized_gibbs_gauss_initexact.RData")
+
+
+nu=rbind(data.table(pos=cs@biases[,pos],method="1",nu=exp(op.1$par$log_nu),delta=exp(op.1$par$log_delta)),
+         data.table(pos=cs@biases[,pos],method="10",nu=exp(op.10$par$log_nu),delta=exp(op.10$par$log_delta)),
+         data.table(pos=cs@biases[,pos],method="gauss",nu=exp(op.gauss$par$log_nu),delta=exp(op.gauss$par$log_delta)))
+ggplot(nu)+geom_line(aes(pos,nu,colour=method))
+ggplot(nu)+geom_line(aes(pos,delta,colour=method))
+
+#plots
+dsets=c("data/caulo_NcoI_500k_csnorm_optimized_exact.RData",
+        "data/caulo_NcoI_500k_csnorm_optimized_gibbs_gauss_initexact.RData")
+names=c("exact",
+        #"simplified",
+        "approximation")
+
+dsets=c("data/caulo_NcoI_500k_csnorm_optimized_exact.RData",
+        "data/caulo_NcoI_500k_csnorm_optimized_gibbs_simplified_initexact.RData",
+        "data/caulo_NcoI_500k_csnorm_optimized_gibbs_gauss_initexact.RData")
+names=c("exact",
+        "simplifiedi",
+        "gaussi")
+
+        
+
+
+#nu and delta
+nu = foreach(i=dsets,j=names,.combine=rbind) %do% {
+  load(i)
+  data.table(pos=cs@biases[,pos],nu=exp(cs@par$log_nu),delta=exp(cs@par$log_delta),method=j)
+}
+ggplot(nu)+geom_line(aes(pos,nu,colour=method))
+ggsave(filename = "images/caulo_NcoI_500k_nu_bias.pdf", width=10, height=7)
+ggplot(nu)+geom_line(aes(pos,delta,colour=method))
+ggsave(filename = "images/caulo_NcoI_500k_delta_bias.pdf", width=10, height=7)
+#
+ggplot(merge(nu[method=="exact",.(pos,nuref=nu,deltaref=delta)],nu[method!="exact"],by="pos"))+
+  geom_point(aes(nuref,nu,colour=method))+stat_function(fun=identity)
+ggsave(filename = "images/caulo_NcoI_500k_nu_bias_correlation.pdf", width=10, height=7)
+ggplot(merge(nu[method=="exact",.(pos,nuref=nu,deltaref=delta)],nu[method!="exact"],by="pos"))+
+  geom_point(aes(deltaref,delta,colour=method))+stat_function(fun=identity)
+ggsave(filename = "images/caulo_NcoI_500k_delta_bias_correlation.pdf", width=10, height=7)
+#
+cor.test(nu[method=="exact",log(nu)],nu[method=="simplified",log(nu)])
+cor.test(nu[method=="exact",log(nu)],nu[method=="approximation",log(nu)])
+cor.test(nu[method=="exact",log(delta)],nu[method=="simplified",log(delta)])
+cor.test(nu[method=="exact",log(delta)],nu[method=="approximation",log(delta)])
+
+#decay
+decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
+  load(i)
+  if ("decay" %in% names(cs@par$decay)) {
+    cs@par$decay[,.(method=j,dist,decay)]
+  } else {
+    cs@par$decay[,.(method=j,dist,decay=exp(log_decay))]
+  }
+}
+ggplot(decay)+geom_line(aes(dist,decay,colour=method))+scale_x_log10()+scale_y_log10()
+ggsave(filename = "images/caulo_NcoI_500k_diagonal_decay.pdf", width=10, height=7)
+#
+decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
+  load(i)
+  data.table(dist=cs@counts[,distance], log_decay=cs@par$log_decay, method=j)
+}
+cor.test(decay[method=="exact",log_decay],decay[method=="simplified",log_decay])
+cor.test(decay[method=="exact",log_decay],decay[method=="gauss",log_decay])
+
+
+#parameters
+params = foreach(i=dsets,j=names,.combine=rbind) %do% {
+  load(i)
+  data.table(method=j,eC=cs@par$eC,alpha=cs@par$alpha,lambda_nu=cs@par$lambda_nu,
+             lambda_delta=cs@par$lambda_delta,lambda_diag=cs@par$lambda_diag,value=cs@par$value)
+}
+params
+

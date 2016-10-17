@@ -9,6 +9,8 @@
   //i.e. index of first x value that falls in bins defined by cutpoints defined in q
   //assumes x is ordered.
   //x[hist[i]] is the first value in x that is >= q[i]
+  //if the last value of x is smaller than one of q, hist[i] and the following
+  //will be equal to N+1 where N is the size of x
   int[] cumulative_hist(vector x, row_vector q) {
     int indices[cols(q)];
     int ix;
@@ -16,7 +18,7 @@
     ix = 1;
     N = rows(x);
     for (iq in 1:cols(q)) {
-      while (ix < N && x[ix] < q[iq]) ix = ix + 1;
+      while (ix <= N && x[ix] < q[iq]) ix = ix + 1;
       indices[iq] = ix;
     }
     return indices;

@@ -39,7 +39,7 @@
       int xend;
       xbegin = x_n[i];
       xend = x_n[i+1]-1;
-      {
+      if ((xend-xbegin)>=0) {
         matrix[xend-xbegin+1,splinedegree()+1] tmp;
         tmp = bspl_gen(cutsites[xbegin:xend], dx, t[i:(i+splinedegree())], splinedegree());
         for (ti in 1:(xend-xbegin+1)) {

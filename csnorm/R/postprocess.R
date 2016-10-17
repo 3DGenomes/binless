@@ -172,7 +172,7 @@ detection_binned = function(cs, resolution, group, ref="expected", threshold=0.9
         #compute each signal contribution separately
         data=list(G=length(cbegin)-1, N=cts[,.N], cbegin=cbegin, observed=cts[,count], log_expected=cts[,log_mean],
                   alpha=cs@par$alpha, sigma=prior.sd)
-        output=capture.output(op<-optimizing(csnorm:::stanmodels$detection3, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
+        output=capture.output(op<-optimizing(csnorm:::stanmodels$detection, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
         if (ref=="expected") {
           mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=cts[head(cbegin,-1),bin1], bin2=cts[head(cbegin,-1),bin2],
                          K=exp(op$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op$hessian))))-op$par$lpdf0),
@@ -198,7 +198,7 @@ detection_binned = function(cs, resolution, group, ref="expected", threshold=0.9
           if(diffcounts[,.N]==1){cbegin=c(1,2)} else {cbegin=c(1,diffcounts[,.(newid,row=.I)][newid!=shift(newid),row],diffcounts[,.N+1])}
           data=list(G=length(cbegin)-1, N=diffcounts[,.N], cbegin=cbegin,
                     observed=diffcounts[,count], log_expected=diffcounts[,log_mean], alpha=cs@par$alpha, sigma=prior.sd)
-          output=capture.output(op2<-optimizing(csnorm:::stanmodels$detection3, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
+          output=capture.output(op2<-optimizing(csnorm:::stanmodels$detection, data=data, as_vector=F, hessian=T, iter=1000, verbose=F, init=0))
           refmat=mat[name==ref,.(bin1,bin2,lpdmref=lpdms,logsref=log_s.mean,refsignal=signal,refsignal.sd=signal.sd)]
           mat=merge(mat[name!=ref],refmat,by=c("bin1","bin2"))
           mat[,c("lpdm2","direction"):=list(lpdms+lpdmref,ifelse(logsref<log_s.mean,"enriched","depleted"))]
