@@ -493,12 +493,15 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "H
 
 #' Merge one or more CSdata objects into a CSnorm object and set experimental design
 #'
+#' Note that you can customize the design, as long as you keep the numbering sequential
+#' and starting at 1.
+#' 
 #' @param datasets list of CSdata objects
 #' @param different.decays character. If "none" (default), one decay is modelled
 #'   for all experiments. If "all", each experiment has its own decay. If
 #'   "enzyme", experiments with a different enzyme get their own decay. If
 #'   "condition", experiments with a different condition get their own decay.
-#'   Arguments can be abbreviated
+#'   Arguments can be abbreviated and combined
 #'
 #' @return CSnorm object
 #' @export
@@ -535,17 +538,21 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
   counts[,name:=ordered(name,levels=experiments[,levels(name)])]
   setkey(counts,name,id1,pos1,id2,pos2)
   #design matrix
-  different.decays=match.arg(different.decays)
+  different.decays=match.arg(different.decays, several.ok = T)
   design=experiments[,.(name,enzyme,condition)]
   design[,genomic:=as.integer(factor(enzyme))]
-  if (different.decays=="none") {
+  if (setequal(different.decays,"none")) {
     design[,decay:=1]
-  } else if (different.decays=="all") {
+  } else if (setequal(different.decays,"all")) {
     design[,decay:=.I]
-  } else if (different.decays=="enzyme") {
+  } else if (setequal(different.decays,"enzyme")) {
     design[,decay:=as.integer(factor(enzyme))]
-  } else if (different.decays=="condition") {
+  } else if (setequal(different.decays,"condition")) {
     design[,decay:=as.integer(factor(condition))]
+  } else if (setequal(different.decays, c("condition","enzyme"))) {
+    design[,decay:=as.integer(factor(paste(condition,enzyme)))]
+  } else {
+    stop("I do not know what to do with different.decays = ", different.decays)
   }
   design[,c("enzyme","condition"):=list(NULL,NULL)]
   #return CSnorm object
