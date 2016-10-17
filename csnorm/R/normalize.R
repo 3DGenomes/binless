@@ -43,6 +43,42 @@ fill_zeros = function(counts,biases,biases2=NULL,circularize=-1L) {
   }
 }
 
+#' Initial guess for normalization
+#' @keywords internal
+#' @export
+#' 
+csnorm_fit_initial = function(counts, biases, design, bf_per_kb, dmin, dmax, bf_per_decade, lambda, verbose, iter, ...) {
+  #compute column sums
+  cs1=counts[,.(R=sum(contact.close+contact.down),L=sum(contact.far+contact.up)),by=c("name","id1")][,.(name,id=id1,L,R)]
+  cs2=counts[,.(R=sum(contact.far+contact.down),L=sum(contact.close+contact.up)),by=c("name","id2")][,.(name,id=id2,L,R)]
+  pos=biases[,.(name,id)]
+  setkey(pos, name, id)
+  sums=rbind(cs1,cs2)[,.(L=sum(L),R=sum(R)),keyby=c("name","id")][pos]
+  #run optimization
+  Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
+  bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
+  data=list(Dsets=design[,.N], Biases=design[,uniqueN(genomic)],
+            XB=as.array(design[,genomic]), Krow=Krow, SD=biases[,.N], bbegin=bbegin,
+            cutsitesD=biases[,pos], rejoined=biases[,rejoined],
+            danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+            counts_sum_left=sums[,L], counts_sum_right=sums[,R],
+            lambda_nu=lambda, lambda_delta=lambda)
+  op=optimizing(stanmodels$guess, data=data,
+                as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0, ...)
+  #return initial guesses
+  Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
+  Decays=design[,uniqueN(decay)]
+  beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
+  return(list(eRJ=op$par$eRJ, eDE=op$par$eDE, eC=op$par$eC,
+              alpha=op$par$alpha, beta_nu=op$par$beta_nu, beta_delta=op$par$beta_delta,
+              log_nu=op$par$log_nu, log_delta=op$par$log_delta,
+              lambda_nu=array(lambda,dim=data$Biases),
+              lambda_delta=array(lambda,dim=data$Biases),
+              beta_diag=beta_diag, lambda_diag=array(1,dim=Decays),
+              log_decay=rep(0,counts[,.N])))
+}
+
+
 
 #' Single-cpu fitting
 #' @keywords internal
@@ -148,7 +184,7 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=5, iter=100000, subsa
   setkey(cs@counts,name,id1,pos1,id2,pos2)
   #initial guess
   if (length(init)==1) {
-    init.a=system.time(init.output <- capture.output(init.par <- csnorm:::run_split_parallel_initial_guess(
+    init.a=system.time(init.output <- capture.output(init.par <- csnorm_fit_initial(
       counts=cs@counts, biases=cs@biases, design=cs@design,
       bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, lambda=init[[1]],
       verbose=T, iter=iter, init_alpha=init_alpha)))
