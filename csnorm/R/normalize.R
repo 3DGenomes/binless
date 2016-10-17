@@ -152,7 +152,7 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=5, iter=100000, subsa
       counts=cs@counts, biases=cs@biases, design=cs@design,
       bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, lambda=init[[1]],
       verbose=T, iter=iter, init_alpha=init_alpha)))
-    init.op=list(par=init$par)
+    init.op=list(par=init.par)
     #abort silently if initial guess went wrong
     if (length(grep("Line search failed",tail(init.output,1)))>0) {
       init.op$par$value=-.Machine$double.xmax
