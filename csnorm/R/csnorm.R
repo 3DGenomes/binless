@@ -14,7 +14,7 @@
 #' \code{\link{generate_fake_dataset}} follows model specification
 #'
 #' @section Normalization:
-#' \code{\link{run_simplified}}
+#' \code{\link{run_gauss}}
 #'
 #' @section Postprocessing:
 #' \code{\link{bin_all_datasets}}

@@ -174,8 +174,8 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
 }
 
 #' Run approximate gibbs sampler on with a single starting condition
-#' @inheritParams run_simplified
-#' @param fit.decay,fit.genomic boolean. Whether to fit diagonal decay or
+#' @inheritParams run_gauss
+#' @param fit.decay,fit.genomic,fit.disp boolean. Whether to fit diagonal decay or
 #'   genomic biases. Set to FALSE only for diagnostics.
 #' @keywords internal
 #' @export
