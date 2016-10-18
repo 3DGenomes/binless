@@ -68,13 +68,10 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
                 init=init, ...)
   #make nice decay data table
   csd[,log_decay:=op$par$log_decay]
-  dmat=csd[,.(name, dist=mdist, log_decay, kappahatl, std=sdl)]
-  dmat=merge(cbind(design[,.(name)],eC=init$eC), dmat, by="name",all.x=F,all.y=T)
-  dmat[,z:=kappahatl-eC-log_decay]
-  dmat=dmat[,.(name,dist,log_decay,z,std)]
+  dmat=csd[,.(name,dist=mdist,log_decay,z=kappahatl-op$par$log_mean_counts,std=sdl,ncounts=4*weight)]
   setkey(dmat,name,dist)
   op$par$decay=dmat 
-  #rewrite log_decay as if it was calculated for each count
+  #rewrite log_decay as if it were calculated for each count
   csub=counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=5))]
   a=csd[csub,.(id1,id2,log_decay),on=key(csd)]
   setkeyv(a,key(counts))
