@@ -83,7 +83,7 @@ csnorm_fit_initial = function(counts, biases, design, bf_per_kb, dmin, dmax, bf_
 #' Single-cpu fitting
 #' @keywords internal
 #' 
-csnorm_fit = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_decade=5, iter=10000,
+csnorm_fit = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_decade=20, iter=10000,
                       verbose=T, init=0, weight=array(1,dim=design[,.N]), ...) {
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
@@ -163,7 +163,7 @@ csnorm_predict_all_parallel = function(cs, counts, verbose=T, ncores=1) {
 #' @keywords internal
 #' @export
 #' 
-run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=5, iter=100000, subsampling.pc=100, init_alpha=1e-5) {
+run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subsampling.pc=100, init_alpha=1e-5) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -232,7 +232,7 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=5, iter=100000, subsa
 #' @export
 #' 
 #' @examples
-run_exact = function(cs, bf_per_kb=1, bf_per_decade=5, lambdas=c(0.1,1,10), ncores=1, iter=100000,
+run_exact = function(cs, bf_per_kb=1, bf_per_decade=20, lambdas=c(0.1,1,10), ncores=1, iter=100000,
                      subsampling.pc=100, init_alpha=1e-5, prefix=NULL) {
   cs@binned=list() #erase old binned datasets if available
   registerDoParallel(cores=ncores)

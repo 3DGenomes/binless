@@ -4,7 +4,7 @@ NULL
 #' Single-cpu simplified initial guess
 #' @keywords internal
 #' 
-csnorm_gauss_guess = function(biases, counts, design, lambda, dmin, dmax, bf_per_kb=1, bf_per_decade=5,
+csnorm_gauss_guess = function(biases, counts, design, lambda, dmin, dmax, bf_per_kb=1, bf_per_decade=20,
                               iter=10000, dispersion=10, ...) {
   nBiases=design[,uniqueN(genomic)]
   init=list(log_nu=array(0,dim=biases[,.N]), log_delta=array(0,dim=biases[,.N]),
@@ -25,7 +25,7 @@ csnorm_gauss_guess = function(biases, counts, design, lambda, dmin, dmax, bf_per
 #' @keywords internal
 #' 
 csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
-                              bf_per_decade=5, bins_per_bf=10, iter=10000, verbose=T, ...) {
+                              bf_per_decade=20, bins_per_bf=10, iter=10000, verbose=T, ...) {
   for (n in biases[,unique(name)]) {
     stopifnot(counts[name==n,.N]==biases[name==n,.N*(.N-1)/2]) #needs to be zero-filled
   }
@@ -147,7 +147,7 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
 #' @keywords internal
 #' 
 csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
-                                   bf_per_kb = 1, bf_per_decade=5, iter = 10000,
+                                   bf_per_kb = 1, bf_per_decade = 20, iter = 10000,
                                    weight=design[,.(name,wt=1)], verbose=T, ...) {
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
@@ -177,7 +177,7 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
 #' @keywords internal
 #' @export
 #' 
-run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10,
+run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
                            ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, fit.disp=T,
                            verbose=T, ncounts=100000, init_alpha=1e-5) {
   #basic checks
@@ -330,7 +330,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=5, bins_per_bf=1
 #' @export
 #' 
 #' @examples
-run_gauss = function(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, lambdas=c(0.1,1,10),
+run_gauss = function(cs, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10, lambdas=c(0.1,1,10),
                      ngibbs = 3, iter=100000, ncores=1, verbose=T, init_alpha=1e-5, prefix=NULL) {
   cs@binned=list() #erase old binned datasets if available
   registerDoParallel(cores=ncores)
