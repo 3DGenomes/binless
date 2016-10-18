@@ -473,6 +473,7 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "H
   match.arg(experiment)
   cat("*** READ\n")
   data=read_tsv(infile, skip=skip, nrows=nrows)
+  if (circularize>0) data=data[!((re.closest1 %in% c(1,circularize)) | (re.closest2 %in% c(1,circularize)))]
   cat("*** CATEGORIZE\n")
   data = categorize_by_new_type(data, dangling.L = dangling.L, dangling.R = dangling.R, maxlen = maxlen, read.len=read.len)
   cat("*** BIASES AND COUNTS\n")
