@@ -137,7 +137,8 @@ csnorm_predict_all = function(cs, counts, verbose=T) {
                N=counts[,.N], cbegin=cbegin, cidx=t(data.matrix(counts[,.(id1,id2)])), dist=as.array(counts[,distance]),
                eC=par$eC, log_nu=par$log_nu, log_delta=par$log_delta,
                beta_diag_centered=par$beta_diag_centered)
-  capture.output(pred<-as.data.table(optimizing(stanmodels$predict_all, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0)$par))
+  capture.output(op<-optimizing(stanmodels$predict_all, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0))
+  pred=as.data.table(op$par)
   pred=cbind(counts,pred)
   return(pred)
 }
