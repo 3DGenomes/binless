@@ -155,3 +155,17 @@ get_genomic_biases = function(cs, points_per_kb=10) {
                                    bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 10)[
                                      ,.(pos,log_nu,log_delta,dset=j)]
 }
+
+#' update diagnostics data table or create it if not existing
+#'
+#' @return
+#' @keywords internal
+#'
+#' @examples
+update_diagnostics = function(cs, step, leg, out, runtime, op) {
+  params=data.table(step=step,leg=leg,out=list(out),out.last=tail(out,n=1),value=op$value,runtime=runtime)
+  params=cbind(params,as.data.table(lapply(op$par,list)))
+  if (is.data.table(cs@diagnostics$params)) params=rbind(cs@diagnostics$params,params,fill=T)
+  return(params)
+}
+

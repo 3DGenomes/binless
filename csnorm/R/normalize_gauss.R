@@ -209,7 +209,8 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
     if (length(grep("Line search failed",tail(init.output,1)))>0) {
       init.op$par$value=-.Machine$double.xmax
       cs@par=init.op$par
-      cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4], op.init=init.op)
+      cs@diagnostics$params = update_diagnostics(cs, step=0, leg="bias", out=init.output,
+                                                 runtime=init.a[1]+init.a[4], op=init.op)
       return(cs)
     }
   } else {
@@ -217,7 +218,8 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
     init.output = ""
     init.op = list(par=init,value=NA)
   }
-  cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4], op.init=init.op)
+  cs@diagnostics$params = update_diagnostics(cs, step=0, leg="bias", out=init.output,
+                                             runtime=init.a[1]+init.a[4], op=init.op)
   op=init.op
   #make sure beta_diag is strictly increasing
   for (dec in 1:(dim(op$par$beta_diag)[1])) {
@@ -240,9 +242,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
                                                        "log_decay","decay", "lambda_diag")],
                                          op$par[c("eRJ","eDE","beta_nu","beta_delta", "alpha",
                                                   "lambda_nu","lambda_delta","log_nu","log_delta","biases")]))
-      cs@diagnostics[[paste0("out.decay",i)]]=output
-      cs@diagnostics[[paste0("runtime.decay",i)]]=a[1]+a[4]
-      cs@diagnostics[[paste0("op.decay",i)]]=op.diag
+      cs@diagnostics$params = update_diagnostics(cs, step=i, leg="decay", out=output, runtime=a[1]+a[4], op=op)
     }
     #fit nu and delta given diagonal decay
     if (fit.genomic==T) {
@@ -254,9 +254,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
                                                  "log_decay","decay", "alpha")],
                                         op.gen$par[c("eC","eRJ","eDE","beta_nu","beta_delta",
                                                      "log_nu","log_delta","biases","lambda_nu","lambda_delta")]))
-      cs@diagnostics[[paste0("out.bias",i)]]=output
-      cs@diagnostics[[paste0("runtime.bias",i)]]=a[1]+a[4]
-      cs@diagnostics[[paste0("op.bias",i)]]=op.gen
+      cs@diagnostics$params = update_diagnostics(cs, step=i, leg="bias", out=output, runtime=a[1]+a[4], op=op)
     }
     #make sure beta_diag is strictly increasing
     for (dec in 1:(dim(op$par$beta_diag)[1])) {
@@ -267,7 +265,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
       }
     }
     if (fit.disp==T) {
-      #fit exposures, lambdas and dispersion
+      #fit exposures and dispersion
       if (verbose==T) cat("Gibbs",i,": Remaining parameters\n")
       a=system.time(output <- capture.output(op.disp <- csnorm:::csnorm_gauss_dispersion(
         biases = cs@biases, counts = subcounts, design = cs@design, init=op$par,
@@ -276,16 +274,10 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
       op=list(value=op.disp$value, par=c(op$par[c("beta_diag","beta_diag_centered","log_decay","decay",
                                                   "beta_nu","beta_delta","log_nu","log_delta","biases")],
                                          op.disp$par[c("eC","eRJ","eDE","alpha")]))
-      cs@diagnostics[[paste0("out.disp",i)]]=output
-      cs@diagnostics[[paste0("runtime.disp",i)]]=a[1]+a[4]
-      cs@diagnostics[[paste0("op.disp",i)]]=op.disp
+      cs@diagnostics$params = update_diagnostics(cs, step=i, leg="disp", out=output, runtime=a[1]+a[4], op=op)
     }
   }
   if (verbose==T) cat("Done\n")
-  op$par$runtime=sum(as.numeric(cs@diagnostics[grep("runtime",names(cs@diagnostics))]))
-  op$par$output=output
-  init.op$par$runtime=init.a[1]+init.a[4]
-  init.op$par$output=init.output
   op$par$init=init.op$par
   op$par$value=op$value
   cs@par=op$par
