@@ -308,8 +308,11 @@ check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10) {
 #' 
 #' @examples
 recover_normalization = function(prefix) {
-  foreach (i=Sys.glob(paste0(prefix,"_lambda*.RData")),
-           .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %do%
-    load(i)
+  cs = foreach (i=Sys.glob(paste0(prefix,"_lambda*.RData")),
+           .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %do% {
+             load(i)
+             cs
+           }
+  return(cs)
 }
 

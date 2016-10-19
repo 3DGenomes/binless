@@ -22,8 +22,6 @@ data {
   vector<lower=0>[N] dist;
   //dispersion
   real<lower=0> alpha;
-  //length scales
-  real<lower=0> lambda_diag[Decays];
   //weight for spline centering
   vector<lower=0>[N] weight;
 }
@@ -64,6 +62,8 @@ parameters {
   real eC[Dsets];
   //spline parameters
   positive_ordered[Kdiag-1] beta_diag[Decays];
+  //length scales
+  real<lower=0> lambda_diag[Decays];
 }
 transformed parameters {
   //diag
@@ -101,4 +101,7 @@ model {
   
   //// prior
   for (d in 1:Dsets) beta_diag_diff[d] ~ normal(0,1/lambda_diag[XD[d]]);
+  
+  //// hyperprior
+  lambda_diag ~ cauchy(0,1);
 }
