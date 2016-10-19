@@ -431,6 +431,7 @@ generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4
 examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000, skip.fbm=T, read.len=40) {
   data=read_tsv(infile, skip=skip, nrows=nrows)
   if (skip.fbm == T) data = data[!grepl("[#~]",id)]
+  #dangling
   dleft=data[abs(rbegin1-re.closest1)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0&length1==read.len,
              .(dist=rbegin1-re.closest1,cat="left")]
   dright=data[abs(rbegin2-re.closest2)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0&length2==read.len,
@@ -438,10 +439,17 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000, s
   pdangling=ggplot(rbind(dleft,dright))+
     geom_histogram(aes(dist),binwidth=1)+scale_x_continuous(breaks=-window:window)+facet_grid(~cat)+
     xlab("distance from cut site")+ylab("number of reads")
+  #read size distribution
   pdiag=ggplot(data[abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0])+
     geom_histogram(aes(rbegin2-rbegin1),binwidth=10)+
     xlab("sonication fragment size")+ylab("number of reads")
-  return(list(pdangling=pdangling,pdiag=pdiag,data=data))
+  #close decay
+  dclose=data[abs(re.closest1-re.closest2)<3000 & re.closest1!=re.closest2 & re.dn1 != re.dn2]
+  dclose=dclose[,.(count=.N,dist=abs(re.closest2-re.closest1)[1]),by=c("re.closest1.idx","re.closest2.idx")]
+  dclose[,dbin:=cut(dist,1000,ordered_result=T,right=F,include.lowest=T,dig.lab=5)]
+  pclose=ggplot(dclose[,.(dist=mean(dist),N=mean(count)),by=dbin])+geom_point(aes(dist,N))+
+    xlab("mean distance between cut sites")+ylab("mean count between cut sites")
+  return(list(pdangling=pdangling,pdiag=pdiag,pclose=pclose,data=data))
 }
 
 
