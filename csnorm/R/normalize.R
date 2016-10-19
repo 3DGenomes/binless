@@ -5,6 +5,8 @@ NULL
 #'
 #' @param counts,biases data.tables as returned by \code{\link{prepare_for_sparse_cs_norm}}
 #' @param biases2 data.table of biases for id2 column of counts. If NULL (default), use that of biases
+#' @param circularize integer. Length of the genome if circular
+#' @param dmin numeric. Minimum distance to be considered a contact
 #'
 #' @return a counts data.table with zeros filled according to cut sites provided in biases (and biases2 if available)
 #' @keywords internal
@@ -12,12 +14,12 @@ NULL
 #' @section Warning:
 #' Memory-intensive
 #' @examples
-fill_zeros = function(counts,biases,biases2=NULL,circularize=-1L) {
+fill_zeros = function(counts,biases,biases2=NULL,circularize=-1L,dmin=0) {
   if (is.null(biases2)) biases2=biases
   runname=biases[,unique(name)]
   if (length(runname)>1) {
     foreach (i=runname, .combine=rbind) %do%
-      fill_zeros(counts[name==i],biases[name==i],biases2[name==i],circularize=circularize)
+      fill_zeros(counts[name==i],biases[name==i],biases2[name==i],circularize=circularize,dmin=dmin)
   } else {
     if (biases[,.N]==0 | biases2[,.N]==0) return(data.table())
     newcounts=CJ(biases[,paste(id,pos)],biases2[,paste(id,pos)])
@@ -39,6 +41,7 @@ fill_zeros = function(counts,biases,biases2=NULL,circularize=-1L) {
     } else {
       newcounts[,distance:=abs(pos2-pos1)]
     }
+    newcounts=newcounts[distance>=dmin]
     newcounts
   }
 }
@@ -170,19 +173,12 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subs
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
   #add settings
   cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter))
-  #fill counts matrix
-  cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize)
-  #report min/max distance
-  dmin=0.99
-  if (cs@settings$circularize>0) {
-    dmax=cs@settings$circularize/2+0.01
-  } else {
-    dmax=cs@biases[,max(pos)-min(pos)]+0.01
-  }
-  cs@settings$dmin=dmin
-  cs@settings$dmax=dmax
+  #fill counts matrix and sort data
+  cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize, dmin=cs@settings$dmin)
   setkey(cs@biases,name,id,pos)
   setkey(cs@counts,name,id1,pos1,id2,pos2)
+  dmin=cs@settings$dmin
+  dmax=cs@settings$dmax
   #initial guess
   if (length(init)==1) {
     init.a=system.time(init.output <- capture.output(init.par <- csnorm_fit_initial(
@@ -270,7 +266,7 @@ check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10) {
   biases[,c("log_nu","log_delta"):=list(NULL,NULL)]
   biases=biases[,.SD[sample(.N,min(.N,npoints))],by=c("name","nubin","deltabin")]
   counts=cs@counts[id1%in%biases[,id]&id2%in%biases[,id]]
-  counts=fill_zeros(counts,biases,circularize=cs@settings$circularize)
+  counts=fill_zeros(counts,biases,circularize=cs@settings$circularize, dmin=cs@settings$dmin)
   #filter by distance
   counts[,dbin:=cut(distance, dbins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
   counts=counts[,.SD[sample(.N,min(.N,npoints))],by=c("name","dbin")]

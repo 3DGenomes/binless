@@ -468,6 +468,9 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000, s
 #' @inheritParams read_tsv
 #' @inheritParams categorize_by_new_type
 #' @inheritParams prepare_for_sparse_cs_norm
+#' @param dmin numeric. Minimum disrance between cut sites to consider this as a
+#'   contact. Note that this setting will only be enforced upon merging, and the
+#'   returned object might contain contacts at a smaller distance.
 #' @param save.data boolean. Whether to save a CSdata object that contains the raw data
 #'
 #' @return A CSdata object
@@ -477,7 +480,7 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000, s
 read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "HindIII", experiment = "Hi-C",
                             name = paste(condition, enzyme, replicate), skip = 0L, nrows = -1L,
                             circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1), maxlen = 600,
-                            read.len=40, save.data=T) {
+                            read.len=40, dmin=2000, save.data=T) {
   match.arg(experiment)
   cat("*** READ\n")
   data=read_tsv(infile, skip=skip, nrows=nrows)
@@ -488,11 +491,17 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "H
   cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=circularize)
   dset_statistics(cs_data$biases,cs_data$counts)
   cat("*** WRITE\n")
+  #determine dmax
+  if (circularize>0) {
+      dmax=circularize/2+0.01
+  } else {
+      dmax=cs_data$biases[,max(pos)-min(pos)]+0.01
+  }
   csd = new("CSdata", info=list(name=name, condition=condition, replicate=replicate,
                                enzyme=enzyme, experiment=experiment,
                                dangling.L=deparse(dangling.L), dangling.R=deparse(dangling.R), maxlen=maxlen,
                                filename=infile),
-                     settings=list(circularize=circularize),
+                     settings=list(circularize=circularize, dmin=dmin, dmax=dmax),
                      data=data, biases=cs_data$biases, counts=cs_data$counts)
   if (save.data==T) save(csd, file=paste0(outprefix,"_csdata_with_data.RData"))
   csd@data=data.table()
@@ -524,6 +533,7 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
   if (!(experiments[,.N]==experiments[,uniqueN(name)])) stop("experiment names must be unique")
   if (uniqueN(rbindlist(lapply(datasets, function(x) x@settings)))!=1)
     stop("all experiments must have the same settings")
+  settings=datasets[[1]]@settings
   #merge biases and counts into data tables, make IDs unique
   biases = lapply(datasets, function(x) copy(x@biases))
   counts = lapply(datasets, function(x) copy(x@counts))
@@ -564,10 +574,12 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
     stop("I do not know what to do with different.decays = ", different.decays)
   }
   design[,c("enzyme","condition"):=list(NULL,NULL)]
+  #enforce minimum distance
+  counts=counts[distance>=settings$dmin]
   #return CSnorm object
   new("CSnorm", experiments=experiments,
                 design=design,
-                settings=datasets[[1]]@settings,
+                settings=settings,
                 biases=biases, counts=counts)
 }
 

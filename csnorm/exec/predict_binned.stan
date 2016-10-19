@@ -87,21 +87,23 @@ generated quantities {
     k = 1;
     for (j in 1:S2) {
       real pos2;
+      real dist;
       pos2 = cutsites2[j];
-      if (pos2 > pos1) {
+      dist = pos2-pos1;
+      if (dist >= dmin) {
         int b1;
         int b2;
         b1=bbins1[i];
         b2=bbins2[j];
         ncounts[b1,b2] = ncounts[b1,b2]+4; //1 for each count type
         if (circularize>0) {
-          if (pos2-pos1>circularize/2) {
-            k = bisect(log(circularize+1-(pos2-pos1)), k, log_dist);
+          if (dist>circularize/2) {
+            k = bisect(log(circularize+1-dist), k, log_dist);
           } else {
-            k = bisect(log(pos2-pos1), k, log_dist);
+            k = bisect(log(dist), k, log_dist);
           }
         } else {
-          k = bisect(log(pos2-pos1), k, log_dist);
+          k = bisect(log(dist), k, log_dist);
         }
         expected[b1,b2] = expected[b1,b2] +
             exp(eC + log_nu1[i] + log_nu2[j] + log_decay[k])*2*cosh(log_delta1[i])*2*cosh(log_delta2[j]);

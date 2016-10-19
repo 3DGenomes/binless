@@ -26,9 +26,6 @@ csnorm_gauss_guess = function(biases, counts, design, lambda, dmin, dmax, bf_per
 #' 
 csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
                               bf_per_decade=20, bins_per_bf=10, iter=10000, verbose=T, ...) {
-  for (n in biases[,unique(name)]) {
-    stopifnot(counts[name==n,.N]==biases[name==n,.N*(.N-1)/2]) #needs to be zero-filled
-  }
   #add bias informations to counts
   setkey(counts, id1, id2)
   csub=copy(counts)
@@ -83,9 +80,6 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
 #' @keywords internal
 #' 
 csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=10000, verbose=T, ...) {
-  for (n in biases[,unique(name)]) {
-    stopifnot(counts[name==n,.N]==biases[name==n,.N*(.N-1)/2]) #needs to be zero-filled
-  }
   #add bias informations to counts
   csub=copy(counts)
   csub[,log_decay:=init$log_decay]
@@ -187,7 +181,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
   cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf,
                                     iter=iter, ngibbs=ngibbs))
   #fill counts matrix and take subset
-  cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize)
+  cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize, dmin=cs@settings$dmin)
   setkey(cs@biases, name, id)
   setkey(cs@counts, name, id1, id2)
   ncounts_per_dset=as.integer(ncounts/cs@design[,.N])
@@ -195,15 +189,8 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
   if (subcounts[,uniqueN(c(contact.close,contact.far,contact.up,contact.down))]<2)
     stop("dataset too sparse, please increase ncounts")
   subcounts.weight=merge(cs@counts[,.(nc=.N),keyby=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
-  #report min/max distance
-  dmin=0.99
-  if (cs@settings$circularize>0) {
-    dmax=cs@settings$circularize/2+0.01
-  } else {
-    dmax=cs@biases[,max(pos)-min(pos)]+0.01
-  }
-  cs@settings$dmin=dmin
-  cs@settings$dmax=dmax
+  dmin=cs@settings$dmin
+  dmax=cs@settings$dmax
   #initial guess
   if (length(init)==1) {
     if (verbose==T) cat("Initial guess\n")

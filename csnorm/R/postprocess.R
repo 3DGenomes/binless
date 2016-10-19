@@ -157,7 +157,7 @@ detection_binned = function(cs, resolution, group, ref="expected", threshold=0.9
     biases1=copy(biases[chunk==i]) #just needed to fill the counts matrix
     biases2=copy(biases[chunk==j])
     if (biases1[,.N]>0 & biases2[,.N]>0) {
-      cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize)
+      cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize,dmin=cs@settings$dmin)
       if (cts[,.N]>0) {
         setkey(cts,name,id1,id2)
         cts=csnorm_predict_all(cs, cts, verbose=F)
