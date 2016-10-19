@@ -44,10 +44,10 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
   biases=cs@biases
   counts=cs@counts
   bins=seq(biases[,min(pos)-1],biases[,max(pos)+1+resolution],resolution)
-  counts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
-                                    cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
+  counts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+                                    cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12))]
   counts[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
-  biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
+  biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
   biases[,ibin:=as.integer(bin)-1]
   biases[,c("log_nu","log_delta"):=list(cs@par$log_nu,cs@par$log_delta)]
   #split computation across cores
@@ -140,10 +140,10 @@ detection_binned = function(cs, resolution, group, ref="expected", threshold=0.9
   biases=cs@biases
   counts=cs@counts
   bins=seq(biases[,min(pos)-1],biases[,max(pos)+1+resolution],resolution)
-  counts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5),
-                                 cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5))]
+  counts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+                                 cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12))]
   counts[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
-  biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
+  biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
   biases[,ibin:=as.integer(bin)-1]
   #split across cores
   stepsize=max(2,ceiling(length(bins)/(5*ncores)))

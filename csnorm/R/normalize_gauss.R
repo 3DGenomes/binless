@@ -50,7 +50,7 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
   #bin distances
   stepsz=1/(bins_per_bf*bf_per_decade)
   dbins=10**seq(log10(dmin),log10(dmax)+stepsz,stepsz)
-  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=5)]
+  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #collect all counts in these bins
   csd = csub[,.(mdist=exp(mean(log(distance))), kappahatl=sum((z+kappaij)/var)/sum(1/var),
                 sdl=1/sqrt(sum(1/var)), weight=.N), keyby=c("name", "dbin")]
@@ -69,7 +69,7 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
   setkey(dmat,name,dist)
   op$par$decay=dmat 
   #rewrite log_decay as if it were calculated for each count
-  csub=counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=5))]
+  csub=counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
   a=csd[csub,.(id1,id2,log_decay),on=key(csd)]
   setkeyv(a,key(counts))
   op$par$log_decay=a[,log_decay]

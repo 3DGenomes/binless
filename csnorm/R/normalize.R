@@ -261,14 +261,14 @@ check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10) {
   #build counts matrix 
   biases=copy(cs@biases[,.(name,id,pos)])
   biases[,c("log_nu","log_delta"):=list(cs@par$log_nu,cs@par$log_delta)]
-  biases[,nubin:=cut(log_nu, gbins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
-  biases[,deltabin:=cut(log_delta, gbins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
+  biases[,nubin:=cut(log_nu, gbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
+  biases[,deltabin:=cut(log_delta, gbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
   biases[,c("log_nu","log_delta"):=list(NULL,NULL)]
   biases=biases[,.SD[sample(.N,min(.N,npoints))],by=c("name","nubin","deltabin")]
   counts=cs@counts[id1%in%biases[,id]&id2%in%biases[,id]]
   counts=fill_zeros(counts,biases,circularize=cs@settings$circularize, dmin=cs@settings$dmin)
   #filter by distance
-  counts[,dbin:=cut(distance, dbins, ordered_result=T, right=F, include.lowest=T,dig.lab=5)]
+  counts[,dbin:=cut(distance, dbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
   counts=counts[,.SD[sample(.N,min(.N,npoints))],by=c("name","dbin")]
   setkey(counts, name, id1, id2, pos1, pos2)
   #predict values

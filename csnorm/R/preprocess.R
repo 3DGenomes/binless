@@ -446,7 +446,7 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000, s
   #close decay
   dclose=data[abs(re.closest1-re.closest2)<3000 & re.closest1!=re.closest2 & re.dn1 != re.dn2]
   dclose=dclose[,.(count=.N,dist=abs(re.closest2-re.closest1)[1]),by=c("re.closest1.idx","re.closest2.idx")]
-  dclose[,dbin:=cut(dist,1000,ordered_result=T,right=F,include.lowest=T,dig.lab=5)]
+  dclose[,dbin:=cut(dist,1000,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   pclose=ggplot(dclose[,.(dist=mean(dist),N=mean(count)),by=dbin])+geom_point(aes(dist,N))+
     xlab("mean distance between cut sites")+ylab("mean count between cut sites")
   return(list(pdangling=pdangling,pdiag=pdiag,pclose=pclose,data=data))
