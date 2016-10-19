@@ -281,6 +281,8 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
   op$par$init=init.op$par
   op$par$value=op$value
   cs@par=op$par
+  cs@diagnostics$plot=ggplot(cs@diagnostics$params[,.(step,leg,value,out.last)])+
+    geom_line(aes(step,value))+geom_point(aes(step,value,colour=out.last))+facet_wrap(~leg, scales = "free")
   return(cs)
 }
 
@@ -318,13 +320,16 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
 #' @examples
 run_gauss = function(cs, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10, lambdas=c(0.1,1,10),
                      ngibbs = 3, iter=100000, ncores=1, verbose=T, init_alpha=1e-5, prefix=NULL) {
-  cs@binned=list() #erase old binned datasets if available
+  cs@binned=list() #erase old data if available
+  cs@diagnostics=list()
+  cs@par=list()
   registerDoParallel(cores=ncores)
   cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %dopar% {
-    cs = run_gauss_gibbs(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
-                         bins_per_bf=bins_per_bf, init=lambda, ngibbs = ngibbs,
-                         iter=iter, fit.decay=T, fit.genomic=T, fit.disp=T,
-                         verbose=verbose, init_alpha=1e-5)
+    a=system.time(cs <- run_gauss_gibbs(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
+                           bins_per_bf=bins_per_bf, init=lambda, ngibbs = ngibbs,
+                           iter=iter, fit.decay=T, fit.genomic=T, fit.disp=T,
+                           verbose=verbose, init_alpha=1e-5))
+    cs@diagnostics$runtime=a[1]+a[4]
     if (!is.null(prefix)) save(cs, file=paste0(prefix,"_lambda",lambda,".RData"))
     cs
   }
