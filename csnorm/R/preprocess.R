@@ -531,9 +531,10 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
   experiments[,name:=ordered(name, levels=name)]
   setkey(experiments, name)
   if (!(experiments[,.N]==experiments[,uniqueN(name)])) stop("experiment names must be unique")
-  if (uniqueN(rbindlist(lapply(datasets, function(x) x@settings)))!=1)
-    stop("all experiments must have the same settings")
-  settings=datasets[[1]]@settings
+  if (uniqueN(rbindlist(lapply(datasets, function(x) x@settings[c("dmin","circularize")])))!=1)
+    stop("all experiments must have the same dmin and circularize settings!")
+  settings=datasets[[1]]@settings[c("dmin","circularize")]
+  settings$dmax=max(sapply(datasets, function(x) x@settings$dmax))
   #merge biases and counts into data tables, make IDs unique
   biases = lapply(datasets, function(x) copy(x@biases))
   counts = lapply(datasets, function(x) copy(x@counts))
