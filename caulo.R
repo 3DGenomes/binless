@@ -12,7 +12,7 @@ setwd("/home/yannick/simulations/cs_norm")
 #generate 3 plots to determine dangling.L, dangling.R and maxlen respectively (fread warning can be ignored)
 #with this Caulobacter dataset, we can start with dangling.L=0 dangling.R=3 maxlen=600 read.len=40 and dmin=2000
 a=examine_dataset("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_NcoI_reads_int.tsv",
-                  skip=0L,nrows=10000000, skip.fbm=F)
+                  skip=0L,nrows=1000000, skip.fbm=F)
 #Since the cut site is palindromic, it is expected that the peaks have the same height. You can test this hypothesis.
 chisq.test(c(a$data[(rbegin1-re.closest1)==0&strand1==1,.N],
              a$data[(rbegin2-re.closest2)==3&strand2==0,.N]))
