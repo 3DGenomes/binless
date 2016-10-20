@@ -61,8 +61,7 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
             Kdiag=Kdiag, dmin=dmin, dmax=dmax, N=csd[,.N], cbegin=cbegin,
             kappa_hat=csd[,kappahatl], sdl=csd[,sdl], dist=csd[,mdist],
             alpha=init$alpha, lambda_diag=init$lambda_diag, weight=csd[,weight])
-  op=optimizing(stanmodels$gauss_decay, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
-                init=init, ...)
+  op=optimize_stan_model(model=stanmodels$gauss_decay, data=data, iter=iter, verbose=verbose, init=init, ...)
   #make nice decay data table
   csd[,log_decay:=op$par$log_decay]
   dmat=csd[,.(name,dist=mdist,log_decay,z=kappahatl-op$par$log_mean_counts,std=sdl,ncounts=4*weight)]
@@ -119,8 +118,7 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
             eta_hat_L=cts[,etaLhat], eta_hat_R=cts[,etaRhat], sd_L=cts[,sdL], sd_R=cts[,sdR],
             alpha=init$alpha, lambda_nu=init$lambda_nu, lambda_delta=init$lambda_delta)
-  op=optimizing(stanmodels$gauss_genomic, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
-                init=init, ...)
+  op=optimize_stan_model(model=stanmodels$gauss_genomic, data=data, iter=iter, verbose=verbose, init=init, ...)
   #make nice output table
   bout=cbind(biases,as.data.table(list(log_nu=op$par$log_nu,log_delta=op$par$log_delta)))
   bout=merge(cbind(design[,.(name)],eC=op$par$eC,eRJ=op$par$eRJ,eDE=op$par$eDE), bout, by="name",all.x=F,all.y=T)
@@ -159,8 +157,7 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
                weight=as.array(weight[,wt]), beta_nu=init$beta_nu, beta_delta=init$beta_delta,
                beta_diag=init$beta_diag)
-  op=optimizing(stanmodels$gauss_dispersion, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose,
-                init=init, ...)
+  op=optimize_stan_model(model=stanmodels$gauss_dispersion, data=data, iter=iter, verbose=verbose, init=init, ...)
   return(op)
 }
 

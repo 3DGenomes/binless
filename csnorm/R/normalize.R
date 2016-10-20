@@ -50,6 +50,20 @@ fill_zeros = function(counts,biases,biases2=NULL,circularize=-1L,dmin=0) {
 #' @keywords internal
 #' @export
 #' 
+optimize_stan_model = function(model, data, iter, verbose, init, ...) {
+  out=capture.output(op<-optimizing(model, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...))
+  cat(out,sep="\n")
+  if (length(grep("Line search failed",tail(out,1)))>0) {
+    op=optimizing(model, data=data, as_vector=F, hessian=F, iter=2, verbose=verbose, init=init, algorithm="Newton", ...)
+    cat("!!! Line search error occurred, performed 2 steps of Newton optimization\n")
+  }
+  return(op)
+}
+
+#' Initial guess for normalization
+#' @keywords internal
+#' @export
+#' 
 csnorm_fit_initial = function(counts, biases, design, bf_per_kb, dmin, dmax, bf_per_decade, lambda, verbose, iter, ...) {
   #compute column sums
   cs1=counts[,.(R=sum(contact.close+contact.down),L=sum(contact.far+contact.up)),by=c("name","id1")][,.(name,id=id1,L,R)]
@@ -66,8 +80,7 @@ csnorm_fit_initial = function(counts, biases, design, bf_per_kb, dmin, dmax, bf_
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
             counts_sum_left=sums[,L], counts_sum_right=sums[,R],
             lambda_nu=lambda, lambda_delta=lambda)
-  op=optimizing(stanmodels$guess, data=data,
-                as_vector=F, hessian=F, iter=iter, verbose=verbose, init=0, ...)
+  op=optimize_stan_model(model=stanmodels$guess, data=data, iter=iter, verbose=verbose, init=0, ...)
   #return initial guesses
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   Decays=design[,uniqueN(decay)]
@@ -103,7 +116,7 @@ csnorm_fit = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_de
                counts_close=counts[,contact.close], counts_far=counts[,contact.far],
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
                weight=as.array(weight))
-  op=optimizing(stanmodels$fit, data=data, as_vector=F, hessian=F, iter=iter, verbose=verbose, init=init, ...)
+  op=optimize_stan_model(model=stanmodels$fit, data=data, iter=iter, verbose=verbose, init=init, ...)
   op$par$decay=data.table(name=counts[,name], dist=data$dist, decay=exp(op$par$log_decay), key=c("name","dist"))
   return(op)
 }
