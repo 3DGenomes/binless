@@ -48,6 +48,8 @@ transformed data {
   //diagonal SCAM spline, dense
   matrix[N,Dsets*Kdiag] Xdiag;
   row_vector[Kdiag] pdiagD[Dsets];
+  //scaling factor for genomic lambdas
+  real lfac;
   //nu
   vector[SD] log_nu; // log(nu)
   vector[Krow-2] beta_nu_diff[Dsets]; //2nd order difference on beta_nu_aug
@@ -120,7 +122,10 @@ transformed data {
     }
   }
   
-  //nu
+  //scaling factor for genomic lambdas
+  lfac = 30000*Krow/(max(cutsitesD)-min(cutsitesD));
+  
+    //nu
   {
     vector[Dsets*Krow] beta_nu_centered;
     for (d in 1:Dsets) {
@@ -172,6 +177,10 @@ parameters {
   real eDE[Dsets];
   //dispersion
   real<lower=0> alpha;
+  //length scales
+  real<lower=0> lambda_nu[Biases];
+  real<lower=0> lambda_delta[Biases];
+  real<lower=0> lambda_diag[Decays];
 }
 transformed parameters {
   //means
@@ -221,6 +230,20 @@ model {
     target += weight[d]*neg_binomial_2_log_lpmf(counts_up[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cup[cbegin[d]:(cbegin[d+1]-1)], alpha);
     target += weight[d]*neg_binomial_2_log_lpmf(counts_down[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)], alpha);
   }
+  
+  //// Priors
+  for (d in 1:Dsets) {
+    //P-spline prior on the differences (K-2 params)
+    //warning on jacobian can be ignored
+    //see GAM, Wood (2006), section 4.8.2 (p.187)
+    beta_nu_diff[d] ~ normal(0, 1/(lfac*lambda_nu[XB[d]]));
+    beta_delta_diff[d] ~ normal(0, 1/(lfac*lambda_delta[XB[d]]));
+    beta_diag_diff[d] ~ normal(0, 1/lambda_diag[XD[d]]);
+  }
+  //cauchy hyperprior
+  lambda_nu ~ cauchy(0,1);
+  lambda_delta ~ cauchy(0,1);
+  lambda_diag ~ cauchy(0,1);
 }
 generated quantities {
   vector[N] log_decay;
