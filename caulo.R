@@ -10,9 +10,9 @@ setwd("/home/yannick/simulations/cs_norm")
 ### Preprocessing
 
 #generate 3 plots to determine dangling.L, dangling.R and maxlen respectively (fread warning can be ignored)
-#with this Caulobacter dataset, we can start with dangling.L=0 dangling.R=3 maxlen=600
+#with this Caulobacter dataset, we can start with dangling.L=0 dangling.R=3 maxlen=600 read.len=40 and dmin=2000
 a=examine_dataset("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_NcoI_reads_int.tsv",
-                  skip=0L,nrows=1000000)
+                  skip=0L,nrows=10000000, skip.fbm=F)
 #Since the cut site is palindromic, it is expected that the peaks have the same height. You can test this hypothesis.
 chisq.test(c(a$data[(rbegin1-re.closest1)==0&strand1==1,.N],
              a$data[(rbegin2-re.closest2)==3&strand2==0,.N]))
@@ -26,14 +26,29 @@ chisq.test(c(a$data[(rbegin1-re.closest1)==0&strand1==1,.N],
 #You could also filter the tsv file beforehand for that.
 #two outputs will be created for a given prefix: prefix_csdata.RData and if save.data==T, prefix_csdata_with_data.RData.
 #they contain the respective CSdata objects
-csd1=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_NcoI_reads_int.tsv",
+csd0=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_NcoI_reads_int.tsv",
                       "data/caulo_NcoI_all", "WT", "1", enzyme="NcoI", circularize=4042929, dangling.L=c(0),
-                      dangling.R=c(3), maxlen=600, save.data=T)
+                      dangling.R=c(3), maxlen=600, read.len=40, dmin=1000, save.data=T)
+csd1=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate1_reads_int.tsv",
+                      "data/caulo_BglIIr1_all", "WT", "1", enzyme="BglII", circularize=4042929, dangling.L=c(0),
+                      dangling.R=c(3), maxlen=600, read.len=40, dmin=1000, save.data=T)
+csd2=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_replicate2_reads_int.tsv",
+                      "data/caulo_BglIIr2_all", "WT", "2", enzyme="BglII", circularize=4042929, dangling.L=c(0),
+                      dangling.R=c(3), maxlen=600, read.len=40, dmin=1000, save.data=T)
+csd3=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_rifampicin_reads_int.tsv",
+                      "data/caulo_BglIIrif_all", "rif", "1", enzyme="BglII", circularize=4042929, dangling.L=c(0),
+                      dangling.R=c(3), maxlen=600, read.len=40, dmin=1000, save.data=T)
+csd4=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_novobiocin_reads_int.tsv",
+                      "data/caulo_BglIInov_all", "nov", "1", enzyme="BglII", circularize=4042929, dangling.L=c(0),
+                      dangling.R=c(3), maxlen=600, read.len=40, dmin=1000, save.data=T)
+csd5=read_and_prepare("/scratch/caulobacter/6_preprocessing_raw_reads/3_InteractionMaps/Caulobacter_BglII_dSMC_reads_int.tsv",
+                      "data/caulo_BglIIdSMC_all", "dSMC", "1", enzyme="BglII", circularize=4042929, dangling.L=c(0),
+                      dangling.R=c(3), maxlen=600, read.len=40, dmin=1000, save.data=T)
 
 #We can plot a particular region of interest
 #to save memory, only the CSdata object that does not contain the raw reads is returned.
 #We therefore need to load it
-load("data/caulo_NcoI_all_csdata_with_data.RData")
+load("data/caulo_BglIIr1_all_csdata.RData")
 data=get_raw_reads(csd@data, 1080000, 1100000)
 plot_binned(data, resolution=1000, b1=1081000, e1=1099000)
 plot_raw(data, b1=1081000, e1=1099000)
@@ -55,14 +70,16 @@ plot_raw(data, b1=1089000, e1=1094000)
 #The cs object is full of information, be sure to check it out at every step in this script.
 load("data/caulo_NcoI_all_csdata.RData")
 csd1=csd
-load("data/caulo_BglIIr1_all_csdata.RData")
+load("data/caulo_BglIIr1_150k_csdata.RData")
 csd2=csd
-load("data/caulo_BglIIr2_all_csdata.RData")
+load("data/caulo_BglIIr2_150k_csdata.RData")
 csd3=csd
-load("data/caulo_BglII_rifampicin_all_csdata.RData")
+load("data/caulo_BglIIrif_150k_csdata.RData")
 csd4=csd
+load("data/caulo_BglIInov_all_csdata.RData")
+csd5=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4), different.decays="enzyme")
-save(cs, file="data/caulo_rif_csnorm.RData")
+save(cs, file="data/caulo_rif_150k_csnorm.RData")
 
 #The normalization is performed with a fast approximate Gibbs sampler to the full model
 #bf_per_kb: number of spline basis functions per genomic kilobase. The larger, the better the fit, but the harder the optimization.
@@ -74,17 +91,32 @@ save(cs, file="data/caulo_rif_csnorm.RData")
 #Once optimized, be sure to look at cs@diagnostics. It contains the outputs of the underlying optimization rounds. Make sure that
 #in the last runtime.bias and runtime.decay, you see "Convergence detected". Otherwise, the normalization was not successful.
 #You might either want to increase ngibbs or iter, or both.
-load("data/caulo_rif_csnorm.RData")
-cs = run_simplified(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=10**seq(from=-1,to=1,length.out=5),
-                    ngibbs = 3, iter=10000, ncores=30, verbose=T)
+load("data/caulo_rif_150k_csnorm.RData")
+cs = run_gauss_gibbs(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, init=0.1, ngibbs = 3, iter=10000, verbose=T)
 save(cs, file="data/caulo_rif_csnorm_optimized.RData")
 
 #Some diagnostics plots can be generated. The function generates 4 plots and also returns a data table.
 #The p-values of most points reported should not be too extreme. If they are, then the fit went bad.
 check=check_fit(cs)
 #in particular, the following should be close to 0.05
-check$counts[pval<0.05,.N]/plots$counts[,.N]
-check$counts[pval>0.95,.N]/plots$counts[,.N]
+check$counts[pval<0.05,.N]/check$counts[,.N]
+check$counts[pval>0.95,.N]/check$counts[,.N]
+
+nu=data.table(name=cs@biases[,name],pos=cs@biases[,pos],nu=exp(cs@par$log_nu),delta=exp(cs@par$log_delta))
+ggplot(nu)+geom_line(aes(pos,log(nu)))+facet_wrap(~name,scales = "free")
+
+ggplot(cs@par$biases)+geom_line(aes(pos,log_nu))+
+  geom_pointrange(aes(pos,log_nu+z,ymin=log_nu+z+std,ymax=log_nu+z-std,colour=cat), alpha=0.1)+
+  facet_wrap(~name)+ylim(-5,5)
+
+ggplot(cs@par$decay[dist>1000])+geom_line(aes(dist,log_decay),colour="red")+ facet_wrap(~name) +
+  geom_pointrange(aes(x=dist,y=log_decay+z,ymin=log_decay+z-std,ymax=log_decay+z+std),alpha=0.1)+
+  scale_x_log10()
+
+ggplot(dmat[dist>1000])+geom_line(aes(dist,log_decay),colour="red")+ facet_wrap(~name) +
+  geom_pointrange(aes(x=dist,y=log_decay+z,ymin=log_decay+z-std,ymax=log_decay+z+std),alpha=0.1)+
+  scale_x_log10()
+
 
 ### Binning at a given resolution
 
@@ -128,6 +160,7 @@ ggplot(mat)+geom_density(aes(log10(normalized),colour=name))+facet_wrap(~name)
 #Since you did not do any grouping yet (see below), pass group="all".
 #The interaction detection is made at a 95% posterior confidence threshold
 cs=detect_interactions(cs, resolution=20000, group="all", threshold=0.95, ncores=30)
+save(cs,file="data/caulo_BglII_decay_all_csnorm_optimized.RData")
 
 #you can view the called interactions
 #since there was no grouping, pass group="all"
@@ -176,13 +209,13 @@ ggplot(mat)+
 
 #you can call significant differences. It's just like calling interactions, but you need to specify a reference.
 #All other matrices will then be compared to that one.
-cs=detect_differences(cs, ref="WT BglII", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
-                      threshold=0.95, ncores=30)
+cs=detect_differences(cs, ref="WT BglII 2", resolution=20000, group="all", threshold=0.95, ncores=30)
+save(cs, file="data/caulo_BglII_decay_all_csnorm_optimized.RData")
 
 #the interactions can be retrieved as usual, with a few changes
 # specify type="differences" and ref as given in detect_differences
-mat=get_interactions(cs, type="differences", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
-                     threshold=0.95, ref="WT BglII")
+mat=get_interactions(cs, type="differences", resolution=20000, group="all",
+                     threshold=0.95, ref="WT BglII 2")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(icelike)))+
   geom_raster(aes(begin2,begin1,fill=log(icelike)))+
