@@ -272,7 +272,8 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
         dmin=dmin, dmax=dmax, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter,
         weight=subcounts.weight, init_alpha=init_alpha)))
       op=list(value=op.disp$value, par=c(op$par[c("beta_diag","beta_diag_centered","log_decay","decay",
-                                                  "beta_nu","beta_delta","log_nu","log_delta","biases")],
+                                                  "beta_nu","beta_delta","log_nu","log_delta","biases",
+                                                  "lambda_nu","lambda_delta","lambda_diag")],
                                          op.disp$par[c("eC","eRJ","eDE","alpha")]))
       cs@diagnostics$params = update_diagnostics(cs, step=i, leg="disp", out=output, runtime=a[1]+a[4], op=op)
     }
