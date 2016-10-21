@@ -27,16 +27,37 @@ a=examine_dataset("/scratch/rao/mapped/IMR90_MboI_in_situ/HICall_IMR90_both_map_
 #You could also filter the tsv file beforehand for that.
 #two outputs will be created for a given prefix: prefix_csdata.RData and if save.data==T, prefix_csdata_with_data.RData.
 #they contain the respective CSdata objects
-csd=read_and_prepare("/scratch/rao/mapped/GM12878_MboI_in_situ/HICall_both_filled_map_chrX_Peak1.tsv",
-                     "data/rao_HiCall_GM12878_Peak1_450k", "GM", "1", enzyme="MboI", circularize=-1, dangling.L=c(0),
-                     dangling.R=c(3), maxlen=900, read.len=101, dmin=1000, save.data=T)
-csd=read_and_prepare("/scratch/rao/mapped/IMR90_MboI_in_situ/HICall_IMR90_both_map_chr1_SELP.tsv",
-                     "data/rao_HiCall_IMR90_SELP_150k", "IMR90", "1", enzyme="MboI", circularize=-1, dangling.L=c(0),
-                     dangling.R=c(3), maxlen=600, read.len=101, dmin=1000, save.data=T)
+
+foreach (chr=c("chrX","chr1","chr21","chr1","chr8","chr3","chr4","chr21"),
+         name=c("Peak1","SELP","ADAMT","Talk","SEMA3C","FOXP1","PARM1","Comparison"),
+         size=c("450k","150k","2.3M","2M","1M","1.3M","600k","1.7M")) %do% {
+           csd=read_and_prepare(paste0("/scratch/rao/mapped/GM12878_MboI_in_situ/HICall_both_filled_map_",chr,"_",name,".tsv"),
+                                paste0("data/rao_HiCall_GM12878_",name,"_",size), "GM", "1",
+                                enzyme="MboI", circularize=-1, dangling.L=c(0),
+                                dangling.R=c(3), maxlen=900, read.len=101, dmin=1000, save.data=T)
+           csd=read_and_prepare(paste0("/scratch/rao/mapped/IMR90_MboI_in_situ/HICall_IMR90_both_map_",chr,"_",name,".tsv"),
+                                paste0("data/rao_HiCall_IMR90_",name,"_",size), "IMR90", "1", enzyme="MboI", circularize=-1, dangling.L=c(0),
+                                dangling.R=c(3), maxlen=600, read.len=101, dmin=1000, save.data=T)
+         }
+
 #here we plot the raw reads. We need to load the full csdata object, as only the one without the raw reads is returned.
 load("data/rao_HiCall_chrX_450k_csdata_with_data.RData")
 data=get_raw_reads(csd@data, csd@biases[,min(pos)], csd@biases[,max(pos)])
 plot_binned(data, resolution=10000, b1=csd@biases[,min(pos)], e1=csd@biases[,max(pos)])
+
+
+
+
+load("data/rao_HiCall_GM12878_bpk1_fix_Peak1_450k_csnorm_optimized.RData")
+load("data/rao_HiCall_GM12878_bpk1_variable_Peak1_450k_csnorm_optimized.RData")
+load("data/rao_HiCall_GM12878_bpk1_newbiases_variable_Peak1_450k_csnorm_optimized.RData")
+cs@diagnostics$plot
+ggsave(filename="diag_variable_new.pdf",width=10,height=5)
+cs@diagnostics$runtime
+cs@par$value
+
+
+
 
 
 #The normalization is performed with a fast approximation to the full model
@@ -58,9 +79,9 @@ save(cs, file="data/rao_HiCall_chrX_450k_csnorm_optimized.RData")
 #all three panels reach a plateau, and the last points report "Convergence detected". Otherwise, the normalization was not successful.
 #You might then either want to increase ngibbs or iter, or both.
 cs@diagnostics$plot
-#similar plots can be generated. For example, to visualize lambda_nu
-ggplot(cs@diagnostics$params[leg=="bias",.(lambda_nu=sapply(lambda_nu,function(x){x[[1]]}),out.last),by=step])+
-  geom_line(aes(step,lambda_nu))+geom_point(aes(step,lambda_nu,colour=out.last))
+#similar plots can be generated. For example, to visualize lambda_iota
+ggplot(cs@diagnostics$params[leg=="bias",.(lambda_iota=sapply(lambda_iota,function(x){x[[1]]}),out.last),by=step])+
+  geom_line(aes(step,lambda_iota))+geom_point(aes(step,lambda_iota,colour=out.last))
 #or eC
 ggplot(cs@diagnostics$params[,.(step,leg,eC=sapply(eC,function(x){x[[1]]}),out.last)])+
   geom_line(aes(step,eC))+geom_point(aes(step,eC,colour=out.last))+facet_grid(~leg)
@@ -74,15 +95,30 @@ check$counts[pval<0.05,.N]/check$counts[,.N]
 check$counts[pval>0.95,.N]/check$counts[,.N]
 
 
-#you can also plot the value of the biases along the genome. Here, we plot nu and the reduced aggregate counts used for optimization.
-ggplot(cs@par$biases)+geom_line(aes(pos,log_nu))+
-  geom_pointrange(aes(pos,log_nu+z,ymin=log_nu+z-std,ymax=log_nu+z+std,colour=cat), alpha=0.1)+
+#you can also plot the value of the biases along the genome. Here, we plot iota and the reduced aggregate counts used for optimization.
+ggplot(cs@par$biases)+geom_line(aes(pos,log_iota))+
+  geom_pointrange(aes(pos,log_iota+z,ymin=log_iota+z-std,ymax=log_iota+z+std,colour=cat), alpha=0.1)+
   facet_wrap(~name,scales = "free")
 
+ggplot(cs@par$biases)+geom_line(aes(pos,log_rho,colour="rho"))+
+  geom_pointrange(aes(pos,log_rho+z,ymin=log_rho+z-std,ymax=log_rho+z+std,colour=cat), alpha=0.1)+
+  facet_wrap(~name,scales = "free")
+
+
+#former nu
+ggplot(cs@par$biases)+geom_line(aes(pos,(log_iota+log_rho)/2,colour="nu"))+
+  geom_pointrange(aes(pos,(log_iota+log_rho)/2+z,ymin=(log_iota+log_rho)/2+z-std,ymax=(log_iota+log_rho)/2+z+std,colour=cat), alpha=0.1)+
+  facet_wrap(~name,scales = "free")
+#former delta
+ggplot(cs@par$biases)+geom_line(aes(pos,(log_iota-log_rho)/2,colour="nu"))+
+  geom_pointrange(aes(pos,(log_iota-log_rho)/2+z,ymin=(log_iota-log_rho)/2+z-std,ymax=(log_iota-log_rho)/2+z+std,colour=cat), alpha=0.1)+
+  facet_wrap(~name,scales = "free")
+
+
 #the diagonal decay can be plotted this way
-ggplot(cs@par$decay)+geom_line(aes(dist,log_decay))+
+ggplot(cs@par$decay)+geom_line(aes(dist,log_decay))+scale_x_log10()+
   geom_pointrange(aes(dist,log_decay+z,ymin=log_decay+z-std,ymax=log_decay+z+std), alpha=0.1)+
-  facet_wrap(~name,scales = "free")+scale_x_log10()
+  facet_wrap(~name,scales = "free")
 
 ### Binning at a given resolution
 
@@ -212,34 +248,34 @@ save(cs, file="data/caulo_csnorm_optimized.RData")
 ### END
 
 
-#nu and delta correlation
-nu = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
+#iota and rho correlation
+iota = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
   load(i)
-  csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=cs@par$beta_nu, beta_delta=cs@par$beta_delta,
+  csnorm:::generate_genomic_biases(biases=cs@biases, beta_iota=cs@par$beta_iota, beta_rho=cs@par$beta_rho,
                                    bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 10)[
-                                     ,.(pos,log_nu,log_delta,dset=j)]
+                                     ,.(pos,log_iota,log_rho,dset=j)]
 }
-nu[,pbin:=cut(pos,3)]
-ggplot(nu)+geom_line(aes(pos,exp(log_nu),colour=dset))+facet_wrap(~pbin,scales = "free_x", nrow=3)+
+iota[,pbin:=cut(pos,3)]
+ggplot(iota)+geom_line(aes(pos,exp(log_iota),colour=dset))+facet_wrap(~pbin,scales = "free_x", nrow=3)+
   #scale_y_continuous(limits = c(0,2))+
-  ylab("nu")+scale_y_log10()
-#ggsave(filename=paste0("images/",prefix,"_nu.png"), width=10, height=7.5)
+  ylab("iota")+scale_y_log10()
+#ggsave(filename=paste0("images/",prefix,"_iota.png"), width=10, height=7.5)
 
 #sorted with data points
-nu.obs = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
+iota.obs = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
   load(i)
   a=data.table(id=cs@counts[,id1], pos=cs@counts[,pos1],
                obs=cs@counts[,contact.down]*exp(-cs@pred$log_mean_cdown),
                dset=j)[sample(.N,min(.N,100000))]
-  a=merge(a,cs@biases[,.(id,nu=exp(cs@par$log_nu))],by="id")
-  a[,obs:=obs*nu]
-  setkey(a,nu,pos)
+  a=merge(a,cs@biases[,.(id,iota=exp(cs@par$log_iota))],by="id")
+  a[,obs:=obs*iota]
+  setkey(a,iota,pos)
   a[,rank:=.I]
   a
 }
-ggplot(nu.obs)+geom_line(aes(rank,nu,colour=dset))+geom_point(aes(rank,obs,colour=dset),alpha=0.01)+
+ggplot(iota.obs)+geom_line(aes(rank,iota,colour=dset))+geom_point(aes(rank,obs,colour=dset),alpha=0.01)+
   #scale_y_continuous(limits = c(0,2))+
-  ylab("nu")+scale_y_log10()
+  ylab("iota")+scale_y_log10()
 
 
 #diagonal decay
