@@ -122,17 +122,15 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
             alpha=init$alpha)
   op=optimize_stan_model(model=stanmodels$gauss_genomic, data=data, iter=iter, verbose=verbose, init=init, ...)
   #make nice output table
-  bout=cbind(biases,as.data.table(list(log_iota=op$par$log_iota,log_rho=op$par$log_rho)))
-  bout=merge(cbind(design[,.(name)],eC=op$par$eC,eRJ=op$par$eRJ,eDE=op$par$eDE), bout, by="name",all.x=F,all.y=T)
-  bout=merge(cts,bout,by="id",all=T)
-  bout[,c("mu.DL","mu.DR","mu.RJ","lmu.L","lmu.R"):=list(
-    exp(eDE+log_iota),exp(eDE+log_rho),exp(eRJ+(log_iota+log_rho)/2),
-    eC+log_iota,eC+log_rho)]
-  bout=rbind(bout[,.(cat="dangling L", name, id, pos, log_iota, log_rho, z=dangling.L/mu.DL-1, std=sqrt(1/mu.DL+1/init$alpha))],
-             bout[,.(cat="dangling R", name, id, pos, log_iota, log_rho, z=dangling.R/mu.DR-1, std=sqrt(1/mu.DR+1/init$alpha))],
-             bout[,.(cat="rejoined", name, id, pos, log_iota, log_rho, z=rejoined/mu.RJ-1, std=sqrt(1/mu.RJ+1/init$alpha))],
-             bout[,.(cat="contact L", name, id, pos, log_iota, log_rho, z=etaLhat-lmu.L, std=sdL)],
-             bout[,.(cat="contact R", name, id, pos, log_iota, log_rho, z=etaRhat-lmu.R, std=sdR)])
+  bout=cbind(biases,as.data.table(op$par[c("log_iota","log_rho","log_mean_DL","log_mean_DR","log_mean_RJ")]))
+  cout=cbind(cts,as.data.table(op$par[c("log_iota","log_rho","log_mean_cleft","log_mean_cright")]))
+  cout=merge(cout,bout[,.(name,id,pos)],by="id")
+  bout=rbind(bout[,.(cat="dangling L", name, id, pos, log_iota, log_rho, z=dangling.L/exp(log_mean_DL)-1, std=sqrt(1/exp(log_mean_DL)+1/init$alpha))],
+             bout[,.(cat="dangling R", name, id, pos, log_iota, log_rho, z=dangling.R/exp(log_mean_DR)-1, std=sqrt(1/exp(log_mean_DL)+1/init$alpha))],
+             bout[,.(cat="rejoined", name, id, pos, log_iota, log_rho, z=rejoined/exp(log_mean_RJ)-1, std=sqrt(1/exp(log_mean_RJ)+1/init$alpha))])
+  cout=rbind(cout[,.(cat="contact L", name, id, pos, log_iota, log_rho, z=etaLhat-log_mean_cleft, std=sdL)],
+             cout[,.(cat="contact R", name, id, pos, log_iota, log_rho, z=etaRhat-log_mean_cright, std=sdR)])
+  bout=rbind(bout,cout)
   op$par$biases=bout
   op
 }
