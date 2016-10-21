@@ -106,7 +106,7 @@ generated quantities {
           k = bisect(log(dist), k, log_dist);
         }
         expected[b1,b2] = expected[b1,b2] +
-            exp(eC + log_decay[k])*(exp(log_iota1[i]) + exp(log_rho[i]))*(exp(log_iota1[j]) + exp(log_rho[j]));
+            exp(eC + log_decay[k])*(exp(log_iota1[i]) + exp(log_rho1[i]))*(exp(log_iota2[j]) + exp(log_rho2[j]));
         decaymat[b1,b2] = decaymat[b1,b2] + exp(4*log_decay[k]);
       }
     }
