@@ -26,6 +26,9 @@ data {
   vector<lower=0>[SD] sd_R;
   //dispersion
   real<lower=0> alpha;
+  //stiffnesses
+  real<lower=0> lambda_nu[Biases];
+  real<lower=0> lambda_delta[Biases];
 }
 transformed data {
   //bias spline, sparse (nu and delta have the same design)
@@ -80,9 +83,6 @@ parameters {
   //spline parameters
   vector[Krow-1] beta_nu[Biases];
   vector[Krow-1] beta_delta[Biases];
-  //stiffnesses
-  real<lower=0> lambda_nu[Biases];
-  real<lower=0> lambda_delta[Biases];
 }
 transformed parameters {
   //nu
@@ -166,8 +166,4 @@ model {
     beta_nu_diff[d] ~ normal(0,1/(lfac*lambda_nu[XB[d]]));
     beta_delta_diff[d] ~ normal(0,1/(lfac*lambda_delta[XB[d]]));
   }
-  
-  //// hyperprior
-  lambda_nu ~ cauchy(0,1);
-  lambda_delta ~ cauchy(0,1);
 }
