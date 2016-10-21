@@ -254,6 +254,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
                                          op.disp$par[c("eC","eRJ","eDE","alpha",
                                                        "lambda_iota","lambda_rho", "lambda_diag")]))
       cs@diagnostics$params = update_diagnostics(cs, step=i, leg="disp", out=output, runtime=a[1]+a[4], op=op)
+      if (verbose==T) cat("Gibbs",i,": log-likelihood = ",op$value,"\n")
     }
   }
   if (verbose==T) cat("Done\n")
