@@ -151,9 +151,9 @@ get_predicted_subset = function(cs, ncounts=100000) {
 #' @examples
 get_genomic_biases = function(cs, points_per_kb=10) {
   if (length(cs@par)==0) stop("You should first normalize the datasets")
-  csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=cs@par$beta_nu, beta_delta=cs@par$beta_delta,
+  csnorm:::generate_genomic_biases(biases=cs@biases, beta_iota=cs@par$beta_iota, beta_rho=cs@par$beta_rho,
                                    bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 10)[
-                                     ,.(pos,log_nu,log_delta,dset=j)]
+                                     ,.(pos,log_iota,log_rho,dset=j)]
 }
 
 #' update diagnostics data table or create it if not existing
