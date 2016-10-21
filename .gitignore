@@ -9,3 +9,4 @@ csnorm/src/include/models.hpp*
 csnorm/man/*
 .*.sw*
 *_cmdline.R
+run*.R
