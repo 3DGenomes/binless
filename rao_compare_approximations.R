@@ -206,13 +206,15 @@ refparams=data.table(method="ref",step=0:nsteps,leg="ref",eC=cs@par$eC,alpha=cs@
 dset="data/rao_HiCall_chrX_60k_csnorm_optimized_exact_lambda0.001.RData"
 dset="data/rao_HiCall_chrX_100k_csnorm_optimized_gibbs_simplified_lambda100.RData"
 dset="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss_lambda100.RData"
+dset="data/caulo_NcoI_500k_csnorm_optimized.RData"
 load(dset)
 params = foreach(i=0:nsteps,.combine=rbind) %do% {
                  if (i==0) {
                    params=data.table(method="10",step=0,leg="init",eC=cs@diagnostics$op.init$par$eC, alpha=cs@diagnostics$op.init$par$alpha,
                                      lambda_nu=cs@diagnostics$op.init$par$lambda_nu, log_nu38=cs@diagnostics$op.init$par$log_nu[38],
                                      beta_diag5=cs@diagnostics$op.init$par$beta_diag[5], lambda_delta=cs@diagnostics$op.init$par$lambda_delta,
-                                     lambda_diag=cs@diagnostics$op.init$par$lambda_diag, value=cs@diagnostics$op.init$value, out=tail(cs@diagnostics$out.init,1))
+                                     lambda_diag=cs@diagnostics$op.init$par$lambda_diag,
+                                     value=cs@diagnostics$op.init$value, out=tail(cs@diagnostics$out.init,1))
                  } else {
                    foreach (leg=c("decay","bias","disp"), inc=(c(0,0.3,0.6)),.combine=function(...){rbind(...,fill=T)}) %do% {
                      stepname=paste0(leg,i)
@@ -234,7 +236,7 @@ ggplot(params)+geom_line(aes(step,lambda_nu))+geom_point(aes(step,lambda_nu,colo
 ggplot(params)+geom_line(aes(step,log_nu38))+geom_point(aes(step,log_nu38,colour=leg))+
   geom_hline(aes(yintercept=log_nu38),data=refparams,colour="red")
 #value
-ggplot(params[!(leg%in%c("ref","init"))])+geom_line(aes(step,value))+
+ggplot(params[!(leg%in%c("ref","init"))&step>=2])+geom_line(aes(step,value))+
   geom_point(aes(step,value,colour=out))+facet_wrap(~leg, scales = "free")
 #alpha
 ggplot(params)+geom_line(aes(step,alpha))+geom_point(aes(step,alpha,colour=leg))+
