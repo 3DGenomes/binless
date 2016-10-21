@@ -211,13 +211,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
                                              runtime=init.a[1]+init.a[4], op=init.op)
   op=init.op
   #make sure beta_diag is strictly increasing
-  for (dec in 1:(dim(op$par$beta_diag)[1])) {
-    for (d in 2:(dim(op$par$beta_diag)[2])) {
-      if (abs(op$par$beta_diag[dec,d]-op$par$beta_diag[dec,d-1])<10*.Machine$double.eps) {
-        op$par$beta_diag[dec,d:(dim(op$par$beta_diag)[2])]=op$par$beta_diag[dec,d:(dim(op$par$beta_diag)[2])]+10*.Machine$double.eps
-      }
-    }
-  }
+  op$par$beta_diag = guarantee_beta_diag_increasing(op$par$beta_diag)
   #gibbs sampling
   for (i in 1:ngibbs) {
     #fit diagonal decay given nu and delta
@@ -246,13 +240,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
       cs@diagnostics$params = update_diagnostics(cs, step=i, leg="bias", out=output, runtime=a[1]+a[4], op=op)
     }
     #make sure beta_diag is strictly increasing
-    for (dec in 1:(dim(op$par$beta_diag)[1])) {
-      for (d in 2:(dim(op$par$beta_diag)[2])) {
-        if (abs(op$par$beta_diag[dec,d]-op$par$beta_diag[dec,d-1])<10*.Machine$double.eps) {
-          op$par$beta_diag[dec,d:(dim(op$par$beta_diag)[2])]=op$par$beta_diag[dec,d:(dim(op$par$beta_diag)[2])]+10*.Machine$double.eps
-        }
-      }
-    }
+    op$par$beta_diag = guarantee_beta_diag_increasing(op$par$beta_diag)
     if (fit.disp==T) {
       #fit exposures and dispersion
       if (verbose==T) cat("Gibbs",i,": Remaining parameters\n")
