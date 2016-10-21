@@ -61,7 +61,8 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
             Kdiag=Kdiag, dmin=dmin, dmax=dmax, N=csd[,.N], cbegin=cbegin,
             kappa_hat=csd[,kappahatl], sdl=csd[,sdl], dist=csd[,mdist],
             alpha=init$alpha, lambda_diag=init$lambda_diag, weight=csd[,weight])
-  op=optimize_stan_model(model=stanmodels$gauss_decay, data=data, iter=iter, verbose=verbose, init=init, ...)
+  #optimize from scratch, to avoid getting stuck. Slower but more robust
+  op=optimize_stan_model(model=csnorm:::stanmodels$gauss_decay, data=data, iter=iter, verbose=verbose, init=0, ...)
   #make nice decay data table
   csd[,log_decay:=op$par$log_decay]
   dmat=csd[,.(name,dist=mdist,log_decay,z=kappahatl-op$par$log_mean_counts,std=sdl,ncounts=4*weight)]
