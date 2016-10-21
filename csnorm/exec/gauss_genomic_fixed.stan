@@ -26,6 +26,9 @@ data {
   vector<lower=0>[SD] sd_R;
   //dispersion
   real<lower=0> alpha;
+  //stiffnesses
+  real<lower=0> lambda_iota[Biases];
+  real<lower=0> lambda_rho[Biases];
 }
 transformed data {
   //bias spline, sparse (iota and rho have the same design)
@@ -80,9 +83,6 @@ parameters {
   //spline parameters
   vector[Krow-1] beta_iota[Biases];
   vector[Krow-1] beta_rho[Biases];
-  //stiffnesses
-  real<lower=0> lambda_iota[Biases];
-  real<lower=0> lambda_rho[Biases];
 }
 transformed parameters {
   //iota
@@ -166,8 +166,4 @@ model {
     beta_iota_diff[d] ~ normal(0,1/(lfac*lambda_iota[XB[d]]));
     beta_rho_diff[d] ~ normal(0,1/(lfac*lambda_rho[XB[d]]));
   }
-  
-  //// hyperprior
-  lambda_iota ~ cauchy(0,1);
-  lambda_rho ~ cauchy(0,1);
 }

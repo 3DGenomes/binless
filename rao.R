@@ -40,24 +40,11 @@ foreach (chr=c("chrX","chr1","chr21","chr1","chr8","chr3","chr4","chr21"),
                                 dangling.R=c(3), maxlen=600, read.len=101, dmin=1000, save.data=T)
          }
 
+
 #here we plot the raw reads. We need to load the full csdata object, as only the one without the raw reads is returned.
 load("data/rao_HiCall_chrX_450k_csdata_with_data.RData")
 data=get_raw_reads(csd@data, csd@biases[,min(pos)], csd@biases[,max(pos)])
 plot_binned(data, resolution=10000, b1=csd@biases[,min(pos)], e1=csd@biases[,max(pos)])
-
-
-
-
-load("data/rao_HiCall_GM12878_bpk1_fix_Peak1_450k_csnorm_optimized.RData")
-load("data/rao_HiCall_GM12878_bpk1_variable_Peak1_450k_csnorm_optimized.RData")
-load("data/rao_HiCall_GM12878_bpk1_newbiases_variable_Peak1_450k_csnorm_optimized.RData")
-cs@diagnostics$plot
-ggsave(filename="diag_variable_new.pdf",width=10,height=5)
-cs@diagnostics$runtime
-cs@par$value
-
-
-
 
 
 #The normalization is performed with a fast approximation to the full model
@@ -79,9 +66,9 @@ save(cs, file="data/rao_HiCall_chrX_450k_csnorm_optimized.RData")
 #all three panels reach a plateau, and the last points report "Convergence detected". Otherwise, the normalization was not successful.
 #You might then either want to increase ngibbs or iter, or both.
 cs@diagnostics$plot
-#similar plots can be generated. For example, to visualize lambda_iota
-ggplot(cs@diagnostics$params[leg=="bias",.(lambda_iota=sapply(lambda_iota,function(x){x[[1]]}),out.last),by=step])+
-  geom_line(aes(step,lambda_iota))+geom_point(aes(step,lambda_iota,colour=out.last))
+#similar plots can be generated. For example, to visualize lambda_nu
+ggplot(cs@diagnostics$params[leg=="bias",.(lambda_nu=sapply(lambda_nu,function(x){x[[1]]}),out.last),by=step])+
+  geom_line(aes(step,lambda_nu))+geom_point(aes(step,lambda_nu,colour=out.last))
 #or eC
 ggplot(cs@diagnostics$params[,.(step,leg,eC=sapply(eC,function(x){x[[1]]}),out.last)])+
   geom_line(aes(step,eC))+geom_point(aes(step,eC,colour=out.last))+facet_grid(~leg)
@@ -95,30 +82,18 @@ check$counts[pval<0.05,.N]/check$counts[,.N]
 check$counts[pval>0.95,.N]/check$counts[,.N]
 
 
-#you can also plot the value of the biases along the genome. Here, we plot iota and the reduced aggregate counts used for optimization.
-ggplot(cs@par$biases)+geom_line(aes(pos,log_iota))+
-  geom_pointrange(aes(pos,log_iota+z,ymin=log_iota+z-std,ymax=log_iota+z+std,colour=cat), alpha=0.1)+
+#you can also plot the value of the biases along the genome. Here, we plot nu and the reduced aggregate counts used for optimization.
+ggplot(cs@par$biases)+geom_line(aes(pos,log_nu))+
+  geom_pointrange(aes(pos,log_nu+z,ymin=log_nu+z-std,ymax=log_nu+z+std,colour=cat), alpha=0.1)+
   facet_wrap(~name,scales = "free")
-
-ggplot(cs@par$biases)+geom_line(aes(pos,log_rho,colour="rho"))+
-  geom_pointrange(aes(pos,log_rho+z,ymin=log_rho+z-std,ymax=log_rho+z+std,colour=cat), alpha=0.1)+
-  facet_wrap(~name,scales = "free")
-
-
-#former nu
-ggplot(cs@par$biases)+geom_line(aes(pos,(log_iota+log_rho)/2,colour="nu"))+
-  geom_pointrange(aes(pos,(log_iota+log_rho)/2+z,ymin=(log_iota+log_rho)/2+z-std,ymax=(log_iota+log_rho)/2+z+std,colour=cat), alpha=0.1)+
-  facet_wrap(~name,scales = "free")
-#former delta
-ggplot(cs@par$biases)+geom_line(aes(pos,(log_iota-log_rho)/2,colour="nu"))+
-  geom_pointrange(aes(pos,(log_iota-log_rho)/2+z,ymin=(log_iota-log_rho)/2+z-std,ymax=(log_iota-log_rho)/2+z+std,colour=cat), alpha=0.1)+
-  facet_wrap(~name,scales = "free")
-
 
 #the diagonal decay can be plotted this way
-ggplot(cs@par$decay)+geom_line(aes(dist,log_decay))+scale_x_log10()+
+ggplot(cs@par$decay)+geom_line(aes(dist,log_decay))+
   geom_pointrange(aes(dist,log_decay+z,ymin=log_decay+z-std,ymax=log_decay+z+std), alpha=0.1)+
-  facet_wrap(~name,scales = "free")
+  facet_wrap(~name,scales = "free")+scale_x_log10()
+
+
+
 
 ### Binning at a given resolution
 
@@ -144,6 +119,13 @@ ggplot(mat)+geom_point(aes(expected,observed),alpha=0.1)+stat_function(fun=ident
 #or a density plot
 ggplot(mat)+geom_density(aes(log10(normalized),colour=name))+facet_wrap(~name)
 
+load("data/rao_HiCall_GM12878_bpk1_fix_Peak1_450k_csnorm_optimized.RData")
+load("data/rao_HiCall_GM12878_bpk1_variable_Peak1_450k_csnorm_optimized.RData")
+load("data/rao_HiCall_GM12878_bpk1_newbiases_variable_Peak1_450k_csnorm_optimized.RData")
+cs@diagnostics$plot
+ggsave(filename="diag_variable_new.pdf",width=10,height=5)
+cs@diagnostics$runtime
+cs@par$value
 
 
 ### Interaction calling 
@@ -166,129 +148,4 @@ ggplot(mat)+
   scale_fill_gradient2()+ scale_colour_manual(values = muted(c("blue","red")))+
   theme_bw()+theme(legend.position = "none")+facet_wrap(~name, nrow=2, ncol=2)
 
-
-
-
-cs=detect_differences(cs, ref="GM MboI 1", resolution=5000, group="all", threshold=0.95, ncores=30)
-mat=get_interactions(cs, type="differences", resolution=5000, group="all", threshold=0.95, ref="GM MboI 1")
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=-log(normalized)))+
-  #geom_raster(aes(begin2,begin1,fill=-log(signal)))+
-  geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])+
-  scale_fill_gradient2()+ scale_colour_manual(values = muted(c("blue","red")))+
-  theme_bw()+theme(legend.position = "none")+facet_wrap(~name, nrow=2, ncol=2)
-
-
-
-
-mat1=get_interactions(cs, type="interactions", resolution=5000, group="all", detection.type=1,
-                      threshold=0.95, ref="expected")
-mat2=get_interactions(cs, type="interactions", resolution=5000, group="all", detection.type=2,
-                      threshold=0.95, ref="expected")
-mat=rbindlist(list(det1=mat1,det2=mat2),use.names=T,idcol="method")
-#for example, we can plot the ice-like matrices with highlighted interactions in the upper left corner
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
-  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=prob.gt.expected<0.5),data=mat[is.significant==T])+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_grid(method~name)
-
-
-
-
-### Grouping of datasets
-
-#Datasets can be grouped (merged) to improve the quality of the matrices and the interaction detection power
-#for example, we can group datasets by condition and enzyme. For that purpose, pass group the corresponding groupings.
-cs=group_datasets(cs, resolution=20000, group=c("condition", "enzyme"), ice=1, verbose=T)
-
-#Again, you can detect interactions in these grouped datasets, and plot the results
-cs=detect_interactions(cs, resolution=20000, group=c("condition", "enzyme"), detection.type=1,
-                       threshold=0.95, ncores=30)
-mat=get_interactions(cs, type="interactions", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
-                     threshold=0.95, ref="expected")
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
-  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=prob.gt.expected<0.5),data=mat[is.significant==T])+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~name)
-
-
-### Difference calling
-
-#you can call significant differences. It's just like calling interactions, but you need to specify a reference.
-#All other matrices will then be compared to that one.
-cs=detect_differences(cs, ref="WT BglII", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
-                      threshold=0.95, ncores=30)
-
-#the interactions can be retrieved as usual, with a few changes
-# specify type="differences" and ref as given in detect_differences
-mat=get_interactions(cs, type="differences", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
-                     threshold=0.95, ref="WT BglII")
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
-  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=`prob.gt.WT BglII`<0.5),data=mat[is.significant==T])+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~name)
-
-#You can also plot the matrix of the ratio of one experiment to its reference, along with its error bar
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(ratio)))+
-  geom_raster(aes(begin2,begin1,fill=log(ratio.sd)))+
-  scale_fill_gradient2(na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~name)
-
-save(cs, file="data/caulo_csnorm_optimized.RData")
-
-
-
-### END
-
-
-#iota and rho correlation
-iota = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
-  load(i)
-  csnorm:::generate_genomic_biases(biases=cs@biases, beta_iota=cs@par$beta_iota, beta_rho=cs@par$beta_rho,
-                                   bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 10)[
-                                     ,.(pos,log_iota,log_rho,dset=j)]
-}
-iota[,pbin:=cut(pos,3)]
-ggplot(iota)+geom_line(aes(pos,exp(log_iota),colour=dset))+facet_wrap(~pbin,scales = "free_x", nrow=3)+
-  #scale_y_continuous(limits = c(0,2))+
-  ylab("iota")+scale_y_log10()
-#ggsave(filename=paste0("images/",prefix,"_iota.png"), width=10, height=7.5)
-
-#sorted with data points
-iota.obs = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
-  load(i)
-  a=data.table(id=cs@counts[,id1], pos=cs@counts[,pos1],
-               obs=cs@counts[,contact.down]*exp(-cs@pred$log_mean_cdown),
-               dset=j)[sample(.N,min(.N,100000))]
-  a=merge(a,cs@biases[,.(id,iota=exp(cs@par$log_iota))],by="id")
-  a[,obs:=obs*iota]
-  setkey(a,iota,pos)
-  a[,rank:=.I]
-  a
-}
-ggplot(iota.obs)+geom_line(aes(rank,iota,colour=dset))+geom_point(aes(rank,obs,colour=dset),alpha=0.01)+
-  #scale_y_continuous(limits = c(0,2))+
-  ylab("iota")+scale_y_log10()
-
-
-#diagonal decay
-decay.obs = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
-  load(i)
-  data.table(dist=cs@counts[,distance],
-             obs=cs@counts[,contact.down]*exp(-cs@pred$log_mean_cdown+cs@pred$log_decay_down),
-             decay=exp(cs@pred$log_decay_down),
-             dset=j)[sample(.N,min(.N,100000))]
-}
-decay.obs=decay.obs[dist>1000]
-setkey(decay.obs, dist)
-ggplot(decay.obs)+geom_line(aes(dist,decay,colour=dset))+geom_point(aes(dist,obs,colour=dset),alpha=0.01)+
-  scale_x_log10()+scale_y_log10()
-#ggsave(filename=paste0("images/",prefix,"_decay.png"), width=10, height=7.5)
 
