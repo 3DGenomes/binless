@@ -46,6 +46,23 @@ fill_zeros = function(counts,biases,biases2=NULL,circularize=-1L,dmin=0) {
   }
 }
 
+#' Ensure beta_diag is strictly increasing to make stan happy
+#' @keywords internal
+#' @export
+#'
+guarantee_beta_diag_increasing = function(beta_diag) {
+  ndecays=dim(beta_diag)[1]
+  ncoefs=dim(beta_diag)[2]
+  for (decay in 1:ndecays) {
+    for (coef in 2:ncoefs) {
+      if (abs(beta_diag[decay,coef]-beta_diag[decay,coef-1])<10*.Machine$double.eps*beta_diag[decay,coef-1]) {
+        beta_diag[decay,coef:ncoefs]=beta_diag[decay,coef:ncoefs]*(1+10*.Machine$double.eps)
+      }
+    }
+  }
+  return(beta_diag)
+}
+
 #' Initial guess for normalization
 #' @keywords internal
 #' @export
