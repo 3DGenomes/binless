@@ -83,9 +83,14 @@ check$counts[pval>0.95,.N]/check$counts[,.N]
 
 
 #you can also plot the value of the biases along the genome. Here, we plot nu and the reduced aggregate counts used for optimization.
-ggplot(cs@par$biases)+geom_line(aes(pos,log_nu))+
-  geom_pointrange(aes(pos,log_nu+z,ymin=log_nu+z-std,ymax=log_nu+z+std,colour=cat), alpha=0.1)+
-  facet_wrap(~name,scales = "free")
+ggplot(cs@par$biases[cat %in% c("contact L","dangling L", "rejoined")])+geom_line(aes(pos,log_iota))+
+  geom_pointrange(aes(pos,log_iota+z,ymin=log_iota+z-std,ymax=log_iota+z+std,colour=cat), alpha=0.1)+
+  geom_line(aes(pos,log_iota+z,colour=cat))+
+  facet_wrap(~name,scales = "free")+xlim(73800000,73810000)
+ggplot(cs@par$biases[cat %in% c("contact R","dangling R")])+geom_line(aes(pos,log_iota))+
+  geom_pointrange(aes(pos,log_iota+z,ymin=log_iota+z-std,ymax=log_iota+z+std,colour=cat), alpha=0.1)+
+  geom_line(aes(pos,log_iota+z,colour=cat))+
+  facet_wrap(~name,scales = "free")+xlim(73800000,73810000)
 
 #the diagonal decay can be plotted this way
 ggplot(cs@par$decay)+geom_line(aes(dist,log_decay))+
