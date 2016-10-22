@@ -59,30 +59,43 @@ ggplot(mat)+geom_line(aes(x,value,colour=variable))+facet_wrap(~method)
 
 
 load("biases.RData")
-data=rbind(biases[cat%in%c("dangling L","contact L"),.(cat=factor(cat),x=pos-min(pos),y=log_iota+z,std,weight=1/std^2)],
-           biases[cat%in%c("dangling R","contact R"),.(cat=factor(cat),x=pos-min(pos),y=log_rho+z,std,weight=1/std^2)],
-           biases[cat=="rejoined",.(cat=factor(cat),x=pos-min(pos),y=(log_iota+log_rho)/2+z,std,weight=1/std^2)])
+data=rbind(biases[cat%in%c("dangling L","contact L"),
+                  .(cat=factor(cat),x=pos-min(pos),y=log_iota+z,std,weight=1/std^2,iota.coef=1,rho.coef=0)],
+           biases[cat%in%c("dangling R","contact R"),
+                  .(cat=factor(cat),x=pos-min(pos),y=log_rho+z,std,weight=1/std^2, iota.coef=0,rho.coef=1)],
+           biases[cat=="rejoined",
+                  .(cat=factor(cat),x=pos-min(pos),y=(log_iota+log_rho)/2+z,std,weight=1/std^2, iota.coef=1/2, rho.coef=1/2)])
 data[,is.rejoined:=ifelse(cat=="rejoined",1,0)]
-data[cat %in% c("dangling L","contact L"), c("iota.coef","rho.coef"):=list(1,0)]
-data[cat %in% c("dangling R","contact R"), c("iota.coef","rho.coef"):=list(0,1)]
-data[cat == "rejoined", c("iota.coef","rho.coef"):=list(1/2,1/2)]
+data[,is.dangling:=ifelse(cat %in% c("dangling L","dangling R"),1,0)]
+data[cat == "rejoined", y:=y+1]
+data[cat %in% c("dangling L","dangling R"), y:=y+5]
+data[cat %in% c("contact L","contact R"), y:=y+10]
 data=data[x<1e5]
 ggplot(data)+geom_pointrange(aes(x,y,ymin=y-std,ymax=y+std,colour=cat),alpha=0.1)
 ggplot(data)+geom_pointrange(aes(x,y,ymin=y-std,ymax=y+std,colour=cat))+xlim(0,3e4)
 
 
 
+
 #toy fit
+fit=gam(data=data[,.SD[1:5],by=cat], formula = y ~ is.dangling+is.rejoined-1+s(x,bs="ps", m=2, k=4, by=iota.coef)+s(x,bs="ps", m=2, k=4, by=rho.coef),
+        family=gaussian(), scale=1, fit=F)
 fit=gam(data=data[,.SD[1:5],by=cat], formula = y ~ is.rejoined-1 + s(x, by=iota.coef,bs="ps", m=2, k=4) + s(x, by=rho.coef,bs="ps", m=2, k=4),
         family=gaussian(), scale=1, fit=F)
-X1=predict(fit, type="lpmatrix")
-
+#X1=predict(fit, type="lpmatrix")
+colSums(fit$X)
+dim(fit$X)
+rankMatrix(fit$X)
+a=data.table(fit$X)
+a[,idx:=.I]
+a=melt(a, id.vars="idx")
+ggplot(a)+geom_line(aes(idx,value,colour=variable))+xlim(0,5)
 
 #fit genomic biases
-fit=gam(data=data, formula = y ~ is.rejoined-1 + s(x, by=iota.coef,bs="ps", m=2, k=50) + s(x, by=rho.coef,bs="ps", m=2, k=50),
+fit=gam(data=data, formula = y ~ is.dangling+is.rejoined-1 + s(x, by=iota.coef,bs="ps", m=2, k=50) + s(x, by=rho.coef,bs="ps", m=2, k=50),
         family=gaussian(), weight=weight, scale=1)
 data[,gam:=fit$fitted.values]
-
+dcast(data[,.(cat,x,gam)], x ~ cat)
 
 
 #plot result
