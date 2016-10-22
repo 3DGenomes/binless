@@ -71,14 +71,17 @@ data[cat == "rejoined", y:=y+1]
 data[cat %in% c("dangling L","dangling R"), y:=y+5]
 data[cat %in% c("contact L","contact R"), y:=y+10]
 data=data[x<1e5]
-ggplot(data)+geom_pointrange(aes(x,y,ymin=y-std,ymax=y+std,colour=cat),alpha=0.1)
+data=rbind(cbind(data,dset="a"),cbind(data,dset="b"))
+data[dset=="b",y:=y+10]
+data[,dset:=as.integer(factor(dset))-1]
+ggplot(data)+geom_pointrange(aes(x,y,ymin=y-std,ymax=y+std,colour=cat),alpha=0.1)+facet_wrap(~dset)
 ggplot(data)+geom_pointrange(aes(x,y,ymin=y-std,ymax=y+std,colour=cat))+xlim(0,3e4)
 
 
 
 
 #toy fit
-fit=gam(data=data[,.SD[1:5],by=cat], formula = y ~ is.dangling+is.rejoined-1+s(x,bs="ps", m=2, k=4, by=iota.coef)+s(x,bs="ps", m=2, k=4, by=rho.coef),
+fit=gam(data=data[,.SD[1:5],by=c("cat","dset")], formula = y ~ dset+is.dangling+is.rejoined-1+s(x,bs="ps", m=2, k=4, by=iota.coef)+s(x,bs="ps", m=2, k=4, by=rho.coef),
         family=gaussian(), scale=1, fit=F)
 fit=gam(data=data[,.SD[1:5],by=cat], formula = y ~ is.rejoined-1 + s(x, by=iota.coef,bs="ps", m=2, k=4) + s(x, by=rho.coef,bs="ps", m=2, k=4),
         family=gaussian(), scale=1, fit=F)
@@ -92,10 +95,12 @@ a=melt(a, id.vars="idx")
 ggplot(a)+geom_line(aes(idx,value,colour=variable))+xlim(0,5)
 
 #fit genomic biases
-fit=gam(data=data, formula = y ~ is.dangling+is.rejoined-1 + s(x, by=iota.coef,bs="ps", m=2, k=50) + s(x, by=rho.coef,bs="ps", m=2, k=50),
+fit=gam(data=data, formula = y ~ dset+is.dangling+is.rejoined-1 + s(x, by=iota.coef,bs="ps", m=2, k=50) + s(x, by=rho.coef,bs="ps", m=2, k=50),
         family=gaussian(), weight=weight, scale=1)
 data[,gam:=fit$fitted.values]
-dcast(data[,.(cat,x,gam)], x ~ cat)
+dcast(data[,.(cat,x,gam,y,dset)], dset+x ~ cat, value.var=c("gam","y"))
+ggplot(data)+geom_pointrange(aes(x,y,ymin=y-std,ymax=y+std,colour=cat),alpha=0.1)+
+  geom_line(aes(x,gam,colour=cat))+facet_wrap(~dset)
 
 
 #plot result
