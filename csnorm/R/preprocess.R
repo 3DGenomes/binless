@@ -368,26 +368,26 @@ generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4
                     pos=cumsum(rmultinom(n=1, size=genome_size, prob=rep(1,num_rsites+1)))[1:num_rsites])
   setkey(biases,id)
   #build biases
-  biases[,true_log_nu:=sin(pos/1000)+(pos-genome_size/2)/genome_size]
-  biases[,true_log_nu:=true_log_nu-mean(true_log_nu)]
-  #ggplot(biases,aes(pos,true_log_nu))+geom_point()+geom_line()
-  biases[,true_log_delta:=-(pos-genome_size/2)/genome_size+sin(pos/2100)]
-  biases[,true_log_delta:=true_log_delta-mean(true_log_delta)]
-  #ggplot(biases,aes(pos,true_log_delta))+geom_point()+geom_line()
-  biases[,true_log_mean_RJ:=eRJ+true_log_nu]
-  biases[,true_log_mean_DL:=eDE+true_log_nu+true_log_delta]
-  biases[,true_log_mean_DR:=eDE+true_log_nu-true_log_delta]
+  biases[,true_log_iota:=sin(pos/1000)+(pos-genome_size/2)/genome_size]
+  biases[,true_log_iota:=true_log_iota-mean(true_log_iota)]
+  #ggplot(biases,aes(pos,true_log_iota))+geom_point()+geom_line()
+  biases[,true_log_rho:=-(pos-genome_size/2)/genome_size+sin(pos/2100)]
+  biases[,true_log_rho:=true_log_rho-mean(true_log_rho)]
+  #ggplot(biases,aes(pos,true_log_rho))+geom_point()+geom_line()
+  biases[,true_log_mean_RJ:=eRJ+(true_log_iota+true_log_rho)/2]
+  biases[,true_log_mean_DL:=eDE+true_log_iota]
+  biases[,true_log_mean_DR:=eDE+true_log_rho]
   #draw dangling/rejoined
   biases[,dangling.L:=rnbinom(.N, mu=exp(true_log_mean_DL), size=alpha)]
   biases[,dangling.R:=rnbinom(.N, mu=exp(true_log_mean_DR), size=alpha)]
   biases[,rejoined:=rnbinom(.N, mu=exp(true_log_mean_RJ), size=alpha)]
   #report rsites in counts
-  counts=CJ(biases[,paste(id,pos,true_log_nu,true_log_delta)],biases[,paste(id,pos,true_log_nu,true_log_delta)])
-  counts[,c("id1","pos1","true_log_nu1","true_log_delta1"):=tstrsplit(V1, " ")]
-  counts[,c("id2","pos2","true_log_nu2","true_log_delta2"):=tstrsplit(V2, " ")]
+  counts=CJ(biases[,paste(id,pos,true_log_iota,true_log_rho)],biases[,paste(id,pos,true_log_iota,true_log_rho)])
+  counts[,c("id1","pos1","true_log_iota1","true_log_rho1"):=tstrsplit(V1, " ")]
+  counts[,c("id2","pos2","true_log_iota2","true_log_rho2"):=tstrsplit(V2, " ")]
   counts[,c("id1","id2","pos1","pos2","V1","V2"):=list(as.integer(id1),as.integer(id2),as.integer(pos1),as.integer(pos2),NULL,NULL)]
-  counts[,c("true_log_nu1","true_log_nu2","true_log_delta1","true_log_delta2"):=list(
-    as.numeric(true_log_nu1), as.numeric(true_log_nu2), as.numeric(true_log_delta1), as.numeric(true_log_delta2))]
+  counts[,c("true_log_iota1","true_log_iota2","true_log_rho1","true_log_rho2"):=list(
+    as.numeric(true_log_iota1), as.numeric(true_log_iota2), as.numeric(true_log_rho1), as.numeric(true_log_rho2))]
   counts=counts[pos1<pos2]
   setkey(counts, id1, id2)
   #build decay
@@ -395,11 +395,11 @@ generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4
   counts[,true_log_decay:=5*dnorm(log(distance), mean=log(min(distance)), sd=log(max(distance))/10)-0.2*log(distance)]
   counts[,true_log_decay:=true_log_decay-mean(true_log_decay)]
   #ggplot(counts)+geom_point(aes(distance,exp(true_log_decay)))+scale_x_log10()+scale_y_log10()
-  counts[,base_count:=eC+true_log_decay+true_log_nu1+true_log_nu2]
-  counts[,true_log_mean_cclose:=base_count-true_log_delta1+true_log_delta2]
-  counts[,true_log_mean_cfar:=base_count+true_log_delta1-true_log_delta2]
-  counts[,true_log_mean_cup:=base_count+true_log_delta1+true_log_delta2]
-  counts[,true_log_mean_cdown:=base_count-true_log_delta1-true_log_delta2]
+  counts[,base_count:=eC+true_log_decay]
+  counts[,true_log_mean_cclose:=base_count+true_log_rho1+true_log_iota2]
+  counts[,true_log_mean_cfar:=base_count+true_log_iota1+true_log_rho2]
+  counts[,true_log_mean_cup:=base_count+true_log_iota1+true_log_iota2]
+  counts[,true_log_mean_cdown:=base_count+true_log_rho1+true_log_rho2]
   #draw counts
   counts[,contact.close:=rnbinom(.N, mu=exp(true_log_mean_cclose), size=alpha)]
   counts[,contact.far:=rnbinom(.N, mu=exp(true_log_mean_cfar), size=alpha)]

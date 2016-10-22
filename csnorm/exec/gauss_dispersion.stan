@@ -35,12 +35,12 @@ data {
   int<lower=0> counts_down[N];
   real<lower=0> weight[Dsets]; //in case of subsampling
   //parameters: spline
-  vector[Krow-1] beta_nu[Biases];
-  vector[Krow-1] beta_delta[Biases];
+  vector[Krow-1] beta_iota[Biases];
+  vector[Krow-1] beta_rho[Biases];
   positive_ordered[Kdiag-1] beta_diag[Decays];
 }
 transformed data {
-  //bias spline, sparse (nu and delta have the same design)
+  //bias spline, sparse (iota and rho have the same design)
   vector[nnz(SD)] XDrow_w;
   int XDrow_v[nnz(SD)];
   int XDrow_u[SD+1];
@@ -48,12 +48,12 @@ transformed data {
   //diagonal SCAM spline, dense
   matrix[N,Dsets*Kdiag] Xdiag;
   row_vector[Kdiag] pdiagD[Dsets];
-  //nu
-  vector[SD] log_nu; // log(nu)
-  vector[Krow-2] beta_nu_diff[Dsets]; //2nd order difference on beta_nu_aug
-  //delta
-  vector[SD] log_delta; // log(delta)
-  vector[Krow-2] beta_delta_diff[Dsets]; //2nd order difference on beta_delta_aug
+  //iota
+  vector[SD] log_iota; // log(iota)
+  vector[Krow-2] beta_iota_diff[Dsets]; //2nd order difference on beta_iota_aug
+  //rho
+  vector[SD] log_rho; // log(rho)
+  vector[Krow-2] beta_rho_diff[Dsets]; //2nd order difference on beta_rho_aug
   //diag
   vector[N] ldec;
   vector[Dsets*Kdiag] beta_diag_centered;
@@ -120,34 +120,34 @@ transformed data {
     }
   }
   
-  //nu
+    //iota
   {
-    vector[Dsets*Krow] beta_nu_centered;
+    vector[Dsets*Krow] beta_iota_centered;
     for (d in 1:Dsets) {
-      vector[Krow] beta_nu_aug;
+      vector[Krow] beta_iota_aug;
       vector[Krow] tmp;
-      beta_nu_aug[1] = 0;
-      beta_nu_aug[2:] = beta_nu[XB[d]];
-      tmp = beta_nu_aug - (prowD[d] * beta_nu_aug) * rep_vector(1,Krow);
-      beta_nu_centered[((d-1)*Krow+1):(d*Krow)] = tmp;
-      beta_nu_diff[d] = tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
+      beta_iota_aug[1] = 0;
+      beta_iota_aug[2:] = beta_iota[XB[d]];
+      tmp = beta_iota_aug - (prowD[d] * beta_iota_aug) * rep_vector(1,Krow);
+      beta_iota_centered[((d-1)*Krow+1):(d*Krow)] = tmp;
+      beta_iota_diff[d] = tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
     }
-    log_nu = csr_matrix_times_vector(SD, Dsets*Krow, XDrow_w, XDrow_v, XDrow_u, beta_nu_centered);
+    log_iota = csr_matrix_times_vector(SD, Dsets*Krow, XDrow_w, XDrow_v, XDrow_u, beta_iota_centered);
   }
   
-  //delta
+  //rho
   {
-    vector[Dsets*Krow] beta_delta_centered;
+    vector[Dsets*Krow] beta_rho_centered;
     for (d in 1:Dsets) {
-      vector[Krow] beta_delta_aug;
+      vector[Krow] beta_rho_aug;
       vector[Krow] tmp;
-      beta_delta_aug[1] = 0;
-      beta_delta_aug[2:] = beta_delta[XB[d]];
-      tmp = beta_delta_aug - (prowD[d] * beta_delta_aug) * rep_vector(1,Krow);
-      beta_delta_centered[((d-1)*Krow+1):(d*Krow)] = tmp;
-      beta_delta_diff[d] = tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
+      beta_rho_aug[1] = 0;
+      beta_rho_aug[2:] = beta_rho[XB[d]];
+      tmp = beta_rho_aug - (prowD[d] * beta_rho_aug) * rep_vector(1,Krow);
+      beta_rho_centered[((d-1)*Krow+1):(d*Krow)] = tmp;
+      beta_rho_diff[d] = tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
     }
-    log_delta = csr_matrix_times_vector(SD, Dsets*Krow, XDrow_w, XDrow_v, XDrow_u, beta_delta_centered);
+    log_rho = csr_matrix_times_vector(SD, Dsets*Krow, XDrow_w, XDrow_v, XDrow_u, beta_rho_centered);
   }
   
   //decay
@@ -187,14 +187,14 @@ transformed parameters {
   //means
   {
     //biases
-    log_mean_RJ = log_nu;
-    log_mean_DL = log_nu + log_delta;
-    log_mean_DR = log_nu - log_delta;
+    log_mean_RJ = (log_iota + log_rho)/2;
+    log_mean_DL = log_iota;
+    log_mean_DR = log_rho;
     //exact counts  
-    log_mean_cclose = ldec + (log_nu - log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
-    log_mean_cfar   = ldec + (log_nu + log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
-    log_mean_cup    = ldec + (log_nu + log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
-    log_mean_cdown  = ldec + (log_nu - log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
+    log_mean_cclose = ldec + log_rho[cidx[1]]  + log_iota[cidx[2]];
+    log_mean_cfar   = ldec + log_iota[cidx[1]] + log_rho[cidx[2]];
+    log_mean_cup    = ldec + log_iota[cidx[1]] + log_iota[cidx[2]];
+    log_mean_cdown  = ldec + log_rho[cidx[1]]  + log_rho[cidx[2]];
     //add exposures
     for (d in 1:Dsets) {
       log_mean_RJ[bbegin[d]:(bbegin[d+1]-1)]     = log_mean_RJ[bbegin[d]:(bbegin[d+1]-1)] + eRJ[d];

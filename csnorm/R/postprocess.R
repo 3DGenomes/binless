@@ -49,7 +49,7 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
   counts[,c("ibin1","ibin2"):=list(as.integer(bin1)-1,as.integer(bin2)-1)]
   biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
   biases[,ibin:=as.integer(bin)-1]
-  biases[,c("log_nu","log_delta"):=list(cs@par$log_nu,cs@par$log_delta)]
+  biases[,c("log_iota","log_rho"):=list(cs@par$log_iota,cs@par$log_rho)]
   #split computation across cores
   stepsize=max(2,ceiling(Dsets*length(bins)/(5*ncores)))
   counts[,c("chunk1","chunk2"):=list(ibin1 %/% stepsize, ibin2 %/% stepsize)]
@@ -82,8 +82,8 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
                    dmin=cs@settings$dmin, dmax=cs@settings$dmax,
                    #
                    eC=cs@par$eC[k],
-                   log_nu1=as.array(biases1[,log_nu]), log_nu2=as.array(biases2[,log_nu]),
-                   log_delta1=as.array(biases1[,log_delta]), log_delta2=as.array(biases2[,log_delta]),
+                   log_iota1=as.array(biases1[,log_iota]), log_iota2=as.array(biases2[,log_iota]),
+                   log_rho1=as.array(biases1[,log_rho]), log_rho2=as.array(biases2[,log_rho]),
                    beta_diag_centered=cs@par$beta_diag_centered[((k-1)*Kdiag+1):(k*Kdiag)]
       )
       out <- capture.output(binned <- optimizing(csnorm:::stanmodels$predict_binned,
@@ -108,7 +108,7 @@ csnorm_predict_binned = function(cs, resolution, ncores=1) {
   setkey(binned,name,bin1,bin2)
   #remove created entries
   counts[,c("bin1","bin2","ibin1","ibin2","chunk1","chunk2"):=list(NULL,NULL,NULL,NULL,NULL,NULL)]
-  biases[,c("bin","ibin","chunk","log_nu","log_delta"):=list(NULL,NULL,NULL,NULL,NULL)]
+  biases[,c("bin","ibin","chunk","log_iota","log_rho"):=list(NULL,NULL,NULL,NULL,NULL)]
   return(binned)
 }
 
@@ -222,10 +222,10 @@ detection_binned = function(cs, resolution, group, ref="expected", threshold=0.9
   mat
 }
 
-#' Generate nu and delta genomic biases on evenly spaced points along the genome
+#' Generate iota and rho genomic biases on evenly spaced points along the genome
 #'
 #' @param biases data.table.
-#' @param beta_nu,beta_delta vectors. spline parameters
+#' @param beta_iota,beta_rho vectors. spline parameters
 #' @param bf_per_kb number of basis functions per kb
 #' @param points_per_kb number of evaluation points per kb
 #'
@@ -234,14 +234,14 @@ detection_binned = function(cs, resolution, group, ref="expected", threshold=0.9
 #' @export
 #'
 #' @examples
-generate_genomic_biases = function(biases, beta_nu, beta_delta, bf_per_kb=1, points_per_kb=100) {
+generate_genomic_biases = function(biases, beta_iota, beta_rho, bf_per_kb=1, points_per_kb=100) {
   begin=biases[,min(pos)]
   end=biases[,max(pos)]
   genome_sz=end-begin
   Krow=round(bf_per_kb*genome_sz/1000)
   S=round(points_per_kb*genome_sz/1000)
   op=optimizing(stanmodels$gen_genomic_biases, data=list(Krow=Krow, S=S, begin=begin, end=end,
-                                                         beta_nu=beta_nu, beta_delta=beta_delta),
+                                                         beta_iota=beta_iota, beta_rho=beta_rho),
                 as_vector=F, hessian=F, iter=1, verbose=F, init=0)
   dt=as.data.table(op$par)
   setkey(dt, pos)

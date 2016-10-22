@@ -11,7 +11,7 @@
   //row_vector[Krow] prow;
   //and row_weights needs to be filled
 
-  ////bias spline, sparse (nu and delta have the same design)
+  ////bias spline, sparse (iota and rho have the same design)
   //BEGIN sparse calculation
   //cannot write function that modifies its arguments so we put it here
   //input: vector[S] cutsites, int Krow, int splinedegree()

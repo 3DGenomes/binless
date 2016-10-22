@@ -217,6 +217,9 @@ setMethod("show",signature="CSnorm",definition=function(object) {
   cat(" and ", ncounts, " nonzero counts\n", sep="")
   nreads=object@counts[,sum(contact.close+contact.far+contact.up+contact.down)]
   cat(" from ", nreads, " reads\n", sep="")
+  cat(" First cut site at ", object@biases[,min(pos)], "\n", sep="")
+  cat(" Last cut site at ", object@biases[,max(pos)], "\n", sep="")
+  cat(" Cut sites span ", object@biases[,(max(pos)-min(pos))/1000], " kb\n", sep="")
   cat(" Reads density excl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
   nreads=nreads+object@biases[,sum(dangling.L+dangling.R+rejoined)]
   cat(" Reads density incl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
@@ -226,8 +229,8 @@ setMethod("show",signature="CSnorm",definition=function(object) {
     cat(" Dataset not yet normalized\n")
   } else {
     cat(" Normalized dataset\n")
-    cat("  lambda_nu: ",cs@par$lambda_nu, "\n  lambda_delta: ",cs@par$lambda_delta, "\n  lambda_diag: ",cs@par$lambda_diag,"\n")
-    cat("  dispersion: ",cs@par$alpha,"\n")
+    cat("  lambda_iota: ",cs@par$lambda_iota, "\n  lambda_rho: ",cs@par$lambda_rho, "\n  lambda_diag: ",cs@par$lambda_diag,"\n")
+    cat("  dispersion: ",cs@par$alpha,"\n log likelihood: ", cs@par$value, "\n")
     nbinned=length(object@binned)
     if (nbinned==0) {
       cat(" No binned matrix available")

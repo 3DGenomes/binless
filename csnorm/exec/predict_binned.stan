@@ -33,10 +33,10 @@ data {
   real<lower=dmin> dmax;
   //estimated parameters
   real eC;  //exposure for counts
-  vector[S1] log_nu1; //take nu and delta directly to avoid base reconstruction
-  vector[S2] log_nu2;
-  vector[S1] log_delta1; 
-  vector[S2] log_delta2; 
+  vector[S1] log_iota1; //take iota and rho directly to avoid base reconstruction
+  vector[S2] log_iota2;
+  vector[S1] log_rho1; 
+  vector[S2] log_rho2; 
   vector[Kdiag] beta_diag_centered; //need to build spline base for diagonal decay
 }
 transformed data {
@@ -106,7 +106,7 @@ generated quantities {
           k = bisect(log(dist), k, log_dist);
         }
         expected[b1,b2] = expected[b1,b2] +
-            exp(eC + log_nu1[i] + log_nu2[j] + log_decay[k])*2*cosh(log_delta1[i])*2*cosh(log_delta2[j]);
+            exp(eC + log_decay[k])*(exp(log_iota1[i]) + exp(log_rho1[i]))*(exp(log_iota2[j]) + exp(log_rho2[j]));
         decaymat[b1,b2] = decaymat[b1,b2] + exp(4*log_decay[k]);
       }
     }

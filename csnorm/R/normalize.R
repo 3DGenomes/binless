@@ -96,17 +96,17 @@ csnorm_fit_initial = function(counts, biases, design, bf_per_kb, dmin, dmax, bf_
             cutsitesD=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
             counts_sum_left=sums[,L], counts_sum_right=sums[,R],
-            lambda_nu=lambda, lambda_delta=lambda)
+            lambda_iota=lambda, lambda_rho=lambda)
   op=optimize_stan_model(model=stanmodels$guess, data=data, iter=iter, verbose=verbose, init=0, ...)
   #return initial guesses
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   Decays=design[,uniqueN(decay)]
   beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
   return(list(eRJ=op$par$eRJ, eDE=op$par$eDE, eC=op$par$eC,
-              alpha=op$par$alpha, beta_nu=op$par$beta_nu, beta_delta=op$par$beta_delta,
-              log_nu=op$par$log_nu, log_delta=op$par$log_delta,
-              lambda_nu=array(lambda,dim=data$Biases),
-              lambda_delta=array(lambda,dim=data$Biases),
+              alpha=op$par$alpha, beta_iota=op$par$beta_iota, beta_rho=op$par$beta_rho,
+              log_iota=op$par$log_iota, log_rho=op$par$log_rho,
+              lambda_iota=array(lambda,dim=data$Biases),
+              lambda_rho=array(lambda,dim=data$Biases),
               beta_diag=beta_diag, lambda_diag=array(1,dim=Decays),
               log_decay=rep(0,counts[,.N])))
 }
@@ -168,7 +168,7 @@ csnorm_predict_all = function(cs, counts, verbose=T) {
   data = list( Dsets=design[,.N], Decays=design[,uniqueN(decay)], XD=as.array(design[,decay]),
                Kdiag=Kdiag, SD=biases[,.N], cutsitesD=biases[,pos], dmin=dmin, dmax=dmax,
                N=counts[,.N], cbegin=cbegin, cidx=t(data.matrix(counts[,.(id1,id2)])), dist=as.array(counts[,distance]),
-               eC=par$eC, log_nu=par$log_nu, log_delta=par$log_delta,
+               eC=par$eC, log_iota=par$log_iota, log_rho=par$log_rho,
                beta_diag_centered=par$beta_diag_centered)
   capture.output(op<-optimizing(stanmodels$predict_all, data=data, as_vector=F, hessian=F, iter=1, verbose=verbose, init=0))
   pred=as.data.table(op$par)
@@ -275,7 +275,7 @@ run_exact = function(cs, bf_per_kb=1, bf_per_decade=20, lambdas=c(0.1,1,10), nco
 #' Verify model fit by computing posterior predictive quantities
 #'
 #' @param cs CSnorm object, normalized.
-#' @param genomic.groups How many groups for nu and delta
+#' @param genomic.groups How many groups for iota and rho
 #' @param decay.groups How many groups for diagonal decay
 #' @param npoints Number of points per group to take (not guaranteed)
 #'
@@ -287,14 +287,14 @@ check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10) {
   if (length(cs@par)==0) stop("Must normalize the datasets first")
   #build bins
   dbins=c(0,10**seq(3,log10(cs@settings$dmax),length.out=decay.groups))
-  gbins=cut2(c(cs@par$log_nu,cs@par$log_delta),g=genomic.groups,onlycuts=T)
+  gbins=cut2(c(cs@par$log_iota,cs@par$log_rho),g=genomic.groups,onlycuts=T)
   #build counts matrix 
   biases=copy(cs@biases[,.(name,id,pos)])
-  biases[,c("log_nu","log_delta"):=list(cs@par$log_nu,cs@par$log_delta)]
-  biases[,nubin:=cut(log_nu, gbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
-  biases[,deltabin:=cut(log_delta, gbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
-  biases[,c("log_nu","log_delta"):=list(NULL,NULL)]
-  biases=biases[,.SD[sample(.N,min(.N,npoints))],by=c("name","nubin","deltabin")]
+  biases[,c("log_iota","log_rho"):=list(cs@par$log_iota,cs@par$log_rho)]
+  biases[,iotabin:=cut(log_iota, gbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
+  biases[,rhobin:=cut(log_rho, gbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
+  biases[,c("log_iota","log_rho"):=list(NULL,NULL)]
+  biases=biases[,.SD[sample(.N,min(.N,npoints))],by=c("name","iotabin","rhobin")]
   counts=cs@counts[id1%in%biases[,id]&id2%in%biases[,id]]
   counts=fill_zeros(counts,biases,circularize=cs@settings$circularize, dmin=cs@settings$dmin)
   #filter by distance
@@ -317,9 +317,9 @@ check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10) {
   #graph p-values
   p.all=ggplot(counts)+geom_histogram(aes(pval))+facet_wrap(~name)+xlab("model p-value")+ylab("frequency")
   p.decay=ggplot(counts)+geom_jitter(aes(1,pval))+facet_grid(name~dbin)+ylab("model p-value")+xlab("diagonal decay bin")
-  p.nu=ggplot(counts)+geom_jitter(aes(1,pval))+facet_grid(name~nubin1)+ylab("model p-value")+xlab("nu bin")
-  p.delta=ggplot(counts)+geom_jitter(aes(1,pval))+facet_grid(name~deltabin1)+ylab("model p-value")+xlab("delta bin")
-  return(list(all=p.all,decay=p.decay,nu=p.nu,delta=p.delta,counts=counts))
+  p.iota=ggplot(counts)+geom_jitter(aes(1,pval))+facet_grid(name~iotabin1)+ylab("model p-value")+xlab("iota bin")
+  p.rho=ggplot(counts)+geom_jitter(aes(1,pval))+facet_grid(name~rhobin1)+ylab("model p-value")+xlab("rho bin")
+  return(list(all=p.all,decay=p.decay,iota=p.iota,rho=p.rho,counts=counts))
 }
 
 

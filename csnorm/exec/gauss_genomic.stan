@@ -1,5 +1,5 @@
 ////
-// Cut-site normalization model: normal approximation for nu and delta
+// Cut-site normalization model: normal approximation for iota and rho
 ////
 functions {
   #include "common_functions.stan"
@@ -28,7 +28,7 @@ data {
   real<lower=0> alpha;
 }
 transformed data {
-  //bias spline, sparse (nu and delta have the same design)
+  //bias spline, sparse (iota and rho have the same design)
   vector[nnz(SD)] XDrow_w;
   int XDrow_v[nnz(SD)];
   int XDrow_u[SD+1];
@@ -78,19 +78,19 @@ parameters {
   real eRJ[Dsets];
   real eDE[Dsets];
   //spline parameters
-  vector[Krow-1] beta_nu[Biases];
-  vector[Krow-1] beta_delta[Biases];
+  vector[Krow-1] beta_iota[Biases];
+  vector[Krow-1] beta_rho[Biases];
   //stiffnesses
-  real<lower=0> lambda_nu[Biases];
-  real<lower=0> lambda_delta[Biases];
+  real<lower=0> lambda_iota[Biases];
+  real<lower=0> lambda_rho[Biases];
 }
 transformed parameters {
-  //nu
-  vector[SD] log_nu; // log(nu)
-  vector[Krow-2] beta_nu_diff[Dsets]; //2nd order difference on beta_nu_aug
-  //delta
-  vector[SD] log_delta; // log(delta)
-  vector[Krow-2] beta_delta_diff[Dsets]; //2nd order difference on beta_delta_aug
+  //iota
+  vector[SD] log_iota; // log(iota)
+  vector[Krow-2] beta_iota_diff[Dsets]; //2nd order difference on beta_iota_aug
+  //rho
+  vector[SD] log_rho; // log(rho)
+  vector[Krow-2] beta_rho_diff[Dsets]; //2nd order difference on beta_rho_aug
   //means
   vector[SD] log_mean_DL;
   vector[SD] log_mean_DR;
@@ -99,43 +99,43 @@ transformed parameters {
   vector[SD] log_mean_cleft;
   vector[SD] log_mean_cright;
 
-  //nu
+  //iota
   {
-    vector[Dsets*Krow] beta_nu_centered;
+    vector[Dsets*Krow] beta_iota_centered;
     for (d in 1:Dsets) {
-      vector[Krow] beta_nu_aug;
+      vector[Krow] beta_iota_aug;
       vector[Krow] tmp;
-      beta_nu_aug[1] = 0;
-      beta_nu_aug[2:] = beta_nu[XB[d]];
-      tmp = beta_nu_aug - (prowD[d] * beta_nu_aug) * rep_vector(1,Krow);
-      beta_nu_centered[((d-1)*Krow+1):(d*Krow)] = tmp;
-      beta_nu_diff[d] = tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
+      beta_iota_aug[1] = 0;
+      beta_iota_aug[2:] = beta_iota[XB[d]];
+      tmp = beta_iota_aug - (prowD[d] * beta_iota_aug) * rep_vector(1,Krow);
+      beta_iota_centered[((d-1)*Krow+1):(d*Krow)] = tmp;
+      beta_iota_diff[d] = tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
     }
-    log_nu = csr_matrix_times_vector(SD, Dsets*Krow, XDrow_w, XDrow_v, XDrow_u, beta_nu_centered);
+    log_iota = csr_matrix_times_vector(SD, Dsets*Krow, XDrow_w, XDrow_v, XDrow_u, beta_iota_centered);
   }
   
-  //delta
+  //rho
   {
-    vector[Dsets*Krow] beta_delta_centered;
+    vector[Dsets*Krow] beta_rho_centered;
     for (d in 1:Dsets) {
-      vector[Krow] beta_delta_aug;
+      vector[Krow] beta_rho_aug;
       vector[Krow] tmp;
-      beta_delta_aug[1] = 0;
-      beta_delta_aug[2:] = beta_delta[XB[d]];
-      tmp = beta_delta_aug - (prowD[d] * beta_delta_aug) * rep_vector(1,Krow);
-      beta_delta_centered[((d-1)*Krow+1):(d*Krow)] = tmp;
-      beta_delta_diff[d] = tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
+      beta_rho_aug[1] = 0;
+      beta_rho_aug[2:] = beta_rho[XB[d]];
+      tmp = beta_rho_aug - (prowD[d] * beta_rho_aug) * rep_vector(1,Krow);
+      beta_rho_centered[((d-1)*Krow+1):(d*Krow)] = tmp;
+      beta_rho_diff[d] = tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
     }
-    log_delta = csr_matrix_times_vector(SD, Dsets*Krow, XDrow_w, XDrow_v, XDrow_u, beta_delta_centered);
+    log_rho = csr_matrix_times_vector(SD, Dsets*Krow, XDrow_w, XDrow_v, XDrow_u, beta_rho_centered);
   }
   
   //means
   {
     vector[SD] counts_exposure;
     //biases
-    log_mean_RJ = log_nu;
-    log_mean_DL = log_nu + log_delta;
-    log_mean_DR = log_nu - log_delta;
+    log_mean_RJ = (log_iota + log_rho)/2;
+    log_mean_DL = log_iota;
+    log_mean_DR = log_rho;
     //add exposures
     for (d in 1:Dsets) {
       log_mean_RJ[bbegin[d]:(bbegin[d+1]-1)]     = log_mean_RJ[bbegin[d]:(bbegin[d+1]-1)] + eRJ[d];
@@ -144,8 +144,8 @@ transformed parameters {
       counts_exposure[bbegin[d]:(bbegin[d+1]-1)] = rep_vector(eC[d],bbegin[d+1]-bbegin[d]);
     }
     //exact counts  
-    log_mean_cleft  = counts_exposure + log_nu + log_delta;
-    log_mean_cright = counts_exposure + log_nu - log_delta;
+    log_mean_cleft  = counts_exposure + log_iota;
+    log_mean_cright = counts_exposure + log_rho;
   }
 }
 model {
@@ -163,11 +163,11 @@ model {
   
   //// prior
   for (d in 1:Dsets) {
-    beta_nu_diff[d] ~ normal(0,1/(lfac*lambda_nu[XB[d]]));
-    beta_delta_diff[d] ~ normal(0,1/(lfac*lambda_delta[XB[d]]));
+    beta_iota_diff[d] ~ normal(0,1/(lfac*lambda_iota[XB[d]]));
+    beta_rho_diff[d] ~ normal(0,1/(lfac*lambda_rho[XB[d]]));
   }
   
   //// hyperprior
-  lambda_nu ~ cauchy(0,1);
-  lambda_delta ~ cauchy(0,1);
+  lambda_iota ~ cauchy(0,1);
+  lambda_rho ~ cauchy(0,1);
 }
