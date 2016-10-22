@@ -155,7 +155,7 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
                cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
                counts_close=counts[,contact.close], counts_far=counts[,contact.far],
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
-               weight=as.array(weight[,wt]), beta_iota=init$beta_iota, beta_rho=init$beta_rho,
+               weight=as.array(weight[,wt]), log_iota=init$log_iota, log_rho=init$log_rho,
                beta_diag=init$beta_diag)
   op=optimize_stan_model(model=stanmodels$gauss_dispersion, data=data, iter=iter, verbose=verbose, init=init, ...)
   return(op)
