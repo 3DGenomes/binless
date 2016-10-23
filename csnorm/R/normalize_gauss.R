@@ -66,11 +66,11 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
   bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
   bsub=merge(cbind(design[,.(name)],eRJ=init$eRJ,eDE=init$eDE), bsub, by="name",all.x=F,all.y=T)
   bsub[,c("lmu.DL","lmu.DR","lmu.RJ"):=list(eDE+log_iota,eDE+log_rho,eRJ+(log_iota+log_rho)/2)]
-  bts=rbind(bsub[,.(name,id,pos,cat="dangling L", z=dangling.L/exp(lmu.DL)-1, etahat=dangling.L/exp(lmu.DL)-1+lmu.DL,
+  bts=rbind(bsub[,.(name,id,pos,cat="dangling L", lmu=lmu.DL, etahat=dangling.L/exp(lmu.DL)-1+lmu.DL,
                     std=sqrt(1/exp(lmu.DL)+1/init$alpha))],
-            bsub[,.(name,id,pos,cat="dangling R", z=dangling.R/exp(lmu.DR)-1, etahat=dangling.R/exp(lmu.DR)-1+lmu.DR,
+            bsub[,.(name,id,pos,cat="dangling R", lmu=lmu.DR, etahat=dangling.R/exp(lmu.DR)-1+lmu.DR,
                     std=sqrt(1/exp(lmu.DR)+1/init$alpha))],
-            bsub[,.(name,id,pos,cat="rejoined", z=rejoined/exp(lmu.RJ)-1, etahat=rejoined/exp(lmu.RJ)-1+lmu.RJ,
+            bsub[,.(name,id,pos,cat="rejoined", lmu=lmu.RJ, etahat=rejoined/exp(lmu.RJ)-1+lmu.RJ,
                     std=sqrt(1/exp(lmu.RJ)+1/init$alpha))])
   stopifnot(bts[,.N]==3*biases[,.N])
   bsub=bsub[,.(id,log_iota,log_rho)]
@@ -98,9 +98,9 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
                     etaL=eC + log_iota2, etaR=eC + log_rho2)])
   rm(csub)
   cts[,c("varL","varR"):=list(1/muL+1/init$alpha,1/muR+1/init$alpha)]
-  cts=rbind(cts[,.(cat="contact L", z=sum((L/muL-1)/varL)/sum(1/varL), etahat=sum((L/muL-1+etaL)/varL)/sum(1/varL),
+  cts=rbind(cts[,.(cat="contact L", lmu=sum(etaL/varL)/sum(1/varL), etahat=sum((L/muL-1+etaL)/varL)/sum(1/varL),
                    std=sqrt(2)/sqrt(sum(1/varL))),by=c("name","id","pos")],
-            cts[,.(cat="contact R", z=sum((R/muR-1)/varR)/sum(1/varR), etahat=sum((R/muR-1+etaR)/varR)/sum(1/varR),
+            cts[,.(cat="contact R", lmu=sum(etaR/varR)/sum(1/varR), etahat=sum((R/muR-1+etaR)/varR)/sum(1/varR),
                    std=sqrt(2)/sqrt(sum(1/varR))),by=c("name","id","pos")])
   stopifnot(cts[,.N]==2*biases[,.N])
   #add factors for design matrix
@@ -122,11 +122,11 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
       sdata[,dset:=as.integer(factor(name))-1]
       fit=bam(formula = etahat ~ dset+is.dangling+is.rejoined-1
                          +s(pos, by=iota.coef,bs="ps", m=2, k=Krow) +s(pos, by=rho.coef,bs="ps", m=2, k=Krow),
-              data=sdata, family=gaussian(), weight=weight, scale=1, discrete=T)
+              data=sdata, family=gaussian(), weight=sdata$weight, scale=1, discrete=T, samfrac=0.1, mustart=sdata$lmu)
     } else {
       fit=bam(formula = etahat ~ is.dangling+is.rejoined-1
               +s(pos, by=iota.coef,bs="ps", m=2, k=Krow) +s(pos, by=rho.coef,bs="ps", m=2, k=Krow),
-              data=sdata, family=gaussian(), weight=weight, scale=1, discrete=T)
+              data=sdata, family=gaussian(), weight=sdata$weight, scale=1, discrete=T, samfrac=0.1, mustart=sdata$lmu)
     }
     sdata[,gam:=fit$fitted.values]
     sdata
@@ -140,7 +140,7 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
   log_rho=data[cat=="contact R",.(id,log_rho=gam-mean(gam)),by=name]
   data=data[merge(log_iota,log_rho,by=key(data))]
   op=list(value=-1, par=list(eC=eC[,eC], eDE=eDE[,eDE], eRJ=eRJ[,eRJ], log_iota=log_iota[,log_iota], log_rho=log_rho[,log_rho]))
-  op$par$biases = data[,.(cat, name, id, pos, log_iota, log_rho, z, std)]                           
+  op$par$biases = data[,.(cat, name, id, pos, etahat, std, eta=lmu)]
   op
 }
 
