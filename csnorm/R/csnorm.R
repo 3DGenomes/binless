@@ -230,7 +230,6 @@ setMethod("show",signature="CSnorm",definition=function(object) {
     cat(" Dataset not yet normalized\n")
   } else {
     cat(" Normalized dataset\n")
-    cat("  lambda_iota: ",cs@par$lambda_iota, "\n  lambda_rho: ",cs@par$lambda_rho, "\n  lambda_diag: ",cs@par$lambda_diag,"\n")
     cat("  dispersion: ",cs@par$alpha,"\n log likelihood: ", cs@par$value, "\n")
     nbinned=length(object@binned)
     if (nbinned==0) {
