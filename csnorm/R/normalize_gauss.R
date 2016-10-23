@@ -1,6 +1,26 @@
 #' @include csnorm.R
 NULL
 
+#' Single-cpu simplified initial guess
+#' @keywords internal
+#' 
+csnorm_gauss_guess = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_decade=20,
+                              dispersion=10, nthreads=1, verbose=T) {
+  init=list(log_iota=array(0,dim=biases[,.N]), log_rho=array(0,dim=biases[,.N]),
+            log_decay=array(0,dim=counts[,.N]), eC=array(0,dim=design[,.N]),
+            eRJ=array(0,dim=design[,.N]), eDE=array(0,dim=design[,.N]), alpha=dispersion)
+  op = csnorm:::csnorm_gauss_genomic(biases, counts, design, init, bf_per_kb=bf_per_kb, verbose=verbose, init.mean="data", nthreads=nthreads)
+  #add diagonal decay inits
+  Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
+  Decays=design[,uniqueN(decay)]
+  beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
+  op$par=c(list(beta_diag=beta_diag, lambda_diag=array(1,dim=Decays), log_decay=rep(0,counts[,.N]),
+                alpha=dispersion),
+           op$par[c("eC","eRJ","eDE","log_iota","log_rho")])
+  op
+}
+  
+
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
@@ -59,8 +79,7 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=10000,
-                                verbose=T, estimate.lambdas=T, ...) {
+csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, verbose=T, init.mean="mean", ...) {
   #compute bias means
   bsub=copy(biases)
   bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
@@ -117,16 +136,23 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
   data = foreach(gen=design[,uniqueN(genomic)], .combine=rbind) %do% {
     dsets=design[genomic==gen,name]
     sdata=data[name %in% dsets]
+    if (init.mean=="mean") {
+      sdata[,initval:=lmu]
+    } else {
+      sdata[,initval:=etahat]
+    }
     #formula differs if there is more than one dataset
     if (length(dsets)>1) {
       sdata[,dset:=as.integer(factor(name))-1]
       fit=bam(formula = etahat ~ dset+is.dangling+is.rejoined-1
                          +s(pos, by=iota.coef,bs="ps", m=2, k=Krow) +s(pos, by=rho.coef,bs="ps", m=2, k=Krow),
-              data=sdata, family=gaussian(), weight=sdata$weight, scale=1, discrete=T, samfrac=0.1, mustart=sdata$lmu)
+              data=sdata, family=gaussian(), weight=sdata[,weight], scale=1,
+              discrete=T, samfrac=0.1, mustart=sdata[,initval], ...)
     } else {
       fit=bam(formula = etahat ~ is.dangling+is.rejoined-1
               +s(pos, by=iota.coef,bs="ps", m=2, k=Krow) +s(pos, by=rho.coef,bs="ps", m=2, k=Krow),
-              data=sdata, family=gaussian(), weight=sdata$weight, scale=1, discrete=T, samfrac=0.1, mustart=sdata$lmu)
+              data=sdata, family=gaussian(), weight=sdata[,weight], scale=1,
+              discrete=T, samfrac=0.1, mustart=sdata[,initval], ...)
     }
     sdata[,gam:=fit$fitted.values]
     sdata
@@ -195,6 +221,7 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
 #' @param ncounts positive integer. Number of counts to use for dispersion estimation.
 #' @param init_alpha positive numeric, default 1e-5. Initial step size of LBFGS
 #'   line search (decay and dispersion steps).
+#' @param ncores positive integer. Number of cores to parallelize the fit using bam. Does not scale well.
 #'   
 #' @return A csnorm object
 #' @export
@@ -202,7 +229,7 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
 #' @examples
 run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
                            ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, fit.disp=T,
-                           verbose=T, ncounts=100000, init_alpha=1e-5) {
+                           verbose=T, ncounts=100000, init_alpha=1e-5, ncores=1) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -223,18 +250,18 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   #initial guess
   if (is.null(init)) {
     if (verbose==T) cat("No initial guess provided\n")
-    nBiases=cs@design[,uniqueN(genomic)]
-    init=list(log_iota=array(0,dim=cs@biases[,.N]), log_rho=array(0,dim=cs@biases[,.N]), log_decay=array(0,dim=cs@counts[,.N]),
-              eC=array(0,dim=cs@design[,.N]),  eRJ=array(0,dim=cs@design[,.N]),  eDE=array(0,dim=cs@design[,.N]),
-              alpha=10)
+    init.a=system.time(init.output <- capture.output(op <- csnorm:::csnorm_gauss_guess(
+      biases = cs@biases, counts = cs@counts, design = cs@design, dmin=dmin, dmax=dmax,
+      bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, nthreads=ncores)))
     init.output = "Flat init"
+    cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=0, leg="bias", out=init.output,
+                                                 runtime=init.a[1]+init.a[4], op=op)
   } else {
     if (verbose==T) cat("Using provided initial guess\n")
-    init$beta_diag = guarantee_beta_diag_increasing(init$beta_diag)
     init.output = "Init provided"
   }
-  op = list(par=init,value=NA)
   #make sure beta_diag is strictly increasing
+  op$par$beta_diag = guarantee_beta_diag_increasing(op$par$beta_diag)
   #gibbs sampling
   for (i in 1:ngibbs) {
     #fit diagonal decay given iota and rho
@@ -255,7 +282,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
       if (verbose==T) cat("Gibbs",i,": Genomic\n")
       a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_gauss_genomic(
         biases = cs@biases, counts = cs@counts, design = cs@design,
-        init = op$par, bf_per_kb = bf_per_kb, iter = iter, init_alpha=init_alpha)))
+        init = op$par, bf_per_kb = bf_per_kb, nthreads=ncores)))
       op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag",
                                                  "log_decay","decay", "alpha")],
                                         op.gen$par[c("eC","eRJ","eDE", "log_iota","log_rho","biases")]))
