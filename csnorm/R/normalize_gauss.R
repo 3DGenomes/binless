@@ -113,6 +113,7 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
   data[cat=="rejoined",   c("iota.coef","rho.coef","is.dangling","is.rejoined"):=list(1/2,1/2,0,1)]
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   #optimize each set of biases separately
+  cat("optimize with BAM") #necessary so logging goes smoothly
   data = foreach(gen=design[,uniqueN(genomic)], .combine=rbind) %do% {
     dsets=design[genomic==gen,name]
     sdata=data[name %in% dsets]
@@ -138,7 +139,7 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
   log_iota=data[cat=="contact L",.(id,log_iota=gam-mean(gam)),by=name]
   log_rho=data[cat=="contact R",.(id,log_rho=gam-mean(gam)),by=name]
   data=data[merge(log_iota,log_rho,by=key(data))]
-  op=list(value=-1, par=list(eC=eC[,eC], eDE=eDE[,eDE], eRJ=eRJ[,eRJ], log_iota=log_iota[,log_iota], log_rho=log_iota[,log_rho]))
+  op=list(value=-1, par=list(eC=eC[,eC], eDE=eDE[,eDE], eRJ=eRJ[,eRJ], log_iota=log_iota[,log_iota], log_rho=log_rho[,log_rho]))
   op$par$biases = data[,.(cat, name, id, pos, log_iota, log_rho, z, std)]                           
   op
 }
@@ -222,19 +223,18 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   #initial guess
   if (is.null(init)) {
     if (verbose==T) cat("No initial guess provided\n")
-    nBiases=design[,uniqueN(genomic)]
-    init=list(log_iota=array(0,dim=biases[,.N]), log_rho=array(0,dim=biases[,.N]), log_decay=array(0,dim=counts[,.N]),
-              eC=array(0,dim=design[,.N]),  eRJ=array(0,dim=design[,.N]),  eDE=array(0,dim=design[,.N]),
+    nBiases=cs@design[,uniqueN(genomic)]
+    init=list(log_iota=array(0,dim=cs@biases[,.N]), log_rho=array(0,dim=cs@biases[,.N]), log_decay=array(0,dim=cs@counts[,.N]),
+              eC=array(0,dim=cs@design[,.N]),  eRJ=array(0,dim=cs@design[,.N]),  eDE=array(0,dim=cs@design[,.N]),
               alpha=10)
     init.output = "Flat init"
   } else {
     if (verbose==T) cat("Using provided initial guess\n")
+    init$beta_diag = guarantee_beta_diag_increasing(init$beta_diag)
     init.output = "Init provided"
   }
   op = list(par=init,value=NA)
-  op=init.op
   #make sure beta_diag is strictly increasing
-  op$par$beta_diag = guarantee_beta_diag_increasing(op$par$beta_diag)
   #gibbs sampling
   for (i in 1:ngibbs) {
     #fit diagonal decay given iota and rho
@@ -259,7 +259,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
       op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag",
                                                  "log_decay","decay", "alpha")],
                                         op.gen$par[c("eC","eRJ","eDE", "log_iota","log_rho","biases")]))
-      cs@diagnostics$params = update_diagnostics(cs, step=i, leg="bias", out=output, runtime=a[1]+a[4], op=op)
+      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", out=output, runtime=a[1]+a[4], op=op)
     }
     #make sure beta_diag is strictly increasing
     op$par$beta_diag = guarantee_beta_diag_increasing(op$par$beta_diag)
@@ -278,7 +278,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     }
   }
   if (verbose==T) cat("Done\n")
-  op$par$init=init.op$par
+  op$par$init=init
   op$par$value=op$value
   cs@par=op$par
   cs@diagnostics$plot=ggplot(cs@diagnostics$params[,.(step,leg,value,out.last)])+
