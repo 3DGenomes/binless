@@ -81,7 +81,7 @@ ggplot(data)+geom_pointrange(aes(x,y,ymin=y-std,ymax=y+std,colour=cat))+xlim(0,3
 
 
 #toy fit
-fit=gam(data=data[,.SD[1:5],by=c("cat","dset")], formula = y ~ dset+is.dangling+is.rejoined-1+s(x,bs="ps", m=2, k=4, by=iota.coef)+s(x,bs="ps", m=2, k=4, by=rho.coef),
+fit=bam(data=data[,.SD[1:5],by=c("cat","dset")], formula = y ~ dset+is.dangling+is.rejoined-1+s(x,bs="ps", m=2, k=4, by=iota.coef)+s(x,bs="ps", m=2, k=4, by=rho.coef),
         family=gaussian(), scale=1, fit=F)
 fit=gam(data=data[,.SD[1:5],by=cat], formula = y ~ is.rejoined-1 + s(x, by=iota.coef,bs="ps", m=2, k=4) + s(x, by=rho.coef,bs="ps", m=2, k=4),
         family=gaussian(), scale=1, fit=F)
@@ -95,8 +95,8 @@ a=melt(a, id.vars="idx")
 ggplot(a)+geom_line(aes(idx,value,colour=variable))+xlim(0,5)
 
 #fit genomic biases
-fit=gam(data=data, formula = y ~ dset+is.dangling+is.rejoined-1 + s(x, by=iota.coef,bs="ps", m=2, k=50) + s(x, by=rho.coef,bs="ps", m=2, k=50),
-        family=gaussian(), weight=weight, scale=1)
+fit=bam(data=data, formula = y ~ dset+is.dangling+is.rejoined-1 + s(x, by=iota.coef,bs="ps", m=2, k=50) + s(x, by=rho.coef,bs="ps", m=2, k=50),
+        family=gaussian(), weight=weight, scale=1, discrete=T)
 data[,gam:=fit$fitted.values]
 dcast(data[,.(cat,x,gam,y,dset)], dset+x ~ cat, value.var=c("gam","y"))
 ggplot(data)+geom_pointrange(aes(x,y,ymin=y-std,ymax=y+std,colour=cat),alpha=0.1)+
