@@ -7,8 +7,8 @@ NULL
 csnorm_gauss_guess = function(biases, counts, design, lambda, dmin, dmax, bf_per_kb=1, bf_per_decade=20,
                               iter=10000, dispersion=10, ...) {
   nBiases=design[,uniqueN(genomic)]
-  init=list(log_iota=array(0,dim=biases[,.N]), log_rho=array(0,dim=biases[,.N]),
-            log_decay=array(0,dim=counts[,.N]), eC=array(0,dim=design[,.N]),
+  init=list(log_iota=array(0,dim=biases[,.N]), log_rho=array(0,dim=biases[,.N]), log_decay=array(0,dim=counts[,.N]),
+            eC=array(0,dim=design[,.N]),  eRJ=array(0,dim=design[,.N]),  eDE=array(0,dim=design[,.N]),
             alpha=dispersion, lambda_iota=array(lambda,dim=nBiases), lambda_rho=array(lambda,dim=nBiases))
   op=csnorm_gauss_genomic(biases, counts, design, init, bf_per_kb=bf_per_kb, iter=iter, estimate.lambdas=F, ...)
   #add diagonal decay inits
@@ -17,7 +17,7 @@ csnorm_gauss_guess = function(biases, counts, design, lambda, dmin, dmax, bf_per
   beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
   op$par=c(list(beta_diag=beta_diag, lambda_diag=array(1,dim=Decays), log_decay=rep(0,counts[,.N]),
                 alpha=dispersion, lambda_iota=init$lambda_iota, lambda_rho=init$lambda_rho),
-           op$par[c("eC","eRJ","eDE","beta_iota","beta_rho","log_iota","log_rho")])
+           op$par[c("eC","eRJ","eDE","log_iota","log_rho")])
   return(op)
 }
 
@@ -81,11 +81,22 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
 #' 
 csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=10000,
                                 verbose=T, estimate.lambdas=T, ...) {
+  #compute bias means
+  bsub=copy(biases)
+  bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
+  bsub=merge(cbind(design[,.(name)],eRJ=init$eRJ,eDE=init$eDE), bsub, by="name",all.x=F,all.y=T)
+  bsub[,c("lmu.DL","lmu.DR","lmu.RJ"):=list(eDE+log_iota,eDE+log_rho,eRJ+(log_iota+log_rho)/2)]
+  bts=rbind(bsub[,.(name,id,pos,cat="dangling L", z=dangling.L/exp(lmu.DL)-1, etahat=dangling.L/exp(lmu.DL)-1+lmu.DL,
+                    std=sqrt(1/exp(lmu.DL)+1/init$alpha))],
+            bsub[,.(name,id,pos,cat="dangling R", z=dangling.R/exp(lmu.DR)-1, etahat=dangling.R/exp(lmu.DR)-1+lmu.DR,
+                    std=sqrt(1/exp(lmu.DR)+1/init$alpha))],
+            bsub[,.(name,id,pos,cat="rejoined", z=rejoined/exp(lmu.RJ)-1, etahat=rejoined/exp(lmu.RJ)-1+lmu.RJ,
+                    std=sqrt(1/exp(lmu.RJ)+1/init$alpha))])
+  stopifnot(bts[,.N]==3*biases[,.N])
+  bsub=bsub[,.(id,log_iota,log_rho)]
   #add bias informations to counts
   csub=copy(counts)
   csub[,log_decay:=init$log_decay]
-  bsub=biases[,.(id)]
-  bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
   csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
   csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
   csub=merge(cbind(design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
@@ -97,41 +108,58 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
                                                            lmu.base+log_iota1+log_iota2)]
   csub[,lmu.base:=NULL]
   #collect all counts on left/right side
-  cts=rbind(csub[,.(id=id1,R=contact.close, L=contact.far,  muR=exp(lmu.close), muL=exp(lmu.far),
+  cts=rbind(csub[,.(name,id=id1, pos=pos1, R=contact.close, L=contact.far,  muR=exp(lmu.close), muL=exp(lmu.far),
                     etaL=eC + log_iota1, etaR=eC + log_rho1)],
-            csub[,.(id=id1,R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
+            csub[,.(name,id=id1, pos=pos1, R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
                     etaL=eC + log_iota1, etaR=eC + log_rho1)],
-            csub[,.(id=id2,R=contact.far,   L=contact.close,muR=exp(lmu.far),   muL=exp(lmu.close),
+            csub[,.(name,id=id2, pos=pos2, R=contact.far,   L=contact.close,muR=exp(lmu.far),   muL=exp(lmu.close),
                     etaL=eC + log_iota2, etaR=eC + log_rho2)],
-            csub[,.(id=id2,R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
+            csub[,.(name,id=id2, pos=pos2, R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
                     etaL=eC + log_iota2, etaR=eC + log_rho2)])
+  rm(csub)
   cts[,c("varL","varR"):=list(1/muL+1/init$alpha,1/muR+1/init$alpha)]
-  cts=cts[,.(etaLhat=sum((L/muL-1+etaL)/varL)/sum(1/varL),
-             etaRhat=sum((R/muR-1+etaR)/varR)/sum(1/varR),
-             sdL=sqrt(2)/sqrt(sum(1/varL)),
-             sdR=sqrt(2)/sqrt(sum(1/varR))),keyby=id]
-  stopifnot(cts[,.N]==biases[,.N])
-  #run optimization
+  cts=rbind(cts[,.(cat="contact L", z=sum((L/muL-1)/varL)/sum(1/varL), etahat=sum((L/muL-1+etaL)/varL)/sum(1/varL),
+                   std=sqrt(2)/sqrt(sum(1/varL))),by=c("name","id","pos")],
+            cts[,.(cat="contact R", z=sum((R/muR-1)/varR)/sum(1/varR), etahat=sum((R/muR-1+etaR)/varR)/sum(1/varR),
+                   std=sqrt(2)/sqrt(sum(1/varR))),by=c("name","id","pos")])
+  stopifnot(cts[,.N]==2*biases[,.N])
+  #add factors for design matrix
+  data=rbind(bts,cts)
+  data[,weight:=1/std^2]
+  data[cat=="contact L",  c("iota.coef","rho.coef","is.dangling","is.rejoined"):=list(1,0,0,0)]
+  data[cat=="contact R",  c("iota.coef","rho.coef","is.dangling","is.rejoined"):=list(0,1,0,0)]
+  data[cat=="dangling L", c("iota.coef","rho.coef","is.dangling","is.rejoined"):=list(1,0,1,0)]
+  data[cat=="dangling R", c("iota.coef","rho.coef","is.dangling","is.rejoined"):=list(0,1,1,0)]
+  data[cat=="rejoined",   c("iota.coef","rho.coef","is.dangling","is.rejoined"):=list(1/2,1/2,0,1)]
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
-  bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
-  data=list(Dsets=design[,.N], Biases=design[,uniqueN(genomic)], XB=as.array(design[,genomic]),
-            Krow=Krow, SD=biases[,.N], bbegin=bbegin,
-            cutsitesD=biases[,pos], rejoined=biases[,rejoined],
-            danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            eta_hat_L=cts[,etaLhat], eta_hat_R=cts[,etaRhat], sd_L=cts[,sdL], sd_R=cts[,sdR],
-            alpha=init$alpha)
-  op=optimize_stan_model(model=stanmodels$gauss_genomic, data=data, iter=iter, verbose=verbose, init=init, ...)
-  #make nice output table
-  bout=cbind(biases,as.data.table(op$par[c("log_iota","log_rho","log_mean_DL","log_mean_DR","log_mean_RJ")]))
-  cout=cbind(cts,as.data.table(op$par[c("log_iota","log_rho","log_mean_cleft","log_mean_cright")]))
-  cout=merge(cout,bout[,.(name,id,pos)],by="id")
-  bout=rbind(bout[,.(cat="dangling L", name, id, pos, log_iota, log_rho, z=dangling.L/exp(log_mean_DL)-1, std=sqrt(1/exp(log_mean_DL)+1/init$alpha))],
-             bout[,.(cat="dangling R", name, id, pos, log_iota, log_rho, z=dangling.R/exp(log_mean_DR)-1, std=sqrt(1/exp(log_mean_DL)+1/init$alpha))],
-             bout[,.(cat="rejoined", name, id, pos, log_iota, log_rho, z=rejoined/exp(log_mean_RJ)-1, std=sqrt(1/exp(log_mean_RJ)+1/init$alpha))])
-  cout=rbind(cout[,.(cat="contact L", name, id, pos, log_iota, log_rho, z=etaLhat-log_mean_cleft, std=sdL)],
-             cout[,.(cat="contact R", name, id, pos, log_iota, log_rho, z=etaRhat-log_mean_cright, std=sdR)])
-  bout=rbind(bout,cout)
-  op$par$biases=bout
+  #optimize each set of biases separately
+  data = foreach(gen=design[,uniqueN(genomic)], .combine=rbind) %do% {
+    dsets=design[genomic==gen,name]
+    sdata=data[name %in% dsets]
+    #formula differs if there is more than one dataset
+    if (length(dsets)>1) {
+      sdata[,dset:=as.integer(factor(name))-1]
+      fit=bam(formula = etahat ~ dset+is.dangling+is.rejoined-1
+                         +s(pos, by=iota.coef,bs="ps", m=2, k=Krow) +s(pos, by=rho.coef,bs="ps", m=2, k=Krow),
+              data=sdata, family=gaussian(), weight=weight, scale=1, discrete=T)
+    } else {
+      fit=bam(formula = etahat ~ is.dangling+is.rejoined-1
+              +s(pos, by=iota.coef,bs="ps", m=2, k=Krow) +s(pos, by=rho.coef,bs="ps", m=2, k=Krow),
+              data=sdata, family=gaussian(), weight=weight, scale=1, discrete=T)
+    }
+    sdata[,gam:=fit$fitted.values]
+    sdata
+  }
+  #return values as if optimized by stan
+  setkeyv(data,key(biases))
+  eC=data[cat%in%c("contact L","contact R"), .(eC=mean(gam)),by=name]
+  eDE=data[cat%in%c("dangling L","dangling R"), .(eDE=mean(gam)),by=name]
+  eRJ=data[cat=="rejoined", .(eRJ=mean(gam)),by=name]
+  log_iota=data[cat=="contact L",.(id,log_iota=gam-mean(gam)),by=name]
+  log_rho=data[cat=="contact R",.(id,log_rho=gam-mean(gam)),by=name]
+  data=data[merge(log_iota,log_rho,by=key(data))]
+  op=list(value=-1, par=list(eC=eC[,eC], eDE=eDE[,eDE], eRJ=eRJ[,eRJ], log_iota=log_iota[,log_iota], log_rho=log_iota[,log_rho]))
+  op$par$biases = data[,.(cat, name, id, pos, log_iota, log_rho, z, std)]                           
   op
 }
 
@@ -223,8 +251,8 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
         bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, iter=iter, init_alpha=init_alpha)))
       op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","beta_diag_centered",
                                                        "log_decay","decay", "lambda_diag")],
-                                         op$par[c("eRJ","eDE","beta_iota","beta_rho", "alpha",
-                                                  "lambda_iota","lambda_rho","log_iota","log_rho","biases")]))
+                                         op$par[c("eRJ","eDE", "alpha",
+                                                  "log_iota","log_rho","biases")]))
       cs@diagnostics$params = update_diagnostics(cs, step=i, leg="decay", out=output, runtime=a[1]+a[4], op=op)
     }
     #fit iota and rho given diagonal decay
@@ -235,8 +263,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
         init = op$par, bf_per_kb = bf_per_kb, iter = iter, init_alpha=init_alpha)))
       op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag",
                                                  "log_decay","decay", "alpha")],
-                                        op.gen$par[c("eC","eRJ","eDE","beta_iota","beta_rho",
-                                                     "log_iota","log_rho","biases","lambda_iota","lambda_rho")]))
+                                        op.gen$par[c("eC","eRJ","eDE", "log_iota","log_rho","biases")]))
       cs@diagnostics$params = update_diagnostics(cs, step=i, leg="bias", out=output, runtime=a[1]+a[4], op=op)
     }
     #make sure beta_diag is strictly increasing
@@ -249,8 +276,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
         dmin=dmin, dmax=dmax, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter,
         weight=subcounts.weight, init_alpha=init_alpha)))
       op=list(value=op.disp$value, par=c(op$par[c("beta_diag","beta_diag_centered","log_decay","decay",
-                                                  "beta_iota","beta_rho","log_iota","log_rho","biases",
-                                                  "lambda_iota","lambda_rho", "lambda_diag")],
+                                                  "log_iota","log_rho","biases","lambda_diag")],
                                          op.disp$par[c("eC","eRJ","eDE","alpha")]))
       cs@diagnostics$params = update_diagnostics(cs, step=i, leg="disp", out=output, runtime=a[1]+a[4], op=op)
       if (verbose==T) cat("Gibbs",i,": log-likelihood = ",op$value,"\n")

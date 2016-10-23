@@ -25,6 +25,7 @@
 #'
 #' @useDynLib csnorm, .registration = TRUE
 #' @import rstan
+#' @import mgcv
 #' @import data.table
 #' @import doParallel
 #' @import foreach
