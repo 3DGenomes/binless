@@ -259,6 +259,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   } else {
     if (verbose==T) cat("Using provided initial guess\n")
     init.output = "Init provided"
+    op=list(value=-1, par=init)
   }
   #make sure beta_diag is strictly increasing
   op$par$beta_diag = guarantee_beta_diag_increasing(op$par$beta_diag)
