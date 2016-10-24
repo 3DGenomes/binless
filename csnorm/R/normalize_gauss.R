@@ -250,6 +250,10 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   #initial guess
   if (is.null(init)) {
     if (verbose==T) cat("No initial guess provided\n")
+    cs@par=list() #in case we have a weird object
+    cs@diagnostics=list()
+    cs@binned=list()
+    laststep=0
     init.a=system.time(init.output <- capture.output(op <- csnorm:::csnorm_gauss_guess(
       biases = cs@biases, counts = cs@counts, design = cs@design, dmin=dmin, dmax=dmax,
       bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, nthreads=ncores)))
@@ -260,11 +264,13 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     if (verbose==T) cat("Using provided initial guess\n")
     init.output = "Init provided"
     op=list(value=-1, par=init)
+    cs@binned=list()
+    if (is.data.table(cs@diagnostics$params)) laststep = cs@diagnostics$params[,max(step)]
   }
   #make sure beta_diag is strictly increasing
   op$par$beta_diag = guarantee_beta_diag_increasing(op$par$beta_diag)
   #gibbs sampling
-  for (i in 1:ngibbs) {
+  for (i in (laststep + 1:ngibbs)) {
     #fit diagonal decay given iota and rho
     if (fit.decay==T) {
       if (verbose==T) cat("Gibbs",i,": Decay\n")
