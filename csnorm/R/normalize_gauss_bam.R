@@ -165,7 +165,8 @@ csnorm_gauss_genomic_bam = function(biases, counts, design, init, bf_per_kb=1, v
   log_iota=data[cat=="contact L",.(id,log_iota=gam-mean(gam)),by=name]
   log_rho=data[cat=="contact R",.(id,log_rho=gam-mean(gam)),by=name]
   data=data[merge(log_iota,log_rho,by=key(data))]
-  op=list(value=-1, par=list(eC=eC[,eC], eDE=eDE[,eDE], eRJ=eRJ[,eRJ], log_iota=log_iota[,log_iota], log_rho=log_rho[,log_rho]))
+  op=list(value=-1, par=list(eC=eC[,as.array(eC)], eDE=eDE[,as.array(eDE)], eRJ=eRJ[,as.array(eRJ)],
+                             log_iota=log_iota[,log_iota], log_rho=log_rho[,log_rho]))
   op$par$biases = data[,.(cat, name, id, pos, etahat, std, eta=lmu)]
   op
 }
