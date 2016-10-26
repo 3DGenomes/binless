@@ -66,9 +66,9 @@ save(cs, file="data/rao_HiCall_chrX_450k_csnorm_optimized.RData")
 #all three panels reach a plateau, and the last points report "Convergence detected". Otherwise, the normalization was not successful.
 #You might then either want to increase ngibbs or iter, or both.
 cs@diagnostics$plot
-#similar plots can be generated. For example, to visualize lambda_nu
-ggplot(cs@diagnostics$params[leg=="bias",.(lambda_nu=sapply(lambda_nu,function(x){x[[1]]}),out.last),by=step])+
-  geom_line(aes(step,lambda_nu))+geom_point(aes(step,lambda_nu,colour=out.last))
+#similar plots can be generated. For example, to visualize alpha
+ggplot(cs@diagnostics$params[leg=="disp",.(alpha=sapply(alpha,function(x){x[[1]]}),out.last),by=step])+
+  geom_line(aes(step,alpha))+geom_point(aes(step,alpha,colour=out.last))
 #or eC
 ggplot(cs@diagnostics$params[,.(step,leg,eC=sapply(eC,function(x){x[[1]]}),out.last)])+
   geom_line(aes(step,eC))+geom_point(aes(step,eC,colour=out.last))+facet_grid(~leg)
@@ -83,14 +83,11 @@ check$counts[pval>0.95,.N]/check$counts[,.N]
 
 
 #you can also plot the value of the biases along the genome. Here, we plot nu and the reduced aggregate counts used for optimization.
-ggplot(cs@par$biases[cat %in% c("contact L","dangling L", "rejoined")])+geom_line(aes(pos,log_iota))+
-  geom_pointrange(aes(pos,log_iota+z,ymin=log_iota+z-std,ymax=log_iota+z+std,colour=cat), alpha=0.1)+
-  geom_line(aes(pos,log_iota+z,colour=cat))+
-  facet_wrap(~name,scales = "free")+xlim(73800000,73810000)
-ggplot(cs@par$biases[cat %in% c("contact R","dangling R")])+geom_line(aes(pos,log_iota))+
-  geom_pointrange(aes(pos,log_iota+z,ymin=log_iota+z-std,ymax=log_iota+z+std,colour=cat), alpha=0.1)+
-  geom_line(aes(pos,log_iota+z,colour=cat))+
-  facet_wrap(~name,scales = "free")+xlim(73800000,73810000)
+ggplot(cs@par$biases)+geom_pointrange(aes(pos,etahat,ymin=etahat-std,ymax=etahat+std,colour=cat),alpha=0.1)+
+  geom_line(aes(pos,eta))+facet_grid(name ~ cat)#+
+  xlim(73800000,73810000)+ylim(-10,10)
+  xlim(26627203,26637203)+ylim(-10,10)
+
 
 #the diagonal decay can be plotted this way
 ggplot(cs@par$decay)+geom_line(aes(dist,log_decay))+
@@ -112,9 +109,19 @@ save(cs, file="data/rao_HiCall_SELP_150k_csnorm_optimized_newton.RData")
 #Since you will not do any grouping in this example, pass group="all".
 mat=get_matrices(cs, resolution=5000, group="all")
 ggplot(mat)+
+  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
+  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
+  scale_fill_gradient(low="white", high="black")+
+  theme_bw()+theme(legend.position = "none")+facet_wrap(~name)
+ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=-log(normalized)))+
   geom_raster(aes(begin2,begin1,fill=-log(normalized)))+
   scale_fill_gradient2()+
+  theme_bw()+theme(legend.position = "none")+facet_wrap(~name)
+ggplot(mat)+
+  geom_raster(aes(begin1,begin2,fill=observed))+
+  geom_raster(aes(begin2,begin1,fill=expected))+
+  scale_fill_gradient(low="white", high="black")+
   theme_bw()+theme(legend.position = "none")+facet_wrap(~name)
 
 
@@ -152,5 +159,16 @@ ggplot(mat)+
   geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])+
   scale_fill_gradient2()+ scale_colour_manual(values = muted(c("blue","red")))+
   theme_bw()+theme(legend.position = "none")+facet_wrap(~name, nrow=2, ncol=2)
+
+
+cs=detect_differences(cs, resolution=5000, group="all", threshold=0.95, ncores=30, ref="GM MboI 1")
+mat=get_interactions(cs, type="differences", resolution=5000, group="all", threshold=0.95, ref="GM MboI 1")
+ggplot(mat)+
+  geom_raster(aes(begin1,begin2,fill=-log(normalized)))+
+  #geom_raster(aes(begin2,begin1,fill=-log(signal)))+
+  geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])+
+  scale_fill_gradient2()+ scale_colour_manual(values = muted(c("blue","red")))+
+  theme_bw()+theme(legend.position = "none")+facet_wrap(~name, nrow=2, ncol=2)
+
 
 

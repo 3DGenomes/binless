@@ -15,6 +15,7 @@
 #'
 #' @section Normalization:
 #' \code{\link{run_gauss_stan}}
+#' \code{\link{run_gauss_bam}}
 #'
 #' @section Postprocessing:
 #' \code{\link{bin_all_datasets}}
@@ -25,6 +26,7 @@
 #'
 #' @useDynLib csnorm, .registration = TRUE
 #' @import rstan
+#' @import mgcv
 #' @import data.table
 #' @import doParallel
 #' @import foreach
@@ -229,7 +231,6 @@ setMethod("show",signature="CSnorm",definition=function(object) {
     cat(" Dataset not yet normalized\n")
   } else {
     cat(" Normalized dataset\n")
-    cat("  lambda_iota: ",cs@par$lambda_iota, "\n  lambda_rho: ",cs@par$lambda_rho, "\n  lambda_diag: ",cs@par$lambda_diag,"\n")
     cat("  dispersion: ",cs@par$alpha,"\n log likelihood: ", cs@par$value, "\n")
     nbinned=length(object@binned)
     if (nbinned==0) {
