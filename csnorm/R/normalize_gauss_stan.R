@@ -4,13 +4,13 @@ NULL
 #' Single-cpu simplified initial guess
 #' @keywords internal
 #' 
-csnorm_gauss_guess = function(biases, counts, design, lambda, dmin, dmax, bf_per_kb=1, bf_per_decade=20,
+csnorm_gauss_guess_stan = function(biases, counts, design, lambda, dmin, dmax, bf_per_kb=1, bf_per_decade=20,
                               iter=10000, dispersion=10, ...) {
   nBiases=design[,uniqueN(genomic)]
   init=list(log_iota=array(0,dim=biases[,.N]), log_rho=array(0,dim=biases[,.N]),
             log_decay=array(0,dim=counts[,.N]), eC=array(0,dim=design[,.N]),
             alpha=dispersion, lambda_iota=array(lambda,dim=nBiases), lambda_rho=array(lambda,dim=nBiases))
-  op=csnorm_gauss_genomic(biases, counts, design, init, bf_per_kb=bf_per_kb, iter=iter, estimate.lambdas=F, ...)
+  op=csnorm_gauss_genomic_stan(biases, counts, design, init, bf_per_kb=bf_per_kb, iter=iter, estimate.lambdas=F, ...)
   #add diagonal decay inits
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   Decays=design[,uniqueN(decay)]
@@ -79,7 +79,7 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=10000,
+csnorm_gauss_genomic_stan = function(biases, counts, design, init, bf_per_kb=1, iter=10000,
                                 verbose=T, estimate.lambdas=T, ...) {
   #add bias informations to counts
   csub=copy(counts)
@@ -155,20 +155,20 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
                cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
                counts_close=counts[,contact.close], counts_far=counts[,contact.far],
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
-               weight=as.array(weight[,wt]), beta_iota=init$beta_iota, beta_rho=init$beta_rho,
+               weight=as.array(weight[,wt]), log_iota=init$log_iota, log_rho=init$log_rho,
                beta_diag=init$beta_diag)
   op=optimize_stan_model(model=stanmodels$gauss_dispersion, data=data, iter=iter, verbose=verbose, init=init, ...)
   return(op)
 }
 
 #' Run approximate gibbs sampler on with a single starting condition
-#' @inheritParams run_gauss
+#' @inheritParams run_gauss_stan
 #' @param fit.decay,fit.genomic,fit.disp boolean. Whether to fit diagonal decay or
 #'   genomic biases. Set to FALSE only for diagnostics.
 #' @keywords internal
 #' @export
 #' 
-run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
+run_gauss_stan_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
                            ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, fit.disp=T,
                            verbose=T, ncounts=100000, init_alpha=1e-5) {
   #basic checks
@@ -191,7 +191,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
   #initial guess
   if (length(init)==1) {
     if (verbose==T) cat("Initial guess\n")
-    init.a = system.time(init.output <- capture.output(init.op <- csnorm:::csnorm_gauss_guess(
+    init.a = system.time(init.output <- capture.output(init.op <- csnorm:::csnorm_gauss_guess_stan(
       biases = cs@biases, counts = cs@counts, design = cs@design, lambda=init[[1]], dmin=dmin, dmax=dmax,
       bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter, dispersion=10, init_alpha=init_alpha)))
     #abort silently if initial guess went wrong
@@ -230,7 +230,7 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
     #fit iota and rho given diagonal decay
     if (fit.genomic==T) {
       if (verbose==T) cat("Gibbs",i,": Genomic\n")
-      a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_gauss_genomic(
+      a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_gauss_genomic_stan(
         biases = cs@biases, counts = cs@counts, design = cs@design,
         init = op$par, bf_per_kb = bf_per_kb, iter = iter, init_alpha=init_alpha)))
       op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag",
@@ -297,14 +297,14 @@ run_gauss_gibbs = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=
 #' @export
 #' 
 #' @examples
-run_gauss = function(cs, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10, lambdas=c(0.1,1,10),
+run_gauss_stan = function(cs, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10, lambdas=c(0.1,1,10),
                      ngibbs = 3, iter=100000, ncores=1, verbose=T, init_alpha=1e-5, prefix=NULL) {
   cs@binned=list() #erase old data if available
   cs@diagnostics=list()
   cs@par=list()
   registerDoParallel(cores=ncores)
   cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value[1]<y@par$value[1]){return(y)}else{return(x)}}) %dopar% {
-    a=system.time(cs <- run_gauss_gibbs(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
+    a=system.time(cs <- run_gauss_stan_gibbs(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade,
                            bins_per_bf=bins_per_bf, init=lambda, ngibbs = ngibbs,
                            iter=iter, fit.decay=T, fit.genomic=T, fit.disp=T,
                            verbose=verbose, init_alpha=1e-5))

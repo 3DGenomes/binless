@@ -35,65 +35,18 @@ data {
   int<lower=0> counts_down[N];
   real<lower=0> weight[Dsets]; //in case of subsampling
   //parameters: spline
-  vector[Krow-1] beta_iota[Biases];
-  vector[Krow-1] beta_rho[Biases];
+  vector[SD] log_iota;
+  vector[SD] log_rho;
   positive_ordered[Kdiag-1] beta_diag[Decays];
 }
 transformed data {
-  //bias spline, sparse (iota and rho have the same design)
-  vector[nnz(SD)] XDrow_w;
-  int XDrow_v[nnz(SD)];
-  int XDrow_u[SD+1];
-  row_vector[Krow] prowD[Dsets];
   //diagonal SCAM spline, dense
   matrix[N,Dsets*Kdiag] Xdiag;
   row_vector[Kdiag] pdiagD[Dsets];
-  //iota
-  vector[SD] log_iota; // log(iota)
-  vector[Krow-2] beta_iota_diff[Dsets]; //2nd order difference on beta_iota_aug
-  //rho
-  vector[SD] log_rho; // log(rho)
-  vector[Krow-2] beta_rho_diff[Dsets]; //2nd order difference on beta_rho_aug
   //diag
   vector[N] ldec;
   vector[Dsets*Kdiag] beta_diag_centered;
-  vector[Kdiag-2] beta_diag_diff[Dsets];
   
-  //Bias GAM spline, sparse
-  {
-    vector[SD] row_weightsD;
-    int nnzs[Dsets+1];
-    row_weightsD = rep_vector(3, SD); //dangling L/R + rejoined
-    for (i in 1:N) {
-      row_weightsD[cidx[1,i]] = row_weightsD[cidx[1,i]] + 1;
-      row_weightsD[cidx[2,i]] = row_weightsD[cidx[2,i]] + 1;
-    }
-    nnzs[1] = 1;
-    for (i in 1:Dsets) nnzs[i+1] = nnzs[i]+nnz(bbegin[i+1]-bbegin[i]);
-    
-    #compute design matrix and projector
-    for (d in 1:Dsets) {
-      int S;
-      S = bbegin[d+1]-bbegin[d];
-      {
-        vector[S] cutsites;
-        vector[nnz(S)] Xrow_w;
-        int Xrow_v[nnz(S)];
-        int Xrow_u[S+1];
-        vector[S] row_weights;
-        row_vector[Krow] prow;
-        cutsites = cutsitesD[bbegin[d]:(bbegin[d+1]-1)];
-        row_weights = row_weightsD[bbegin[d]:(bbegin[d+1]-1)];
-        #include "sparse_spline_construction.stan"
-        XDrow_w[nnzs[d]:(nnzs[d+1]-1)] = Xrow_w;
-        for (i in 1:size(Xrow_v)) Xrow_v[i] = Xrow_v[i] + Krow*(d-1);
-        XDrow_v[nnzs[d]:(nnzs[d+1]-1)] = Xrow_v;
-        prowD[d] = prow;
-      }
-    }
-    XDrow_u[1] = 1;
-    for (i in 1:SD) XDrow_u[i+1] = XDrow_u[i]+nnz(1);
-  }
   //diagonal SCAM spline, dense
   {
     {
@@ -120,36 +73,6 @@ transformed data {
     }
   }
   
-    //iota
-  {
-    vector[Dsets*Krow] beta_iota_centered;
-    for (d in 1:Dsets) {
-      vector[Krow] beta_iota_aug;
-      vector[Krow] tmp;
-      beta_iota_aug[1] = 0;
-      beta_iota_aug[2:] = beta_iota[XB[d]];
-      tmp = beta_iota_aug - (prowD[d] * beta_iota_aug) * rep_vector(1,Krow);
-      beta_iota_centered[((d-1)*Krow+1):(d*Krow)] = tmp;
-      beta_iota_diff[d] = tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
-    }
-    log_iota = csr_matrix_times_vector(SD, Dsets*Krow, XDrow_w, XDrow_v, XDrow_u, beta_iota_centered);
-  }
-  
-  //rho
-  {
-    vector[Dsets*Krow] beta_rho_centered;
-    for (d in 1:Dsets) {
-      vector[Krow] beta_rho_aug;
-      vector[Krow] tmp;
-      beta_rho_aug[1] = 0;
-      beta_rho_aug[2:] = beta_rho[XB[d]];
-      tmp = beta_rho_aug - (prowD[d] * beta_rho_aug) * rep_vector(1,Krow);
-      beta_rho_centered[((d-1)*Krow+1):(d*Krow)] = tmp;
-      beta_rho_diff[d] = tmp[:(Krow-2)]-2*tmp[2:(Krow-1)]+tmp[3:];
-    }
-    log_rho = csr_matrix_times_vector(SD, Dsets*Krow, XDrow_w, XDrow_v, XDrow_u, beta_rho_centered);
-  }
-  
   //decay
   for (d in 1:Dsets) {
     vector[Kdiag] beta_diag_aug;
@@ -160,7 +83,6 @@ transformed data {
     beta_diag_aug[2:] = beta_diag[XD[d]];
     tmp = epsilon * (beta_diag_aug - (pdiagD[d] * beta_diag_aug) * rep_vector(1, Kdiag));
     beta_diag_centered[((d-1)*Kdiag+1):(d*Kdiag)] = tmp;
-    beta_diag_diff[d] = tmp[:(Kdiag-2)]-2*tmp[2:(Kdiag-1)]+tmp[3:];
   }
   ldec = Xdiag * beta_diag_centered;
 

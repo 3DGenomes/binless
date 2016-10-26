@@ -92,7 +92,7 @@ save(cs, file="data/caulo_rif_150k_csnorm.RData")
 #in the last runtime.bias and runtime.decay, you see "Convergence detected". Otherwise, the normalization was not successful.
 #You might either want to increase ngibbs or iter, or both.
 load("data/caulo_rif_150k_csnorm.RData")
-cs = run_gauss_gibbs(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, init=0.1, ngibbs = 3, iter=10000, verbose=T)
+cs = run_gauss_stan_gibbs(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, init=0.1, ngibbs = 2, iter=10000, verbose=T)
 save(cs, file="data/caulo_rif_csnorm_optimized.RData")
 
 #Some diagnostics plots can be generated. The function generates 4 plots and also returns a data table.
