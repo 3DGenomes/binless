@@ -4,12 +4,12 @@ NULL
 #' Single-cpu simplified initial guess
 #' @keywords internal
 #' 
-csnorm_gauss_guess = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_decade=20,
+csnorm_gauss_guess_bam = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_decade=20,
                               dispersion=10, nthreads=1, verbose=T) {
   init=list(log_iota=array(0,dim=biases[,.N]), log_rho=array(0,dim=biases[,.N]),
             log_decay=array(0,dim=counts[,.N]), eC=array(0,dim=design[,.N]),
             eRJ=array(0,dim=design[,.N]), eDE=array(0,dim=design[,.N]), alpha=dispersion)
-  op = csnorm:::csnorm_gauss_genomic(biases, counts, design, init, bf_per_kb=bf_per_kb, verbose=verbose, init.mean="data", nthreads=nthreads)
+  op = csnorm:::csnorm_gauss_genomic_bam(biases, counts, design, init, bf_per_kb=bf_per_kb, verbose=verbose, init.mean="data", nthreads=nthreads)
   #add diagonal decay inits
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   Decays=design[,uniqueN(decay)]
@@ -79,7 +79,7 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, verbose=T, init.mean="mean", ...) {
+csnorm_gauss_genomic_bam = function(biases, counts, design, init, bf_per_kb=1, verbose=T, init.mean="mean", ...) {
   #compute bias means
   bsub=copy(biases)
   bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
@@ -196,7 +196,7 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
   return(op)
 }
 
-#' Cut-site normalization (simplified gibbs sampling)
+#' Cut-site normalization (fast approximation, using mgcv BAM)
 #' 
 #' Alternates two approximations to the exact model, fitting the diagonal decay
 #' and iota/rho.
@@ -227,7 +227,7 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
 #' @export
 #' 
 #' @examples
-run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
+run_gauss_bam = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
                            ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, fit.disp=T,
                            verbose=T, ncounts=100000, init_alpha=1e-5, ncores=1) {
   #basic checks
@@ -254,7 +254,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     cs@diagnostics=list()
     cs@binned=list()
     laststep=0
-    init.a=system.time(init.output <- capture.output(op <- csnorm:::csnorm_gauss_guess(
+    init.a=system.time(init.output <- capture.output(op <- csnorm:::csnorm_gauss_guess_bam(
       biases = cs@biases, counts = cs@counts, design = cs@design, dmin=dmin, dmax=dmax,
       bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, nthreads=ncores)))
     init.output = "Flat init"
@@ -287,7 +287,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     #fit iota and rho given diagonal decay
     if (fit.genomic==T) {
       if (verbose==T) cat("Gibbs",i,": Genomic\n")
-      a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_gauss_genomic(
+      a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_gauss_genomic_bam(
         biases = cs@biases, counts = cs@counts, design = cs@design,
         init = op$par, bf_per_kb = bf_per_kb, nthreads=ncores)))
       op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag",

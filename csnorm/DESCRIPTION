@@ -27,7 +27,7 @@ Collate:
     'csnorm.R'
     'accessors.R'
     'normalize.R'
-    'normalize_gauss.R'
+    'normalize_gauss_bam.R'
     'postprocess.R'
     'preprocess.R'
     'stanmodels.R'
