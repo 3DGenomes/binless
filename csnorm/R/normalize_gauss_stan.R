@@ -7,10 +7,17 @@ NULL
 csnorm_gauss_guess_stan = function(biases, counts, design, lambda, dmin, dmax, bf_per_kb=1, bf_per_decade=20,
                               iter=10000, dispersion=10, ...) {
   nBiases=design[,uniqueN(genomic)]
+  if (lambda=="observed") initlambda=1e-9 else initlambda=as.numeric(lambda)
   init=list(log_iota=array(0,dim=biases[,.N]), log_rho=array(0,dim=biases[,.N]),
             log_decay=array(0,dim=counts[,.N]), eC=array(0,dim=design[,.N]),
-            alpha=dispersion, lambda_iota=array(lambda,dim=nBiases), lambda_rho=array(lambda,dim=nBiases))
-  op=csnorm_gauss_genomic_stan(biases, counts, design, init, bf_per_kb=bf_per_kb, iter=iter, estimate.lambdas=F, ...)
+            alpha=dispersion, lambda_iota=array(initlambda,dim=nBiases), lambda_rho=array(initlambda,dim=nBiases))
+  if (lambda=="observed") {
+    cat("init with data\n")
+    op=csnorm_gauss_genomic_stan(biases, counts, design, init, bf_per_kb=bf_per_kb, iter=iter, init.mean="data", ...)
+  } else {
+    cat("init with mean\n")
+    op=csnorm_gauss_genomic_stan(biases, counts, design, init, bf_per_kb=bf_per_kb, iter=iter, init.mean="mean", ...)
+  }
   #add diagonal decay inits
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   Decays=design[,uniqueN(decay)]
@@ -80,31 +87,44 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
 #' @keywords internal
 #' 
 csnorm_gauss_genomic_stan = function(biases, counts, design, init, bf_per_kb=1, iter=10000,
-                                verbose=T, estimate.lambdas=T, ...) {
+                                verbose=T, init.mean="mean", ...) {
   #add bias informations to counts
   csub=copy(counts)
-  csub[,log_decay:=init$log_decay]
-  bsub=biases[,.(id)]
-  bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
-  csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
-  csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-  csub=merge(cbind(design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
-  #compute means
-  csub[,lmu.base:=eC + log_decay]
-  csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(lmu.base+log_iota1+log_rho2,
-                                                           lmu.base+log_rho1 +log_rho2,
-                                                           lmu.base+log_rho1 +log_iota2,
-                                                           lmu.base+log_iota1+log_iota2)]
-  csub[,lmu.base:=NULL]
-  #collect all counts on left/right side
-  cts=rbind(csub[,.(id=id1,R=contact.close, L=contact.far,  muR=exp(lmu.close), muL=exp(lmu.far),
-                    etaL=eC + log_iota1, etaR=eC + log_rho1)],
-            csub[,.(id=id1,R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
-                    etaL=eC + log_iota1, etaR=eC + log_rho1)],
-            csub[,.(id=id2,R=contact.far,   L=contact.close,muR=exp(lmu.far),   muL=exp(lmu.close),
-                    etaL=eC + log_iota2, etaR=eC + log_rho2)],
-            csub[,.(id=id2,R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
-                    etaL=eC + log_iota2, etaR=eC + log_rho2)])
+  if (init.mean=="mean") {
+    csub[,log_decay:=init$log_decay]
+    bsub=biases[,.(id)]
+    bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
+    csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
+    csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
+    csub=merge(cbind(design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
+    #compute means
+    csub[,lmu.base:=eC + log_decay]
+    csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(lmu.base+log_iota1+log_rho2,
+                                                             lmu.base+log_rho1 +log_rho2,
+                                                             lmu.base+log_rho1 +log_iota2,
+                                                             lmu.base+log_iota1+log_iota2)]
+    csub[,lmu.base:=NULL]
+    #collect all counts on left/right side
+    cts=rbind(csub[,.(id=id1,R=contact.close, L=contact.far,  muR=exp(lmu.close), muL=exp(lmu.far),
+                      etaL=eC + log_iota1, etaR=eC + log_rho1)],
+              csub[,.(id=id1,R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
+                      etaL=eC + log_iota1, etaR=eC + log_rho1)],
+              csub[,.(id=id2,R=contact.far,   L=contact.close,muR=exp(lmu.far),   muL=exp(lmu.close),
+                      etaL=eC + log_iota2, etaR=eC + log_rho2)],
+              csub[,.(id=id2,R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
+                      etaL=eC + log_iota2, etaR=eC + log_rho2)])
+  } else {
+    epsilon=1e-7
+    csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log(contact.far+epsilon),
+                                                             log(contact.down+epsilon),
+                                                             log(contact.close+epsilon),
+                                                             log(contact.up+epsilon))]
+    cts=rbind(csub[,.(id=id1,R=contact.close, L=contact.far,  etaR=lmu.close, etaL=lmu.far)],
+              csub[,.(id=id1,R=contact.down,  L=contact.up,   etaR=lmu.down,  etaL=lmu.up)],
+              csub[,.(id=id2,R=contact.far,   L=contact.close,etaR=lmu.far,   etaL=lmu.close)],
+              csub[,.(id=id2,R=contact.down,  L=contact.up,   etaR=lmu.down,  etaL=lmu.up)])
+    cts[,c("muL","muR"):=list(exp(etaL),exp(etaR))]
+  }
   cts[,c("varL","varR"):=list(1/muL+1/init$alpha,1/muR+1/init$alpha)]
   cts=cts[,.(etaLhat=sum((L/muL-1+etaL)/varL)/sum(1/varL),
              etaRhat=sum((R/muR-1+etaR)/varR)/sum(1/varR),
@@ -120,7 +140,6 @@ csnorm_gauss_genomic_stan = function(biases, counts, design, init, bf_per_kb=1, 
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
             eta_hat_L=cts[,etaLhat], eta_hat_R=cts[,etaRhat], sd_L=cts[,sdL], sd_R=cts[,sdR],
             alpha=init$alpha)
-  op=optimize_stan_model(model=csnorm:::stanmodels$gauss_genomic, data=data, iter=100, verbose=T, init=init)
   op=optimize_stan_model(model=stanmodels$gauss_genomic, data=data, iter=iter, verbose=verbose, init=init, ...)
   #make nice output table
   bout=cbind(biases,as.data.table(op$par[c("log_mean_DL","log_mean_DR","log_mean_RJ")]))
