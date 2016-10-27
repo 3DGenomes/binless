@@ -11,20 +11,14 @@ csnorm_gauss_guess_stan = function(biases, counts, design, lambda, dmin, dmax, b
   init=list(log_iota=array(0,dim=biases[,.N]), log_rho=array(0,dim=biases[,.N]),
             log_decay=array(0,dim=counts[,.N]), eC=array(0,dim=design[,.N]), eRJ=array(0,dim=design[,.N]), eDE=array(0,dim=design[,.N]),
             alpha=dispersion, lambda_iota=array(initlambda,dim=nBiases), lambda_rho=array(initlambda,dim=nBiases))
-  if (lambda=="observed") {
-    cat("init with data\n")
-    op=csnorm_gauss_genomic_stan(biases, counts, design, init, bf_per_kb=bf_per_kb, iter=iter, init.mean="data", ...)
-  } else {
-    cat("init with mean\n")
-    op=csnorm_gauss_genomic_stan(biases, counts, design, init, bf_per_kb=bf_per_kb, iter=iter, init.mean="mean", ...)
-  }
+  op=csnorm_gauss_genomic_stan(biases, counts, design, init, bf_per_kb=bf_per_kb, iter=iter, ...)
   #add diagonal decay inits
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   Decays=design[,uniqueN(decay)]
   beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
   op$par=c(list(beta_diag=beta_diag, lambda_diag=array(1,dim=Decays), log_decay=rep(0,counts[,.N]),
                 alpha=dispersion, lambda_iota=init$lambda_iota, lambda_rho=init$lambda_rho),
-           op$par[c("eC","eRJ","eDE","beta_iota","beta_rho","log_iota","log_rho")])
+           op$par[c("eC","eRJ","eDE","beta_iota","beta_rho","log_iota","log_rho","biases")])
   return(op)
 }
 
@@ -87,7 +81,7 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
 #' @keywords internal
 #' 
 csnorm_gauss_genomic_stan = function(biases, counts, design, init, bf_per_kb=1, iter=10000,
-                                verbose=T, init.mean="mean", ...) {
+                                verbose=T, ...) {
   #compute bias means
   bsub=copy(biases)
   bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
@@ -143,13 +137,9 @@ csnorm_gauss_genomic_stan = function(biases, counts, design, init, bf_per_kb=1, 
             sd_L=cts[cat=="contact L",std], sd_R=cts[cat=="contact R",std], alpha=init$alpha)
   op=optimize_stan_model(model=stanmodels$gauss_genomic, data=data, iter=iter, verbose=verbose, init=init, ...)
   #make nice output table
-  bout=cbind(biases,as.data.table(op$par[c("log_mean_DL","log_mean_DR","log_mean_RJ")]))
-  bout=rbind(bout[,.(cat="dangling L", name, id, pos, etahat=dangling.L/exp(log_mean_DL)-1+log_mean_DL,
-                     std=sqrt(1/exp(log_mean_DL)+1/init$alpha), eta=log_mean_DL)],
-             bout[,.(cat="dangling R", name, id, pos, etahat=dangling.R/exp(log_mean_DR)-1+log_mean_DR,
-                     std=sqrt(1/exp(log_mean_DR)+1/init$alpha), eta=log_mean_DR)],
-             bout[,.(cat="rejoined", name, id, pos, etahat=rejoined/exp(log_mean_RJ)-1+log_mean_RJ,
-                     std=sqrt(1/exp(log_mean_RJ)+1/init$alpha), eta=log_mean_RJ)])
+  bout=rbind(bts[,.(cat="dangling L", name, id, pos, etahat, std, eta=op$par$log_mean_DL)],
+             bts[,.(cat="dangling R", name, id, pos, etahat, std, eta=op$par$log_mean_DR)],
+             bts[,.(cat="rejoined", name, id, pos, etahat, std, eta=op$par$log_mean_RJ)])
   cout=rbind(cts[,.(cat="contact L", name, id, pos, etahat, std, eta=op$par$log_mean_cleft)],
              cts[,.(cat="contact R", name, id, pos, etahat, std, eta=op$par$log_mean_cright)])
   bout=rbind(bout,cout)

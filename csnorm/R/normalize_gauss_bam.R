@@ -16,7 +16,7 @@ csnorm_gauss_guess_bam = function(biases, counts, design, dmin, dmax, bf_per_kb=
   beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
   op$par=c(list(beta_diag=beta_diag, lambda_diag=array(1,dim=Decays), log_decay=rep(0,counts[,.N]),
                 alpha=dispersion),
-           op$par[c("eC","eRJ","eDE","log_iota","log_rho")])
+           op$par[c("eC","eRJ","eDE","log_iota","log_rho","biases")])
   op
 }
 
@@ -111,7 +111,7 @@ csnorm_gauss_genomic_bam = function(biases, counts, design, init, bf_per_kb=1, v
   data=data[merge(log_iota,log_rho,by=key(data))]
   op=list(value=-1, par=list(eC=eC[,as.array(eC)], eDE=eDE[,as.array(eDE)], eRJ=eRJ[,as.array(eRJ)],
                              log_iota=log_iota[,log_iota], log_rho=log_rho[,log_rho]))
-  op$par$biases = data[,.(cat, name, id, pos, etahat, std, eta=lmu)]
+  op$par$biases = data[,.(cat, name, id, pos, etahat, std, eta=gam)]
   setkey(op$par$biases, cat, name, id)
   op
 }
