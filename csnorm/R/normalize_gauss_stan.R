@@ -9,7 +9,7 @@ csnorm_gauss_guess_stan = function(biases, counts, design, lambda, dmin, dmax, b
   nBiases=design[,uniqueN(genomic)]
   if (lambda=="observed") initlambda=1e-9 else initlambda=as.numeric(lambda)
   init=list(log_iota=array(0,dim=biases[,.N]), log_rho=array(0,dim=biases[,.N]),
-            log_decay=array(0,dim=counts[,.N]), eC=array(0,dim=design[,.N]),
+            log_decay=array(0,dim=counts[,.N]), eC=array(0,dim=design[,.N]), eRJ=array(0,dim=design[,.N]), eDE=array(0,dim=design[,.N]),
             alpha=dispersion, lambda_iota=array(initlambda,dim=nBiases), lambda_rho=array(initlambda,dim=nBiases))
   if (lambda=="observed") {
     cat("init with data\n")
@@ -88,71 +88,70 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
 #' 
 csnorm_gauss_genomic_stan = function(biases, counts, design, init, bf_per_kb=1, iter=10000,
                                 verbose=T, init.mean="mean", ...) {
+  #compute bias means
+  bsub=copy(biases)
+  bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
+  bsub=merge(cbind(design[,.(name)],eRJ=init$eRJ,eDE=init$eDE), bsub, by="name",all.x=F,all.y=T)
+  bsub[,c("lmu.DL","lmu.DR","lmu.RJ"):=list(eDE+log_iota,eDE+log_rho,eRJ+(log_iota+log_rho)/2)]
+  bts=rbind(bsub[,.(name,id,pos,cat="dangling L", lmu=lmu.DL, etahat=dangling.L/exp(lmu.DL)-1+lmu.DL,
+                    std=sqrt(1/exp(lmu.DL)+1/init$alpha))],
+            bsub[,.(name,id,pos,cat="dangling R", lmu=lmu.DR, etahat=dangling.R/exp(lmu.DR)-1+lmu.DR,
+                    std=sqrt(1/exp(lmu.DR)+1/init$alpha))],
+            bsub[,.(name,id,pos,cat="rejoined", lmu=lmu.RJ, etahat=rejoined/exp(lmu.RJ)-1+lmu.RJ,
+                    std=sqrt(1/exp(lmu.RJ)+1/init$alpha))])
+  stopifnot(bts[,.N]==3*biases[,.N])
+  bsub=bsub[,.(id,log_iota,log_rho)]
   #add bias informations to counts
   csub=copy(counts)
-  if (init.mean=="mean") {
-    csub[,log_decay:=init$log_decay]
-    bsub=biases[,.(id)]
-    bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
-    csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
-    csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-    csub=merge(cbind(design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
-    #compute means
-    csub[,lmu.base:=eC + log_decay]
-    csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(lmu.base+log_iota1+log_rho2,
-                                                             lmu.base+log_rho1 +log_rho2,
-                                                             lmu.base+log_rho1 +log_iota2,
-                                                             lmu.base+log_iota1+log_iota2)]
-    csub[,lmu.base:=NULL]
-    #collect all counts on left/right side
-    cts=rbind(csub[,.(id=id1,R=contact.close, L=contact.far,  muR=exp(lmu.close), muL=exp(lmu.far),
-                      etaL=eC + log_iota1, etaR=eC + log_rho1)],
-              csub[,.(id=id1,R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
-                      etaL=eC + log_iota1, etaR=eC + log_rho1)],
-              csub[,.(id=id2,R=contact.far,   L=contact.close,muR=exp(lmu.far),   muL=exp(lmu.close),
-                      etaL=eC + log_iota2, etaR=eC + log_rho2)],
-              csub[,.(id=id2,R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
-                      etaL=eC + log_iota2, etaR=eC + log_rho2)])
-  } else {
-    epsilon=1e-7
-    csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log(contact.far+epsilon),
-                                                             log(contact.down+epsilon),
-                                                             log(contact.close+epsilon),
-                                                             log(contact.up+epsilon))]
-    cts=rbind(csub[,.(id=id1,R=contact.close, L=contact.far,  etaR=lmu.close, etaL=lmu.far)],
-              csub[,.(id=id1,R=contact.down,  L=contact.up,   etaR=lmu.down,  etaL=lmu.up)],
-              csub[,.(id=id2,R=contact.far,   L=contact.close,etaR=lmu.far,   etaL=lmu.close)],
-              csub[,.(id=id2,R=contact.down,  L=contact.up,   etaR=lmu.down,  etaL=lmu.up)])
-    cts[,c("muL","muR"):=list(exp(etaL),exp(etaR))]
-  }
+  csub[,log_decay:=init$log_decay]
+  csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
+  csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
+  csub=merge(cbind(design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
+  #compute means
+  csub[,lmu.base:=eC + log_decay]
+  csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(lmu.base+log_iota1+log_rho2,
+                                                           lmu.base+log_rho1 +log_rho2,
+                                                           lmu.base+log_rho1 +log_iota2,
+                                                           lmu.base+log_iota1+log_iota2)]
+  csub[,lmu.base:=NULL]
+  #collect all counts on left/right side
+  cts=rbind(csub[,.(name,id=id1, pos=pos1, R=contact.close, L=contact.far,  muR=exp(lmu.close), muL=exp(lmu.far),
+                    etaL=eC + log_iota1, etaR=eC + log_rho1)],
+            csub[,.(name,id=id1, pos=pos1, R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
+                    etaL=eC + log_iota1, etaR=eC + log_rho1)],
+            csub[,.(name,id=id2, pos=pos2, R=contact.far,   L=contact.close,muR=exp(lmu.far),   muL=exp(lmu.close),
+                    etaL=eC + log_iota2, etaR=eC + log_rho2)],
+            csub[,.(name,id=id2, pos=pos2, R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
+                    etaL=eC + log_iota2, etaR=eC + log_rho2)])
+  rm(csub)
   cts[,c("varL","varR"):=list(1/muL+1/init$alpha,1/muR+1/init$alpha)]
-  cts=cts[,.(etaLhat=sum((L/muL-1+etaL)/varL)/sum(1/varL),
-             etaRhat=sum((R/muR-1+etaR)/varR)/sum(1/varR),
-             sdL=sqrt(2)/sqrt(sum(1/varL)),
-             sdR=sqrt(2)/sqrt(sum(1/varR))),keyby=id]
-  stopifnot(cts[,.N]==biases[,.N])
+  cts=rbind(cts[,.(cat="contact L", lmu=sum(etaL/varL)/sum(1/varL), etahat=sum((L/muL-1+etaL)/varL)/sum(1/varL),
+                   std=sqrt(2)/sqrt(sum(1/varL))),by=c("name","id","pos")],
+            cts[,.(cat="contact R", lmu=sum(etaR/varR)/sum(1/varR), etahat=sum((R/muR-1+etaR)/varR)/sum(1/varR),
+                   std=sqrt(2)/sqrt(sum(1/varR))),by=c("name","id","pos")])
+  setkey(cts,name,id,cat)
+  stopifnot(cts[,.N]==2*biases[,.N])
   #run optimization
+  cat("optimize with stan\n")
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
   data=list(Dsets=design[,.N], Biases=design[,uniqueN(genomic)], XB=as.array(design[,genomic]),
             Krow=Krow, SD=biases[,.N], bbegin=bbegin,
             cutsitesD=biases[,pos], rejoined=biases[,rejoined],
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            eta_hat_L=cts[,etaLhat], eta_hat_R=cts[,etaRhat], sd_L=cts[,sdL], sd_R=cts[,sdR],
-            alpha=init$alpha)
+            eta_hat_L=cts[cat=="contact L",etahat], eta_hat_R=cts[cat=="contact R",etahat],
+            sd_L=cts[cat=="contact L",std], sd_R=cts[cat=="contact R",std], alpha=init$alpha)
   op=optimize_stan_model(model=stanmodels$gauss_genomic, data=data, iter=iter, verbose=verbose, init=init, ...)
   #make nice output table
   bout=cbind(biases,as.data.table(op$par[c("log_mean_DL","log_mean_DR","log_mean_RJ")]))
-  cout=cbind(cts,as.data.table(op$par[c("log_mean_cleft","log_mean_cright")]))
-  cout=merge(cout,bout[,.(name,id,pos)],by="id")
   bout=rbind(bout[,.(cat="dangling L", name, id, pos, etahat=dangling.L/exp(log_mean_DL)-1+log_mean_DL,
                      std=sqrt(1/exp(log_mean_DL)+1/init$alpha), eta=log_mean_DL)],
              bout[,.(cat="dangling R", name, id, pos, etahat=dangling.R/exp(log_mean_DR)-1+log_mean_DR,
                      std=sqrt(1/exp(log_mean_DR)+1/init$alpha), eta=log_mean_DR)],
              bout[,.(cat="rejoined", name, id, pos, etahat=rejoined/exp(log_mean_RJ)-1+log_mean_RJ,
                      std=sqrt(1/exp(log_mean_RJ)+1/init$alpha), eta=log_mean_RJ)])
-  cout=rbind(cout[,.(cat="contact L", name, id, pos, etahat=etaLhat, std=sdL, eta=log_mean_cleft)],
-             cout[,.(cat="contact R", name, id, pos, etahat=etaRhat, std=sdR, eta=log_mean_cright)])
+  cout=rbind(cts[,.(cat="contact L", name, id, pos, etahat, std, eta=op$par$log_mean_cleft)],
+             cts[,.(cat="contact R", name, id, pos, etahat, std, eta=op$par$log_mean_cright)])
   bout=rbind(bout,cout)
   setkey(bout, cat, name, id)
   op$par$biases=bout

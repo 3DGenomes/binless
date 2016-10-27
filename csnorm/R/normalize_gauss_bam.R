@@ -76,7 +76,7 @@ csnorm_gauss_genomic_bam = function(biases, counts, design, init, bf_per_kb=1, v
   data[cat=="rejoined",   c("iota.coef","rho.coef","is.dangling","is.rejoined"):=list(1/2,1/2,0,1)]
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   #optimize each set of biases separately
-  cat("optimize with BAM") #necessary so logging goes smoothly
+  cat("optimize with BAM\n") #necessary so logging goes smoothly
   data = foreach(gen=design[,uniqueN(genomic)], .combine=rbind) %do% {
     dsets=design[genomic==gen,name]
     sdata=data[name %in% dsets]
