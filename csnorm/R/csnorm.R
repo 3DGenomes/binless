@@ -231,7 +231,7 @@ setMethod("show",signature="CSnorm",definition=function(object) {
     cat(" Dataset not yet normalized\n")
   } else {
     cat(" Normalized dataset\n")
-    cat("  dispersion: ",cs@par$alpha,"\n log likelihood: ", cs@par$value, "\n")
+    cat("  dispersion: ",object@par$alpha,"\n log likelihood: ", object@par$value, "\n")
     nbinned=length(object@binned)
     if (nbinned==0) {
       cat(" No binned matrix available")
