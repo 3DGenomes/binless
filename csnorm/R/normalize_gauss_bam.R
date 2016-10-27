@@ -112,6 +112,7 @@ csnorm_gauss_genomic_bam = function(biases, counts, design, init, bf_per_kb=1, v
   op=list(value=-1, par=list(eC=eC[,as.array(eC)], eDE=eDE[,as.array(eDE)], eRJ=eRJ[,as.array(eRJ)],
                              log_iota=log_iota[,log_iota], log_rho=log_rho[,log_rho]))
   op$par$biases = data[,.(cat, name, id, pos, etahat, std, eta=lmu)]
+  setkey(op$par$biases, cat, name, id)
   op
 }
 

@@ -120,17 +120,22 @@ csnorm_gauss_genomic_stan = function(biases, counts, design, init, bf_per_kb=1, 
             danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
             eta_hat_L=cts[,etaLhat], eta_hat_R=cts[,etaRhat], sd_L=cts[,sdL], sd_R=cts[,sdR],
             alpha=init$alpha)
+  op=optimize_stan_model(model=csnorm:::stanmodels$gauss_genomic, data=data, iter=100, verbose=T, init=init)
   op=optimize_stan_model(model=stanmodels$gauss_genomic, data=data, iter=iter, verbose=verbose, init=init, ...)
   #make nice output table
-  bout=cbind(biases,as.data.table(op$par[c("log_iota","log_rho","log_mean_DL","log_mean_DR","log_mean_RJ")]))
-  cout=cbind(cts,as.data.table(op$par[c("log_iota","log_rho","log_mean_cleft","log_mean_cright")]))
+  bout=cbind(biases,as.data.table(op$par[c("log_mean_DL","log_mean_DR","log_mean_RJ")]))
+  cout=cbind(cts,as.data.table(op$par[c("log_mean_cleft","log_mean_cright")]))
   cout=merge(cout,bout[,.(name,id,pos)],by="id")
-  bout=rbind(bout[,.(cat="dangling L", name, id, pos, log_iota, log_rho, z=dangling.L/exp(log_mean_DL)-1, std=sqrt(1/exp(log_mean_DL)+1/init$alpha))],
-             bout[,.(cat="dangling R", name, id, pos, log_iota, log_rho, z=dangling.R/exp(log_mean_DR)-1, std=sqrt(1/exp(log_mean_DL)+1/init$alpha))],
-             bout[,.(cat="rejoined", name, id, pos, log_iota, log_rho, z=rejoined/exp(log_mean_RJ)-1, std=sqrt(1/exp(log_mean_RJ)+1/init$alpha))])
-  cout=rbind(cout[,.(cat="contact L", name, id, pos, log_iota, log_rho, z=etaLhat-log_mean_cleft, std=sdL)],
-             cout[,.(cat="contact R", name, id, pos, log_iota, log_rho, z=etaRhat-log_mean_cright, std=sdR)])
+  bout=rbind(bout[,.(cat="dangling L", name, id, pos, etahat=dangling.L/exp(log_mean_DL)-1+log_mean_DL,
+                     std=sqrt(1/exp(log_mean_DL)+1/init$alpha), eta=log_mean_DL)],
+             bout[,.(cat="dangling R", name, id, pos, etahat=dangling.R/exp(log_mean_DR)-1+log_mean_DR,
+                     std=sqrt(1/exp(log_mean_DR)+1/init$alpha), eta=log_mean_DR)],
+             bout[,.(cat="rejoined", name, id, pos, etahat=rejoined/exp(log_mean_RJ)-1+log_mean_RJ,
+                     std=sqrt(1/exp(log_mean_RJ)+1/init$alpha), eta=log_mean_RJ)])
+  cout=rbind(cout[,.(cat="contact L", name, id, pos, etahat=etaLhat, std=sdL, eta=log_mean_cleft)],
+             cout[,.(cat="contact R", name, id, pos, etahat=etaRhat, std=sdR, eta=log_mean_cright)])
   bout=rbind(bout,cout)
+  setkey(bout, cat, name, id)
   op$par$biases=bout
   op
 }
