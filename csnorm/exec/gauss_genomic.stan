@@ -15,17 +15,18 @@ data {
   int<lower=1> SD; //number of cut sites across all datasets
   int<lower=1,upper=SD+1> bbegin[Dsets+1]; //bbegin[i]=j: dataset i starts at j
   vector[SD] cutsitesD; //cut site locations, all data
-  int<lower=0> rejoined[SD];
-  int<lower=0> danglingL[SD];
-  int<lower=0> danglingR[SD];
-  //reduced count sums
+  //reduced count sums and standard deviations
+  vector[SD] eta_hat_RJ;
+  vector[SD] eta_hat_DL;
+  vector[SD] eta_hat_DR;
   vector[SD] eta_hat_L;
   vector[SD] eta_hat_R;
   //standard deviations
+  vector<lower=0>[SD] sd_RJ;
+  vector<lower=0>[SD] sd_DL;
+  vector<lower=0>[SD] sd_DR;
   vector<lower=0>[SD] sd_L;
   vector<lower=0>[SD] sd_R;
-  //dispersion
-  real<lower=0> alpha;
 }
 transformed data {
   //bias spline, sparse (iota and rho have the same design)
@@ -151,13 +152,11 @@ transformed parameters {
 model {
   //// likelihoods
   //biases
-  rejoined  ~ neg_binomial_2_log(log_mean_RJ, alpha);
-  danglingL ~ neg_binomial_2_log(log_mean_DL, alpha);
-  danglingR ~ neg_binomial_2_log(log_mean_DR, alpha);
+  eta_hat_RJ  ~ normal(log_mean_RJ, sd_RJ);
+  eta_hat_DL  ~ normal(log_mean_DL, sd_DL);
+  eta_hat_DR  ~ normal(log_mean_DR, sd_DR);
   
   //counts
-  //grouping reduces the number of likelihoods from S-1 to G, so reweighting is
-  //needed for a proper estimation of the lambdas
   eta_hat_L ~ normal(log_mean_cleft, sd_L);
   eta_hat_R ~ normal(log_mean_cright, sd_R);
   

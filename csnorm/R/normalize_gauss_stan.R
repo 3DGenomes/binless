@@ -130,18 +130,19 @@ csnorm_gauss_genomic_stan = function(biases, counts, design, init, bf_per_kb=1, 
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
   data=list(Dsets=design[,.N], Biases=design[,uniqueN(genomic)], XB=as.array(design[,genomic]),
-            Krow=Krow, SD=biases[,.N], bbegin=bbegin,
-            cutsitesD=biases[,pos], rejoined=biases[,rejoined],
-            danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            eta_hat_L=cts[cat=="contact L",etahat], eta_hat_R=cts[cat=="contact R",etahat],
-            sd_L=cts[cat=="contact L",std], sd_R=cts[cat=="contact R",std], alpha=init$alpha)
-  op=optimize_stan_model(model=stanmodels$gauss_genomic, data=data, iter=iter, verbose=verbose, init=init, ...)
+            Krow=Krow, SD=biases[,.N], bbegin=bbegin, cutsitesD=biases[,pos],
+            eta_hat_RJ=bts[cat=="rejoined",etahat], sd_RJ=bts[cat=="rejoined",std],
+            eta_hat_DL=bts[cat=="dangling L",etahat], sd_DL=bts[cat=="dangling L",std],
+            eta_hat_DR=bts[cat=="dangling R",etahat], sd_DR=bts[cat=="dangling R",std],
+            eta_hat_L=cts[cat=="contact L",etahat], sd_L=cts[cat=="contact L",std],
+            eta_hat_R=cts[cat=="contact R",etahat], sd_R=cts[cat=="contact R",std], alpha=init$alpha)
+  op=optimize_stan_model(model=stanmodels$gauss_genomic, data=data, iter=iter, verbose=verbose, init=0, ...)
   #make nice output table
-  bout=rbind(bts[,.(cat="dangling L", name, id, pos, etahat, std, eta=op$par$log_mean_DL)],
-             bts[,.(cat="dangling R", name, id, pos, etahat, std, eta=op$par$log_mean_DR)],
-             bts[,.(cat="rejoined", name, id, pos, etahat, std, eta=op$par$log_mean_RJ)])
-  cout=rbind(cts[,.(cat="contact L", name, id, pos, etahat, std, eta=op$par$log_mean_cleft)],
-             cts[,.(cat="contact R", name, id, pos, etahat, std, eta=op$par$log_mean_cright)])
+  bout=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_DL)],
+             bts[cat=="dangling R",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_DR)],
+             bts[cat=="rejoined",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_RJ)])
+  cout=rbind(cts[cat=="contact L",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_cleft)],
+             cts[cat=="contact R",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_cright)])
   bout=rbind(bout,cout)
   setkey(bout, cat, name, id)
   op$par$biases=bout
