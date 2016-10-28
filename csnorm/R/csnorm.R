@@ -14,8 +14,9 @@
 #' \code{\link{generate_fake_dataset}} follows model specification
 #'
 #' @section Normalization:
-#' \code{\link{run_gauss_stan}}
+#' \code{\link{run_gauss}}
 #' \code{\link{run_gauss_bam}}
+#' \code{\link{run_exact}}
 #'
 #' @section Postprocessing:
 #' \code{\link{bin_all_datasets}}

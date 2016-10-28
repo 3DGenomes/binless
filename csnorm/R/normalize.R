@@ -250,9 +250,9 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subs
 #' Will run the exact model of normalization (on one cpu for each lambda 
 #' provided) and returns the most likely model and predicted quantities. Useful
 #' for comparison purposes. If you don't know what to use, try 
-#' \code{\link{run_gauss_stan}} or \code{\link{run_gauss_bam}}.
+#' \code{\link{run_gauss}}
 #' 
-#' @inheritParams run_gauss_stan
+#' @inheritParams run_gauss
 #' @param subsampling.pc numeric. Percentage of the data used to do the calculations (default 100).
 #'   
 #' @return A csnorm object
@@ -330,7 +330,7 @@ check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10) {
 #' make sure these input files correspond to a run with the exact same
 #' parameters up to the initial condition.
 #' 
-#' @param prefix character. As provided to \code{\link{run_gauss_stan}} or
+#' @param prefix character. As provided to \code{\link{run_gauss}} or
 #' \code{\link{run_gauss_bam}} or \code{\link{run_exact}}.
 #'   
 #' @return A CSnorm object

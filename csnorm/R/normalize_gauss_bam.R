@@ -6,14 +6,15 @@ NULL
 #' 
 csnorm_gauss_guess_bam = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_decade=20,
                               dispersion=10, nthreads=1, verbose=T) {
-  op = csnorm:::csnorm_gauss_genomic_bam(biases, counts, design, init=dispersion, bf_per_kb=bf_per_kb, verbose=verbose, nthreads=nthreads)
+  op = csnorm_gauss_genomic_bam(biases, counts, design, init=dispersion,
+                                bf_per_kb=bf_per_kb, verbose=verbose, nthreads=nthreads)
   #add diagonal decay inits
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   Decays=design[,uniqueN(decay)]
   beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
   op$par=c(list(beta_diag=beta_diag, lambda_diag=array(1,dim=Decays), log_decay=rep(0,counts[,.N]),
                 alpha=dispersion),
-           op$par[c("eC","eRJ","eDE","log_iota","log_rho","biases")])
+           op$par[c("eC","eRJ","eDE","log_iota","log_rho","biases","lambda_iota","lambda_rho")])
   op
 }
 
@@ -77,35 +78,9 @@ csnorm_gauss_genomic_bam = function(biases, counts, design, init, bf_per_kb=1, v
   op
 }
 
-#' Cut-site normalization (fast approximation, using mgcv BAM)
+#' Cut-site normalization (deprecated fast approximation, using mgcv BAM)
 #' 
-#' Alternates two approximations to the exact model, fitting the diagonal decay
-#' and iota/rho.
-#' 
-#' @param cs CSnorm object as returned by \code{\link{merge_cs_norm_datasets}}
-#' @param If provided, should correspond to a previous cs@par slot which will be used as a starting point
-#' @param bf_per_kb positive numeric. Number of cubic spline basis functions per
-#'   kilobase, for genomic bias estimates. Small values make the optimization 
-#'   easy, but makes the genomic biases stiffer.
-#' @param bf_per_decade positive numeric. Number of cubic spline basis functions
-#'   per distance decade (in bases), for diagonal decay. Default parameter 
-#'   should suffice.
-#' @param bins_per_bf positive integer. Number of distance bins to split basis 
-#'   functions into. Must be sufficiently small so that the diagonal decay is 
-#'   approximately constant in that bin.
-#' @param ngibbs positive integer. Number of gibbs sampling iterations.
-#' @param iter positive integer. Number of optimization steps for each stan 
-#'   optimization call.
-#' @param fit.decay,fit.genomic,fit.disp boolean. Whether to fit diagonal decay or
-#'   genomic biases. Set to FALSE only for diagnostics.
-#' @param verbose Display progress if TRUE
-#' @param ncounts positive integer. Number of counts to use for dispersion estimation.
-#' @param init_alpha positive numeric, default 1e-5. Initial step size of LBFGS
-#'   line search (decay and dispersion steps).
-#' @param ncores positive integer. Number of cores to parallelize the fit using bam. Does not scale well.
-#'   
-#' @return A csnorm object
-#' @export
+#' @inheritParams run_gauss
 #' 
 #' @examples
 run_gauss_bam = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
@@ -135,10 +110,10 @@ run_gauss_bam = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_
     cs@diagnostics=list()
     cs@binned=list()
     laststep=0
-    init.a=system.time(init.output <- capture.output(op <- csnorm:::csnorm_gauss_guess_bam(
+    init.a = system.time(init.output <- capture.output(op <- csnorm:::csnorm_gauss_guess_bam(
       biases = cs@biases, counts = cs@counts, design = cs@design, dmin=dmin, dmax=dmax,
-      bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, nthreads=ncores)))
-    init.output = "Flat init"
+      bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, dispersion=1, nthreads=ncores)))
+    init.output = "Init with data"
     cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=0, leg="bias", out=init.output,
                                                  runtime=init.a[1]+init.a[4], op=op)
   } else {
@@ -162,7 +137,7 @@ run_gauss_bam = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_
       op=list(value=op.diag$value, par=c(op.diag$par[c("eC","beta_diag","beta_diag_centered",
                                                        "log_decay","decay", "lambda_diag")],
                                          op$par[c("eRJ","eDE", "alpha",
-                                                  "log_iota","log_rho","biases")]))
+                                                  "lambda_iota","lambda_rho","log_iota","log_rho","biases")]))
       cs@diagnostics$params = update_diagnostics(cs, step=i, leg="decay", out=output, runtime=a[1]+a[4], op=op)
     }
     #fit iota and rho given diagonal decay
@@ -173,7 +148,8 @@ run_gauss_bam = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_
         init = op$par, bf_per_kb = bf_per_kb, nthreads=ncores)))
       op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag",
                                                  "log_decay","decay", "alpha")],
-                                        op.gen$par[c("eC","eRJ","eDE", "log_iota","log_rho","biases")]))
+                                        op.gen$par[c("eC","eRJ","eDE",
+                                                     "log_iota","log_rho","biases","lambda_iota","lambda_rho")]))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", out=output, runtime=a[1]+a[4], op=op)
     }
     #make sure beta_diag is strictly increasing
@@ -186,7 +162,8 @@ run_gauss_bam = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_
         dmin=dmin, dmax=dmax, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter,
         weight=subcounts.weight, init_alpha=init_alpha)))
       op=list(value=op.disp$value, par=c(op$par[c("beta_diag","beta_diag_centered","log_decay","decay",
-                                                  "log_iota","log_rho","biases","lambda_diag")],
+                                                  "log_iota","log_rho","biases",
+                                                  "lambda_iota","lambda_rho", "lambda_diag")],
                                          op.disp$par[c("eC","eRJ","eDE","alpha")]))
       cs@diagnostics$params = update_diagnostics(cs, step=i, leg="disp", out=output, runtime=a[1]+a[4], op=op)
       if (verbose==T) cat("Gibbs",i,": log-likelihood = ",op$value,"\n")
