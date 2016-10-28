@@ -167,6 +167,6 @@ model {
   }
   
   //// hyperprior
-  lambda_iota ~ cauchy(0,1);
-  lambda_rho ~ cauchy(0,1);
+  lambda_iota ~ normal(0,0.1);
+  lambda_rho ~ normal(0,0.1);
 }
