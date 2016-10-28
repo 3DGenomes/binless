@@ -6,12 +6,7 @@ NULL
 #' 
 csnorm_gauss_guess_stan = function(biases, counts, design, lambda, dmin, dmax, bf_per_kb=1, bf_per_decade=20,
                               iter=10000, dispersion=10, ...) {
-  nBiases=design[,uniqueN(genomic)]
-  if (lambda=="observed") initlambda=1e-9 else initlambda=as.numeric(lambda)
-  init=list(log_iota=array(0,dim=biases[,.N]), log_rho=array(0,dim=biases[,.N]),
-            log_decay=array(0,dim=counts[,.N]), eC=array(0,dim=design[,.N]), eRJ=array(0,dim=design[,.N]), eDE=array(0,dim=design[,.N]),
-            alpha=dispersion, lambda_iota=array(initlambda,dim=nBiases), lambda_rho=array(initlambda,dim=nBiases))
-  op=csnorm_gauss_genomic_stan(biases, counts, design, init, bf_per_kb=bf_per_kb, iter=iter, ...)
+  op=csnorm_gauss_genomic_stan(biases, counts, design, init=dispersion, bf_per_kb=bf_per_kb, iter=iter, ...)
   #add diagonal decay inits
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   Decays=design[,uniqueN(decay)]
@@ -77,11 +72,32 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
   return(op)
 }
 
-#' Single-cpu simplified fitting for iota and rho
+#' Compute genomic etahat and weights using data as initial guess
 #' @keywords internal
 #' 
-csnorm_gauss_genomic_stan = function(biases, counts, design, init, bf_per_kb=1, iter=10000,
-                                verbose=T, ...) {
+csnorm_gauss_genomic_muhat_data = function(biases, counts, dispersion, pseudocount=1e-2) {
+  bts=rbind(biases[,.(name,id,pos,cat="dangling L", etahat=log(dangling.L+pseudocount), std=sqrt(1/(dangling.L+pseudocount)+1/dispersion))],
+            biases[,.(name,id,pos,cat="dangling R", etahat=log(dangling.R+pseudocount), std=sqrt(1/(dangling.R+pseudocount)+1/dispersion))],
+            biases[,.(name,id,pos,cat="rejoined", etahat=log(rejoined+pseudocount), std=sqrt(1/(rejoined+pseudocount)+1/dispersion))])
+  setkey(bts,name,id,pos,cat)
+  stopifnot(bts[,.N]==3*biases[,.N])
+  cts=rbind(counts[,.(name,id=id1,pos=pos1, cat="contact R", etahat=log(contact.close+pseudocount), var=(1/(contact.close+pseudocount)+1/dispersion))],
+            counts[,.(name,id=id1,pos=pos1, cat="contact L", etahat=log(contact.far+pseudocount), var=(1/(contact.far+pseudocount)+1/dispersion))],
+            counts[,.(name,id=id1,pos=pos1, cat="contact R", etahat=log(contact.down+pseudocount), var=(1/(contact.down+pseudocount)+1/dispersion))],
+            counts[,.(name,id=id1,pos=pos1, cat="contact L", etahat=log(contact.up+pseudocount), var=(1/(contact.up+pseudocount)+1/dispersion))],
+            counts[,.(name,id=id2,pos=pos2, cat="contact R", etahat=log(contact.far+pseudocount), var=(1/(contact.far+pseudocount)+1/dispersion))],
+            counts[,.(name,id=id2,pos=pos2, cat="contact L", etahat=log(contact.close+pseudocount), var=(1/(contact.close+pseudocount)+1/dispersion))],
+            counts[,.(name,id=id2,pos=pos2, cat="contact R", etahat=log(contact.down+pseudocount), var=(1/(contact.down+pseudocount)+1/dispersion))],
+            counts[,.(name,id=id2,pos=pos2, cat="contact L", etahat=log(contact.up+pseudocount), var=(1/(contact.up+pseudocount)+1/dispersion))])
+  cts=cts[,.(etahat=sum(etahat/var)/sum(1/var),std=sqrt(2/sum(1/var))),keyby=c("name","id","pos","cat")]
+  stopifnot(cts[,.N]==2*biases[,.N])
+  return(list(cts=cts,bts=bts))
+}
+
+#' Compute genomic etahat and weights using previous mean
+#' @keywords internal
+#' 
+csnorm_gauss_genomic_muhat_mean = function(biases, counts, design, init) {
   #compute bias means
   bsub=copy(biases)
   bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
@@ -93,14 +109,16 @@ csnorm_gauss_genomic_stan = function(biases, counts, design, init, bf_per_kb=1, 
                     std=sqrt(1/exp(lmu.DR)+1/init$alpha))],
             bsub[,.(name,id,pos,cat="rejoined", lmu=lmu.RJ, etahat=rejoined/exp(lmu.RJ)-1+lmu.RJ,
                     std=sqrt(1/exp(lmu.RJ)+1/init$alpha))])
+  setkey(bts,name,id,pos,cat)
   stopifnot(bts[,.N]==3*biases[,.N])
   bsub=bsub[,.(id,log_iota,log_rho)]
   #add bias informations to counts
   csub=copy(counts)
-  csub[,log_decay:=init$log_decay]
+  csub[,c("distance","log_decay"):=list(NULL,init$log_decay)]
   csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
   csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
   csub=merge(cbind(design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
+  rm(bsub)
   #compute means
   csub[,lmu.base:=eC + log_decay]
   csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(lmu.base+log_iota1+log_rho2,
@@ -109,22 +127,36 @@ csnorm_gauss_genomic_stan = function(biases, counts, design, init, bf_per_kb=1, 
                                                            lmu.base+log_iota1+log_iota2)]
   csub[,lmu.base:=NULL]
   #collect all counts on left/right side
-  cts=rbind(csub[,.(name,id=id1, pos=pos1, R=contact.close, L=contact.far,  muR=exp(lmu.close), muL=exp(lmu.far),
+  cts=rbind(csub[,.(name, id=id1, pos=pos1, R=contact.close, L=contact.far,  muR=exp(lmu.close), muL=exp(lmu.far),
                     etaL=eC + log_iota1, etaR=eC + log_rho1)],
-            csub[,.(name,id=id1, pos=pos1, R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
+            csub[,.(name, id=id1, pos=pos1, R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
                     etaL=eC + log_iota1, etaR=eC + log_rho1)],
-            csub[,.(name,id=id2, pos=pos2, R=contact.far,   L=contact.close,muR=exp(lmu.far),   muL=exp(lmu.close),
+            csub[,.(name, id=id2, pos=pos2, R=contact.far,   L=contact.close,muR=exp(lmu.far),   muL=exp(lmu.close),
                     etaL=eC + log_iota2, etaR=eC + log_rho2)],
-            csub[,.(name,id=id2, pos=pos2, R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
+            csub[,.(name, id=id2, pos=pos2, R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
                     etaL=eC + log_iota2, etaR=eC + log_rho2)])
   rm(csub)
   cts[,c("varL","varR"):=list(1/muL+1/init$alpha,1/muR+1/init$alpha)]
-  cts=rbind(cts[,.(cat="contact L", lmu=sum(etaL/varL)/sum(1/varL), etahat=sum((L/muL-1+etaL)/varL)/sum(1/varL),
-                   std=sqrt(2)/sqrt(sum(1/varL))),by=c("name","id","pos")],
-            cts[,.(cat="contact R", lmu=sum(etaR/varR)/sum(1/varR), etahat=sum((R/muR-1+etaR)/varR)/sum(1/varR),
-                   std=sqrt(2)/sqrt(sum(1/varR))),by=c("name","id","pos")])
-  setkey(cts,name,id,cat)
+  cts=rbind(cts[,.(cat="contact L", etahat=sum((L/muL-1+etaL)/varL)/sum(1/varL), std=sqrt(2/sum(1/varL))),by=c("name","id","pos")],
+            cts[,.(cat="contact R", etahat=sum((R/muR-1+etaR)/varR)/sum(1/varR), std=sqrt(2/sum(1/varR))),by=c("name","id","pos")])
+  setkey(cts,name,id,pos,cat)
   stopifnot(cts[,.N]==2*biases[,.N])
+  return(list(bts=bts,cts=cts))
+}
+                                     
+#' Single-cpu simplified fitting for iota and rho
+#' @param if a single value, use data for estimate of mu and that value as a
+#'   dispersion, otherwise it's a list with parameters to compute the mean from
+#' @keywords internal
+#'   
+csnorm_gauss_genomic_stan = function(biases, counts, design, init, bf_per_kb=1, iter=10000, verbose=T, ...) {
+  if (length(init)>1) {
+    a = csnorm_gauss_genomic_muhat_mean(biases, counts, design, init)
+  } else {
+    a = csnorm_gauss_genomic_muhat_data(biases, counts, init[[1]])
+  }
+  bts=a$bts
+  cts=a$cts
   #run optimization
   cat("optimize with stan\n")
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
