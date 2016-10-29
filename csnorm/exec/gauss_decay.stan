@@ -20,8 +20,6 @@ data {
   vector[N] kappa_hat;
   vector<lower=0>[N] sdl;
   vector<lower=0>[N] dist;
-  //dispersion
-  real<lower=0> alpha;
   //weight for spline centering
   vector<lower=0>[N] weight;
 }

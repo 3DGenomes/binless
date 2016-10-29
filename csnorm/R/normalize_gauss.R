@@ -7,7 +7,7 @@ NULL
 csnorm_gauss_guess = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_decade=20,
                               iter=10000, dispersion=10, verbose=T, ...) {
   op = csnorm_gauss_genomic(biases, counts, design, init=dispersion,
-                          bf_per_kb=bf_per_kb, iter=iter, ...)
+                            bf_per_kb=bf_per_kb, iter=iter, ...)
   #add diagonal decay inits
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   Decays=design[,uniqueN(decay)]
@@ -18,11 +18,26 @@ csnorm_gauss_guess = function(biases, counts, design, dmin, dmax, bf_per_kb=1, b
   op
 }
 
-#' Single-cpu simplified fitting for iota and rho
+#' Compute decay etahat and weights using data as initial guess
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
-                              bf_per_decade=20, bins_per_bf=10, iter=10000, verbose=T, ...) {
+csnorm_gauss_decay_muhat_data = function(biases, counts, dispersion, bins_per_bf, bf_per_decade, dmin, dmax, pseudocount=1e-2) {
+  #bin distances
+  stepsz=1/(bins_per_bf*bf_per_decade)
+  dbins=10**seq(log10(dmin),log10(dmax)+stepsz,stepsz)
+  csd=counts[,.(name,distance,
+                dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12),
+                kappahat=log(contact.close+contact.far+contact.up+contact.down+pseudocount),
+                var=1/(contact.close+contact.far+contact.up+contact.down+pseudocount)+1/dispersion)]
+  csd = csd[,.(distance=exp(mean(log(distance))), kappahat=sum(kappahat/var)/sum(1/var),
+               std=1/sqrt(sum(1/var)), weight=4*.N), keyby=c("name", "dbin")]
+  csd
+}
+
+#' Compute decay etahat and weights using previous mean
+#' @keywords internal
+#' 
+csnorm_gauss_decay_muhat_mean = function(biases, counts, design, init, bins_per_bf, bf_per_decade, dmin, dmax) {
   #add bias informations to counts
   setkey(counts, id1, id2)
   csub=copy(counts)
@@ -49,25 +64,40 @@ csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
   dbins=10**seq(log10(dmin),log10(dmax)+stepsz,stepsz)
   csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #collect all counts in these bins
-  csd = csub[,.(mdist=exp(mean(log(distance))), kappahatl=sum((z+kappaij)/var)/sum(1/var),
-                sdl=1/sqrt(sum(1/var)), weight=.N), keyby=c("name", "dbin")]
+  csd = csub[,.(distance=exp(mean(log(distance))), kappahat=sum((z+kappaij)/var)/sum(1/var),
+                std=1/sqrt(sum(1/var)), weight=4*.N), keyby=c("name", "dbin")]
+  csd
+}
+
+#' Single-cpu simplified fitting for iota and rho
+#' @keywords internal
+#' 
+csnorm_gauss_decay = function(biases, counts, design, init, dmin, dmax,
+                              bf_per_decade=20, bins_per_bf=10, iter=10000, verbose=T, ...) {
+  if (length(init)>1) {
+    csd = csnorm_gauss_decay_muhat_mean(biases, counts, design, init, bins_per_bf, bf_per_decade, dmin, dmax)
+  } else {
+    csd = csnorm_gauss_decay_muhat_data(biases, counts, init[[1]], bins_per_bf, bf_per_decade, dmin, dmax)
+  }
   #run optimization
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
   cbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
   data=list(Dsets=design[,.N], Decays=design[,uniqueN(decay)], XD=as.array(design[,decay]),
             Kdiag=Kdiag, dmin=dmin, dmax=dmax, N=csd[,.N], cbegin=cbegin,
-            kappa_hat=csd[,kappahatl], sdl=csd[,sdl], dist=csd[,mdist],
-            alpha=init$alpha, weight=csd[,weight])
+            kappa_hat=csd[,kappahat], sdl=csd[,std], dist=csd[,distance],
+            weight=csd[,weight])
   #optimize from scratch, to avoid getting stuck. Slower but more robust
   op=optimize_stan_model(model=csnorm:::stanmodels$gauss_decay, data=data, iter=iter, verbose=verbose, init=0, ...)
   #make nice decay data table
   csd[,log_decay:=op$par$log_decay]
-  dmat=csd[,.(name,dist=mdist,log_decay,z=kappahatl-op$par$log_mean_counts,std=sdl,ncounts=4*weight)]
-  setkey(dmat,name,dist)
+  dmat=csd[,.(name,distance,kappahat,std,ncounts=weight,log_decay)]
+  setkey(dmat,name,distance)
   op$par$decay=dmat 
   #rewrite log_decay as if it were calculated for each count
+  stepsz=1/(bins_per_bf*bf_per_decade)
+  dbins=10**seq(log10(dmin),log10(dmax)+stepsz,stepsz)
   csub=counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
-  a=csd[csub,.(id1,id2,log_decay),on=key(csd)]
+  a=csd[csub,.(name,id1,id2,log_decay),on=key(csd)]
   setkeyv(a,key(counts))
   op$par$log_decay=a[,log_decay]
   return(op)
@@ -144,7 +174,7 @@ csnorm_gauss_genomic_muhat_mean = function(biases, counts, design, init) {
   stopifnot(cts[,.N]==2*biases[,.N])
   return(list(bts=bts,cts=cts))
 }
-                                     
+
 #' Single-cpu simplified fitting for iota and rho
 #' @param if a single value, use data for estimate of mu and that value as a
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
@@ -154,7 +184,7 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
   if (length(init)>1) {
     a = csnorm_gauss_genomic_muhat_mean(biases, counts, design, init)
   } else {
-    a = csnorm_gauss_genomic_muhat_data(biases, counts, init[[1]])
+    a = csnorm:::csnorm_gauss_genomic_muhat_data(biases, counts, init[[1]])
   }
   bts=a$bts
   cts=a$cts
@@ -167,7 +197,7 @@ csnorm_gauss_genomic = function(biases, counts, design, init, bf_per_kb=1, iter=
             eta_hat_DL=bts[cat=="dangling L",etahat], sd_DL=bts[cat=="dangling L",std],
             eta_hat_DR=bts[cat=="dangling R",etahat], sd_DR=bts[cat=="dangling R",std],
             eta_hat_L=cts[cat=="contact L",etahat], sd_L=cts[cat=="contact L",std],
-            eta_hat_R=cts[cat=="contact R",etahat], sd_R=cts[cat=="contact R",std], alpha=init$alpha)
+            eta_hat_R=cts[cat=="contact R",etahat], sd_R=cts[cat=="contact R",std])
   op=optimize_stan_model(model=stanmodels$gauss_genomic, data=data, iter=iter, verbose=verbose, init=0, ...)
   #make nice output table
   bout=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_DL)],
@@ -238,9 +268,12 @@ csnorm_gauss_dispersion = function(biases, counts, design, dmin, dmax, init,
 #' 
 #' @examples
 #' 
-run_gauss = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
-                           ngibbs = 3, iter=10000, fit.decay=T, fit.genomic=T, fit.disp=T,
-                           verbose=T, ncounts=100000, init_alpha=1e-5) {
+run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
+                     ngibbs = 3, iter=10000, fit.decay=T, fit.genomic=T, fit.disp=T,
+                     verbose=T, ncounts=100000, init_alpha=1e-5) {
+  #clean object if dirty
+  cs@par=list() #in case we have a weird object
+  cs@binned=list()
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -261,31 +294,19 @@ run_gauss = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
   #initial guess
   if (is.null(init)) {
     if (verbose==T) cat("No initial guess provided\n")
-    cs@par=list() #in case we have a weird object
     cs@diagnostics=list()
-    cs@binned=list()
     laststep=0
-    init.a = system.time(init.output <- capture.output(op <- csnorm:::csnorm_gauss_guess(
-      biases = cs@biases, counts = cs@counts, design = cs@design, dmin=dmin, dmax=dmax,
-      bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, iter = iter, dispersion=1, init_alpha=init_alpha)))
-    init.output = "Init with data"
-    cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=0, leg="bias", out=init.output,
-                                                 runtime=init.a[1]+init.a[4], op=op)
-    #abort silently if initial guess went wrong
-    if (length(grep("Line search failed",tail(init.output,1)))>0) {
-      op$par$value=-.Machine$double.xmax
-      cs@par=op$par
-      return(cs)
-    }
+    init.mean="data"
+    init=1
+    op=list(par=init) #init with dispersion=1
   } else {
     if (verbose==T) cat("Using provided initial guess\n")
-    init.output = "Init provided"
-    op=list(value=-1, par=init)
-    cs@binned=list()
     if (is.data.table(cs@diagnostics$params)) laststep = cs@diagnostics$params[,max(step)]
+    init$beta_diag = guarantee_beta_diag_increasing(init$beta_diag)
+    op=list(par=init)
+    init.mean="mean"
   }
   #make sure beta_diag is strictly increasing
-  op$par$beta_diag = guarantee_beta_diag_increasing(op$par$beta_diag)
   #gibbs sampling
   for (i in (laststep + 1:ngibbs)) {
     #fit diagonal decay given iota and rho
@@ -304,9 +325,16 @@ run_gauss = function(cs, init, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
     #fit iota and rho given diagonal decay
     if (fit.genomic==T) {
       if (verbose==T) cat("Gibbs",i,": Genomic\n")
-      a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_gauss_genomic(
-        biases = cs@biases, counts = cs@counts, design = cs@design,
-        init = op$par, bf_per_kb = bf_per_kb, iter = iter, init_alpha=init_alpha)))
+      if (init.mean=="mean") {
+        a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_gauss_genomic(
+          biases = cs@biases, counts = cs@counts, design = cs@design,
+          init = op$par, bf_per_kb = bf_per_kb, iter = iter, init_alpha=init_alpha)))
+      } else {
+        a=system.time(output <- capture.output(op.gen <- csnorm:::csnorm_gauss_genomic(
+          biases = cs@biases, counts = cs@counts, design = cs@design,
+          init = init, bf_per_kb = bf_per_kb, iter = iter, init_alpha=init_alpha)))
+        init.mean="mean"
+      }
       op=list(value=op.gen$value, par=c(op$par[c("beta_diag","beta_diag_centered","lambda_diag",
                                                  "log_decay","decay", "alpha")],
                                         op.gen$par[c("eC","eRJ","eDE","beta_iota","beta_rho",
