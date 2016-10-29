@@ -165,7 +165,10 @@ get_genomic_biases = function(cs, points_per_kb=10) {
 update_diagnostics = function(cs, step, leg, out, runtime, op) {
   params=data.table(step=step,leg=leg,out=list(out),out.last=tail(out,n=1),value=op$value,runtime=runtime)
   tmp=as.data.table(lapply(op$par,list))
-  tmp[,c("log_decay","biases"):=NULL] #too heavy and redundant
+  #remove entries that are too heavy and redundant
+  if ("log_decay" %in% names(tmp)) tmp[,log_decay:=NULL]
+  if ("biases" %in% names(tmp)) tmp[,biases:=NULL]
+  #merge with previous
   params=cbind(params,tmp)
   if (is.data.table(cs@diagnostics$params)) params=rbind(cs@diagnostics$params,params,fill=T)
   return(params)
