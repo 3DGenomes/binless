@@ -13,7 +13,6 @@ data {
   int<lower=1,upper=Biases> XB[Dsets]; //XB[i]=j: dataset i has bias set j
   int<lower=1,upper=Decays> XD[Dsets]; //XD[i]=j: dataset i has decay set j
   //genomic biases
-  int<lower=4> Krow; //number of functions in spline base for row biases
   int<lower=1> SD; //number of cut sites across all datasets
   int<lower=1,upper=SD+1> bbegin[Dsets+1]; //bbegin[i]=j: dataset i starts at j
   vector[SD] cutsitesD; //cut site locations, all data
