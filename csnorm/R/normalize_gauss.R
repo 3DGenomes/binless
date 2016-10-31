@@ -234,7 +234,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=design[,.(name,wt=1)], ver
                          verbose=verbose, init=cs@par, init_alpha=1e-5)
   #update par slot
   op$par$value=op$value
-  cs@par=modifyList(cs@par, op$par[c("eC","eRJ","eDE","alpha")])
+  cs@par=modifyList(cs@par, op$par[c("eC","eRJ","eDE","alpha","value")])
   return(cs)
 }
 
