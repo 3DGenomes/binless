@@ -37,27 +37,14 @@ data {
   vector[SD] log_iota;
   vector[SD] log_rho;
   positive_ordered[Kdiag-1] beta_diag[Decays];
-  //exposures
-  real eC[Dsets];
-  real eRJ[Dsets];
-  real eDE[Dsets];
 }
 transformed data {
   //diagonal SCAM spline, dense
   matrix[N,Dsets*Kdiag] Xdiag;
   row_vector[Kdiag] pdiagD[Dsets];
   //diag
-  vector[N] log_decay;
+  vector[N] ldec;
   vector[Dsets*Kdiag] beta_diag_centered;
-  //means
-  vector[SD] log_mean_DL;
-  vector[SD] log_mean_DR;
-  vector[SD] log_mean_RJ;
-  //
-  vector[N] log_mean_cclose;
-  vector[N] log_mean_cfar;
-  vector[N] log_mean_cup;
-  vector[N] log_mean_cdown;
   
   //diagonal SCAM spline, dense
   {
@@ -96,8 +83,28 @@ transformed data {
     tmp = epsilon * (beta_diag_aug - (pdiagD[d] * beta_diag_aug) * rep_vector(1, Kdiag));
     beta_diag_centered[((d-1)*Kdiag+1):(d*Kdiag)] = tmp;
   }
-  log_decay = Xdiag * beta_diag_centered;
+  ldec = Xdiag * beta_diag_centered;
 
+}
+parameters {
+  //exposures
+  real eC[Dsets];
+  real eRJ[Dsets];
+  real eDE[Dsets];
+  //dispersion
+  real<lower=0> alpha;
+}
+transformed parameters {
+  //means
+  vector[SD] log_mean_DL;
+  vector[SD] log_mean_DR;
+  vector[SD] log_mean_RJ;
+  //
+  vector[N] log_mean_cclose;
+  vector[N] log_mean_cfar;
+  vector[N] log_mean_cup;
+  vector[N] log_mean_cdown;
+    
   //means
   {
     //biases
@@ -105,10 +112,10 @@ transformed data {
     log_mean_DL = log_iota;
     log_mean_DR = log_rho;
     //exact counts  
-    log_mean_cclose = log_decay + log_rho[cidx[1]]  + log_iota[cidx[2]];
-    log_mean_cfar   = log_decay + log_iota[cidx[1]] + log_rho[cidx[2]];
-    log_mean_cup    = log_decay + log_iota[cidx[1]] + log_iota[cidx[2]];
-    log_mean_cdown  = log_decay + log_rho[cidx[1]]  + log_rho[cidx[2]];
+    log_mean_cclose = ldec + log_rho[cidx[1]]  + log_iota[cidx[2]];
+    log_mean_cfar   = ldec + log_iota[cidx[1]] + log_rho[cidx[2]];
+    log_mean_cup    = ldec + log_iota[cidx[1]] + log_iota[cidx[2]];
+    log_mean_cdown  = ldec + log_rho[cidx[1]]  + log_rho[cidx[2]];
     //add exposures
     for (d in 1:Dsets) {
       log_mean_RJ[bbegin[d]:(bbegin[d+1]-1)]     = log_mean_RJ[bbegin[d]:(bbegin[d+1]-1)] + eRJ[d];
@@ -120,10 +127,6 @@ transformed data {
       log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)]  = log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
     }
   }
-}
-parameters {
-  //dispersion
-  real<lower=0> alpha;
 }
 model {
   //// likelihoods
@@ -140,3 +143,8 @@ model {
     target += weight[d]*neg_binomial_2_log_lpmf(counts_down[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)], alpha);
   }
 }
+generated quantities {
+  vector[N] log_decay;
+  log_decay = ldec;
+}
+

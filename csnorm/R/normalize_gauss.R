@@ -237,7 +237,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
 #' 
-csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T) {
+csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T, init_alpha=1e-7) {
   Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))* cs@settings$bf_per_decade)
   bbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
   cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
@@ -252,12 +252,12 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
                counts_close=counts[,contact.close], counts_far=counts[,contact.far],
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
                weight=as.array(weight[,wt]), log_iota=cs@par$log_iota, log_rho=cs@par$log_rho,
-               beta_diag=cs@par$beta_diag, eC=as.array(cs@par$eC), eRJ=as.array(cs@par$eRJ), eDE=as.array(cs@par$eDE))
+               beta_diag=cs@par$beta_diag)
   op=optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, data=data, iter=cs@settings$iter,
-                         verbose=verbose, init=cs@par["alpha"], init_alpha=1)
+                         verbose=verbose, init=cs@par, init_alpha=init_alpha)
   #update par slot
   op$par$value=op$value
-  cs@par=modifyList(cs@par, op$par[c("alpha","value")])
+  cs@par=modifyList(cs@par, op$par[c("eC","eRJ","eDE","alpha","value")])
   return(cs)
 }
 
@@ -346,7 +346,8 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     if (fit.disp==T) {
       #fit exposures and dispersion
       if (verbose==T) cat("Gibbs",i,": Remaining parameters\n")
-      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight)))
+      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight,
+                                                                                    init_alpha=init_alpha)))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", out=output, runtime=a[1]+a[4])
       if (verbose==T) cat("Gibbs",i,": log-likelihood = ",cs@par$value,"\n")
     }
