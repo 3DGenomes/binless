@@ -78,7 +78,7 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", init_alpha=1e-5) {
+csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7) {
   if (init.mean=="mean") {
     csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
   } else {
@@ -194,7 +194,7 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-5) {
+csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7) {
   if (init.mean=="mean") {
     a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
   } else {
@@ -237,7 +237,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-5
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
 #' 
-csnorm_gauss_dispersion = function(cs, counts, weight=design[,.(name,wt=1)], verbose=T, init_alpha=1e-5) {
+csnorm_gauss_dispersion = function(cs, counts, weight=design[,.(name,wt=1)], verbose=T, init_alpha=1e-7) {
   Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))* cs@settings$bf_per_decade)
   bbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
   cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
@@ -254,7 +254,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=design[,.(name,wt=1)], ver
                weight=as.array(weight[,wt]), log_iota=cs@par$log_iota, log_rho=cs@par$log_rho,
                beta_diag=cs@par$beta_diag)
   op=optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, data=data, iter=cs@settings$iter,
-                         verbose=verbose, init=cs@par, init_alpha=1e-5)
+                         verbose=verbose, init=cs@par, init_alpha=init_alpha)
   #update par slot
   op$par$value=op$value
   cs@par=modifyList(cs@par, op$par[c("eC","eRJ","eDE","alpha","value")])
@@ -294,7 +294,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=design[,.(name,wt=1)], ver
 #' 
 run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
                      ngibbs = 3, iter=10000, fit.decay=T, fit.genomic=T, fit.disp=T,
-                     verbose=T, ncounts=100000, init_alpha=1e-5) {
+                     verbose=T, ncounts=100000, init_alpha=1e-7) {
   #clean object if dirty
   cs@par=list() #in case we have a weird object
   cs@binned=list()

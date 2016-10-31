@@ -71,8 +71,8 @@ csnorm_gauss_genomic_bam = function(cs, verbose=T, init.mean="mean", nthreads=1)
 #' 
 #' @examples
 run_gauss_bam = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
-                           ngibbs = 3, iter=100000, fit.decay=T, fit.genomic=T, fit.disp=T,
-                           verbose=T, ncounts=100000, init_alpha=1e-5, ncores=1) {
+                           ngibbs = 3, iter=10000, fit.decay=T, fit.genomic=T, fit.disp=T,
+                           verbose=T, ncounts=100000, init_alpha=1e-7, ncores=1) {
   #clean object if dirty
   cs@par=list() #in case we have a weird object
   cs@binned=list()

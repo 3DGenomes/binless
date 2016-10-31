@@ -197,7 +197,7 @@ csnorm_predict_all_parallel = function(cs, counts, verbose=T, ncores=1) {
 #' @keywords internal
 #' @export
 #' 
-run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subsampling.pc=100, init_alpha=1e-5) {
+run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subsampling.pc=100, init_alpha=1e-7) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -260,7 +260,7 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subs
 #' 
 #' @examples
 run_exact = function(cs, bf_per_kb=1, bf_per_decade=20, lambdas=c(0.1,1,10), ncores=1, iter=100000,
-                     subsampling.pc=100, init_alpha=1e-5, prefix=NULL) {
+                     subsampling.pc=100, init_alpha=1e-7, prefix=NULL) {
   cs@binned=list() #erase old binned datasets if available
   registerDoParallel(cores=ncores)
   cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value<y@par$value){return(y)}else{return(x)}}) %dopar% {
