@@ -95,15 +95,14 @@ csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", init_alpha=1e-5) 
   op=optimize_stan_model(model=csnorm:::stanmodels$gauss_decay, data=data, iter=cs@settings$iter,
                          verbose=verbose, init=0, init_alpha=init_alpha)
   #make nice decay data table
-  csd[,log_decay:=op$par$log_decay]
-  dmat=csd[,.(name,distance,kappahat,std,ncounts=weight,log_decay)]
+  dmat=csd[,.(name,distance,kappahat,std,ncounts=weight,kappa=op$par$log_mean_counts)]
   setkey(dmat,name,distance)
   op$par$decay=dmat 
   #rewrite log_decay as if it were calculated for each count
   stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
   dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
   csub=cs@counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
-  a=csd[csub,.(name,id1,id2,log_decay),on=key(csd)]
+  a=csd[csub,.(name,id1,id2,log_decay=op$par$log_decay),on=key(csd)]
   setkeyv(a,key(cs@counts))
   op$par$log_decay=a[,log_decay]
   #update par slot
