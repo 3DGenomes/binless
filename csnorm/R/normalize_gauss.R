@@ -43,8 +43,8 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
              csub[,.(name,id1,id2,distance,kappaij,count=contact.close,mu=exp(lmu.close))])
   csub[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
   #bin distances
-  stepsz=1/(bins_per_bf*bf_per_decade)
-  dbins=10**seq(log10(dmin),log10(dmax)+stepsz,stepsz)
+  stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
+  dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
   csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #collect all counts in these bins
   csd = csub[,.(distance=exp(mean(log(distance))), kappahat=sum((z+kappaij)/var)/sum(1/var),
@@ -57,7 +57,7 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
 #' 
 csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", init_alpha=1e-5) {
   if (init.mean=="mean") {
-    csd = csnorm_gauss_decay_muhat_mean(cs)
+    csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
   } else {
     csd = csnorm_gauss_decay_muhat_data(cs)
   }
@@ -77,15 +77,16 @@ csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", init_alpha=1e-5) 
   setkey(dmat,name,distance)
   op$par$decay=dmat 
   #rewrite log_decay as if it were calculated for each count
-  stepsz=1/(bins_per_bf*bf_per_decade)
-  dbins=10**seq(log10(dmin),log10(dmax)+stepsz,stepsz)
-  csub=counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
+  stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
+  dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
+  csub=cs@counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
   a=csd[csub,.(name,id1,id2,log_decay),on=key(csd)]
-  setkeyv(a,key(counts))
+  setkeyv(a,key(cs@counts))
   op$par$log_decay=a[,log_decay]
   #update par slot
   op$par$value=op$value
   op$par$beta_diag=guarantee_beta_diag_increasing(op$par$beta_diag)
+  op$par$log_mean_counts=NULL
   cs@par=modifyList(cs@par, op$par)
   return(cs)
 }
@@ -98,7 +99,7 @@ csnorm_gauss_genomic_muhat_data = function(cs, pseudocount=1e-2) {
   bts=rbind(cs@biases[,.(name,id,pos,cat="dangling L", etahat=log(dangling.L+pseudocount), std=sqrt(1/(dangling.L+pseudocount)+1/dispersion))],
             cs@biases[,.(name,id,pos,cat="dangling R", etahat=log(dangling.R+pseudocount), std=sqrt(1/(dangling.R+pseudocount)+1/dispersion))],
             cs@biases[,.(name,id,pos,cat="rejoined", etahat=log(rejoined+pseudocount), std=sqrt(1/(rejoined+pseudocount)+1/dispersion))])
-  setkey(bts,id,pos,name,cat)
+  setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
   cts=rbind(cs@counts[,.(name,id=id1,pos=pos1, cat="contact R", etahat=log(contact.close+pseudocount), var=(1/(contact.close+pseudocount)+1/dispersion))],
             cs@counts[,.(name,id=id1,pos=pos1, cat="contact L", etahat=log(contact.far+pseudocount), var=(1/(contact.far+pseudocount)+1/dispersion))],
@@ -109,6 +110,7 @@ csnorm_gauss_genomic_muhat_data = function(cs, pseudocount=1e-2) {
             cs@counts[,.(name,id=id2,pos=pos2, cat="contact R", etahat=log(contact.down+pseudocount), var=(1/(contact.down+pseudocount)+1/dispersion))],
             cs@counts[,.(name,id=id2,pos=pos2, cat="contact L", etahat=log(contact.up+pseudocount), var=(1/(contact.up+pseudocount)+1/dispersion))])
   cts=cts[,.(etahat=sum(etahat/var)/sum(1/var),std=sqrt(2/sum(1/var))),keyby=c("id","pos","name","cat")]
+  setkeyv(cts,c("id","name","cat"))
   stopifnot(cts[,.N]==2*cs@biases[,.N])
   return(list(cts=cts,bts=bts))
 }
@@ -129,7 +131,7 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
                     std=sqrt(1/exp(lmu.DR)+1/init$alpha))],
             bsub[,.(name,id,pos,cat="rejoined", lmu=lmu.RJ, etahat=rejoined/exp(lmu.RJ)-1+lmu.RJ,
                     std=sqrt(1/exp(lmu.RJ)+1/init$alpha))])
-  setkey(bts,id,pos,name,cat)
+  setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
   bsub=bsub[,.(id,log_iota,log_rho)]
   #add bias informations to counts
@@ -159,7 +161,7 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
   cts[,c("varL","varR"):=list(1/muL+1/init$alpha,1/muR+1/init$alpha)]
   cts=rbind(cts[,.(cat="contact L", etahat=sum((L/muL-1+etaL)/varL)/sum(1/varL), std=sqrt(2/sum(1/varL))),by=c("name","id","pos")],
             cts[,.(cat="contact R", etahat=sum((R/muR-1+etaR)/varR)/sum(1/varR), std=sqrt(2/sum(1/varR))),by=c("name","id","pos")])
-  setkey(cts,id,pos,name,cat)
+  setkey(cts,id,name,cat)
   stopifnot(cts[,.N]==2*cs@biases[,.N])
   return(list(bts=bts,cts=cts))
 }
@@ -171,17 +173,15 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
 #'   
 csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-5) {
   if (init.mean=="mean") {
-    a = csnorm_gauss_genomic_muhat_mean(cs)
+    a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
   } else {
     a = csnorm_gauss_genomic_muhat_data(cs)
   }
   bts=a$bts
   cts=a$cts
-  stopifnot(key(bts)==key(cs@biases))
-  stopifnot(key(cts)==key(cs@biases))
   #run optimization
   Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
-  bbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
+  bbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
   data=list(Dsets=cs@design[,.N], Biases=cs@design[,uniqueN(genomic)], XB=as.array(cs@design[,genomic]),
             Krow=Krow, SD=cs@biases[,.N], bbegin=bbegin, cutsitesD=cs@biases[,pos],
             eta_hat_RJ=bts[cat=="rejoined",etahat], sd_RJ=bts[cat=="rejoined",std],
@@ -189,7 +189,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-5
             eta_hat_DR=bts[cat=="dangling R",etahat], sd_DR=bts[cat=="dangling R",std],
             eta_hat_L=cts[cat=="contact L",etahat], sd_L=cts[cat=="contact L",std],
             eta_hat_R=cts[cat=="contact R",etahat], sd_R=cts[cat=="contact R",std])
-  op=optimize_stan_model(model=stanmodels$gauss_genomic, data=data, iter=cs@settings$iter,
+  op=optimize_stan_model(model=csnorm:::stanmodels$gauss_genomic, data=data, iter=cs@settings$iter,
                          verbose=verbose, init=0, init_alpha=init_alpha)
   #make nice output table
   bout=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_DL)],
@@ -198,10 +198,15 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-5
   cout=rbind(cts[cat=="contact L",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_cleft)],
              cts[cat=="contact R",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_cright)])
   bout=rbind(bout,cout)
-  setkey(bout, cat, name, id)
+  setkey(bout, id, name, cat)
   op$par$biases=bout
   #update par slot
   op$par$value=op$value
+  op$par$log_mean_DL=NULL
+  op$par$log_mean_DR=NULL
+  op$par$log_mean_RJ=NULL
+  op$par$log_mean_cleft=NULL
+  op$par$log_mean_cright=NULL
   cs@par=modifyList(cs@par, op$par)
   return(cs)
 }
@@ -210,7 +215,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-5
 #' @keywords internal
 #' 
 csnorm_gauss_dispersion = function(cs, counts, weight=design[,.(name,wt=1)], verbose=T, init_alpha=1e-5) {
-  Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*bf_per_decade)
+  Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))* cs@settings$bf_per_decade)
   bbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
   cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
   data = list( Dsets=cs@design[,.N], Biases=cs@design[,uniqueN(genomic)], Decays=cs@design[,uniqueN(decay)],
@@ -225,11 +230,11 @@ csnorm_gauss_dispersion = function(cs, counts, weight=design[,.(name,wt=1)], ver
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
                weight=as.array(weight[,wt]), log_iota=cs@par$log_iota, log_rho=cs@par$log_rho,
                beta_diag=cs@par$beta_diag)
-  op=optimize_stan_model(model=stanmodels$gauss_dispersion, data=data, iter=cs@settings$iter,
+  op=optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, data=data, iter=cs@settings$iter,
                          verbose=verbose, init=cs@par, init_alpha=1e-5)
   #update par slot
   op$par$value=op$value
-  cs@par=modifyList(cs@par, op$par)
+  cs@par=modifyList(cs@par, op$par[c("eC","eRJ","eDE","alpha")])
   return(cs)
 }
 
@@ -282,7 +287,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   setkey(cs@counts, id1, id2, name)
   ncounts_per_dset=as.integer(ncounts/cs@design[,.N])
   subcounts = cs@counts[,.SD[1:min(.N,ncounts_per_dset)],by=name]
-  stopifnot(key(subcounts)==key(cs@counts))
+  setkeyv(subcounts,key(cs@counts))
   if (subcounts[,uniqueN(c(contact.close,contact.far,contact.up,contact.down))]<2)
     stop("dataset too sparse, please increase ncounts")
   subcounts.weight=merge(cs@counts[,.(nc=.N),keyby=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
@@ -307,20 +312,21 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     if (fit.decay==T) {
       if (verbose==T) cat("Gibbs",i,": Decay\n")
       a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean, init_alpha=init_alpha)))
-      cs@diagnostics$params = update_diagnostics(cs, step=i, leg="decay", out=output, runtime=a[1]+a[4], op=cs@par)
+      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", out=output, runtime=a[1]+a[4])
     }
     #fit iota and rho given diagonal decay
     if (fit.genomic==T) {
       if (verbose==T) cat("Gibbs",i,": Genomic\n")
       a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean, init_alpha=init_alpha)))
-      cs@diagnostics$params = update_diagnostics(cs, step=i, leg="bias", out=output, runtime=a[1]+a[4], op=cs@par)
+      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", out=output, runtime=a[1]+a[4])
     }
     init.mean="mean"
     if (fit.disp==T) {
       #fit exposures and dispersion
       if (verbose==T) cat("Gibbs",i,": Remaining parameters\n")
-      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight, init_alpha=init_alpha)))
-      cs@diagnostics$params = update_diagnostics(cs, step=i, leg="disp", out=output, runtime=a[1]+a[4], op=cs@par)
+      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight,
+                                                                                    init_alpha=init_alpha)))
+      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", out=output, runtime=a[1]+a[4])
       if (verbose==T) cat("Gibbs",i,": log-likelihood = ",cs@par$value,"\n")
     }
   }
