@@ -57,7 +57,7 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
 #' 
 csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", init_alpha=1e-5) {
   if (init.mean=="mean") {
-    csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
+    csd = csnorm_gauss_decay_muhat_mean(cs)
   } else {
     csd = csnorm_gauss_decay_muhat_data(cs)
   }
@@ -125,11 +125,11 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
   bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
   bsub=merge(cbind(cs@design[,.(name)],eRJ=init$eRJ,eDE=init$eDE), bsub, by="name",all.x=F,all.y=T)
   bsub[,c("lmu.DL","lmu.DR","lmu.RJ"):=list(eDE+log_iota,eDE+log_rho,eRJ+(log_iota+log_rho)/2)]
-  bts=rbind(bsub[,.(name,id,pos,cat="dangling L", lmu=lmu.DL, etahat=dangling.L/exp(lmu.DL)-1+lmu.DL,
+  bts=rbind(bsub[,.(name,id,pos,cat="dangling L", etahat=dangling.L/exp(lmu.DL)-1+lmu.DL,
                     std=sqrt(1/exp(lmu.DL)+1/init$alpha))],
-            bsub[,.(name,id,pos,cat="dangling R", lmu=lmu.DR, etahat=dangling.R/exp(lmu.DR)-1+lmu.DR,
+            bsub[,.(name,id,pos,cat="dangling R", etahat=dangling.R/exp(lmu.DR)-1+lmu.DR,
                     std=sqrt(1/exp(lmu.DR)+1/init$alpha))],
-            bsub[,.(name,id,pos,cat="rejoined", lmu=lmu.RJ, etahat=rejoined/exp(lmu.RJ)-1+lmu.RJ,
+            bsub[,.(name,id,pos,cat="rejoined", etahat=rejoined/exp(lmu.RJ)-1+lmu.RJ,
                     std=sqrt(1/exp(lmu.RJ)+1/init$alpha))])
   setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
@@ -305,7 +305,6 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     init.mean="mean"
     cs@par=init
   }
-  #make sure beta_diag is strictly increasing
   #gibbs sampling
   for (i in (laststep + 1:ngibbs)) {
     #fit diagonal decay given iota and rho
