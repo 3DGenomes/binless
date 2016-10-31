@@ -98,7 +98,7 @@ run_gauss_bam = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_
     cs@diagnostics=list()
     laststep=0
     init.mean="data"
-    cs@par=list(alpha=1) #init with dispersion=1
+    cs=fill_parameters(cs, dispersion=1, fit.decay=fit.decay, fit.genomic=fit.genomic, fit.disp=fit.disp) #init with dispersion=1
   } else {
     if (verbose==T) cat("Using provided initial guess\n")
     if (is.data.table(cs@diagnostics$params)) laststep = cs@diagnostics$params[,max(step)]

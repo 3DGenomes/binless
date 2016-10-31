@@ -4,6 +4,29 @@ NULL
 #' Compute decay etahat and weights using data as initial guess
 #' @keywords internal
 #' 
+fill_parameters = function(cs, dispersion=1, lambda=1, fit.decay=T, fit.genomic=T, fit.disp=T) {
+  init=list(alpha=dispersion)
+  if (fit.decay==F) {
+    Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
+    Decays=cs@design[,uniqueN(decay)]
+    beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
+    init=c(init,list(beta_diag=beta_diag, lambda_diag=array(lambda,dim=Decays), log_decay=rep(0,cs@counts[,.N])))
+  }
+  if (fit.genomic==F) {
+    nBiases=cs@design[,uniqueN(genomic)]
+    init=c(init,list(log_iota=array(0,dim=cs@biases[,.N]), log_rho=array(0,dim=cs@biases[,.N]),
+                     lambda_iota=array(lambda,dim=nBiases), lambda_rho=array(lambda,dim=nBiases)))
+  }
+  if (fit.genomic==F || fit.decay==F || fit.disp==F) {
+    init=c(init,list(eC=array(0,dim=cs@design[,.N]),  eRJ=array(0,dim=cs@design[,.N]),  eDE=array(0,dim=cs@design[,.N])))
+  }
+  cs@par=init
+  cs
+}
+
+#' Compute decay etahat and weights using data as initial guess
+#' @keywords internal
+#' 
 csnorm_gauss_decay_muhat_data = function(cs, pseudocount=1e-2) {
   #bin distances
   stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
@@ -297,7 +320,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     cs@diagnostics=list()
     laststep=0
     init.mean="data"
-    cs@par=list(alpha=1) #init with dispersion=1
+    cs=fill_parameters(cs, dispersion=1, fit.decay=fit.decay, fit.genomic=fit.genomic, fit.disp=fit.disp) #init with dispersion=1
   } else {
     if (verbose==T) cat("Using provided initial guess\n")
     if (is.data.table(cs@diagnostics$params)) laststep = cs@diagnostics$params[,max(step)]
