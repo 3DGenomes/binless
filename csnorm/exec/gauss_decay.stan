@@ -101,5 +101,5 @@ model {
   for (d in 1:Dsets) beta_diag_diff[d] ~ normal(0,1/lambda_diag[XD[d]]);
   
   //// hyperprior
-  lambda_diag ~ cauchy(0,1);
+  lambda_diag ~ normal(0,1);
 }
