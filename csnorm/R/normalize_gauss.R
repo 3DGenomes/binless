@@ -80,7 +80,7 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
 #' 
 csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", init_alpha=1e-5) {
   if (init.mean=="mean") {
-    csd = csnorm_gauss_decay_muhat_mean(cs)
+    csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
   } else {
     csd = csnorm_gauss_decay_muhat_data(cs)
   }
@@ -102,7 +102,8 @@ csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", init_alpha=1e-5) 
   stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
   dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
   csub=cs@counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
-  a=csd[csub,.(name,id1,id2,log_decay=op$par$log_decay),on=key(csd)]
+  csd[,log_decay:=op$par$log_decay]
+  a=csd[csub,.(name,id1,id2,log_decay),on=key(csd)]
   setkeyv(a,key(cs@counts))
   op$par$log_decay=a[,log_decay]
   #update par slot
