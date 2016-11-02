@@ -302,8 +302,9 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
   #add settings
-  cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf,
-                                    iter=iter, ngibbs=ngibbs, init_alpha=init_alpha))
+  cs@settings = c(cs@settings[c("circularize","dmin","dmax")],
+                  list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf,
+                       iter=iter, ngibbs=ngibbs, init_alpha=init_alpha))
   #fill counts matrix and take subset
   cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize, dmin=cs@settings$dmin)
   setkey(cs@biases, id, name)
@@ -323,9 +324,10 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     cs=fill_parameters(cs, dispersion=1, fit.decay=fit.decay, fit.genomic=fit.genomic, fit.disp=fit.disp) #init with dispersion=1
   } else {
     if (verbose==T) cat("Using provided initial guess\n")
-    if (is.data.table(cs@diagnostics$params)) laststep = cs@diagnostics$params[,max(step)]
+    if (is.data.table(cs@diagnostics$params)) laststep = cs@diagnostics$params[,max(step)] else laststep = 0
     init$beta_diag = guarantee_beta_diag_increasing(init$beta_diag)
     init.mean="mean"
+    init$decay=NULL
     cs@par=init
   }
   #gibbs sampling
