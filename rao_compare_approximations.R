@@ -37,14 +37,14 @@ cs = run_simplified_gibbs(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=100, gro
 save(cs, file="data/rao_HiCall_chrX_20k_csnorm_optimized_gibbs_simplified_initexact.RData")
 
 #normalize with gauss sampler
-load("data/rao_HiCall_chrX_60k_csdata.RData")
+load("data/rao_HiCall_GM12878_Peak1_450k_csdata.RData")
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-cs = run_gauss(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=100, lambdas=10**seq(from=-2,to=2,length.out=10),
-               ngibbs = 20, iter=10000, ncores=30)
-cs = run_gauss_gibbs(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=100, init=cs@par, fit.disp=T,
-                     ngibbs = 5, iter=10000)
-save(cs, file="data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_gauss_redo.RData")
+cs = run_gauss(cs, bf_per_kb=5, bf_per_decade=10, bins_per_bf=10, ngibbs = 20, iter=100000, init_alpha=1e-7, ncounts = 1000000)
+save(cs, file="data/rao_HiCall_GM12878_Peak1_450k_csnorm_optimized.RData")
 
+load("data/rao_HiCall_GM12878_Peak1_450k_csnorm_optimized_exact_initgauss.RData")
+cs = run_gauss(cs, bf_per_kb=5, bf_per_decade=10, bins_per_bf=10, ngibbs = 20, iter=100000, init_alpha=1e-7, ncounts = 1000000, init=cs@par)
+save(cs, file="data/rao_HiCall_GM12878_Peak1_450k_csnorm_optimized_gauss_initexact.RData")
 
 
 prefix="data/rao_HiCall_chrX_450k_csnorm_optimized_exact_lambda"
@@ -81,9 +81,9 @@ cs=run_serial(cs, bf_per_kb = 5, bf_per_decade = 5, init=cs@par, iter = 10000, i
 
 
 #plots
-dsets=c("data/rao_HiCall_chrX_450k_csnorm_optimized_exact_initgauss.RData",
+dsets=c("data/rao_HiCall_GM12878_Peak1_450k_csnorm_optimized_exact_initgauss.RData",
         #"data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified.RData",
-        "data/rao_HiCall_chrX_450k_csnorm_optimized_gibbs_gauss.RData")
+        "data/rao_HiCall_GM12878_Peak1_450k_csnorm_optimized.RData")
 names=c("exact",
         #"simplified",
         "approximation")
@@ -104,38 +104,38 @@ names=c("exactig",
 
 
 #nu and delta
-nu = foreach(i=dsets,j=names,.combine=rbind) %do% {
+iota = foreach(i=dsets,j=names,.combine=rbind) %do% {
   load(i)
-  data.table(pos=cs@biases[,pos],nu=exp(cs@par$log_nu),delta=exp(cs@par$log_delta),method=j)
+  data.table(pos=cs@biases[,pos],iota=exp(cs@par$log_iota),rho=exp(cs@par$log_rho),method=j)
 }
-ggplot(nu)+geom_line(aes(pos,nu,colour=method))
-ggsave(filename = "images/rao_HiCall_chrX_450k_nu_bias.pdf", width=10, height=7)
-ggplot(nu)+geom_line(aes(pos,delta,colour=method))
-ggsave(filename = "images/rao_HiCall_chrX_450k_delta_bias.pdf", width=10, height=7)
+ggplot(iota)+geom_line(aes(pos,iota,colour=method))
+ggsave(filename = "images/rao_HiCall_chrX_450k_iota_bias.pdf", width=10, height=7)
+ggplot(iota)+geom_line(aes(pos,rho,colour=method))
+ggsave(filename = "images/rao_HiCall_chrX_450k_rho_bias.pdf", width=10, height=7)
 #
-ggplot(merge(nu[method=="exact",.(pos,nuref=nu,deltaref=delta)],nu[method!="exact"],by="pos"))+
-  geom_point(aes(nuref,nu,colour=method))+stat_function(fun=identity)
-ggsave(filename = "images/rao_HiCall_chrX_450k_nu_bias_correlation.pdf", width=10, height=7)
-ggplot(merge(nu[method=="exact",.(pos,nuref=nu,deltaref=delta)],nu[method!="exact"],by="pos"))+
-  geom_point(aes(deltaref,delta,colour=method))+stat_function(fun=identity)
-ggsave(filename = "images/rao_HiCall_chrX_450k_delta_bias_correlation.pdf", width=10, height=7)
+ggplot(merge(iota[method=="exact",.(pos,iotaref=iota,rhoref=rho)],iota[method!="exact"],by="pos"))+
+  geom_point(aes(iotaref,iota,colour=method))+stat_function(fun=identity)
+ggsave(filename = "images/rao_HiCall_chrX_450k_iota_bias_correlation.pdf", width=10, height=7)
+ggplot(merge(iota[method=="exact",.(pos,iotaref=iota,rhoref=rho)],iota[method!="exact"],by="pos"))+
+  geom_point(aes(rhoref,rho,colour=method))+stat_function(fun=identity)
+ggsave(filename = "images/rao_HiCall_chrX_450k_rho_bias_correlation.pdf", width=10, height=7)
 #
-cor.test(nu[method=="exact",log(nu)],nu[method=="simplified",log(nu)])
-cor.test(nu[method=="exact",log(nu)],nu[method=="approximation",log(nu)])
-cor.test(nu[method=="exact",log(delta)],nu[method=="simplified",log(delta)])
-cor.test(nu[method=="exact",log(delta)],nu[method=="approximation",log(delta)])
+cor.test(iota[method=="exact",log(iota)],iota[method=="simplified",log(iota)])
+cor.test(iota[method=="exact",log(iota)],iota[method=="approximation",log(iota)])
+cor.test(iota[method=="exact",log(rho)],iota[method=="simplified",log(rho)])
+cor.test(iota[method=="exact",log(rho)],iota[method=="approximation",log(rho)])
 
-#nu with points
+#iota with points
 load(dsets[3])
-ggplot(cs@par$biases[id>130])+geom_line(aes(pos,log_nu))+
-  geom_pointrange(aes(x=pos,y=log_nu+z,ymin=log_nu+z-std,ymax=log_nu+z+std,colour=cat))
+ggplot(cs@par$biases[id>130])+geom_line(aes(pos,log_iota))+
+  geom_pointrange(aes(x=pos,y=log_iota+z,ymin=log_iota+z-std,ymax=log_iota+z+std,colour=cat))
 
-#beta nu
-a=data.table(bnu=cs@par$beta_nu[1,])
+#beta iota
+a=data.table(biota=cs@par$beta_iota[1,])
 a[,id:=.I]
 a[,pos:=seq(cs@biases[,min(pos)],cs@biases[,max(pos)],length.out=.N)]
-ggplot(a)+geom_point(aes(id,bnu))
-ggplot(nu)+geom_line(aes(pos,log(nu),colour=method))+geom_line(aes(pos,bnu),data=a)
+ggplot(a)+geom_point(aes(id,biota))
+ggplot(iota)+geom_line(aes(pos,log(iota),colour=method))+geom_line(aes(pos,biota),data=a)
 
 #logp with gibbs step
 load(dsets[2])

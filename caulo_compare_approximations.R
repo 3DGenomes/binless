@@ -64,9 +64,8 @@ cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4), different.decays=c("enzyme"
 cs=merge_cs_norm_datasets(list(csd1), different.decays="none")
 cs = run_gauss_gibbs(cs, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10, init=lambda,
                ngibbs = 1, iter=10000)
-cs = run_gauss(cs, bf_per_kb=1, bf_per_decade=10, bins_per_bf=10, lambdas=10**seq(from=-2,to=2,length.out=10),
-                    ngibbs = 10, iter=10000, ncores=30, prefix="tmp/gauss_NcoI_all")
-save(cs, file="data/caulo_NcoI_all_csnorm_optimized.RData")
+cs = run_gauss(cs, bf_per_kb=1, bf_per_decade=10, bins_per_bf=10, ngibbs = 20, iter=100000, init_alpha=1e-7, ncounts = 1000000)
+save(cs, file="data/caulo_NcoI_500k_csnorm_optimized.RData")
 
 load("data/caulo_BglII_rif_all_csnorm_optimized.RData")
 
@@ -173,47 +172,37 @@ save(cs,file="data/caulo_2enz_500k_csnorm_optimized_gauss_initexact.RData")
 
 
 #plots
-dsets=c(#"data/caulo_2enz_500k_csnorm_optimized_exact.RData",
-        "data/caulo_2enz_500k_csnorm_optimized_exact_initgauss.RData",
-        "data/caulo_2enz_500k_csnorm_optimized_gauss_initexact.RData",
-        "data/caulo_2enz_500k_csnorm_optimized_gauss.RData")
-names=c(#"exact",
-        "exactig",
-        "gaussie",
-        "gauss")
+dsets=c("data/caulo_NcoI_500k_csnorm_optimized_exact_initgauss.RData",
+        "data/caulo_NcoI_500k_csnorm_optimized.RData")
+names=c("exact",
+        "approximation")
 
-#nu and delta
-nu = foreach(i=dsets,j=names,.combine=rbind) %do% {
+#iota and rho
+iota = foreach(i=dsets,j=names,.combine=rbind) %do% {
   load(i)
-  data.table(name=cs@biases[,name],pos=cs@biases[,pos],nu=exp(cs@par$log_nu),delta=exp(cs@par$log_delta),method=j)
+  data.table(name=cs@biases[,name],pos=cs@biases[,pos],iota=exp(cs@par$log_iota),rho=exp(cs@par$log_rho),method=j)
 }
-ggplot(nu)+geom_line(aes(pos,nu,colour=method))+facet_wrap(~name)
-ggsave(filename = "images/caulo_NcoI_500k_nu_bias.pdf", width=10, height=7)
-ggplot(nu)+geom_line(aes(pos,delta,colour=method))+facet_wrap(~name)
-ggsave(filename = "images/caulo_NcoI_500k_delta_bias.pdf", width=10, height=7)
+ggplot(iota)+geom_line(aes(pos,iota,colour=method))#+facet_wrap(~name)
+ggsave(filename = "images/caulo_NcoI_500k_iota_bias.pdf", width=10, height=7)
+ggplot(iota)+geom_line(aes(pos,rho,colour=method))#+facet_wrap(~name)
+ggsave(filename = "images/caulo_NcoI_500k_rho_bias.pdf", width=10, height=7)
 #
-ggplot(merge(nu[method=="exact",.(pos,nuref=nu,deltaref=delta)],nu[method!="exact"],by="pos"))+
-  geom_point(aes(nuref,nu,colour=method))+stat_function(fun=identity)
-ggsave(filename = "images/caulo_NcoI_500k_nu_bias_correlation.pdf", width=10, height=7)
-ggplot(merge(nu[method=="exact",.(pos,nuref=nu,deltaref=delta)],nu[method!="exact"],by="pos"))+
-  geom_point(aes(deltaref,delta,colour=method))+stat_function(fun=identity)
-ggsave(filename = "images/caulo_NcoI_500k_delta_bias_correlation.pdf", width=10, height=7)
+ggplot(merge(iota[method=="exact",.(pos,iotaref=iota,rhoref=rho)],iota[method!="exact"],by="pos"))+
+  geom_point(aes(iotaref,iota),colour="red")+stat_function(fun=identity)+xlab("exact")+ylab("approximation")
+ggsave(filename = "images/caulo_NcoI_500k_iota_bias_correlation.pdf", width=10, height=7)
+ggplot(merge(iota[method=="exact",.(pos,iotaref=iota,rhoref=rho)],iota[method!="exact"],by="pos"))+
+  geom_point(aes(rhoref,rho),colour="red")+stat_function(fun=identity)+xlab("exact")+ylab("approximation")
+ggsave(filename = "images/caulo_NcoI_500k_rho_bias_correlation.pdf", width=10, height=7)
 #
-cor.test(nu[method=="exact",log(nu)],nu[method=="simplified",log(nu)])
-cor.test(nu[method=="exact",log(nu)],nu[method=="approximation",log(nu)])
-cor.test(nu[method=="exact",log(delta)],nu[method=="simplified",log(delta)])
-cor.test(nu[method=="exact",log(delta)],nu[method=="approximation",log(delta)])
+cor.test(iota[method=="exact",log(iota)],iota[method=="simplified",log(iota)])
+cor.test(iota[method=="exact",log(iota)],iota[method=="approximation",log(iota)])
+cor.test(iota[method=="exact",log(rho)],iota[method=="simplified",log(rho)])
+cor.test(iota[method=="exact",log(rho)],iota[method=="approximation",log(rho)])
 
 #decay
-decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
-  load(i)
-  if ("decay" %in% names(cs@par$decay)) {
-    cs@par$decay[,.(method=j,name,dist,decay)]
-  } else {
-    cs@par$decay[,.(method=j,name,dist,decay=exp(log_decay))]
-  }
-}
-ggplot(decay)+geom_line(aes(dist,decay,colour=method))+facet_grid(method~name)+scale_x_log10()+scale_y_log10()
+decay = rbind({load(dsets[1]); cs@par$decay[,.(method="exact",name,dist,decay)]},
+              {load(dsets[2]); cs@par$decay[,.(method="approximation",name,dist=distance,decay=exp(kappa-cs@par$eC))]})
+ggplot(decay)+geom_line(aes(dist,decay,colour=method))+scale_x_log10()+scale_y_log10()
 ggsave(filename = "images/caulo_NcoI_500k_diagonal_decay.pdf", width=10, height=7)
 #
 decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
