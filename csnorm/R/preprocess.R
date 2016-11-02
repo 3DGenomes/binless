@@ -152,10 +152,7 @@ plot_raw = function(dt, b1, e1, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
     sub = get_raw_reads(dt, b1, e1, b2, e2)
     if (is.null(b2)) b2=b1
     if (is.null(e2)) e2=e1
-    #plot
     p=ggplot(sub[,.SD[sample(.N,min(.N,100000))],,by=c("strand1","strand2")])
-    p=p+geom_segment(aes(x=rbegin1, y=rbegin2, xend=rend1, yend=rend2, colour=category),
-                     arrow=arrow(type="closed", length=unit(0.005,"npc")))
     if (diagonal==T) p = p+stat_function(fun=function(x){x})
     if (rsites==T) {
       #rsite positions
@@ -165,6 +162,9 @@ plot_raw = function(dt, b1, e1, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
       rsites2=rsites.all[rsites.all>=b2&rsites.all<=e2]
       p = p + geom_hline(yintercept=rsites2, colour="grey")
     }
+    #plot
+    p=p+geom_segment(aes(x=rbegin1, y=rbegin2, xend=rend1, yend=rend2, colour=category),
+                     arrow=arrow(type="closed", length=unit(0.005,"npc")))
     p=p+xlim(b1,e1)+ylim(b2,e2)
   } else {
     sub1 = get_raw_reads(dt, b1, e1)
@@ -174,12 +174,9 @@ plot_raw = function(dt, b1, e1, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
     sub3 = get_raw_reads(dt, b1, e1, b2, e2)
     sub3[,c("xfac","yfac"):=list(0,0)]
     sub=rbind(sub1,sub2,sub3)
-    #plot
-    p=ggplot(sub[,.SD[sample(.N,min(.N,100000))],,by=c("strand1","strand2")])
-    p=p+geom_segment(aes(x=rbegin1, y=rbegin2, xend=rend1, yend=rend2, colour=category),
-                     arrow=arrow(type="closed", length=unit(0.005,"npc")))
     #diagonal
     diag.data = data.table(x=c(b1,b2), y=c(b1,b2), xend=c(e1,e2), yend=c(e1,e2), xfac=c(1,0), yfac=c(0,1))
+    p=ggplot(sub[,.SD[sample(.N,min(.N,100000))],,by=c("strand1","strand2")])
     p = p+geom_segment(aes(x=x, y=y, xend=xend, yend=yend), data=diag.data)
     #rsites
     if (rsites==T) {
@@ -194,6 +191,9 @@ plot_raw = function(dt, b1, e1, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
                                 xfac=c(rep(0,length(rsites2)*2), rep(1,length(rsites1))))
       p = p + geom_vline(aes(xintercept=z), rsite.data.x, colour="grey") + geom_hline(aes(yintercept=z), rsite.data.y, colour="grey")
     }
+    #plot
+    p=p+geom_segment(aes(x=rbegin1, y=rbegin2, xend=rend1, yend=rend2, colour=category),
+                     arrow=arrow(type="closed", length=unit(0.005,"npc")))
     p=p+facet_grid(xfac~yfac, scales = "free", space="free") + theme(axis.text.x = element_text(angle = 90, hjust = 1))
   }
   p = p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank())
