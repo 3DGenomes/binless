@@ -240,7 +240,7 @@ model {
     beta_diag_diff[d] ~ normal(0, 1/lambda_diag[XD[d]]);
   }
   //cauchy hyperprior
-  lambda_iota ~ cauchy(0,1);
-  lambda_rho ~ cauchy(0,1);
-  lambda_diag ~ cauchy(0,1);
+  lambda_iota ~ normal(0,0.01);
+  lambda_rho ~ normal(0,0.01);
+  lambda_diag ~ normal(0,1);
 }
