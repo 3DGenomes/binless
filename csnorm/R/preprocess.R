@@ -161,9 +161,9 @@ plot_raw = function(dt, b1, e1, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
       #rsite positions
       rsites.all=sub[,unique(c(re.up1,re.up2,re.dn1,re.dn2))]
       rsites1=rsites.all[rsites.all>=b1&rsites.all<=e1]
-      p = p + geom_vline(xintercept=rsites1)
+      p = p + geom_vline(xintercept=rsites1, colour="grey")
       rsites2=rsites.all[rsites.all>=b2&rsites.all<=e2]
-      p = p + geom_hline(yintercept=rsites2)
+      p = p + geom_hline(yintercept=rsites2, colour="grey")
     }
     p=p+xlim(b1,e1)+ylim(b2,e2)
   } else {
@@ -192,10 +192,11 @@ plot_raw = function(dt, b1, e1, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
       rsite.data.y = data.table(z=c(rsites2,rsites2,rsites1),
                                 yfac=c(rep(c(1,0),each=length(rsites2)), rep(0,length(rsites1))),
                                 xfac=c(rep(0,length(rsites2)*2), rep(1,length(rsites1))))
-      p = p + geom_vline(aes(xintercept=z), rsite.data.x) + geom_hline(aes(yintercept=z), rsite.data.y)
+      p = p + geom_vline(aes(xintercept=z), rsite.data.x, colour="grey") + geom_hline(aes(yintercept=z), rsite.data.y, colour="grey")
     }
     p=p+facet_grid(xfac~yfac, scales = "free", space="free") + theme(axis.text.x = element_text(angle = 90, hjust = 1))
   }
+  p = p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank())
   print(p)
 }
 
