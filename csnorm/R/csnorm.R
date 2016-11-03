@@ -80,7 +80,7 @@ setMethod("show",signature="CSdata",definition=function(object) {
   ncounts=object@counts[,sum((contact.close>0)+(contact.far>0)+(contact.up>0)+(contact.down>0))]
   cat(" and ", ncounts, " nonzero counts\n", sep="")
   nreads=object@counts[,sum(contact.close+contact.far+contact.up+contact.down)]
-  cat(" from ", nreads, " reads\n", sep="")
+  cat(" from ", nreads, " count reads\n", sep="")
   cat(" Reads density excl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
   nreads=nreads+object@biases[,sum(dangling.L+dangling.R+rejoined)]
   cat(" Reads density incl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
