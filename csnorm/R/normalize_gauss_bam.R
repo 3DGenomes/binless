@@ -65,6 +65,9 @@ csnorm_gauss_genomic_bam = function(cs, verbose=T, init.mean="mean", nthreads=1)
 }
 
 #' Cut-site normalization (deprecated fast approximation, using mgcv BAM)
+#'
+#' Note that the genomic length scales are optimized twice during the
+#' optimization
 #' 
 #' @inheritParams run_gauss
 #' @export

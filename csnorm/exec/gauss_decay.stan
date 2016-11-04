@@ -22,13 +22,15 @@ data {
   vector<lower=0>[N] dist;
   //weight for spline centering
   vector<lower=0>[N] weight;
+  //length scales
+  real<lower=0> lambda_diag[Decays];
 }
 transformed data {
   //diagonal SCAM spline, dense
   matrix[N,Dsets*Kdiag] Xdiag;
   row_vector[Kdiag] pdiagD[Dsets];
   //scaling factor for decay lambda
-  real lfac;
+  real ldfac;
 
   //diagonal SCAM spline, dense
   {
@@ -57,15 +59,13 @@ transformed data {
   }
   
   //scaling factor
-  lfac = Kdiag/sqrt(log(dmax/dmin));
+  ldfac = Kdiag/sqrt(log(dmax/dmin));
 }
 parameters {
   //exposures
   real eC[Dsets];
   //spline parameters
   positive_ordered[Kdiag-1] beta_diag[Decays];
-  //length scales
-  real<lower=0> lambda_diag[Decays];
 }
 transformed parameters {
   //diag
@@ -102,8 +102,5 @@ model {
   kappa_hat ~ normal(log_mean_counts, sdl);
   
   //// prior
-  for (d in 1:Dsets) beta_diag_diff[d] ~ normal(0,1/(lfac*lambda_diag[XD[d]]));
-  
-  //// hyperprior
-  lambda_diag ~ normal(0,1);
+  for (d in 1:Dsets) beta_diag_diff[d] ~ normal(0,1/(ldfac*lambda_diag[XD[d]]));
 }

@@ -27,6 +27,9 @@ data {
   vector<lower=0>[SD] sd_DR;
   vector<lower=0>[SD] sd_L;
   vector<lower=0>[SD] sd_R;
+  //stiffnesses
+  real<lower=0> lambda_iota[Biases];
+  real<lower=0> lambda_rho[Biases];
 }
 transformed data {
   //bias spline, sparse (iota and rho have the same design)
@@ -35,7 +38,7 @@ transformed data {
   int XDrow_u[SD+1];
   row_vector[Krow] prowD[Dsets];
   //scaling factor for genomic lambdas
-  real lfac;
+  real lgfac;
 
   //Bias GAM spline, sparse
   {
@@ -70,7 +73,7 @@ transformed data {
   }
   
   //scaling factor
-  lfac = Krow/sqrt(max(cutsitesD)-min(cutsitesD));
+  lgfac = Krow/sqrt(max(cutsitesD)-min(cutsitesD));
   
 }
 parameters {
@@ -81,9 +84,6 @@ parameters {
   //spline parameters
   vector[Krow-1] beta_iota[Biases];
   vector[Krow-1] beta_rho[Biases];
-  //stiffnesses
-  real<lower=0> lambda_iota[Biases];
-  real<lower=0> lambda_rho[Biases];
 }
 transformed parameters {
   //iota
@@ -162,11 +162,7 @@ model {
   
   //// prior
   for (d in 1:Dsets) {
-    beta_iota_diff[d] ~ normal(0,1/(lfac*lambda_iota[XB[d]]));
-    beta_rho_diff[d] ~ normal(0,1/(lfac*lambda_rho[XB[d]]));
+    beta_iota_diff[d] ~ normal(0,1/(lgfac*lambda_iota[XB[d]]));
+    beta_rho_diff[d] ~ normal(0,1/(lgfac*lambda_rho[XB[d]]));
   }
-  
-  //// hyperprior
-  lambda_iota ~ normal(0,1);
-  lambda_rho ~ normal(0,1);
 }
