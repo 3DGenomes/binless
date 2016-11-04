@@ -35,3 +35,22 @@ plot_raw(data, b1=csd@biases[,min(pos)+10000], e1=csd@biases[,min(pos)+20000])
 #ggsave(filename="images/rao_HiC006_GM12878_Peak1_450k_raw.pdf", width=10, height=8)
 #ggsave(filename="images/rao_HiC035_HindIII_GM12878_Peak1_450k_raw.pdf", width=10, height=8)
 ggsave(filename="images/rao_HiC036_NcoI_GM12878_Peak1_450k_raw.pdf", width=10, height=8)
+
+csd@data[category %in% c("contact up","contact down","contact close","contact far"),.N]*2/(csd@biases[,.N]*csd@biases[,.N-1])
+csd@data[,.N]*2/(csd@biases[,.N]*csd@biases[,.N-1])
+
+
+
+load("data/rao_HiCall_GM12878_SEMA3C_1M_csdata_with_data.RData")
+load("data/rao_HiC036_NcoI_GM12878_SEMA3C_1M_csdata_with_data.RData")
+load("data/caulo_NcoI_all_csdata_with_data.RData")
+load("data/caulo_BglIIr2_all_csdata_with_data.RData")
+
+begin=500000
+end=1500000
+data=csd@data[re.closest1>=begin&re.closest1<=end&re.closest2>=begin&re.closest2<=end]
+cs_data = csnorm:::prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
+csd = new("CSdata", info=csd@info, settings=list(circularize=-1),
+          data=data, biases=cs_data$biases, counts=cs_data$counts)
+
+csd@data[,.N,keyby=category][,.(category,N/csd@data[,.N]*100)]

@@ -8,20 +8,21 @@ setwd("/home/yannick/simulations/cs_norm")
 
 
 ### subsample
-begin=73780165
-#end=73899917 #100k
-end=73861120 #60k
-load("data/rao_HiCall_chrX_450k_csdata_with_data.RData")
+begin=73780000
+#end=73880000 #100k
+end=73840000 #60k
+load("data/rao_HiCall_GM12878_Peak1_450k_csdata_with_data.RData")
 data=csd@data[re.closest1>=begin&re.closest1<=end&re.closest2>=begin&re.closest2<=end]
 cs_data = csnorm:::prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
-csd = new("CSdata", info=csd@info, settings=list(circularize=-1),
+csd = new("CSdata", info=csd@info,
+          settings=list(circularize=-1,dmin=csd@settings$dmin,dmax=cs_data$biases[,max(pos)-min(pos)]),
           data=data, biases=cs_data$biases, counts=cs_data$counts)
 csd@data=data.table()
-save(csd, file="data/rao_HiCall_chrX_60k_csdata.RData")
+save(csd, file="data/rao_HiCall_GM12878_Peak1_sub60k_csdata.RData")
 
 
 #normalize with serial sampler
-load("data/rao_HiCall_chrX_60k_csdata.RData")
+load("data/rao_HiCall_GM12878_Peak1_sub100k_csdata.RData")
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
 cs=run_exact(cs, bf_per_kb = 5, bf_per_decade = 5, lambdas = 10**seq(from=-1,to=1,length.out=6), ncores = 30, iter = 100000)
 cs=run_serial(cs, bf_per_kb = 5, bf_per_decade = 5, init=lambda, iter = 1000000)
@@ -82,10 +83,10 @@ cs=run_serial(cs, bf_per_kb = 5, bf_per_decade = 5, init=cs@par, iter = 10000, i
 
 #plots
 dsets=c("data/rao_HiCall_GM12878_Peak1_450k_csnorm_optimized_exact_initgauss.RData",
-        #"data/rao_HiCall_chrX_60k_csnorm_optimized_gibbs_simplified.RData",
+        "data/rao_HiCall_GM12878_Peak1_450k_csnorm_optimized_gauss_initexact.RData",
         "data/rao_HiCall_GM12878_Peak1_450k_csnorm_optimized.RData")
 names=c("exact",
-        #"simplified",
+        "gaussie",
         "approximation")
 
 dsets=c("data/rao_HiCall_chrX_450k_csnorm_optimized_exact.RData",
@@ -166,7 +167,7 @@ decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
   if ("decay" %in% names(cs@par$decay)) {
     cs@par$decay[,.(method=j,dist,decay)]
   } else {
-    cs@par$decay[,.(method=j,dist,decay=exp(log_decay))]
+    cs@par$decay[,.(method=j,dist=distance,decay=exp(kappa-cs@par$eC))]
   }
 }
 ggplot(decay[,.SD[sample(.N,min(.N,100000))],by=method])+
@@ -190,8 +191,8 @@ ggplot(cs@par$decay)+geom_line(aes(dist,log_decay),colour="red")+
 #parameters
 params = foreach(i=dsets,j=names,.combine=rbind) %do% {
   load(i)
-  data.table(method=j,eC=cs@par$eC,alpha=cs@par$alpha,lambda_nu=cs@par$lambda_nu,
-             lambda_delta=cs@par$lambda_delta,lambda_diag=cs@par$lambda_diag,value=cs@par$value)
+  data.table(method=j,eC=cs@par$eC,alpha=cs@par$alpha,lambda_iota=cs@par$lambda_iota,
+             lambda_rho=cs@par$lambda_rho,lambda_diag=cs@par$lambda_diag,value=cs@par$value)
 }
 params
 
