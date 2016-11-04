@@ -44,8 +44,9 @@ transformed data {
   //diagonal SCAM spline, dense
   matrix[N,Dsets*Kdiag] Xdiag;
   row_vector[Kdiag] pdiagD[Dsets];
-  //scaling factor for genomic lambdas
-  real lfac;
+  //scaling factor for lambdas
+  real lgfac;
+  real ldfac;
   
   //Bias GAM spline, sparse
   {
@@ -108,8 +109,9 @@ transformed data {
     }
   }
   
-  //scaling factor for genomic lambdas
-  lfac = 30000*Krow/(max(cutsitesD)-min(cutsitesD));
+  //scaling factor for lambdas
+  lgfac = Krow/sqrt(max(cutsitesD)-min(cutsitesD));
+  ldfac = Kdiag/sqrt(log(dmax/dmin));
 }
 parameters {
   //exposures
@@ -235,12 +237,12 @@ model {
     //P-spline prior on the differences (K-2 params)
     //warning on jacobian can be ignored
     //see GAM, Wood (2006), section 4.8.2 (p.187)
-    beta_iota_diff[d] ~ normal(0, 1/(lfac*lambda_iota[XB[d]]));
-    beta_rho_diff[d] ~ normal(0, 1/(lfac*lambda_rho[XB[d]]));
-    beta_diag_diff[d] ~ normal(0, 1/lambda_diag[XD[d]]);
+    beta_iota_diff[d] ~ normal(0, 1/(lgfac*lambda_iota[XB[d]]));
+    beta_rho_diff[d] ~ normal(0, 1/(lgfac*lambda_rho[XB[d]]));
+    beta_diag_diff[d] ~ normal(0, 1/(ldfac*lambda_diag[XD[d]]));
   }
   //cauchy hyperprior
-  lambda_iota ~ normal(0,0.01);
-  lambda_rho ~ normal(0,0.01);
+  lambda_iota ~ normal(0,1);
+  lambda_rho ~ normal(0,1);
   lambda_diag ~ normal(0,1);
 }

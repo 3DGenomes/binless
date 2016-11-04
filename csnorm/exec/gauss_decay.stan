@@ -27,7 +27,9 @@ transformed data {
   //diagonal SCAM spline, dense
   matrix[N,Dsets*Kdiag] Xdiag;
   row_vector[Kdiag] pdiagD[Dsets];
-  
+  //scaling factor for decay lambda
+  real lfac;
+
   //diagonal SCAM spline, dense
   {
     {
@@ -54,6 +56,8 @@ transformed data {
     }
   }
   
+  //scaling factor
+  lfac = Kdiag/sqrt(log(dmax/dmin));
 }
 parameters {
   //exposures
@@ -98,7 +102,7 @@ model {
   kappa_hat ~ normal(log_mean_counts, sdl);
   
   //// prior
-  for (d in 1:Dsets) beta_diag_diff[d] ~ normal(0,1/lambda_diag[XD[d]]);
+  for (d in 1:Dsets) beta_diag_diff[d] ~ normal(0,1/(lfac*lambda_diag[XD[d]]));
   
   //// hyperprior
   lambda_diag ~ normal(0,1);

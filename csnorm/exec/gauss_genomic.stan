@@ -70,7 +70,7 @@ transformed data {
   }
   
   //scaling factor
-  lfac = 30000*Krow/(max(cutsitesD)-min(cutsitesD));
+  lfac = Krow/sqrt(max(cutsitesD)-min(cutsitesD));
   
 }
 parameters {
@@ -167,6 +167,6 @@ model {
   }
   
   //// hyperprior
-  lambda_iota ~ normal(0,0.01);
-  lambda_rho ~ normal(0,0.01);
+  lambda_iota ~ normal(0,1);
+  lambda_rho ~ normal(0,1);
 }
