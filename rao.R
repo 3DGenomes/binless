@@ -72,6 +72,8 @@ ggplot(cs@diagnostics$params[leg=="disp",.(alpha=sapply(alpha,function(x){x[[1]]
 #or eC
 ggplot(cs@diagnostics$params[,.(step,leg,eC=sapply(eC,function(x){x[[1]]}),out.last)])+
   geom_line(aes(step,eC))+geom_point(aes(step,eC,colour=out.last))+facet_grid(~leg)
+ggplot(cs@diagnostics$params[,.(step=.I/3,leg,eC=sapply(eC,function(x){x[[1]]}),out.last)])+
+  geom_line(aes(step,eC))+geom_point(aes(step,eC,colour=leg))
 
 #To assess normalization quality, some other diagnostics plots can be generated as well.
 #The function generates 4 plots and also returns a data table.
