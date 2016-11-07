@@ -198,6 +198,9 @@ csnorm_predict_all_parallel = function(cs, counts, verbose=T, ncores=1) {
 #' @export
 #' 
 run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subsampling.pc=100, init_alpha=1e-7) {
+  #clean object if dirty
+  cs@par=list() #in case we have a weird object
+  cs@binned=list()
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -230,7 +233,7 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subs
   }
   cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4], op.init=init.op)
   #main optimization, subsampled
-  counts.sub=cs@counts[sample(.N,round(subsampling.pc/100*.N))]
+  counts.sub=cs@counts[sample(.N,min(.N,round(subsampling.pc/100*.N)))]
   setkeyv(counts.sub,key(cs@counts))
   a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
     biases=cs@biases, counts = counts.sub, design=cs@design, dmin=dmin, dmax=dmax,
