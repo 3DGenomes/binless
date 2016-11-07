@@ -77,38 +77,34 @@ optimize_stan_model = function(model, data, iter, verbose, init, ...) {
   return(op)
 }
 
-#' Initial guess for normalization
+#' Single-cpu fitting, fixed length scales (custom for genomic, lambda=1 for decay)
 #' @keywords internal
 #' @export
 #' 
-csnorm_fit_initial = function(counts, biases, design, bf_per_kb, dmin, dmax, bf_per_decade, lambda, verbose, iter, ...) {
-  #compute column sums
-  cs1=counts[,.(R=sum(contact.close+contact.down),L=sum(contact.far+contact.up)),by=c("name","id1")][,.(name,id=id1,L,R)]
-  cs2=counts[,.(R=sum(contact.far+contact.down),L=sum(contact.close+contact.up)),by=c("name","id2")][,.(name,id=id2,L,R)]
-  pos=biases[,.(name,id)]
-  setkey(pos, name, id)
-  sums=rbind(cs1,cs2)[,.(L=sum(L),R=sum(R)),keyby=c("name","id")][pos]
-  #run optimization
-  Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
-  bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
-  data=list(Dsets=design[,.N], Biases=design[,uniqueN(genomic)],
-            XB=as.array(design[,genomic]), Krow=Krow, SD=biases[,.N], bbegin=bbegin,
-            cutsitesD=biases[,pos], rejoined=biases[,rejoined],
-            danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
-            counts_sum_left=sums[,L], counts_sum_right=sums[,R],
-            lambda_iota=lambda, lambda_rho=lambda)
-  op=optimize_stan_model(model=stanmodels$guess, data=data, iter=iter, verbose=verbose, init=0, ...)
-  #return initial guesses
-  Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
+csnorm_fit_fixed = function(biases, counts, design, dmin, dmax, lambda, bf_per_kb=1, bf_per_decade=20, iter=10000,
+                      verbose=T, weight=array(1,dim=design[,.N]), ...) {
+  nBiases=design[,uniqueN(genomic)]
   Decays=design[,uniqueN(decay)]
-  beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
-  return(list(eRJ=op$par$eRJ, eDE=op$par$eDE, eC=op$par$eC,
-              alpha=op$par$alpha, beta_iota=op$par$beta_iota, beta_rho=op$par$beta_rho,
-              log_iota=op$par$log_iota, log_rho=op$par$log_rho,
-              lambda_iota=array(lambda,dim=data$Biases),
-              lambda_rho=array(lambda,dim=data$Biases),
-              beta_diag=beta_diag, lambda_diag=array(1,dim=Decays),
-              log_decay=rep(0,counts[,.N])))
+  Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
+  Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
+  bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
+  cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
+  data = list( Dsets=design[,.N], Biases=nBiases, Decays=Decays,
+               XB=as.array(design[,genomic]), XD=as.array(design[,decay]),
+               Krow=Krow, SD=biases[,.N], bbegin=bbegin,
+               cutsitesD=biases[,pos], rejoined=biases[,rejoined],
+               danglingL=biases[,dangling.L], danglingR=biases[,dangling.R],
+               Kdiag=Kdiag, dmin=dmin, dmax=dmax,
+               N=counts[,.N], cbegin=cbegin,
+               cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
+               counts_close=counts[,contact.close], counts_far=counts[,contact.far],
+               counts_up=counts[,contact.up], counts_down=counts[,contact.down],
+               weight=as.array(weight),
+               lambda_iota=array(lambda,dim=nBiases), lambda_rho=array(lambda,dim=nBiases),
+               lambda_diag=array(1,dim=Decays))
+  op=optimize_stan_model(model=stanmodels$fit_fixed, data=data, iter=iter, verbose=verbose, init=0, ...)
+  op$par$decay=data.table(name=counts[,name], dist=data$dist, decay=exp(op$par$log_decay), key=c("name","dist"))
+  return(op)
 }
 
 
@@ -214,9 +210,9 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subs
   dmax=cs@settings$dmax
   #initial guess
   if (length(init)==1) {
-    init.a=system.time(init.output <- capture.output(init.par <- csnorm_fit_initial(
-      counts=cs@counts, biases=cs@biases, design=cs@design,
-      bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade, lambda=init[[1]],
+    init.a=system.time(init.output <- capture.output(init.par <- csnorm_fit_fixed(
+      counts=cs@counts, biases=cs@biases, design=cs@design, lambda=init[[1]],
+      bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade,
       verbose=T, iter=iter, init_alpha=init_alpha)))
     init.op=list(par=init.par)
     #abort silently if initial guess went wrong
@@ -233,7 +229,7 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subs
   }
   cs@diagnostics=list(out.init=init.output, runtime.init=init.a[1]+init.a[4], op.init=init.op)
   #main optimization, subsampled
-  counts.sub=cs@counts[sample(.N,min(.N,round(subsampling.pc/100*.N)))]
+  counts.sub=cs@counts[sample(.N,round(subsampling.pc/100*.N))]
   setkeyv(counts.sub,key(cs@counts))
   a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
     biases=cs@biases, counts = counts.sub, design=cs@design, dmin=dmin, dmax=dmax,
