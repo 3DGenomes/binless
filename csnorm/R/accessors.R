@@ -174,3 +174,30 @@ update_diagnostics = function(cs, step, leg, out, runtime) {
   return(params)
 }
 
+
+#' Returns one param's values during optimization
+#'
+#' @keywords internal
+#' @export
+#'
+#' @examples
+get_all_values = function(cs, param) {
+  #get value in tmp as vector of lists, remove NULL lists
+  values=cs@diagnostics$params[,.(step=step+((.I-1)%%3)/3,leg,tmp=get(param))][!sapply(tmp,is.null)]
+  #melt it
+  melted=as.data.table(values[,melt(tmp)])
+  if ("Var1" %in% names(melted)) {
+    if ("Var2" %in% names(melted)) {
+      melted[,variable:=paste0(param,".",Var1,".",Var2)]
+    } else {
+      melted[,variable:=paste0(param,".",Var1)]
+    }
+  } else {
+    melted[,variable:=param]
+  }
+  #merge it back
+  values[,L1:=.I]
+  melted=merge(values,melted,by="L1")[,.(variable,step,leg,value)]
+  setkey(melted,variable,step,leg)
+  melted
+}
