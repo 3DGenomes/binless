@@ -259,7 +259,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
                          verbose=verbose, init=cs@par, init_alpha=init_alpha)
   #update par slot
   op$par$value=op$value
-  cs@par=modifyList(cs@par, op$par[c("eC","eRJ","eDE","alpha","value")])
+  cs@par=modifyList(cs@par, op$par[c("eC","eRJ","eDE","alpha","value","lambda_iota","lambda_rho","lambda_diag")])
   return(cs)
 }
 
@@ -336,24 +336,26 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   for (i in (laststep + 1:ngibbs)) {
     #fit diagonal decay given iota and rho
     if (fit.decay==T) {
-      if (verbose==T) cat("Gibbs",i,": Decay\n")
+      if (verbose==T) cat("Gibbs",i,": Decay ")
       a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean, init_alpha=init_alpha)))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", out=output, runtime=a[1]+a[4])
+      if (verbose==T) cat("log-likelihood = ",cs@par$value, "\n")
     }
     #fit iota and rho given diagonal decay
     if (fit.genomic==T) {
-      if (verbose==T) cat("Gibbs",i,": Genomic\n")
+      if (verbose==T) cat("Gibbs",i,": Genomic ")
       a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean, init_alpha=init_alpha)))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", out=output, runtime=a[1]+a[4])
+      if (verbose==T) cat("log-likelihood = ",cs@par$value, "\n")
     }
     init.mean="mean"
     if (fit.disp==T) {
       #fit exposures and dispersion
-      if (verbose==T) cat("Gibbs",i,": Remaining parameters\n")
+      if (verbose==T) cat("Gibbs",i,": Remaining parameters ")
       a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight,
                                                                                     init_alpha=init_alpha)))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", out=output, runtime=a[1]+a[4])
-      if (verbose==T) cat("Gibbs",i,": log-likelihood = ",cs@par$value,"\n")
+      if (verbose==T) cat("log-likelihood = ",cs@par$value," lambda_iota = ",cs@par$lambda_iota, "\n")
     }
   }
   if (verbose==T) cat("Done\n")
