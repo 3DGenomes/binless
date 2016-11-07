@@ -263,7 +263,7 @@ run_exact = function(cs, bf_per_kb=1, bf_per_decade=20, lambdas=c(0.1,1,10), nco
   cs@binned=list() #erase old binned datasets if available
   registerDoParallel(cores=ncores)
   cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value<y@par$value){return(y)}else{return(x)}}) %dopar% {
-    run_serial(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, init=lambda, iter=iter,
+    cs =run_serial(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, init=lambda, iter=iter,
                subsampling.pc=subsampling.pc, init_alpha=init_alpha)
     if (!is.null(prefix)) save(cs, file=paste0(prefix,"_lambda",lambda,".RData"))
     cs
