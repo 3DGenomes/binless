@@ -240,9 +240,10 @@ generate_genomic_biases = function(biases, beta_iota, beta_rho, bf_per_kb=1, poi
   genome_sz=end-begin
   Krow=round(bf_per_kb*genome_sz/1000)
   S=round(points_per_kb*genome_sz/1000)
-  op=optimizing(stanmodels$gen_genomic_biases, data=list(Krow=Krow, S=S, begin=begin, end=end,
+  out <- capture.output(
+    op<-optimizing(stanmodels$gen_genomic_biases, data=list(Krow=Krow, S=S, begin=begin, end=end,
                                                          beta_iota=beta_iota, beta_rho=beta_rho),
-                as_vector=F, hessian=F, iter=1, verbose=F, init=0)
+                as_vector=F, hessian=F, iter=1, verbose=F, init=0))
   dt=as.data.table(op$par)
   setkey(dt, pos)
   return(dt)
