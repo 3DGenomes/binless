@@ -585,3 +585,28 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
                 biases=biases, counts=counts)
 }
 
+#' Take a random subset of the reads of a given csnorm object
+#' 
+#' @param csnorm a csnorm object
+#' @param subsampling.pc positive integer
+#'   
+#' @return The csnorm object with updated biases and counts slots
+#' @export
+#' 
+#' @examples
+subsample_csnorm = function(cs, subsampling.pc=100) {
+  biases=copy(cs@biases)
+  biases[,dangling.L:=rbinom(.N,dangling.L,subsampling.pc/100)]
+  biases[,dangling.R:=rbinom(.N,dangling.R,subsampling.pc/100)]
+  biases[,rejoined:=rbinom(.N,rejoined,subsampling.pc/100)]
+  counts=copy(cs@counts)
+  counts[,contact.close:=rbinom(.N,contact.close,subsampling.pc/100)]
+  counts[,contact.down:=rbinom(.N,contact.down,subsampling.pc/100)]
+  counts[,contact.far:=rbinom(.N,contact.far,subsampling.pc/100)]
+  counts[,contact.up:=rbinom(.N,contact.up,subsampling.pc/100)]
+  new("CSnorm", experiments=cs@experiments,
+      design=cs@design,
+      settings=cs@settings,
+      biases=biases, counts=counts)
+}
+
