@@ -6,76 +6,48 @@ library(doParallel)
 
 setwd("/home/yannick/simulations/cs_norm")
 
+#exact run
+load(paste0("data/rao_HiCall_GM12878_Peak1_450k_csdata.RData"))
+cs=merge_cs_norm_datasets(list(csd), different.decays="none")
+cs=run_exact(cs, bf_per_kb = 3, bf_per_decade = 10, lambdas =
+               10**seq(from=-3,to=0,length.out=6), ncores = 30, iter = 100000,
+             prefix="tmp/rao_Peak1_450k"))
+save(cs,file=paste0("data/rao_HiCall_GM12878_Peak1_450k_csnorm_optimized_exact.RData"))
 
-### zoom on smaller portions
-begin=73780000
-#end=73880000 #100k
-end=73840000 #60k
-load("data/rao_HiCall_GM12878_Peak1_450k_csdata_with_data.RData")
-data=csd@data[re.closest1>=begin&re.closest1<=end&re.closest2>=begin&re.closest2<=end]
-cs_data = csnorm:::prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
-csd = new("CSdata", info=csd@info,
-          settings=list(circularize=-1,dmin=csd@settings$dmin,dmax=cs_data$biases[,max(pos)-min(pos)]),
-          data=data, biases=cs_data$biases, counts=cs_data$counts)
-save(csd, file="data/rao_HiCall_GM12878_Peak1_sub60k_csdata_with_data.RData")
-csd@data=data.table()
-save(csd, file="data/rao_HiCall_GM12878_Peak1_sub60k_csdata.RData")
+#approximate run
+load(paste0("data/rao_HiCall_GM12878_Peak1_450k_csdata.RData"))
+cs=merge_cs_norm_datasets(list(csd), different.decays="none")
+cs = run_gauss(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 40, iter=100000, init_alpha=1e-7, ncounts = 1000000)
+save(cs,file=paste0("data/rao_HiCall_GM12878_Peak1_450k_csnorm_optimized_gauss.RData"))
 
-
-### take less reads
-foreach (sub=c(1,10,50)) %do% {
-  load("data/rao_HiCall_GM12878_Peak1_sub60k_csdata_with_data.RData")
-  data=csd@data[sample(.N,as.integer(.N*sub/100))]
-  cs_data = csnorm:::prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
-  csd = new("CSdata", info=csd@info,
-            settings=csd@settings, data=data, biases=cs_data$biases, counts=cs_data$counts)
-  csd@data=data.table()
-  save(csd, file=paste0("data/rao_HiCall_GM12878_Peak1_sub60k_",sub,"pc_csdata.RData"))
-}
 
 
 #plots
-sub="sub100k"
-dsets=c(paste0("data/rao_HiCall_GM12878_Peak1_",sub,"_csnorm_optimized_exact_initgauss.RData"),
-        paste0("data/rao_HiCall_GM12878_Peak1_",sub,"_csnorm_optimized_gauss_initexact.RData"),
-        paste0("data/rao_HiCall_GM12878_Peak1_",sub,"_csnorm_optimized_gam.RData"),
-        paste0("data/rao_HiCall_GM12878_Peak1_",sub,"_csnorm_optimized_gauss.RData"))
-names=c("exactig",
-        "gaussie",
-        "gam",
+dsets=c(paste0("data/rao_HiCall_GM12878_Peak1_450k_csnorm_optimized_exact.RData"),
+        paste0("data/rao_HiCall_GM12878_Peak1_450k_csnorm_optimized_gauss.RData"))
+names=c("exact",
         "approximation")
 
-
-dsets=c(paste0("data/rao_HiCall_GM12878_Peak1_sub60k_1pc_csnorm_optimized_exact_initgauss.RData"),
-        paste0("data/rao_HiCall_GM12878_Peak1_sub60k_10pc_csnorm_optimized_exact_initgauss.RData"),
-        paste0("data/rao_HiCall_GM12878_Peak1_sub60k_50pc_csnorm_optimized_exact_initgauss.RData"),
-        paste0("data/rao_HiCall_GM12878_Peak1_sub60k_csnorm_optimized_exact_initgauss.RData"))
-names=c("1pc",
-        "10pc",
-        "50pc",
-        "all")
-
-
-#nu and delta
+#iota and rho
 iota = foreach(i=dsets,j=names,.combine=rbind) %do% {
   load(i)
   data.table(pos=cs@biases[,pos],iota=exp(cs@par$log_iota),rho=exp(cs@par$log_rho),method=j)
 }
 ggplot(iota)+geom_line(aes(pos,iota,colour=method))
-#ggsave(filename = "images/rao_HiCall_chrX_450k_iota_bias.pdf", width=10, height=7)
+ggsave(filename = "images/rao_HiCall_GM12878_Peak1_450k_iota_bias.pdf", width=10, height=7)
 ggplot(iota)+geom_line(aes(pos,rho,colour=method))
-#ggsave(filename = "images/rao_HiCall_chrX_450k_rho_bias.pdf", width=10, height=7)
+ggsave(filename = "images/rao_HiCall_GM12878_Peak1_450k_rho_bias.pdf", width=10, height=7)
 #
 ggplot(merge(iota[method=="exact",.(pos,iotaref=iota,rhoref=rho)],iota[method!="exact"],by="pos"))+
-  geom_point(aes(iotaref,iota,colour=method))+stat_function(fun=identity)
-ggsave(filename = "images/rao_HiCall_chrX_450k_iota_bias_correlation.pdf", width=10, height=7)
+  geom_point(aes(iotaref,iota,colour=method))+stat_function(fun=identity)+xlab("exact")+ylab("approximation")+
+  scale_x_log10(limits=c(1e-2,1e2))+scale_y_log10(limits=c(1e-2,1e2))+guides(colour=F)
+ggsave(filename = "images/rao_HiCall_GM12878_Peak1_450k_iota_bias_correlation.pdf", width=10, height=7)
 ggplot(merge(iota[method=="exact",.(pos,iotaref=iota,rhoref=rho)],iota[method!="exact"],by="pos"))+
-  geom_point(aes(rhoref,rho,colour=method))+stat_function(fun=identity)
-ggsave(filename = "images/rao_HiCall_chrX_450k_rho_bias_correlation.pdf", width=10, height=7)
+  geom_point(aes(iotaref,iota,colour=method))+stat_function(fun=identity)+xlab("exact")+ylab("approximation")+
+  scale_x_log10(limits=c(1e-2,1e2))+scale_y_log10(limits=c(1e-2,1e2))+guides(colour=F)
+ggsave(filename = "images/rao_HiCall_GM12878_Peak1_450k_rho_bias_correlation.pdf", width=10, height=7)
 #
-cor.test(iota[method=="exact",log(iota)],iota[method=="simplified",log(iota)])
 cor.test(iota[method=="exact",log(iota)],iota[method=="approximation",log(iota)])
-cor.test(iota[method=="exact",log(rho)],iota[method=="simplified",log(rho)])
 cor.test(iota[method=="exact",log(rho)],iota[method=="approximation",log(rho)])
 
 
@@ -90,12 +62,12 @@ decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
 }
 ggplot(decay[,.SD[sample(.N,min(.N,100000))],by=method])+
   geom_line(aes(dist,decay,colour=method))+scale_x_log10()+scale_y_log10()
-#ggsave(filename="images/rao_HiCall_chrX_450k_diagonal_decay.pdf", width=10, height=7)
+ggsave(filename="images/rao_HiCall_GM12878_Peak1_450k_diagonal_decay.pdf", width=10, height=7)
 
 #parameters
 params = foreach(i=dsets,j=names,.combine=rbind) %do% {
   load(i)
-  data.table(method=j,eC=cs@par$eC,alpha=cs@par$alpha,lambda_iota=cs@par$lambda_iota,
+  data.table(method=j,eRJ=cs@par$eRJ,eDE=cs@par$eDE,eC=cs@par$eC,alpha=cs@par$alpha,lambda_iota=cs@par$lambda_iota,
              lambda_rho=cs@par$lambda_rho,lambda_diag=cs@par$lambda_diag,value=cs@par$value)
 }
 params
