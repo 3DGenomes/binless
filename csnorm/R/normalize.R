@@ -345,3 +345,36 @@ recover_normalization = function(prefix) {
            }
 }
 
+
+#' Return the value of the log posterior of the exact model (memory-intensive)
+#' 
+#' @param cs an optimized csnorm object
+#'   
+#' @return The log-posterior
+#' @export
+get_exact_logp = function(cs) {
+  #basic checks
+  stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
+               (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
+  if (length(cs@par)==0) stop("Must normalize data first")
+  cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize, dmin=cs@settings$dmin)
+  Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
+  Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
+  bbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
+  cbegin=c(1,cs@counts[,.(name,row=.I)][name!=shift(name),row],cs@counts[,.N+1])
+  data = list( Dsets=cs@design[,.N], Biases=cs@design[,uniqueN(genomic)], Decays=cs@design[,uniqueN(decay)],
+               XB=as.array(cs@design[,genomic]), XD=as.array(cs@design[,decay]),
+               Krow=Krow, SD=cs@biases[,.N], bbegin=bbegin,
+               cutsitesD=cs@biases[,pos], rejoined=cs@biases[,rejoined],
+               danglingL=cs@biases[,dangling.L], danglingR=cs@biases[,dangling.R],
+               Kdiag=Kdiag, dmin=cs@settings$dmin, dmax=cs@settings$dmax,
+               N=cs@counts[,.N], cbegin=cbegin,
+               cidx=t(data.matrix(cs@counts[,.(id1,id2)])), dist=cs@counts[,distance],
+               counts_close=cs@counts[,contact.close], counts_far=cs@counts[,contact.far],
+               counts_up=cs@counts[,contact.up], counts_down=cs@counts[,contact.down],
+               weight=array(1,dim=cs@design[,.N]))
+  output = capture.output(op <- optimizing(csnorm:::stanmodels$fit, data=data, iter=1, verbose=T,
+                                           init=cs@par, as_vector=F, hessian=F))
+  output = output[grepl(pattern="initial.*",output)]
+  return(as.numeric(sub("initial log joint probability = ","",output)))
+}
