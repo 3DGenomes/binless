@@ -59,7 +59,7 @@ transformed data {
   }
   
   //scaling factor
-  ldfac = Kdiag/sqrt(log(dmax/dmin));
+  ldfac = Kdiag;
 }
 parameters {
   //exposures

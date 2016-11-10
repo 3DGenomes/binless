@@ -114,8 +114,8 @@ transformed data {
   }
   
   //scaling factor for lambdas
-  lgfac = Krow/sqrt(max(cutsitesD)-min(cutsitesD));
-  ldfac = Kdiag/sqrt(log(dmax/dmin));
+  lgfac = Krow;
+  ldfac = Kdiag;
 }
 parameters {
   //exposures

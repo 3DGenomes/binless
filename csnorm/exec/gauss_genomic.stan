@@ -73,7 +73,7 @@ transformed data {
   }
   
   //scaling factor
-  lgfac = Krow/sqrt(max(cutsitesD)-min(cutsitesD));
+  lgfac = Krow;
   
 }
 parameters {
