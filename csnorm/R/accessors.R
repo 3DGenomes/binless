@@ -184,7 +184,7 @@ update_diagnostics = function(cs, step, leg, out, runtime) {
 #' @export
 #'
 #' @examples
-get_all_values = function(cs, param) {
+get_all_values = function(cs, param, trans) {
   #get value in tmp as vector of lists, remove NULL lists
   values=cs@diagnostics$params[,.(step=step+((.I-1)%%3)/3,leg,tmp=get(param))][!sapply(tmp,is.null)]
   #melt it
@@ -201,6 +201,17 @@ get_all_values = function(cs, param) {
   #merge it back
   values[,L1:=.I]
   melted=merge(values,melted,by="L1")[,.(variable,step,leg,value)]
+  #transform if necessary
+  if (!is.na(trans)) {
+    if (trans=="log") {
+      melted[,c("variable","value"):=list(paste("log",variable),log(value))]
+    } else if (trans=="exp") {
+      melted[,c("variable","value"):=list(paste("exp",variable),exp(value))]
+    } else {
+      stop("unsupported transformation ",trans)
+    }
+  }
+  #return
   setkey(melted,variable,step,leg)
   melted
 }
