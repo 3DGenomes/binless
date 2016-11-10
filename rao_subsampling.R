@@ -59,13 +59,13 @@ iota = foreach(i=dsets,j=names,.combine=rbind) %dopar% {
 }
 
 ggplot()+facet_grid(method~.)+scale_y_log10(limits=c(0.1,10))+
-  geom_line(aes(pos,iota),data=iota[type=="fun"])#+
+  geom_line(aes(pos,iota),data=iota[type=="fun"])+
   geom_vline(aes(xintercept=pos,y=iota),data=iota[type=="pts"],alpha=0.1)
 ggsave(filename = "images/rao_HiCall_SELP_150k_subs_iota_bias.pdf", width=10, height=7)
 
 
 #decay
-decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
+decay = foreach(i=dsets,j=names,.combine=rbind) %dopar% {
   load(i)
   if ("decay" %in% names(cs@par$decay)) {
     cs@par$decay[,.(subsampling=j,dist,decay)]
@@ -82,8 +82,9 @@ registerDoParallel(cores=30)
 params = foreach(i=dsets,j=names,.combine=rbind) %dopar% {
   load(i)
   #value=get_exact_logp(cs)
-  data.table(subsampling=j,eRJ=cs@par$eRJ,eDE=cs@par$eDE,eC=cs@par$eC,alpha=cs@par$alpha,lambda_iota=cs@par$lambda_iota,
-             lambda_rho=cs@par$lambda_rho,lambda_diag=cs@par$lambda_diag,logp=cs@par$value)
+  data.table(subsampling=j,`exp eRJ`=exp(cs@par$eRJ),`exp eDE`=exp(cs@par$eDE),`exp eC`=exp(cs@par$eC),
+             alpha=cs@par$alpha,`log lambda_iota`=log(cs@par$lambda_iota), `log lambda_rho`=log(cs@par$lambda_rho),
+             `log lambda_diag`=log(cs@par$lambda_diag),logp=cs@par$value)
 }
 params
 ggplot(melt(params,id.vars = "subsampling"))+
