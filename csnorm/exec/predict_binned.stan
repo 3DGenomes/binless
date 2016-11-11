@@ -1,115 +1,61 @@
 ////
-// Cut-site normalization model: predict mean for binned matrices
+// Cut-site normalization: binning matrices
 ////
-functions {
-  #include "common_functions.stan"
-}
-////////////////////////////////////////////////////////////////
 data {
-  //biases
-  int<lower=1> S1; //number of cut sites
-  int<lower=1> S2;
-  vector<lower=0>[S1] cutsites1; //cut site locations, better be sorted
-  vector<lower=0>[S2] cutsites2;
-  //counts
-  int<lower=0> N; //number of nonzero counts to bin
-  int cidx[2,N]; //indices of rsite pairs, pointing to within cutsites1 and cutsites2
-  int<lower=0> counts_close[N]; //value of the count
-  int<lower=0> counts_far[N];
-  int<lower=0> counts_up[N];
-  int<lower=0> counts_down[N];
-  //binned matrix info
-  int<lower=1> B1; //binned (sub)matrix dimensions
-  int<lower=1> B2;
-  int<lower=1,upper=B1> bbins1[S1]; //in which bin the biases fall
-  int<lower=1,upper=B2> bbins2[S2];
-  int<lower=1,upper=B1> cbins1[N]; //in which bin the counts fall
-  int<lower=1,upper=B2> cbins2[N];
-  //spline parameters
-  int Kdiag; //number of functions in spline base for diagonal decay
-  int npoints; //number of points to compute the decay on
-  int circularize; //if >0 assume genome is circular and has this size
-  real<lower=0> dmin;
-  real<lower=dmin> dmax;
-  //estimated parameters
-  real eC;  //exposure for counts
-  vector[S1] log_iota1; //take iota and rho directly to avoid base reconstruction
-  vector[S2] log_iota2;
-  vector[S1] log_rho1; 
-  vector[S2] log_rho2; 
-  vector[Kdiag] beta_diag_centered; //need to build spline base for diagonal decay
+  int<lower=1> G; //number of groups
+  int<lower=1> N; // Number of counts in this bin
+  int<lower=1,upper=N+1> cbegin[G+1]; //cbegin[i]=j: group i starts at j
+  int<lower=0> count[N]; // Value of each count
+  vector[N] log_expected; // Model log mean for each count
+  vector[N] log_decay; // Model log decay for each count
+  real<lower=0> alpha; //dispersion
+  real<lower=0> sigma; //for cauchy prior
 }
-transformed data {
-  if (circularize>0) {
-    if (max(cutsites2)-min(cutsites1) > circularize) {
-      reject("circular genome size smaller than maximum distance between cutsites!");
-    }
+parameters {
+  real log_s[G]; //log(signal)
+  real log_r[G]; //for ice-like matrix
+}
+model {
+  for (g in 1:G) {
+    target += neg_binomial_2_log_lpmf(count[cbegin[g]:(cbegin[g+1]-1)] |
+                        log_s[g]+log_expected[cbegin[g]:(cbegin[g+1]-1)], alpha);
+    target += neg_binomial_2_log_lpmf(count[cbegin[g]:(cbegin[g+1]-1)] |
+                        log_r[g]+log_expected[cbegin[g]:(cbegin[g+1]-1)]-log_decay[cbegin[g]:(cbegin[g+1]-1)], alpha);
   }
+  log_s ~ cauchy(0, sigma);
+  log_r ~ cauchy(0, sigma);
 }
-parameters {}
-model {}
 generated quantities {
-  //decay
-  vector[npoints] log_dist;
-  vector[npoints] log_decay;
-  //matrices
-  matrix[B1,B2] ncounts; //number of possible counts in bin
-  matrix[B1,B2] observed; //summed counts per bin
-  matrix[B1,B2] expected; //posterior mean of negative binomial per bin
-  matrix[B1,B2] decaymat; // average decay per bin
+  vector[G] lpdfr;
+  vector[G] lpdfs;
+  vector[G] lpdf0;
+  int ncounts[G];
+  int observed[G];
+  vector[G] expected;
+  vector[G] expected_sd;
+  vector[G] decaymat;
   
-  //decay
-  {
-    matrix[npoints,Kdiag] Xdiag;
-    log_dist = range(0,npoints-1)*(log(dmax)-log(dmin))/(npoints-1)+log(dmin);
-    Xdiag = bspline(log_dist, Kdiag, splinedegree(), log(dmin), log(dmax));
-    log_decay = Xdiag * beta_diag_centered;
-  }
-
-  //observed
-  observed = rep_matrix(0,B1,B2);
-  for (i in 1:N) { //do not vectorize to avoid aliasing issues
-    int b1;
-    int b2;
-    b1=cbins1[i];
-    b2=cbins2[i];
-    observed[b1,b2] = observed[b1,b2] + counts_close[i] + counts_far[i] + counts_up[i] + counts_down[i];
-  }
-  
-  //expected, ncounts and decaymat
-  ncounts = rep_matrix(0,B1,B2);
-  expected = rep_matrix(0,B1,B2);
-  decaymat = rep_matrix(0,B1,B2);
-  for (i in 1:S1) {
-    real pos1;
-    int k;
-    pos1 = cutsites1[i];
-    k = 1;
-    for (j in 1:S2) {
-      real pos2;
-      real dist;
-      pos2 = cutsites2[j];
-      dist = pos2-pos1;
-      if (dist >= dmin) {
-        int b1;
-        int b2;
-        b1=bbins1[i];
-        b2=bbins2[j];
-        ncounts[b1,b2] = ncounts[b1,b2]+4; //1 for each count type
-        if (circularize>0) {
-          if (dist>circularize/2) {
-            k = bisect(log(circularize+1-dist), k, log_dist);
-          } else {
-            k = bisect(log(dist), k, log_dist);
-          }
-        } else {
-          k = bisect(log(dist), k, log_dist);
-        }
-        expected[b1,b2] = expected[b1,b2] +
-            exp(eC + log_decay[k])*(exp(log_iota1[i]) + exp(log_rho1[i]))*(exp(log_iota2[j]) + exp(log_rho2[j]));
-        decaymat[b1,b2] = decaymat[b1,b2] + exp(4*log_decay[k]);
-      }
+  for (g in 1:G) {
+    lpdfr[g] = neg_binomial_2_log_lpmf(count[cbegin[g]:(cbegin[g+1]-1)] |
+                      log_r[g]+log_expected[cbegin[g]:(cbegin[g+1]-1)]-log_decay[cbegin[g]:(cbegin[g+1]-1)], alpha)
+              + cauchy_lpdf(log_r[g] | 0, sigma);
+    lpdfs[g] = neg_binomial_2_log_lpmf(count[cbegin[g]:(cbegin[g+1]-1)] |
+                      log_s[g]+log_expected[cbegin[g]:(cbegin[g+1]-1)], alpha) + cauchy_lpdf(log_s[g] | 0, sigma);
+    lpdf0[g] = neg_binomial_2_log_lpmf(count[cbegin[g]:(cbegin[g+1]-1)] |
+                      log_expected[cbegin[g]:(cbegin[g+1]-1)], alpha);
+    ncounts[g] = cbegin[g+1]-cbegin[g];
+    observed[g]=0;
+    expected[g]=0;
+    expected_sd[g]=0;
+    decaymat[g]=0;
+    for (i in cbegin[g]:(cbegin[g+1]-1)) {
+      real tmp;
+      observed[g] = observed[g] + count[i];
+      tmp = exp(log_expected[i]);
+      expected[g] = expected[g] + tmp;
+      expected_sd[g] = expected_sd[g] + tmp + tmp*(tmp/alpha);
+      decaymat[g] = decaymat[g] + exp(log_expected[i] - log_decay[i]);
     }
+    expected_sd[g] = sqrt(expected_sd[g]);
   }
-  decaymat = decaymat ./ ncounts;
 }
