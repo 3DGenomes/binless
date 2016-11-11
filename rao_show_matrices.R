@@ -3,10 +3,11 @@ library(data.table)
 library(ggplot2)
 library(doParallel)
 library(foreach)
-
-sub="GM12878_FOXP1_oldmat"
+library(rstan)
 
 setwd("/home/yannick/simulations/cs_norm")
+
+sub="GM12878_FOXP1_oldmat"
 
 #normalize
 load(paste0("data/rao_HiCall_",sub,"_csdata.RData"))
