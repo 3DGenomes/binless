@@ -135,7 +135,12 @@ detection_binned = function(cs, resolution, group, ref="expected", threshold=0.9
     groups=cs@experiments[,.(name,groupname=do.call(paste,mget(group))),by=group][,.(name,groupname)] #we already know groupname is unique
   }
   setkey(groups,name)
-  if (ref != "expected" && !(ref %in% groups[,groupname])) stop("Reference group name not found! Valid names are: ",deparse(as.character(groups[,groupname])))
+  if (ref != "expected") {
+    if (!(ref %in% groups[,groupname]))
+      stop("Reference group name not found! Valid names are: ",deparse(as.character(groups[,groupname])))
+    if (groups[groupname!=ref,.N]==0)
+      stop("There is no other group than ",ref, ", cannot compute differences!")
+  }
   #retrieve bin borders
   biases=cs@biases
   counts=cs@counts
