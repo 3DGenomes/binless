@@ -84,7 +84,7 @@ params = foreach(i=dsets,j=names,.combine=rbind) %dopar% {
   value=get_exact_logp(cs)
   data.table(subsampling=j,`exp eRJ`=exp(cs@par$eRJ),`exp eDE`=exp(cs@par$eDE),`exp eC`=exp(cs@par$eC),
              alpha=cs@par$alpha,`log lambda_iota`=log(cs@par$lambda_iota), `log lambda_rho`=log(cs@par$lambda_rho),
-             `log lambda_diag`=log(cs@par$lambda_diag),loglik=cs@par$value, logp=value)
+             `log lambda_diag`=log(cs@par$lambda_diag),loglik=cs@par$value, logp=value, ngibbs=cs@diagnostics$params[,.N/3])
 }
 params
 ggplot(melt(params,id.vars = "subsampling"))+
