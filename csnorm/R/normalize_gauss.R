@@ -4,7 +4,7 @@ NULL
 #' Compute decay etahat and weights using data as initial guess
 #' @keywords internal
 #' 
-fill_parameters = function(cs, dispersion=1, lambda=1, fit.decay=T, fit.genomic=T, fit.disp=T) {
+fill_parameters = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.genomic=T, fit.disp=T) {
   nBiases=cs@design[,uniqueN(genomic)]
   Decays=cs@design[,uniqueN(decay)]
   init=list(alpha=dispersion,
@@ -288,6 +288,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' @param verbose Display progress if TRUE
 #' @param init_alpha positive numeric, default 1e-5. Initial step size of LBFGS
 #'   line search.
+#' @param init.dispersion positive numeric. Value of the dispersion to use initially.
 #'   
 #' @return A csnorm object
 #' @export
@@ -296,7 +297,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' 
 run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
                      ngibbs = 3, iter=10000, fit.decay=T, fit.genomic=T, fit.disp=T,
-                     verbose=T, ncounts=100000, init_alpha=1e-7) {
+                     verbose=T, ncounts=100000, init_alpha=1e-7, init.dispersion=10) {
   #clean object if dirty
   cs@par=list() #in case we have a weird object
   cs@binned=list()
@@ -306,7 +307,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   #add settings
   cs@settings = c(cs@settings[c("circularize","dmin","dmax")],
                   list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf,
-                       iter=iter, ngibbs=ngibbs, init_alpha=init_alpha))
+                       iter=iter, ngibbs=ngibbs, init_alpha=init_alpha, init.dispersion=init.dispersion))
   #fill counts matrix and take subset
   cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize, dmin=cs@settings$dmin)
   setkey(cs@biases, id, name)
@@ -323,7 +324,8 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     cs@diagnostics=list()
     laststep=0
     init.mean="data"
-    cs=fill_parameters(cs, dispersion=1, fit.decay=fit.decay, fit.genomic=fit.genomic, fit.disp=fit.disp) #init with dispersion=1
+    cs=fill_parameters(cs, dispersion=init.dispersion, fit.decay=fit.decay,
+                       fit.genomic=fit.genomic, fit.disp=fit.disp)
   } else {
     if (verbose==T) cat("Using provided initial guess\n")
     if (is.data.table(cs@diagnostics$params)) laststep = cs@diagnostics$params[,max(step)] else laststep = 0
