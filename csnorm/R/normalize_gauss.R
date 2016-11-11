@@ -261,6 +261,18 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   return(cs)
 }
 
+#' Single-cpu simplified fitting for exposures and dispersion
+#' @keywords internal
+#' 
+has_converged = function(cs) {
+  params=cs@diagnostics$params
+  if (params[,.N]<=3) return(FALSE)
+  tol=cs@settings$tol.obj
+  laststep=params[,step[.N]]
+  delta=abs(params[step==laststep,value]-params[step==laststep-1,value])
+  return(all(delta<tol))
+}
+
 #' Cut-site normalization (simplified gibbs sampling)
 #' 
 #' Alternates two approximations to the exact model, fitting the diagonal decay
@@ -287,6 +299,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' @param init_alpha positive numeric, default 1e-5. Initial step size of LBFGS
 #'   line search.
 #' @param init.dispersion positive numeric. Value of the dispersion to use initially.
+#' @param tol.obj positive numeric (default 1e-1). Convergence tolerance on changes in the three likelihoods.
 #'   
 #' @return A csnorm object
 #' @export
@@ -295,7 +308,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' 
 run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
                      ngibbs = 3, iter=10000, fit.decay=T, fit.genomic=T, fit.disp=T,
-                     verbose=T, ncounts=100000, init_alpha=1e-7, init.dispersion=10) {
+                     verbose=T, ncounts=100000, init_alpha=1e-7, init.dispersion=10, tol.obj=1e-1) {
   #clean object if dirty
   cs@par=list() #in case we have a weird object
   cs@binned=list()
@@ -305,7 +318,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   #add settings
   cs@settings = c(cs@settings[c("circularize","dmin","dmax")],
                   list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf,
-                       iter=iter, ngibbs=ngibbs, init_alpha=init_alpha, init.dispersion=init.dispersion))
+                       iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj))
   #fill counts matrix and take subset
   cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize, dmin=cs@settings$dmin)
   setkey(cs@biases, id, name)
@@ -358,6 +371,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
       if (verbose==T) cat("log-likelihood = ",cs@par$value," dispersion = ",cs@par$alpha,
                           " lambda_iota = ",cs@par$lambda_iota, "\n")
     }
+    if (has_converged(cs)) break
   }
   if (verbose==T) cat("Done\n")
   cs@par$init=init
