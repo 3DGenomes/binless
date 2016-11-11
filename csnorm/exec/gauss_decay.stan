@@ -22,8 +22,6 @@ data {
   vector<lower=0>[N] dist;
   //weight for spline centering
   vector<lower=0>[N] weight;
-  //length scales
-  real<lower=0> lambda_diag[Decays];
 }
 transformed data {
   //diagonal SCAM spline, dense
@@ -66,6 +64,8 @@ parameters {
   real eC[Dsets];
   //spline parameters
   positive_ordered[Kdiag-1] beta_diag[Decays];
+  //length scales
+  real<lower=0> lambda_diag[Decays];
 }
 transformed parameters {
   //diag
@@ -103,4 +103,7 @@ model {
   
   //// prior
   for (d in 1:Dsets) beta_diag_diff[d] ~ normal(0,1/(ldfac*lambda_diag[XD[d]]));
+  
+  //// hyperprior
+  lambda_diag ~ normal(0,1);
 }

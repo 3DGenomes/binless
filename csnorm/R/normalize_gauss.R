@@ -5,17 +5,17 @@ NULL
 #' @keywords internal
 #' 
 fill_parameters = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.genomic=T, fit.disp=T) {
-  nBiases=cs@design[,uniqueN(genomic)]
-  Decays=cs@design[,uniqueN(decay)]
-  init=list(alpha=dispersion,
-            lambda_iota=array(lambda,dim=nBiases), lambda_rho=array(lambda,dim=nBiases), lambda_diag=array(lambda,dim=Decays))
+  init=list(alpha=dispersion)
   if (fit.decay==F) {
     Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
+    Decays=cs@design[,uniqueN(decay)]
     beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
-    init=c(init,list(beta_diag=beta_diag, log_decay=rep(0,cs@counts[,.N])))
+    init=c(init,list(beta_diag=beta_diag, lambda_diag=array(lambda,dim=Decays), log_decay=rep(0,cs@counts[,.N])))
   }
   if (fit.genomic==F) {
-    init=c(init,list(log_iota=array(0,dim=cs@biases[,.N]), log_rho=array(0,dim=cs@biases[,.N])))
+    nBiases=cs@design[,uniqueN(genomic)]
+    init=c(init,list(log_iota=array(0,dim=cs@biases[,.N]), log_rho=array(0,dim=cs@biases[,.N]),
+                     lambda_iota=array(lambda,dim=nBiases), lambda_rho=array(lambda,dim=nBiases)))
   }
   if (fit.genomic==F || fit.decay==F || fit.disp==F) {
     init=c(init,list(eC=array(0,dim=cs@design[,.N]),  eRJ=array(0,dim=cs@design[,.N]),  eDE=array(0,dim=cs@design[,.N])))
@@ -90,7 +90,7 @@ csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7) 
   data=list(Dsets=cs@design[,.N], Decays=cs@design[,uniqueN(decay)], XD=as.array(cs@design[,decay]),
             Kdiag=Kdiag, dmin=cs@settings$dmin, dmax=cs@settings$dmax, N=csd[,.N], cbegin=cbegin,
             kappa_hat=csd[,kappahat], sdl=csd[,std], dist=csd[,distance],
-            weight=csd[,weight], lambda_diag=as.array(cs@par$lambda_diag))
+            weight=csd[,weight])
   #optimize from scratch, to avoid getting stuck. Slower but more robust
   op=optimize_stan_model(model=csnorm:::stanmodels$gauss_decay, data=data, iter=cs@settings$iter,
                          verbose=verbose, init=0, init_alpha=init_alpha)
@@ -211,8 +211,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
             eta_hat_DL=bts[cat=="dangling L",etahat], sd_DL=bts[cat=="dangling L",std],
             eta_hat_DR=bts[cat=="dangling R",etahat], sd_DR=bts[cat=="dangling R",std],
             eta_hat_L=cts[cat=="contact L",etahat], sd_L=cts[cat=="contact L",std],
-            eta_hat_R=cts[cat=="contact R",etahat], sd_R=cts[cat=="contact R",std],
-            lambda_iota=as.array(cs@par$lambda_iota), lambda_rho=as.array(cs@par$lambda_rho))
+            eta_hat_R=cts[cat=="contact R",etahat], sd_R=cts[cat=="contact R",std])
   op=optimize_stan_model(model=csnorm:::stanmodels$gauss_genomic, data=data, iter=cs@settings$iter,
                          verbose=verbose, init=0, init_alpha=init_alpha)
   #make nice output table
@@ -239,13 +238,12 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
 #' @keywords internal
 #' 
 csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T, init_alpha=1e-7) {
-  Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
   Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))* cs@settings$bf_per_decade)
   bbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
   cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
   data = list( Dsets=cs@design[,.N], Biases=cs@design[,uniqueN(genomic)], Decays=cs@design[,uniqueN(decay)],
                XB=as.array(cs@design[,genomic]), XD=as.array(cs@design[,decay]),
-               Krow=Krow, SD=cs@biases[,.N], bbegin=bbegin,
+               SD=cs@biases[,.N], bbegin=bbegin,
                cutsitesD=cs@biases[,pos], rejoined=cs@biases[,rejoined],
                danglingL=cs@biases[,dangling.L], danglingR=cs@biases[,dangling.R],
                Kdiag=Kdiag, dmin=cs@settings$dmin, dmax=cs@settings$dmax,
@@ -253,13 +251,13 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
                cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
                counts_close=counts[,contact.close], counts_far=counts[,contact.far],
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
-               weight=as.array(weight[,wt]), beta_iota=cs@par$beta_iota, beta_rho=cs@par$beta_rho,
+               weight=as.array(weight[,wt]), log_iota=cs@par$log_iota, log_rho=cs@par$log_rho,
                beta_diag=cs@par$beta_diag)
   op=optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, data=data, iter=cs@settings$iter,
                          verbose=verbose, init=cs@par, init_alpha=init_alpha)
   #update par slot
   op$par$value=op$value
-  cs@par=modifyList(cs@par, op$par[c("eC","eRJ","eDE","alpha","value","lambda_iota","lambda_rho","lambda_diag")])
+  cs@par=modifyList(cs@par, op$par[c("eC","eRJ","eDE","alpha","value")])
   return(cs)
 }
 
