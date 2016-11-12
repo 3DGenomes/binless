@@ -61,7 +61,7 @@ bin_and_chunk = function(cs, resolution, group, ncores) {
 
 #' estimate signal and various matrices for these bins
 #' @keywords internal
-estimate_signal = function(cs, cts, groups, gamma) {
+estimate_signal = function(cs, cts, groups) {
   setkey(cts,name,id1,id2)
   cts=csnorm_predict_all(cs, cts, verbose=F)
   cts=groups[cts]
@@ -74,7 +74,7 @@ estimate_signal = function(cs, cts, groups, gamma) {
   if(cts[,.N]==1) {cbegin=c(1,2)} else {cbegin=c(1,cts[,.(newid,row=.I)][newid!=shift(newid),row],cts[,.N+1])}
   #compute each signal contribution separately
   data=list(G=length(cbegin)-1, N=cts[,.N], cbegin=cbegin, count=cts[,count], log_expected=cts[,log_mean],
-            log_decay=cts[,log_decay],alpha=cs@par$alpha, gamma=gamma)
+            log_decay=cts[,log_decay],alpha=cs@par$alpha)
   output=capture.output(op<-optimizing(csnorm:::stanmodels$predict_binned, data=data, as_vector=F, hessian=T, iter=10000, verbose=F, init=0))
   mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=cts[head(cbegin,-1),bin1], bin2=cts[head(cbegin,-1),bin2],
                  ncounts=op$par$ncounts, observed=op$par$observed, expected=op$par$expected, expected.sd=op$par$expected_sd,
@@ -84,62 +84,25 @@ estimate_signal = function(cs, cts, groups, gamma) {
   mat
 }
 
-#' estimate signal and various matrices for these bins
-#' @keywords internal
-estimate_scale = function(counts, biases, groups, nbins, ncores) {
-  maxibin=min(biases[,max(ibin)],as.integer((sqrt(8*nbins+1)-1)/2)-1) #solve for x(x+1)/2=n
-  subcounts = counts[ibin1<maxibin&ibin2<maxibin]
-  biases1 = biases[ibin<maxibin]
-  biases2 = biases1
-  setkeyv(subcounts,key(counts))
-  maxbin=biases[,max(ibin)]
-  rbin=paste(sample(maxbin,size=nbins,replace=T)-1,sample(maxbin,size=nbins,replace=T)-1)
-  cts=counts[paste(ibin1,ibin2)%in%rbin]
-  #fill zeros
-  if (!(biases1[,.N]>0 & biases2[,.N]>0)) stop("Not enough bins, increase nbins")
-  cts=fill_zeros(subcounts,biases1,biases2,circularize=cs@settings$circularize,dmin=cs@settings$dmin)
-  if (!(cts[,.N]>0)) stop("Not enough counts, increase nbins")
-  #predict model
-  setkey(cts,name,id1,id2)
-  cts=csnorm_predict_all_parallel(cs, cts, ncores=ncores)
-  cts=groups[cts]
-  cts[,newid:=paste(groupname,ibin1,ibin2)]
-  cts=rbind(cts[,.(newid,groupname,ibin1,ibin2,bin1,bin2,count=contact.close,log_mean=log_mean_cclose,log_decay)],
-            cts[,.(newid,groupname,ibin1,ibin2,bin1,bin2,count=contact.far,log_mean=log_mean_cfar,log_decay)],
-            cts[,.(newid,groupname,ibin1,ibin2,bin1,bin2,count=contact.up,log_mean=log_mean_cup,log_decay)],
-            cts[,.(newid,groupname,ibin1,ibin2,bin1,bin2,count=contact.down,log_mean=log_mean_cdown,log_decay)])
-  setkey(cts,newid)
-  if(cts[,.N]==1) {cbegin=c(1,2)} else {cbegin=c(1,cts[,.(newid,row=.I)][newid!=shift(newid),row],cts[,.N+1])}
-  #compute signal and gamma
-  data=list(G=length(cbegin)-1, N=cts[,.N], cbegin=cbegin, count=cts[,count], log_expected=cts[,log_mean],
-            log_decay=cts[,log_decay],alpha=cs@par$alpha)
-  output=capture.output(op<-optimizing(csnorm:::stanmodels$predict_binned_gamma, data=data, as_vector=F, hessian=F,
-                                       iter=10000, verbose=T, init=0))
-  return(op$par$gamma)
-}
-
 #' Perform peak and differential detection through model comparison
 #'
 #' @param cs csnorm object
 #' @param resolution target resolution
 #' @param group if grouping is to be performed
 #' @param ncores number of cpus to parallelize on
-#' @param nbins how many bins per dataset to use for estimation of Cauchy scale
 #'
 #' @return
 #' @keywords internal
 #' @export
 #'
 #' @examples
-csnorm_predict_binned = function(cs, resolution, group, ncores=1, nbins=1000) {
+csnorm_predict_binned = function(cs, resolution, group, ncores=1) {
   #organise data into bins and chunks
   stuff = csnorm:::bin_and_chunk(cs, resolution, group, ncores)
   chunks=stuff$chunks
   counts=stuff$counts
   biases=stuff$biases
   groups=stuff$groups
-  #estimate cauchy scale on subset
-  gamma = csnorm:::estimate_scale(counts, biases, groups, nbins)
   #bin all data and estimate signal
   registerDoParallel(cores=ncores)
   mat = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
@@ -150,7 +113,7 @@ csnorm_predict_binned = function(cs, resolution, group, ncores=1, nbins=1000) {
     if (biases1[,.N]>0 & biases2[,.N]>0) {
       cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize,dmin=cs@settings$dmin)
       if (cts[,.N]>0) {
-        csnorm:::estimate_signal(cs, cts, groups, gamma)
+        csnorm:::estimate_signal(cs, cts, groups)
       }
     }
   }
