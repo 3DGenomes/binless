@@ -79,9 +79,9 @@ estimate_signal = function(cs, cts, groups) {
   mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=cts[head(cbegin,-1),bin1], bin2=cts[head(cbegin,-1),bin2],
                  ncounts=op$par$ncounts, observed=op$par$observed, expected=op$par$expected, expected.sd=op$par$expected_sd,
                  decaymat=op$par$decaymat, lpdfr=op$par$lpdfr, lpdfs=op$par$lpdfs, lpdf0=op$par$lpdf0,
-                 normalized=exp(op$par$log_s), normalized.sd=sqrt(as.vector(1/(-head(diag(op$hessian),data$G)))),
-                 icelike=exp(op$par$log_r), icelike.sd=sqrt(as.vector(1/(-tail(diag(op$hessian),data$G)))))
-  mat[observed==0,c("normalized","icelike","normalized.sd","icelike.sd"):=list(0,0,0,0)]
+                 signal=exp(op$par$log_s), signal.sd=sqrt(as.vector(1/(-head(diag(op$hessian),data$G)))),
+                 normalized=exp(op$par$log_r), normalized.sd=sqrt(as.vector(1/(-tail(diag(op$hessian),data$G)))))
+  mat[observed==0,c("signal","normalized","signal.sd","normalized.sd"):=list(0,0,0,0)]
   mat
 }
 
@@ -363,9 +363,9 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   }
   #compute normalized matrices
   mat[,expected.sd:=sqrt(expected+expected^2/dispersion)] #negative binomial SD
-  mat[,normalized:=(dispersion+observed)/(dispersion+expected)] #posterior predictive mean and SD
-  mat[,normalized.sd:=sqrt(dispersion+observed)/(dispersion+expected)]
-  mat[,c("icelike","icelike.sd"):=list(normalized*decaymat,normalized.sd*decaymat)]
+  mat[,signal:=(dispersion+observed)/(dispersion+expected)] #posterior predictive mean and SD
+  mat[,signal.sd:=sqrt(dispersion+observed)/(dispersion+expected)]
+  mat[,c("normalized","normalized.sd"):=list(signal*decaymat,signal.sd*decaymat)]
   #store matrices
   csm=new("CSmatrix", mat=mat, group=group, ice=(ice>0), ice.iterations=ifelse(ice>0,ice,NA),
           names=as.character(mat[,unique(name)]))
