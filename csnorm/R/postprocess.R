@@ -310,12 +310,11 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, verbose=T) {
   mat[,end1:=as.integer(as.character(bin1.end))]
   mat[,begin2:=as.integer(as.character(bin2.begin))]
   mat[,end2:=as.integer(as.character(bin2.end))]
-  mat[,dispersion:=cs@par$alpha]
   #create CSmatrix and CSbinned object
   csm=new("CSmatrix", mat=mat, group="all", ice=(ice>0), ice.iterations=ifelse(ice>0,ice,NA),
           names=as.character(mat[,unique(name)]))
   csb=new("CSbinned", resolution=resolution, grouped=list(csm),
-          individual=copy(mat[,.(name,bin1,begin1,end1,bin2,begin2,end2,observed,expected,ncounts,decaymat,dispersion)]))
+          individual=copy(mat))
   cs@binned=append(cs@binned,csb)
   cs
 }
@@ -346,7 +345,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   if (verbose==T) cat("*** creating groups\n")
   groups=experiments[,.(name,groupno=.GRP,groupname=do.call(paste,mget(group))),by=group][,.(name,groupno,groupname)]
   if (verbose==T) cat("*** merging matrices\n")
-  mat=merge(csb@individual,groups,by="name",all=T)[,.(observed=sum(observed),expected=sum(expected),decaymat=mean(decaymat), dispersion=cs@par$alpha),
+  mat=merge(csb@individual,groups,by="name",all=T)[,.(observed=sum(observed),expected=sum(expected),decaymat=mean(decaymat)),
                                                    by=c("groupno","groupname","bin1","bin2","begin1","end1","begin2","end2")]
   setnames(mat,"groupname","name")
   setkey(mat,name,bin1,bin2)
