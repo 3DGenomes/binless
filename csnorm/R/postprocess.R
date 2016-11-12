@@ -79,8 +79,8 @@ estimate_signal = function(cs, cts, groups) {
   mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=cts[head(cbegin,-1),bin1], bin2=cts[head(cbegin,-1),bin2],
                  ncounts=op$par$ncounts, observed=op$par$observed, expected=op$par$expected, expected.sd=op$par$expected_sd,
                  decaymat=op$par$decaymat, lpdfr=op$par$lpdfr, lpdfs=op$par$lpdfs, lpdf0=op$par$lpdf0,
-                 signal=exp(op$par$log_s), signal.sd=sqrt(as.vector(1/(-head(diag(op$hessian),data$G)))),
-                 normalized=exp(op$par$log_r), normalized.sd=sqrt(as.vector(1/(-tail(diag(op$hessian),data$G)))))
+                 signal=exp(op$par$log_s), signal.sd=exp(op$par$log_s)*sqrt(as.vector(1/(-head(diag(op$hessian),data$G)))),
+                 normalized=exp(op$par$log_r), normalized.sd=exp(op$par$log_r)*sqrt(as.vector(1/(-tail(diag(op$hessian),data$G)))))
   mat[observed==0,c("signal","normalized","signal.sd","normalized.sd"):=list(0,0,0,0)]
   mat
 }
