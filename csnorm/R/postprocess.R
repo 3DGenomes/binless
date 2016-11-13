@@ -123,6 +123,39 @@ csnorm_predict_binned = function(cs, resolution, group, ncores=1) {
   mat
 }
 
+#' Common call for binning
+#' @keywords internal
+#'
+#' @examples
+bin_grouped_matrix = function(cs, resolution, group, ncores, ice, verbose) {
+  if (verbose==T) cat("*** build binned matrices for each experiment\n")
+  mat=csnorm_predict_binned(cs, resolution, group="all", ncores=ncores)
+  setkey(mat,name,bin1,bin2)
+  if (ice>0) {
+    if (verbose==T) cat("*** iterative normalization with ",ice," iterations\n")
+    raw=mat[,.(name,bin1,bin2,observed)]
+    setkey(raw,name,bin1,bin2)
+    iced=iterative_normalization(raw, niterations=ice, namecol="name")
+    setkey(iced,name,bin1,bin2)
+    mat=merge(mat,iced,all.x=T,all.y=F)
+  }
+  #write begins/ends
+  if (verbose==T) cat("*** write begin/end positions\n")
+  bin1.begin=mat[,bin1]
+  bin1.end=mat[,bin1]
+  bin2.begin=mat[,bin2]
+  bin2.end=mat[,bin2]
+  levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[][,)]")[[2]]
+  levels(bin1.end) <- tstrsplit(as.character(levels(bin1.end)), "[][,)]")[[3]]
+  levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[][,)]")[[2]]
+  levels(bin2.end) <- tstrsplit(as.character(levels(bin2.end)), "[][,)]")[[3]]
+  mat[,begin1:=as.integer(as.character(bin1.begin))]
+  mat[,end1:=as.integer(as.character(bin1.end))]
+  mat[,begin2:=as.integer(as.character(bin2.begin))]
+  mat[,end2:=as.integer(as.character(bin2.end))]
+  return(mat)
+}
+
 
 #' Perform peak and differential detection through model comparison
 #'
@@ -285,31 +318,7 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, verbose=T) {
     stop("Refusing to overwrite already existing matrices at ", resolution/1000,
          "kb. Use them or remove them from the cs@binned list")
   }
-  if (verbose==T) cat("*** build binned matrices for each experiment\n")
-  mat=csnorm_predict_binned(cs, resolution, group="all", ncores=ncores, prior.sd = 0.1)
-  setkey(mat,name,bin1,bin2)
-  if (ice>0) {
-    if (verbose==T) cat("*** iterative normalization with ",ice," iterations\n")
-    raw=mat[,.(name,bin1,bin2,observed)]
-    setkey(raw,name,bin1,bin2)
-    iced=iterative_normalization(raw, niterations=ice, namecol="name")
-    setkey(iced,name,bin1,bin2)
-    mat=merge(mat,iced,all.x=T,all.y=F)
-  }
-  #write begins/ends
-  if (verbose==T) cat("*** write begin/end positions\n")
-  bin1.begin=mat[,bin1]
-  bin1.end=mat[,bin1]
-  bin2.begin=mat[,bin2]
-  bin2.end=mat[,bin2]
-  levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[][,)]")[[2]]
-  levels(bin1.end) <- tstrsplit(as.character(levels(bin1.end)), "[][,)]")[[3]]
-  levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[][,)]")[[2]]
-  levels(bin2.end) <- tstrsplit(as.character(levels(bin2.end)), "[][,)]")[[3]]
-  mat[,begin1:=as.integer(as.character(bin1.begin))]
-  mat[,end1:=as.integer(as.character(bin1.end))]
-  mat[,begin2:=as.integer(as.character(bin2.begin))]
-  mat[,end2:=as.integer(as.character(bin2.end))]
+  mat = bin_grouped_matrix(cs, resolution=resolution, group="all", ncores=ncores, ice=ice, verbose=verbose)
   #create CSmatrix and CSbinned object
   csm=new("CSmatrix", mat=mat, group="all", ice=(ice>0), ice.iterations=ifelse(ice>0,ice,NA),
           names=as.character(mat[,unique(name)]))
@@ -342,29 +351,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
          "]]@grouped list and @metadata table")
   }
   #
-  if (verbose==T) cat("*** creating groups\n")
-  groups=experiments[,.(name,groupno=.GRP,groupname=do.call(paste,mget(group))),by=group][,.(name,groupno,groupname)]
-  if (verbose==T) cat("*** merging matrices\n")
-  mat=merge(csb@individual,groups,by="name",all=T)[,.(observed=sum(observed),expected=sum(expected),decaymat=mean(decaymat)),
-                                                   by=c("groupno","groupname","bin1","bin2","begin1","end1","begin2","end2")]
-  setnames(mat,"groupname","name")
-  setkey(mat,name,bin1,bin2)
-  stopifnot(mat[,uniqueN(groupno)==uniqueN(name)]) #otherwise need to change subsequent steps
-  mat[,groupno:=NULL]
-  #ice
-  if (ice>0) {
-    cat("*** iterative normalization with ",ice," iterations\n")
-    raw=mat[,.(name,bin1,bin2,observed)]
-    setkey(raw,name,bin1,bin2)
-    iced=iterative_normalization(raw, niterations=ice, namecol="name")
-    setkey(iced,name,bin1,bin2)
-    mat=merge(mat,iced,all.x=T,all.y=F)
-  }
-  #compute normalized matrices
-  mat[,expected.sd:=sqrt(expected+expected^2/dispersion)] #negative binomial SD
-  mat[,signal:=(dispersion+observed)/(dispersion+expected)] #posterior predictive mean and SD
-  mat[,signal.sd:=sqrt(dispersion+observed)/(dispersion+expected)]
-  mat[,c("normalized","normalized.sd"):=list(signal*decaymat,signal.sd*decaymat)]
+  mat = bin_grouped_matrix(cs, resolution=resolution, group=group, ncores=ncores, ice=ice, verbose=verbose)
   #store matrices
   csm=new("CSmatrix", mat=mat, group=group, ice=(ice>0), ice.iterations=ifelse(ice>0,ice,NA),
           names=as.character(mat[,unique(name)]))
