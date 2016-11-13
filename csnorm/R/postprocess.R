@@ -320,7 +320,7 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, verbose=T) {
   }
   mat = bin_grouped_matrix(cs, resolution=resolution, group="all", ncores=ncores, ice=ice, verbose=verbose)
   #create CSmatrix and CSbinned object
-  csm=new("CSmatrix", mat=mat, group="all", ice=(ice>0), ice.iterations=ifelse(ice>0,ice,NA),
+  csm=new("CSmatrix", mat=mat, group="all", ice=(ice>0), ice.iterations=ice,
           names=as.character(mat[,unique(name)]))
   csb=new("CSbinned", resolution=resolution, grouped=list(csm),
           individual=copy(mat))
@@ -353,7 +353,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   #
   mat = bin_grouped_matrix(cs, resolution=resolution, group=group, ncores=ncores, ice=ice, verbose=verbose)
   #store matrices
-  csm=new("CSmatrix", mat=mat, group=group, ice=(ice>0), ice.iterations=ifelse(ice>0,ice,NA),
+  csm=new("CSmatrix", mat=mat, group=group, ice=(ice>0), ice.iterations=ice,
           names=as.character(mat[,unique(name)]))
   csb@grouped=append(csb@grouped,list(csm))
   cs@binned[[csbi]]=csb
