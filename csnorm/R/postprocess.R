@@ -156,6 +156,89 @@ bin_grouped_matrix = function(cs, resolution, group, ncores, ice, verbose) {
   return(mat)
 }
 
+#' compute log p(D|s)
+#' @keywords internal
+get_signal_likelihood = function(mat, chunks, counts, biases, groups, ncores) {
+  #bin all data and estimate signal
+  registerDoParallel(cores=ncores)
+  liks = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
+    #get zero-filled portion of counts and predict model on it
+    cts=counts[chunk1==i&chunk2==j]
+    biases1=biases[chunk==i] #just needed to fill the counts matrix
+    biases2=biases[chunk==j]
+    if (biases1[,.N]>0 & biases2[,.N]>0) {
+      cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize,dmin=cs@settings$dmin)
+      if (cts[,.N]>0) {
+        setkey(cts,name,id1,id2)
+        cts=csnorm_predict_all(cs, cts, verbose=F)
+        cts=groups[cts]
+        cts[,newid:=paste(groupname,ibin1,ibin2)]
+        cts=rbind(cts[,.(newid,groupname,ibin1,ibin2,bin1,bin2,count=contact.close,log_mean=log_mean_cclose)],
+                  cts[,.(newid,groupname,ibin1,ibin2,bin1,bin2,count=contact.far,log_mean=log_mean_cfar)],
+                  cts[,.(newid,groupname,ibin1,ibin2,bin1,bin2,count=contact.up,log_mean=log_mean_cup)],
+                  cts[,.(newid,groupname,ibin1,ibin2,bin1,bin2,count=contact.down,log_mean=log_mean_cdown)])
+        setkey(cts,newid)
+        signals=merge(mat,cts[,.SD[1],by=newid], by.x=c("name","bin1","bin2"),by.y=c("groupname","bin1","bin2"), sort=F)
+        setkey(signals,newid)
+        if(cts[,.N]==1) {cbegin=c(1,2)} else {cbegin=c(1,cts[,.(newid,row=.I)][newid!=shift(newid),row],cts[,.N+1])}
+        #compute each signal contribution separately
+        data=list(G=length(cbegin)-1, N=cts[,.N], cbegin=cbegin, count=cts[,count], log_expected=cts[,log_mean],
+                  alpha=cs@par$alpha, log_s=signals[,log_s], S=10)
+        output=capture.output(op<-optimizing(csnorm:::stanmodels$likelihood_binned, data=data, as_vector=F, hessian=F, iter=0, verbose=F, init=0))
+        out = foreach (g=1:data$G,.combine=rbind) %do%
+          data.table(bin=g,logp=op$par$lpdfs[g,],log_sref=data$log_s[g], lpdf0=op$par$lpdf0[g], lpdfref=op$par$lpdfref[g], idx=1:data$S)
+        out[,log_s:=log_sref*(idx-1)/(data$S-1)]
+        out[,expected:=(lpdf0-lpdfref)*(log_s/log_sref-1)^2+lpdfref]
+        ggplot(out)+geom_point(aes(log_s,logp))+facet_wrap(~bin,scales="free")+
+          geom_line(aes(log_s,expected),colour="red")
+        
+        lik=data.table(name=cts[head(cbegin,-1),groupname], bin1=cts[head(cbegin,-1),bin1], bin2=cts[head(cbegin,-1),bin2],
+                       ncounts=op$par$ncounts, observed=op$par$observed, expected=op$par$expected, expected.sd=op$par$expected_sd,
+                       decaymat=op$par$decaymat, lpdfr=op$par$lpdfr, lpdfs=op$par$lpdfs, lpdf0=op$par$lpdf0,
+                       signal=exp(op$par$log_s), signal.sd=exp(op$par$log_s)*sqrt(as.vector(1/(-head(diag(op$hessian),data$G)))),
+                       normalized=exp(op$par$log_r), normalized.sd=exp(op$par$log_r)*sqrt(as.vector(1/(-tail(diag(op$hessian),data$G)))))
+        lik[observed==0,c("signal","normalized","signal.sd","normalized.sd"):=list(0,0,0,0)]
+        lik
+      }
+    }
+  }
+}
+
+#' Perform peak calling through lasso and model comparison
+#' @keywords internal
+interactions_binned = function(cs, resolution=resolution, group=group, threshold=threshold, ncores=ncores, iter=10) {
+  #organise data into bins and chunks
+  stuff = csnorm:::bin_and_chunk(cs, resolution, group, ncores)
+  chunks=stuff$chunks
+  counts=stuff$counts
+  biases=stuff$biases
+  groups=stuff$groups
+  #initial gamma and log_s estimates
+  likmat = get_matrices(cs, resolution=resolution, group=group)[bin2>=bin1,.(name,bin1,bin2,log_s=log(signal))]
+  gamma = likmat[,.N/sum(abs(log_s))]
+  mat = copy(likmat)
+  #alternate recalculation of log-likelihood and estimation of gamma
+  for (i in 1:iter) {
+    mat[,log_s:= sign(log_s)*pmax(abs(log_s)-gamma,0)] #soft-thresholding
+    mat = get_signal_likelihood(mat, chunks, counts, biases, groups, ncores)
+    #gamma = estimate_gamma()
+  }
+  mat = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
+    #get zero-filled portion of counts and predict model on it
+    cts=counts[chunk1==i&chunk2==j]
+    biases1=biases[chunk==i] #just needed to fill the counts matrix
+    biases2=biases[chunk==j]
+    if (biases1[,.N]>0 & biases2[,.N]>0) {
+      cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize,dmin=cs@settings$dmin)
+      if (cts[,.N]>0) {
+        csnorm:::estimate_signal(cs, cts, groups)
+      }
+    }
+  }
+  counts[,c("bin1","bin2","ibin1","ibin2"):=list(NULL,NULL,NULL,NULL)]
+  biases[,c("bin","ibin"):=list(NULL,NULL)]
+  list(mat=mat, gamma=gamma)
+}
 
 #' Perform peak and differential detection through model comparison
 #'
@@ -385,7 +468,9 @@ detect_interactions = function(cs, resolution, group, threshold=0.95, ncores=1){
   if (get_cs_interaction_idx(csm, type="interactions", threshold=threshold, ref="expected", raise=F)>0) {
     stop("Refusing to overwrite this already detected interaction")
   }
-  mat=detection_binned(cs, resolution=resolution, group=group, ref="expected", threshold=threshold, ncores=ncores)
+  stuff = interactions_binned(cs, resolution=resolution, group=group, ref="expected", threshold=threshold, ncores=ncores)
+  mat=stuff$mat
+  gamma=stuff$gamma
   #store back
   csi=new("CSinter", mat=mat, type="interactions", threshold=threshold, ref="expected")
   csm@interactions=append(csm@interactions,list(csi))
