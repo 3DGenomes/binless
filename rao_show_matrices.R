@@ -16,10 +16,13 @@ cs = run_gauss(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 20, i
 save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_gauss.RData"))
 
 #bin
-resolution=50000
+resolution=10000
 cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ice=100, ncores=ncores)
 cs=group_datasets(cs, resolution=50000, group="condition")
-cs=detect_interactions(cs, resolution=resolution, group="all", threshold=0.95, ncores=ncores)
+for (i in 1:6) cs@binned[[i]]@grouped[[1]]@interactions=list()
+for (resolution in c(5000,10000,15000,16000,18000,20000)) {
+  cs=detect_interactions(cs, resolution=resolution, group="all", ncores=ncores)
+}
 
 #normalized matrix
 mat=get_matrices(cs, resolution=resolution, group="all")
@@ -52,3 +55,17 @@ ggplot(mat)+
   theme_bw()+theme(legend.position = "none", axis.title=element_blank())
 ggsave(filename=paste0("images/rao_HiCall_",sub,"_expected_",resolution/1000,"kb.pdf"), width=10,height=9)
 
+
+#interactions
+mat=foreach (resolution=c(5000,10000,15000,16000,18000,20000),.combine=rbind) %do% {
+  mat=get_interactions(cs, resolution=resolution, group="all", ref="expected", type="interactions")
+  mat[,resolution:=resolution]
+  mat
+}
+ggplot(mat)+facet_wrap(~ resolution)+
+  geom_raster(aes(begin1,begin2,fill=-log(signal)))+
+  geom_raster(aes(begin2,begin1,fill=-log(signal.signif)),data=mat[signal.signif!=1])+
+  theme_bw()+theme(legend.position = "none", axis.title=element_blank())+
+  scale_fill_gradient(low="black", high="white")
+  #scale_fill_gradient2(na.value="black")
+ggsave(filename="foxp1_alpha10_beta15.png",width=15,height=10)
