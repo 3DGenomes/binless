@@ -221,9 +221,9 @@ interactions_binned = function(cs, resolution=resolution, group=group, threshold
     mat=copy(likmat)
     mat[,log_s:=sign(log_sref)*pmax(abs(log_sref)-gamma,0)]
     #interpolate log likelihood using laplace approximation
-    mat[,lpdfs:=(lpdf0-lpdfref)*(log_s/log_sref-1)^2+lpdfref]
+    mat[,lpdfs:=ifelse(log_sref==0,lpdf0,(lpdf0-lpdfref)*(log_s/log_sref-1)^2+lpdfref)]
     #compute K(gamma)
-    data.table(gamma=gamma,nnz=mat[abs(log_sref)>gamma,.N],alpha.gamma=alpha.gamma,beta.gamma=beta.gamma,
+    data.table(gamma=gamma,nnz=mat[abs(log_sref)>gamma,.N],params=paste(alpha.gamma,beta.gamma),
                logK=mat[,sum(lpdfs-lpdf0-gamma*(abs(log_s)+beta.gamma)+alpha.gamma*log(beta.gamma*gamma)
                              - log(2) - lgamma(alpha.gamma))])
   }
