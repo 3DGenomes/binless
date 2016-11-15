@@ -206,15 +206,16 @@ get_signal_likelihood = function(mat, chunks, counts, biases, groups, ncores) {
 
 #' Perform peak calling through lasso and model comparison
 #' @keywords internal
-interactions_binned = function(cs, resolution=resolution, group=group, threshold=threshold,
-                               ncores=ncores, alpha.gamma=2, beta.gamma=1) {
+interactions_binned = function(cs, resolution=resolution, group=group, ncores=ncores, alpha.gamma=10, beta.gamma=15) {
   #initial gamma and log_s estimates
+  #bfac=foreach (resolution=c(5000,10000,15000,16000,18000,20000),.combine=rbind) %do% {
   likmat = get_matrices(cs, resolution=resolution, group=group)[bin2>=bin1,.(name,bin1,bin2,log_sref=log(signal),
                                                                              lpdf0,lpdfref=lpdfs, signal.sd)]
-  #gamma = likmat[,.N/sum(abs(log_sref))]
+  #ggplot(likmat)+geom_histogram(aes(abs(log_sref)),bins=100)
   likmat[,log_s:=log_sref]
   nbins=likmat[,.N]
   #alternate recalculation of log-likelihood and estimation of gamma
+  #ggplot(data.table(x=seq(0,3,length.out=1000))[,.(x,y=dgamma(x,shape=10,rate=2))])+geom_line(aes(x,y))
   registerDoParallel(cores=ncores)
   bfac = foreach (gamma=likmat[,unique(abs(log_sref))], .combine=rbind) %dopar% {
     #soft-thresholding of log_s
@@ -223,19 +224,32 @@ interactions_binned = function(cs, resolution=resolution, group=group, threshold
     #interpolate log likelihood using laplace approximation
     mat[,lpdfs:=ifelse(log_sref==0,lpdf0,(lpdf0-lpdfref)*(log_s/log_sref-1)^2+lpdfref)]
     #compute K(gamma)
+    #data.table(gamma=gamma,nnz=mat[abs(log_sref)>gamma,.N],params=paste(alpha.gamma,beta.gamma),
+    #           loglik=mat[,sum(lpdfs-gamma*(abs(log_s))+log(gamma/2)-log(2*pi*alpha.gamma^2)/2-(gamma-beta.gamma)^2/(2*alpha.gamma^2))])
     data.table(gamma=gamma,nnz=mat[abs(log_sref)>gamma,.N],params=paste(alpha.gamma,beta.gamma),
-               logK=mat[,sum(lpdfs-lpdf0-gamma*(abs(log_s)+beta.gamma)+alpha.gamma*log(beta.gamma*gamma)
-                             - log(2) - lgamma(alpha.gamma))])
+               loglik=mat[,sum(lpdfs-gamma*(abs(log_s)+beta.gamma)+alpha.gamma*log(beta.gamma*gamma)
+                               - log(2) - lgamma(alpha.gamma))])
+    #data.table(gamma=gamma,nnz=mat[abs(log_sref)>gamma,.N],#params=paste(alpha.gamma,beta.gamma),
+    #           loglik=mat[,sum(lpdfs-gamma*(abs(log_s))+log(gamma/2))], resolution=resolution)
   }
+  #}
+  #mu=0.75  #bias
+  #var=.05 #variance
+  #alpha.gamma=mu^2/var 
+  #beta.gamma=mu/var
+  #c(alpha.gamma,beta.gamma)
+  #bfac[,logp:=loglik+nbins*(-gamma*beta.gamma+(alpha.gamma-1)*log(gamma))] #gamma
+  #bfac[,logp:=loglik+nbins*(-(gamma-beta.gamma)^2/(2*alpha.gamma^2))] #normal
+  #bfac[,logp:=loglik+nbins*(-gamma*alpha.gamma)] #exponential
+  #ggplot(bfac[resolution%in%c(5000,10000,15000,20000)])+ylim(-1700000,NA)+#xlim(0.1,2)+
+  #  geom_line(aes(gamma,loglik,colour=factor(resolution)))+
+  #  geom_line(aes(gamma,logp,colour=factor(resolution)),linetype="dashed")
+  #ggplot(data.table(x=seq(0,3,length.out=1000))[,.(x,y=dgamma(x,shape=alpha.gamma,rate=beta.gamma))])+geom_line(aes(x,y))
+  #bfac[,.SD[logp==max(logp)],by=resolution]
   #select best model and produce matrix with interactions
-  bfac=bfac[logK==max(logK)]
-  retlist=list(gamma=bfac[,gamma], prob.signal=bfac[,1/(exp(-logK)+1)])
-  retlist$is.significant=retlist$prob.signal>threshold
-  if(retlist$is.significant==TRUE) {
-    mat=likmat[,.(name,bin1,bin2,signal=exp(sign(log_sref)*pmax(abs(log_sref)-retlist$gamma,0)),signal.sd)]
-  } else {
-    mat=likmat[,.(name,bin1,bin2,signal=1,signal.sd=0)]
-  }
+  bfac=bfac[loglik==max(loglik)]
+  retlist=list(gamma=bfac[,gamma])
+  mat=likmat[,.(name,bin1,bin2,signal=exp(sign(log_sref)*pmax(abs(log_sref)-retlist$gamma,0)),signal.sd)]
   mat[,direction:=ifelse(signal>1,"enriched",ifelse(signal==1,NA,"depleted"))]
   retlist$mat=mat
   retlist
@@ -335,30 +349,28 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
 #' @param resolution,group see
 #'   \code{\link{bin_all_datasets}} and \code{\link{group_datasets}}, used to
 #'   identify the input matrices.
-#' @param threshold significance threshold, between 0 and 1
 #' @param ncores number of cores used for parallelization
-#' @inheritParams call_interactions
 #'   
 #' @return the binned matrix with additional information relating to these 
 #'   significant interactions
 #' @export
 #' 
 #' @examples
-detect_interactions = function(cs, resolution, group, threshold=0.95, ncores=1){
+detect_interactions = function(cs, resolution, group, ncores=1){
   #get CSmat object
   idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
   idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
   #check if interaction wasn't calculated already
-  if (get_cs_interaction_idx(csm, type="interactions", threshold=threshold, ref="expected", raise=F)>0) {
+  if (get_cs_interaction_idx(csm, type="interactions", ref="expected", raise=F)>0) {
     stop("Refusing to overwrite this already detected interaction")
   }
-  stuff = interactions_binned(cs, resolution=resolution, group=group, threshold=threshold, ncores=ncores)
+  stuff = interactions_binned(cs, resolution=resolution, group=group, ncores=ncores)
   mat=stuff$mat
   #store back
-  csi=new("CSinter", mat=stuff$mat, type="interactions", threshold=threshold, ref="expected",
-          gamma=stuff$gamma, prob.signal=stuff$prob.signal, nnz=mat[signal!=1,.N])
+  csi=new("CSinter", mat=stuff$mat, type="interactions", ref="expected",
+          gamma=stuff$gamma, nnz=mat[signal!=1,.N])
   csm@interactions=append(csm@interactions,list(csi))
   csb@grouped[[idx2]]=csm
   cs@binned[[idx1]]=csb
@@ -369,7 +381,6 @@ detect_interactions = function(cs, resolution, group, threshold=0.95, ncores=1){
 #' Detect significant differences with a reference
 #' 
 #' @param binned as returned by \code{\link{csnorm_predict_binned}}
-#' @inheritParams call_interactions
 #'   
 #' @return the binned matrix with additional information relating to these
 #'   significant interactions
