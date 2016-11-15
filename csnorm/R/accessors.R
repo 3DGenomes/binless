@@ -51,6 +51,7 @@ get_cs_matrix_idx = function(csb, group, raise=T) {
 #'
 #' @param csm 
 #' @param type 
+#' @param threshold 
 #' @param ref 
 #' @param raise 
 #'
@@ -59,11 +60,11 @@ get_cs_matrix_idx = function(csb, group, raise=T) {
 #' @export
 #'
 #' @examples
-get_cs_interaction_idx = function(csm, type, ref, raise=T) {
+get_cs_interaction_idx = function(csm, type, threshold, ref, raise=T) {
   if(length(csm@interactions)>0) {
     for (i in 1:length(csm@interactions)) {
       if (csm@interactions[[i]]@type==type
-          && csm@interactions[[i]]@ref==ref) return(i)
+          && csm@interactions[[i]]@threshold==threshold && csm@interactions[[i]]@ref==ref) return(i)
     }
   }
   if (raise==T) {
@@ -98,21 +99,22 @@ get_matrices = function(cs, resolution, group) {
 #' @param type character. Either "interactions" or "differences"
 #' @inheritParams get_matrices
 #' @param ref character. The 
+#' @param threshold 
 #' @return a data.table containing the interactions
 #' @export
 #' 
 #' @examples
-get_interactions = function(cs, type, resolution, group, ref) {
+get_interactions = function(cs, type, resolution, group,
+                            ref, threshold) {
   idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
   idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
   mat=csm@mat
-  idx3=get_cs_interaction_idx(csm, type, ref)
+  idx3=get_cs_interaction_idx(csm, type, threshold, ref)
   int=csm@interactions[[idx3]]@mat
+  ret=merge(mat,int,by=c("name","bin1","bin2"))
   if (type=="interactions") {
-    ret = merge(mat[,.(name,bin1,begin1,end1,bin2,begin2,end2,observed,signal,signal.sd,normalized)],
-                int[,.(name,bin1,bin2,signal.signif=signal,direction)], by=c("name","bin1","bin2"))
     return(ret)
   } else {
     ret=merge(ret, mat[name==ref,.(bin1,bin2,ref.observed=observed,ref.expected=expected,
