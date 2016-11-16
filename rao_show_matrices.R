@@ -62,10 +62,13 @@ mat=foreach (resolution=c(5000,20000),.combine=rbind) %do% {
   mat[,resolution:=resolution]
   mat
 }
-ggplot(mat)+facet_wrap(~ resolution)+
-  geom_raster(aes(begin1,begin2,fill=-log(signal.x)))+
-  geom_raster(aes(begin2,begin1,fill=-log(signal.y)),data=mat[is.significant==T])+
+ggplot(mat)+#facet_wrap(~ resolution)+
+  geom_raster(aes(begin1,begin2,fill=-log(signal)))+
+  geom_raster(aes(begin2,begin1,fill=-log(signal.signif)),data=mat[is.significant==T])+
   theme_bw()+theme(legend.position = "none", axis.title=element_blank())+
   scale_fill_gradient(low="black", high="white")
   #scale_fill_gradient2(na.value="black")
 ggsave(filename="foxp1_alpha10_beta15.png",width=15,height=10)
+
+ggplot(mat)+geom_point(aes(signal,signal.signif))+stat_function(fun=identity)+scale_x_log10()+scale_y_log10()
+ggplot(mat)+geom_point(aes(signal.sd,signal.signif.sd))+stat_function(fun=identity)+scale_x_log10()+scale_y_log10()

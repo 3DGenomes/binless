@@ -204,42 +204,6 @@ get_signal_likelihood = function(mat, chunks, counts, biases, groups, ncores) {
   }
 }
 
-#' Perform peak calling through lasso and model comparison
-#' @keywords internal
-interactions_binned = function(cs, resolution=resolution, group=group, threshold=threshold, ncores=ncores, iter=10) {
-  #organise data into bins and chunks
-  stuff = csnorm:::bin_and_chunk(cs, resolution, group, ncores)
-  chunks=stuff$chunks
-  counts=stuff$counts
-  biases=stuff$biases
-  groups=stuff$groups
-  #initial gamma and log_s estimates
-  likmat = get_matrices(cs, resolution=resolution, group=group)[bin2>=bin1,.(name,bin1,bin2,log_s=log(signal))]
-  gamma = likmat[,.N/sum(abs(log_s))]
-  mat = copy(likmat)
-  #alternate recalculation of log-likelihood and estimation of gamma
-  for (i in 1:iter) {
-    mat[,log_s:= sign(log_s)*pmax(abs(log_s)-gamma,0)] #soft-thresholding
-    mat = get_signal_likelihood(mat, chunks, counts, biases, groups, ncores)
-    #gamma = estimate_gamma()
-  }
-  mat = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
-    #get zero-filled portion of counts and predict model on it
-    cts=counts[chunk1==i&chunk2==j]
-    biases1=biases[chunk==i] #just needed to fill the counts matrix
-    biases2=biases[chunk==j]
-    if (biases1[,.N]>0 & biases2[,.N]>0) {
-      cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize,dmin=cs@settings$dmin)
-      if (cts[,.N]>0) {
-        csnorm:::estimate_signal(cs, cts, groups)
-      }
-    }
-  }
-  counts[,c("bin1","bin2","ibin1","ibin2"):=list(NULL,NULL,NULL,NULL)]
-  biases[,c("bin","ibin"):=list(NULL,NULL)]
-  list(mat=mat, gamma=gamma)
-}
-
 #' Perform peak and differential detection through model comparison
 #'
 #' @param cs 
@@ -310,8 +274,9 @@ detection_binned = function(cs, resolution, group, ref="expected", threshold=0.9
           mat=data.table(name=cts[head(cbegin,-1),groupname], bin1=cts[head(cbegin,-1),bin1], bin2=cts[head(cbegin,-1),bin2],
                          K=exp(op$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op$hessian))))-op$par$lpdf0),
                          direction=ifelse(0<op$par$log_s,"enriched","depleted"),
-                         signal=exp(op$par$log_s))
-          mat[,signal.sd:=sqrt(as.vector(1/(-diag(op$hessian))))*signal]
+                         signal.signif=exp(op$par$log_s))
+          mat[,signal.signif.sd:=sqrt(as.vector(1/(-diag(op$hessian))))*signal.signif]
+          mat[op$par$binned==0,c("signal.signif","signal.signif.sd","K","direction"):=list(1,0,0,NA)]
           mat[,prob.gt.expected:=K/(1+K)]
           mat[,K:=NULL]
           mat[,is.significant:=prob.gt.expected > threshold]
@@ -321,6 +286,7 @@ detection_binned = function(cs, resolution, group, ref="expected", threshold=0.9
                          lpdms=op$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op$hessian)))), #log(p(D|Msignal))
                          log_s.mean=op$par$log_s, signal=exp(op$par$log_s))
           mat[,signal.sd:=sqrt(as.vector(1/(-diag(op$hessian))))*signal]
+          mat[data$observed==0,c("signal","signal.sd","lpdms","log_s.mean"):=list(1,0,op$par$lpdf0[data$observed==0],0)]
           refcounts=cts[groupname==ref]
           diffcounts=foreach(n=cts[groupname!=ref,unique(groupname)],.combine=rbind) %do% {
             tmp=rbind(cts[groupname==n],refcounts)
@@ -339,13 +305,14 @@ detection_binned = function(cs, resolution, group, ref="expected", threshold=0.9
           mat2=data.table(name=diffcounts[head(cbegin,-1),groupname],
                           bin1=diffcounts[head(cbegin,-1),bin1], bin2=diffcounts[head(cbegin,-1),bin2],
                           lpdms=op2$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op2$hessian)))))
+          mat2[op2$par$binned==0,lpdms:=op2$par$lpdf0]
           mat=merge(mat,mat2,by=c("name","bin1","bin2"))
           mat[,K:=exp(lpdm2-lpdms)]
           colname=paste0("prob.gt.",ref)
           mat[,c(colname):=K/(1+K)]
           mat[,is.significant:=get(colname) > threshold]
-          mat[,c("signal","signal.sd"):=list(signal/refsignal,(signal.sd*refsignal-refsignal.sd*signal)/(signal*refsignal))]
-          mat[,c("lpdm2","lpdms","K","refsignal","refsignal.sd"):=list(NULL,NULL,NULL,NULL,NULL)]
+          mat[,c("difference","difference.sd"):=list(signal/refsignal,(signal.sd*refsignal-refsignal.sd*signal)/(signal*refsignal))]
+          mat[,c("lpdm2","lpdms","K","signal","signal.sd","refsignal","refsignal.sd"):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
         }
       }
     }
