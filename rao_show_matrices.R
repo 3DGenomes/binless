@@ -82,9 +82,18 @@ mat=get_interactions(cs, resolution=resolution, group="all", type="differences",
 ggplot(mat)+facet_grid(~name)+
   geom_raster(aes(begin1,begin2,fill=-log(signal)))+
   geom_raster(aes(begin2,begin1,fill=-log(ref.signal)))+
+  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
   geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])+
   scale_fill_gradient2()+ scale_colour_manual(values = muted(c("blue","red")))+
   theme_bw()+theme(legend.position = "none", axis.title=element_blank())
 ggsave(filename=paste0("images/rao_HiCall_",sub,"_both_differences_",resolution/1000,"kb.pdf"), width=10,height=9)
 
+#difference matrix
+ggplot(mat)+facet_grid(~name)+
+  geom_raster(aes(begin1,begin2,fill=-log(difference)))+
+  geom_raster(aes(begin2,begin1,fill=-log(difference)))+
+  geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])+
+  scale_fill_gradient2()+ scale_colour_manual(values = muted(c("blue","red")))+
+  theme_bw()+theme(legend.position = "none", axis.title=element_blank())
+ggsave(filename=paste0("images/rao_HiCall_",sub,"_both_diffsig_",resolution/1000,"kb.pdf"), width=10,height=9)
 

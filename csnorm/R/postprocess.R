@@ -286,7 +286,7 @@ detection_binned = function(cs, resolution, group, ref="expected", threshold=0.9
                          lpdms=op$par$lpdfs+1/2*log(2*pi*as.vector(1/(-diag(op$hessian)))), #log(p(D|Msignal))
                          log_s.mean=op$par$log_s, signal=exp(op$par$log_s))
           mat[,signal.sd:=sqrt(as.vector(1/(-diag(op$hessian))))*signal]
-          mat[data$observed==0,c("signal","signal.sd","lpdms","log_s.mean"):=list(1,0,op$par$lpdf0[data$observed==0],0)]
+          mat[op$par$binned==0,c("signal","signal.sd","lpdms","log_s.mean"):=list(1,0,op$par$lpdf0[op$par$binned==0],0)]
           refcounts=cts[groupname==ref]
           diffcounts=foreach(n=cts[groupname!=ref,unique(groupname)],.combine=rbind) %do% {
             tmp=rbind(cts[groupname==n],refcounts)
