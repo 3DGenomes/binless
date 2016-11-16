@@ -3,10 +3,12 @@ library(data.table)
 library(ggplot2)
 library(doParallel)
 library(foreach)
-
-sub="GM12878_FOXP1_oldmat"
+library(rstan)
+library(scales)
 
 setwd("/home/yannick/simulations/cs_norm")
+
+sub="FOXP1"
 
 #normalize
 load(paste0("data/rao_HiCall_",sub,"_csdata.RData"))
@@ -15,37 +17,83 @@ cs = run_gauss(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 20, i
 save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_gauss.RData"))
 
 #bin
-resolution=20000
-cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ice=100, ncores=ncores)
-cs=detect_interactions(cs, resolution=resolution, group="all", threshold=0.95, ncores=ncores)
+for (resolution in c(5000,20000)) {
+  cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ice=1, ncores=ncores)
+  cs=detect_interactions(cs, resolution=resolution, group="all", ncores=ncores)
+  cs=detect_differences(cs, resolution=resolution, group="all", ncores=ncores, ref="GM MboI 1")
+}
 
-#icelike matrix
-mat=get_matrices(cs, resolution=resolution, group="all")
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
-  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  scale_fill_gradient(low="white", high="black")+
-  theme_bw()+theme(legend.position = "none", axis.title=element_blank())
-ggsave(filename=paste0("images/rao_HiCall_",sub,"_icelike_",resolution/1000,"kb.pdf"), width=10,height=9)
-#normalized
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=-log(normalized)))+
-  geom_raster(aes(begin2,begin1,fill=-log(normalized)))+
-  scale_fill_gradient2()+
-  theme_bw()+theme(legend.position = "none", axis.title=element_blank())
-ggsave(filename=paste0("images/rao_HiCall_",sub,"_normalized_",resolution/1000,"kb.pdf"), width=10,height=9)
+#different matrices for GM MboI 1
+for (resolution in c(5000,20000)) {
+  mat=get_matrices(cs, resolution=resolution, group="all")[name=="GM MboI 1"]
+  ggplot(mat)+
+    geom_raster(aes(begin1,begin2,fill=log(normalized)))+
+    geom_raster(aes(begin2,begin1,fill=log(normalized)))+
+    scale_fill_gradient(low="white", high="black")+
+    theme_bw()+theme(legend.position = "none", axis.title=element_blank())
+  ggsave(filename=paste0("images/rao_HiCall_",sub,"_normalized_",resolution/1000,"kb.pdf"), width=10,height=9)
+  #signal
+  ggplot(mat)+
+    geom_raster(aes(begin1,begin2,fill=-log(signal)))+
+    geom_raster(aes(begin2,begin1,fill=-log(signal)))+
+    theme_bw()+theme(legend.position = "none", axis.title=element_blank())+
+    #scale_fill_gradient(low="black", high="white")
+    scale_fill_gradient2()
+  ggsave(filename=paste0("images/rao_HiCall_",sub,"_signal_",resolution/1000,"kb.pdf"), width=10,height=9)
+  #observed
+  ggplot(mat)+
+    geom_raster(aes(begin1,begin2,fill=log(observed)))+
+    geom_raster(aes(begin2,begin1,fill=log(observed)))+
+    scale_fill_gradient(low="white", high="black",na.value="white")+
+    theme_bw()+theme(legend.position = "none", axis.title=element_blank())
+  ggsave(filename=paste0("images/rao_HiCall_",sub,"_observed_",resolution/1000,"kb.pdf"), width=10,height=9)
+  #expected
+  ggplot(mat)+
+    geom_raster(aes(begin1,begin2,fill=log(expected)))+
+    geom_raster(aes(begin2,begin1,fill=log(expected)))+
+    scale_fill_gradient(low="white", high="black")+
+    theme_bw()+theme(legend.position = "none", axis.title=element_blank())
+  ggsave(filename=paste0("images/rao_HiCall_",sub,"_expected_",resolution/1000,"kb.pdf"), width=10,height=9)
+}
+
+#Interactions at 20kb
+resolution=20000
+mat=get_interactions(cs, resolution=resolution, group="all", type="interactions", ref="expected", threshold=0.95)
 #observed
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(observed)))+
-  geom_raster(aes(begin2,begin1,fill=log(observed)))+
+ggplot(mat)+facet_grid(~name)+
+  geom_raster(aes(begin1,begin2,fill=log(normalized)))+
+  geom_raster(aes(begin2,begin1,fill=log(normalized)))+
   scale_fill_gradient(low="white", high="black")+
   theme_bw()+theme(legend.position = "none", axis.title=element_blank())
-ggsave(filename=paste0("images/rao_HiCall_",sub,"_observed_",resolution/1000,"kb.pdf"), width=10,height=9)
-#expected
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(expected)))+
-  geom_raster(aes(begin2,begin1,fill=log(expected)))+
-  scale_fill_gradient(low="white", high="black")+
+ggsave(filename=paste0("images/rao_HiCall_",sub,"_both_observed_",resolution/1000,"kb.pdf"), width=19,height=9)
+#interactions  
+ggplot(mat)+facet_grid(~name)+
+  geom_raster(aes(begin1,begin2,fill=-log(signal)))+
+  geom_raster(aes(begin2,begin1,fill=-log(signal)))+
+  geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])+
+  scale_fill_gradient2()+ scale_colour_manual(values = muted(c("blue","red")))+
   theme_bw()+theme(legend.position = "none", axis.title=element_blank())
-ggsave(filename=paste0("images/rao_HiCall_",sub,"_expected_",resolution/1000,"kb.pdf"), width=10,height=9)
+ggsave(filename=paste0("images/rao_HiCall_",sub,"_both_signal_",resolution/1000,"kb.pdf"), width=19,height=9)
+
+
+#Differences at 20kb
+resolution=20000
+mat=get_interactions(cs, resolution=resolution, group="all", type="differences", ref="GM MboI 1", threshold=0.95)
+ggplot(mat)+facet_grid(~name)+
+  geom_raster(aes(begin1,begin2,fill=-log(signal)))+
+  geom_raster(aes(begin2,begin1,fill=-log(ref.signal)))+
+  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])+
+  geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])+
+  scale_fill_gradient2()+ scale_colour_manual(values = muted(c("blue","red")))+
+  theme_bw()+theme(legend.position = "none", axis.title=element_blank())
+ggsave(filename=paste0("images/rao_HiCall_",sub,"_both_differences_",resolution/1000,"kb.pdf"), width=10,height=9)
+
+#difference matrix
+ggplot(mat)+facet_grid(~name)+
+  geom_raster(aes(begin1,begin2,fill=-log(difference)))+
+  geom_raster(aes(begin2,begin1,fill=-log(difference)))+
+  geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])+
+  scale_fill_gradient2()+ scale_colour_manual(values = muted(c("blue","red")))+
+  theme_bw()+theme(legend.position = "none", axis.title=element_blank())
+ggsave(filename=paste0("images/rao_HiCall_",sub,"_both_diffsig_",resolution/1000,"kb.pdf"), width=10,height=9)
 

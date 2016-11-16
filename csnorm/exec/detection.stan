@@ -10,6 +10,10 @@ data {
   real<lower=0> alpha; //dispersion
   real<lower=0> sigma; //for cauchy prior
 }
+transformed data {
+  vector[G] bd;
+  for (g in 1:G) bd[g] = sum(observed[cbegin[g]:(cbegin[g+1]-1)]);
+}
 parameters {
   real log_s[G]; //log(signal)
 }
@@ -22,9 +26,11 @@ model {
 generated quantities {
   vector[G] lpdfs;
   vector[G] lpdf0;
+  vector[G] binned;
   for (g in 1:G) {
     lpdfs[g] = neg_binomial_2_log_lpmf(observed[cbegin[g]:(cbegin[g+1]-1)] | log_s[g]+log_expected[cbegin[g]:(cbegin[g+1]-1)], alpha)
               + cauchy_lpdf(log_s[g] | 0, sigma);
     lpdf0[g] = neg_binomial_2_log_lpmf(observed[cbegin[g]:(cbegin[g+1]-1)] | log_expected[cbegin[g]:(cbegin[g+1]-1)], alpha);
   }
+  binned=bd;
 }

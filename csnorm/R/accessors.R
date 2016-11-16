@@ -118,7 +118,7 @@ get_interactions = function(cs, type, resolution, group,
     return(ret)
   } else {
     ret=merge(ret, mat[name==ref,.(bin1,bin2,ref.observed=observed,ref.expected=expected,
-                                   ref.normalized=normalized,ref.icelike=icelike)], by=c("bin1","bin2"))
+                                   ref.normalized=normalized,ref.signal=signal)], by=c("bin1","bin2"))
     return(ret)
   }
 }
