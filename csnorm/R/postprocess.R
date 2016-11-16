@@ -129,7 +129,7 @@ csnorm_predict_binned = function(cs, resolution, group, ncores=1) {
 #' @examples
 bin_grouped_matrix = function(cs, resolution, group, ncores, ice, verbose) {
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
-  mat=csnorm_predict_binned(cs, resolution, group="all", ncores=ncores)
+  mat=csnorm_predict_binned(cs, resolution, group=group, ncores=ncores)
   setkey(mat,name,bin1,bin2)
   if (ice>0) {
     if (verbose==T) cat("*** iterative normalization with ",ice," iterations\n")
