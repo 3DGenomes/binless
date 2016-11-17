@@ -16,13 +16,36 @@ save(cs,file=paste0("data/caulo_BglII_all_csnorm_optimized_gauss.RData"))
 
 load("data/caulo_BglII_all_csnorm_optimized_gauss.RData")
 
+ggplot(cs@par$biases)+geom_pointrange(aes(pos,etahat,ymin=etahat-std,ymax=etahat+std,colour=cat),alpha=0.1)+
+  geom_line(aes(pos,eta))+facet_grid(name ~ cat)+xlim(550000,570000)#+ylim(-10,10)
+
+load("data/")
+
+bts=melt(cs@biases,id.vars=c("name","id","pos"))
+cts=rbind(cs@counts[,.(name, id=id1, pos=pos1, contact.R=contact.close, contact.L=contact.far)],
+          cs@counts[,.(name, id=id1, pos=pos1, contact.R=contact.down,  contact.L=contact.up)],
+          cs@counts[,.(name, id=id2, pos=pos2, contact.R=contact.far,   contact.L=contact.close)],
+          cs@counts[,.(name, id=id2, pos=pos2, contact.R=contact.down,  contact.L=contact.up)])
+cts=rbind(bts,melt(cts[,.(contact.R=sum(contact.R),contact.L=sum(contact.L)),by=c("name","id","pos")],id.vars=c("name","id","pos")))
+
+ggplot(cts)+geom_histogram(aes(value),bins=100)+facet_grid(name~variable,scales="free")
+ggplot(cts[,.(value=sum(value)),by=c("name","id")])+geom_histogram(aes(value),bins=100)+facet_grid(~name,scales="free")
+cts=cts[name=="WT BglII 2"]
+cts[,.(value=sum(value)),by=c("id","name")][value<100,.N]/cts[,.(value=sum(value)),by=c("id","name")][,.N]
+
+cts[,.(value=sum(value)),by=c("id","name")][,quantile(value,c(0.01,0.99))]
+
+load("data/caulo_BglIIr2_all_csdata_with_data.RData")
+
+csd@data[]
+
 #bin
 resolution=20000
 cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ice=1, ncores=ncores)
 cs=detect_interactions(cs, resolution=resolution, group="all", ncores=ncores)
 cs=detect_differences(cs, resolution=resolution, group="all", ncores=ncores, ref="GM MboI 1")
 
-mat=get_matrices(cs, resolution=resolution, group="condition")
+mat=get_matrices(cs, resolution=resolution, group="all")
 ggplot(mat)+facet_wrap(~name)+
   geom_raster(aes(begin1,begin2,fill=log(normalized)))+
   geom_raster(aes(begin2,begin1,fill=log(normalized)))+
