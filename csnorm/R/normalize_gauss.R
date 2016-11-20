@@ -273,6 +273,67 @@ has_converged = function(cs) {
   return(all(delta<tol))
 }
 
+#' count number of zeros in each decay bin
+#' @keywords internal
+#' 
+get_nzeros_per_decay = function(cs) {
+  #bin distances
+  dbins=c(0,cs@settings$dbins) #also count those that are <=dmin, used by get_nzeros_per_cutsite
+  stopifnot(cs@counts[id1>=id2,.N]==0)
+  mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
+               variable.name = "category", value.name = "count")[count>0]
+  mcounts[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  #Count positive counts in these bins
+  Nkd = mcounts[,.(nnz=.N),keyby=c("name","bdist")]
+  #Nkd[,mdist:=sqrt(dbins[unclass(bdist)+1]*dbins[unclass(bdist)])] #cannot use dbins because some rows could be missing
+  #stopifnot(Nkd[mdist<cs@settings$dmin,.N]==0) #otherwise cs@counts has not been censored properly
+  #Count the number of crossings per distance bin
+  #looping over IDs avoids building NxN matrix
+  Nkz = foreach(i=cs@biases[,id], .combine=function(x,y){rbind(x,y)[,.(ncross=sum(ncross)),keyby=c("name","bdist")]}) %do% {
+    stuff=c(cs@biases[i,.(name,id,pos)])
+    dists=cs@biases[name==stuff$name & id>stuff$id,.(name,distance=abs(pos-stuff$pos))]
+    if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
+    dists[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+    dists[,.(ncross=.N),keyby=c("name","bdist")]
+  }
+  #deduce zero counts
+  Nkz = merge(Nkz,Nkd,all=T)
+  Nkz[is.na(nnz),nnz:=0]
+  Nkz[,nzero:=4*ncross-nnz]
+  return(Nkz)
+}
+
+#' count number of zeros in each decay bin
+#' @keywords internal
+#' 
+get_nzeros_per_cutsite = function(cs, zdecay) {
+  stopifnot(cs@counts[id1>=id2,.N]==0)
+  mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
+               variable.name = "category", value.name = "count")[count>0]
+  ### accumulate counts
+  ci=mcounts[,.(id=id1,count,category)][,.N,by=c("id","count","category")]
+  cj=mcounts[,.(id=id2,count,category)][,.N,by=c("id","count","category")]
+  nsites=cs@biases[,.N]
+  ### make histograms for biases TODO
+  Nkl=dcast(rbind(ci[category=="contact.up",.(id,count,category="Ni.up",N)],
+                  ci[category=="contact.far",.(id,count,category="Ni.far",N)],
+                  cj[category=="contact.up",.(id,count,category="Nj.up",N)],
+                  cj[category=="contact.close",.(id,count,category="Nj.close",N)]),
+            ...~category, value.var="N", fill=0)[,.(id,count,N=Ni.far+Ni.up+Nj.up+Nj.close)]
+  Nkl=rbind(Nkl,Nkl[,.(count=0,N=2*nsites-sum(N)),by=id]) #each rsite is counted twice
+  setkey(Nkl,N,id,count)
+  Nkl=Nkl[N>0]
+  Nkr=dcast(rbind(ci[category=="contact.close",.(id,count,category="Ni.close",N)],
+                  ci[category=="contact.down",.(id,count,category="Ni.down",N)],
+                  cj[category=="contact.far",.(id,count,category="Nj.far",N)],
+                  cj[category=="contact.down",.(id,count,category="Nj.down",N)]),
+            ...~category, value.var="N", fill=0)[,.(id,count,N=Ni.close+Ni.down+Nj.far+Nj.down)]
+  Nkr=rbind(Nkr,Nkr[,.(count=0,N=2*nsites-sum(N)),by=id]) #each rsite is counted twice
+  setkey(Nkr,N,id,count)
+  Nkr=Nkr[N>0]
+  
+}
+
 #' Cut-site normalization (simplified gibbs sampling)
 #' 
 #' Alternates two approximations to the exact model, fitting the diagonal decay
@@ -319,7 +380,12 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","qmax")],
                   list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf,
                        iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj))
-  #fill counts matrix and take subset
+  #get number of zeros along cut sites and decay
+  stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
+  cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
+  zdecay = get_nzeros_per_decay(cs)
+  zbias = get_nzeros_per_cutsite(cs)
+  #
   cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize, dmin=cs@settings$dmin)
   setkey(cs@biases, id, name)
   setkey(cs@counts, id1, id2, name)
