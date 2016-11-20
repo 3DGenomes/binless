@@ -14,12 +14,23 @@ cs=merge_cs_norm_datasets(list(csd), different.decays="none")
 cs = run_gauss(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 20, iter=100000, init_alpha=1e-7, ncounts = 1000000)
 save(cs,file=paste0("data/caulo_BglII_all_csnorm_optimized_gauss.RData"))
 
-load("data/caulo_BglII_all_csnorm_optimized_gauss.RData")
+load("data/caulo_BglII_all_csnorm_optimized_gauss_bpk1_nooutliers.RData")
+
+ggplot(cs@diagnostics$params[step>4,.(step,leg,value,out.last)])+
+  geom_line(aes(step,value))+geom_point(aes(step,value,colour=out.last))+facet_wrap(~leg, scales = "free")+
+  theme(legend.position="bottom")
+vars=foreach(var=c("eC","eRJ","eDE","alpha","lambda_iota","lambda_rho"),
+             trans=(c("exp","exp","exp",NA,"log","log")),.combine=rbind) %do% get_all_values(cs,var,trans)
+ggplot(vars[step>4])+geom_line(aes(step,value))+
+  geom_point(aes(step,value,colour=leg))+facet_wrap(~variable, scales = "free_y")
+
+
 
 ggplot(cs@par$biases)+geom_pointrange(aes(pos,etahat,ymin=etahat-std,ymax=etahat+std,colour=cat),alpha=0.1)+
-  geom_line(aes(pos,eta))+facet_grid(name ~ cat)+xlim(550000,570000)#+ylim(-10,10)
+  geom_line(aes(pos,eta))+facet_grid(name ~ cat)#+xlim(500000,600000)#+ylim(-10,10)
 
-load("data/")
+ggplot(cs@par$decay)+geom_pointrange(aes(distance,kappahat,ymin=kappahat-std,ymax=kappahat+std,colour=name),alpha=0.1)+
+  geom_line(aes(distance,kappa,group=name))+scale_x_log10()
 
 bts=melt(cs@biases,id.vars=c("name","id","pos"))
 cts=rbind(cs@counts[,.(name, id=id1, pos=pos1, contact.R=contact.close, contact.L=contact.far)],
