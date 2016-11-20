@@ -374,14 +374,28 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     if (has_converged(cs)) break
   }
   if (verbose==T) cat("Done\n")
+  if ("init" %in% names(init)) init$init=NULL
   cs@par$init=init
-  cs@diagnostics$plot=ggplot(cs@diagnostics$params[,.(step,leg,value,out.last)])+
+  return(cs)
+}
+
+#' Diagnostics plots to monitor convergence of normalization (gaussian
+#' approximation)
+#' 
+#' @param cs a normalized CSnorm object
+#'   
+#' @return Two plots in a list. The first is for the three log-likelihoods, the
+#'   second is for the parameters.
+#' @export
+#' 
+#' @examples
+plot_diagnostics = function(cs) {
+  plot=ggplot(cs@diagnostics$params[,.(step,leg,value,out.last)])+
     geom_line(aes(step,value))+geom_point(aes(step,value,colour=out.last))+facet_wrap(~leg, scales = "free")+
     theme(legend.position="bottom")
   vars=foreach(var=c("eC","eRJ","eDE","alpha","lambda_iota","lambda_rho"),
                trans=(c("exp","exp","exp",NA,"log","log")),.combine=rbind) %do% get_all_values(cs,var,trans)
-  cs@diagnostics$plot2=ggplot(vars)+geom_line(aes(step,value))+
+  plot2=ggplot(vars)+geom_line(aes(step,value))+
     geom_point(aes(step,value,colour=leg))+facet_wrap(~variable, scales = "free_y")
-  return(cs)
+  return(list(plot=plot,plot2=plot2))
 }
-
