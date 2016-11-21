@@ -291,7 +291,7 @@ get_nzeros_per_decay = function(cs) {
   #looping over IDs avoids building NxN matrix
   Nkz = foreach(i=cs@biases[,1:.N], .combine=function(x,y){rbind(x,y)[,.(ncross=sum(ncross)),keyby=c("name","bdist")]}) %do% {
     stuff=c(cs@biases[i,.(name,id,pos)])
-    dists=cs@biases[name==stuff$name & id!=stuff$id,.(name,distance=abs(pos-stuff$pos))]
+    dists=cs@biases[name==stuff$name & id>stuff$id,.(name,distance=abs(pos-stuff$pos))]
     if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
     dists[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
     dists[,.(ncross=.N),keyby=c("name","bdist")]
@@ -301,6 +301,13 @@ get_nzeros_per_decay = function(cs) {
   Nkz[is.na(nnz),nnz:=0]
   Nkz[,nzero:=4*ncross-nnz]
   return(Nkz)
+  verif=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
+               variable.name = "category", value.name = "count")[count==0]
+  verif[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  verif=verif[,.N,keyby=c("name","bdist")]
+  both=merge(verif,Nkz,all=T)
+  ggplot(both)+geom_point(aes(nzero,N,colour=name))
+  both[,all(nzero==N,na.rm=T)]
 }
 
 #' count number of zeros in each decay bin
@@ -325,22 +332,46 @@ get_nzeros_per_cutsite = function(cs) {
                   cj[category=="contact.down",.(name,id,category="Nj.down",N)]),
             ...~category, value.var="N", fill=0)[,.(name,id,nnzr=Ni.close+Ni.down+Nj.far+Nj.down)]
   zbias=merge(Nkl,Nkr,all=T)
-  zbias[is.na(nnzl),nnzl:=0]
-  zbias[is.na(nnzr),nnzr:=0]
   #count masked contacts where d<dmin
   masked = foreach(i=cs@biases[,1:.N], .combine=rbind) %do% {
     stuff=c(cs@biases[i,.(name,id,pos)])
     dists=cs@biases[name==stuff$name & id!=stuff$id,.(name,distance=abs(pos-stuff$pos))]
     if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
-    dists[distance<cs@settings$dmin,.(name=stuff$name,id=stuff$id,ncross.close=.N)]
+    dists[distance<cs@settings$dmin,.(name=name[1],id=stuff$id,ncross.close=.N)]
   }
   setkey(masked,name,id)
   #deduce number of zero counts
   zbias=merge(zbias,masked,all=T)
+  zbias[is.na(nnzl),nnzl:=0]
+  zbias[is.na(nnzr),nnzr:=0]
   zbias[is.na(ncross.close),ncross.close:=0]
-  nsites=cs@biases[,.N-1]
-  zbias[,c("nzero.L","nzero.R"):=list(2*(nsites-ncross.close)-nnzl,2*(nsites-ncross.close)-nnzr)]
+  nsites=cs@biases[,.(ncs=.N-1),by=name]
+  zbias=merge(zbias,nsites)
+  zbias[,c("nzero.L","nzero.R"):=list(2*(ncs-ncross.close)-nnzl,2*(ncs-ncross.close)-nnzr)]
+  setkey(zbias,name,id)
   return(zbias)
+  mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
+               variable.name = "category", value.name = "count")[count==0]
+  ci=mcounts[,.(name,id=id1,count,category)][,.N,by=c("name","id","category")]
+  cj=mcounts[,.(name,id=id2,count,category)][,.N,by=c("name","id","category")]
+  Nkl=dcast(rbind(ci[category=="contact.up",.(name,id,category="Ni.up",N)],
+                  ci[category=="contact.far",.(name,id,category="Ni.far",N)],
+                  cj[category=="contact.up",.(name,id,category="Nj.up",N)],
+                  cj[category=="contact.close",.(name,id,category="Nj.close",N)]),
+            ...~category, value.var="N", fill=0)[,.(name,id,nzl=Ni.far+Ni.up+Nj.up+Nj.close)]
+  Nkr=dcast(rbind(ci[category=="contact.close",.(name,id,category="Ni.close",N)],
+                  ci[category=="contact.down",.(name,id,category="Ni.down",N)],
+                  cj[category=="contact.far",.(name,id,category="Nj.far",N)],
+                  cj[category=="contact.down",.(name,id,category="Nj.down",N)]),
+            ...~category, value.var="N", fill=0)[,.(name,id,nzr=Ni.close+Ni.down+Nj.far+Nj.down)]
+  verif=merge(Nkl,Nkr,all=T)
+  verif[is.na(nzl),nzl:=0]
+  verif[is.na(nzr),nzr:=0]
+  both=merge(verif,zbias,all=T)
+  ggplot(both)+geom_point(aes(nzl,nzero.L,colour=name))
+  ggplot(both)+geom_point(aes(nzr,nzero.R,colour=name))
+  both[,all(nzero.L==nzl,na.rm=T)]
+  both[,all(nzero.R==nzr,na.rm=T)]
 }
 
 #' Cut-site normalization (simplified gibbs sampling)
