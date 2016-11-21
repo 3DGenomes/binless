@@ -345,6 +345,40 @@ get_nzeros_per_cutsite = function(cs) {
   return(zbias)
 }
 
+#' Get the first ncounts/d of each of d datasets, including zeros 
+#' @keywords internal
+#' 
+subsample_counts = function(cs, ncounts, dset=NA) {
+  ncounts_per_dset=as.integer(ncounts/cs@design[,.N])
+  if (is.na(dset)) {
+    cts = foreach (d=cs@design[,name],.combine=rbind) %do% subsample_counts(cs,ncounts_per_dset,dset=d)
+  } else {
+    #get name and id of counts
+    nbiases = cs@biases[name==dset, .N]
+    ncounts = min(nbiases*(nbiases-1)/2,ncounts)
+    ids=c(cs@biases[name==dset,.(minid=min(id),maxid=max(id))])
+    cts=data.table(name=dset,id1=ids$minid,id2=(ids$minid+1):ids$maxid)
+    while(cts[,.N]<ncounts)
+      cts=rbind(cts,data.table(name=dset,id1=cts[.N,id1+1],id2=cts[.N,id1+2]:ids$maxid))
+    cts=cts[1:ncounts]
+    #merge positions and compute distances
+    cts = merge(cts,cs@biases[,.(name,id,pos)],by.x=c("name","id1"),by.y=c("name","id"))
+    cts = merge(cts,cs@biases[,.(name,id,pos)],by.x=c("name","id2"),by.y=c("name","id"),suffixes=c("1","2"))
+    cts[,distance:=abs(pos2-pos1)]
+    if (cs@settings$circularize>0) cts[,distance:=pmin(distance, cs@settings$circularize+1-distance)] 
+    #merge counts
+    setkey(cts, id1, id2, name)
+    cts = merge(cts, cs@counts[,.(name,id1,id2,contact.close,contact.down,contact.far,contact.up)], all.x=T)
+    cts[is.na(contact.close),contact.close:=0]
+    cts[is.na(contact.down),contact.down:=0]
+    cts[is.na(contact.far),contact.far:=0]
+    cts[is.na(contact.up),contact.up:=0]
+    if (cts[,uniqueN(c(contact.close,contact.far,contact.up,contact.down))]<2)
+      stop("dataset too sparse, please increase ncounts")
+    return(cts)
+  }
+}
+
 #' Cut-site normalization (simplified gibbs sampling)
 #' 
 #' Alternates two approximations to the exact model, fitting the diagonal decay
@@ -384,6 +418,8 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   #clean object if dirty
   cs@par=list() #in case we have a weird object
   cs@binned=list()
+  setkey(cs@biases, id, name)
+  setkey(cs@counts, id1, id2, name)
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -400,15 +436,8 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   zbias = get_nzeros_per_cutsite(cs)
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
-  cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize, dmin=cs@settings$dmin)
-  setkey(cs@biases, id, name)
-  setkey(cs@counts, id1, id2, name)
-  ncounts_per_dset=as.integer(ncounts/cs@design[,.N])
-  subcounts = cs@counts[,.SD[1:min(.N,ncounts_per_dset)],by=name]
-  setkeyv(subcounts,key(cs@counts))
-  if (subcounts[,uniqueN(c(contact.close,contact.far,contact.up,contact.down))]<2)
-    stop("dataset too sparse, please increase ncounts")
-  subcounts.weight=merge(cs@counts[,.(nc=.N),keyby=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
+  subcounts = csnorm:::subsample_counts(cs, ncounts)
+  subcounts.weight = merge(cs@counts[,.(nc=.N),keyby=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
   #initial guess
   if (is.null(init)) {
     if (verbose==T) cat("No initial guess provided\n")
