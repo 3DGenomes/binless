@@ -394,9 +394,12 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   #get number of zeros along cut sites and decay
   stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
   cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
+  if(verbose==T) cat("Counting zeros for decay\n")
   zdecay = get_nzeros_per_decay(cs)
+  if(verbose==T) cat("Counting zeros for bias\n")
   zbias = get_nzeros_per_cutsite(cs)
   #
+  if(verbose==T) cat("Subsampling counts for dispersion\n")
   cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize, dmin=cs@settings$dmin)
   setkey(cs@biases, id, name)
   setkey(cs@counts, id1, id2, name)
