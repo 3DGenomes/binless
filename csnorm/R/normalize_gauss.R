@@ -301,13 +301,6 @@ get_nzeros_per_decay = function(cs) {
   Nkz[is.na(nnz),nnz:=0]
   Nkz[,nzero:=4*ncross-nnz]
   return(Nkz)
-  verif=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
-               variable.name = "category", value.name = "count")[count==0]
-  verif[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-  verif=verif[,.N,keyby=c("name","bdist")]
-  both=merge(verif,Nkz,all=T)
-  ggplot(both)+geom_point(aes(nzero,N,colour=name))
-  both[,all(nzero==N,na.rm=T)]
 }
 
 #' count number of zeros in each decay bin
@@ -350,28 +343,6 @@ get_nzeros_per_cutsite = function(cs) {
   zbias[,c("nzero.L","nzero.R"):=list(2*(ncs-ncross.close)-nnzl,2*(ncs-ncross.close)-nnzr)]
   setkey(zbias,name,id)
   return(zbias)
-  mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
-               variable.name = "category", value.name = "count")[count==0]
-  ci=mcounts[,.(name,id=id1,count,category)][,.N,by=c("name","id","category")]
-  cj=mcounts[,.(name,id=id2,count,category)][,.N,by=c("name","id","category")]
-  Nkl=dcast(rbind(ci[category=="contact.up",.(name,id,category="Ni.up",N)],
-                  ci[category=="contact.far",.(name,id,category="Ni.far",N)],
-                  cj[category=="contact.up",.(name,id,category="Nj.up",N)],
-                  cj[category=="contact.close",.(name,id,category="Nj.close",N)]),
-            ...~category, value.var="N", fill=0)[,.(name,id,nzl=Ni.far+Ni.up+Nj.up+Nj.close)]
-  Nkr=dcast(rbind(ci[category=="contact.close",.(name,id,category="Ni.close",N)],
-                  ci[category=="contact.down",.(name,id,category="Ni.down",N)],
-                  cj[category=="contact.far",.(name,id,category="Nj.far",N)],
-                  cj[category=="contact.down",.(name,id,category="Nj.down",N)]),
-            ...~category, value.var="N", fill=0)[,.(name,id,nzr=Ni.close+Ni.down+Nj.far+Nj.down)]
-  verif=merge(Nkl,Nkr,all=T)
-  verif[is.na(nzl),nzl:=0]
-  verif[is.na(nzr),nzr:=0]
-  both=merge(verif,zbias,all=T)
-  ggplot(both)+geom_point(aes(nzl,nzero.L,colour=name))
-  ggplot(both)+geom_point(aes(nzr,nzero.R,colour=name))
-  both[,all(nzero.L==nzl,na.rm=T)]
-  both[,all(nzero.R==nzr,na.rm=T)]
 }
 
 #' Cut-site normalization (simplified gibbs sampling)
