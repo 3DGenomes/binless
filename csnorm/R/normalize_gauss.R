@@ -278,7 +278,7 @@ has_converged = function(cs) {
 #' 
 get_nzeros_per_decay = function(cs) {
   #bin distances
-  dbins=c(0,cs@settings$dbins) #also count those that are <=dmin, used by get_nzeros_per_cutsite
+  dbins=c(0,cs@settings$dbins) #also count those that are <=dmin
   stopifnot(cs@counts[id1>=id2,.N]==0)
   mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
                variable.name = "category", value.name = "count")[count>0]
@@ -289,9 +289,9 @@ get_nzeros_per_decay = function(cs) {
   #stopifnot(Nkd[mdist<cs@settings$dmin,.N]==0) #otherwise cs@counts has not been censored properly
   #Count the number of crossings per distance bin
   #looping over IDs avoids building NxN matrix
-  Nkz = foreach(i=cs@biases[,id], .combine=function(x,y){rbind(x,y)[,.(ncross=sum(ncross)),keyby=c("name","bdist")]}) %do% {
+  Nkz = foreach(i=cs@biases[,1:.N], .combine=function(x,y){rbind(x,y)[,.(ncross=sum(ncross)),keyby=c("name","bdist")]}) %do% {
     stuff=c(cs@biases[i,.(name,id,pos)])
-    dists=cs@biases[name==stuff$name & id>stuff$id,.(name,distance=abs(pos-stuff$pos))]
+    dists=cs@biases[name==stuff$name & id!=stuff$id,.(name,distance=abs(pos-stuff$pos))]
     if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
     dists[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
     dists[,.(ncross=.N),keyby=c("name","bdist")]
@@ -306,32 +306,41 @@ get_nzeros_per_decay = function(cs) {
 #' count number of zeros in each decay bin
 #' @keywords internal
 #' 
-get_nzeros_per_cutsite = function(cs, zdecay) {
+get_nzeros_per_cutsite = function(cs) {
   stopifnot(cs@counts[id1>=id2,.N]==0)
   mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
                variable.name = "category", value.name = "count")[count>0]
   ### accumulate counts
-  ci=mcounts[,.(id=id1,count,category)][,.N,by=c("id","count","category")]
-  cj=mcounts[,.(id=id2,count,category)][,.N,by=c("id","count","category")]
-  nsites=cs@biases[,.N]
-  ### make histograms for biases TODO
-  Nkl=dcast(rbind(ci[category=="contact.up",.(id,count,category="Ni.up",N)],
-                  ci[category=="contact.far",.(id,count,category="Ni.far",N)],
-                  cj[category=="contact.up",.(id,count,category="Nj.up",N)],
-                  cj[category=="contact.close",.(id,count,category="Nj.close",N)]),
-            ...~category, value.var="N", fill=0)[,.(id,count,N=Ni.far+Ni.up+Nj.up+Nj.close)]
-  Nkl=rbind(Nkl,Nkl[,.(count=0,N=2*nsites-sum(N)),by=id]) #each rsite is counted twice
-  setkey(Nkl,N,id,count)
-  Nkl=Nkl[N>0]
-  Nkr=dcast(rbind(ci[category=="contact.close",.(id,count,category="Ni.close",N)],
-                  ci[category=="contact.down",.(id,count,category="Ni.down",N)],
-                  cj[category=="contact.far",.(id,count,category="Nj.far",N)],
-                  cj[category=="contact.down",.(id,count,category="Nj.down",N)]),
-            ...~category, value.var="N", fill=0)[,.(id,count,N=Ni.close+Ni.down+Nj.far+Nj.down)]
-  Nkr=rbind(Nkr,Nkr[,.(count=0,N=2*nsites-sum(N)),by=id]) #each rsite is counted twice
-  setkey(Nkr,N,id,count)
-  Nkr=Nkr[N>0]
-  
+  ci=mcounts[,.(name,id=id1,count,category)][,.N,by=c("name","id","category")]
+  cj=mcounts[,.(name,id=id2,count,category)][,.N,by=c("name","id","category")]
+  ### count positive counts at each cut site
+  Nkl=dcast(rbind(ci[category=="contact.up",.(name,id,category="Ni.up",N)],
+                  ci[category=="contact.far",.(name,id,category="Ni.far",N)],
+                  cj[category=="contact.up",.(name,id,category="Nj.up",N)],
+                  cj[category=="contact.close",.(name,id,category="Nj.close",N)]),
+            ...~category, value.var="N", fill=0)[,.(name,id,nnzl=Ni.far+Ni.up+Nj.up+Nj.close)]
+  Nkr=dcast(rbind(ci[category=="contact.close",.(name,id,category="Ni.close",N)],
+                  ci[category=="contact.down",.(name,id,category="Ni.down",N)],
+                  cj[category=="contact.far",.(name,id,category="Nj.far",N)],
+                  cj[category=="contact.down",.(name,id,category="Nj.down",N)]),
+            ...~category, value.var="N", fill=0)[,.(name,id,nnzr=Ni.close+Ni.down+Nj.far+Nj.down)]
+  zbias=merge(Nkl,Nkr,all=T)
+  zbias[is.na(nnzl),nnzl:=0]
+  zbias[is.na(nnzr),nnzr:=0]
+  #count masked contacts where d<dmin
+  masked = foreach(i=cs@biases[,1:.N], .combine=rbind) %do% {
+    stuff=c(cs@biases[i,.(name,id,pos)])
+    dists=cs@biases[name==stuff$name & id!=stuff$id,.(name,distance=abs(pos-stuff$pos))]
+    if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
+    dists[distance<cs@settings$dmin,.(name=stuff$name,id=stuff$id,ncross.close=.N)]
+  }
+  setkey(masked,name,id)
+  #deduce number of zero counts
+  zbias=merge(zbias,masked,all=T)
+  zbias[is.na(ncross.close),ncross.close:=0]
+  nsites=cs@biases[,.N-1]
+  zbias[,c("nzero.L","nzero.R"):=list(2*(nsites-ncross.close)-nnzl,2*(nsites-ncross.close)-nnzr)]
+  return(zbias)
 }
 
 #' Cut-site normalization (simplified gibbs sampling)
