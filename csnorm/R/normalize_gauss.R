@@ -47,7 +47,7 @@ csnorm_gauss_decay_muhat_data = function(cs, zdecay, pseudocount=1e-2) {
 #' Compute decay etahat and weights using previous mean
 #' @keywords internal
 #' 
-csnorm_gauss_decay_muhat_mean = function(cs) {
+csnorm_gauss_decay_muhat_mean = function(cs, zdecay) {
   #add bias informations to counts
   init=cs@par
   csub=copy(cs@counts)
@@ -64,19 +64,29 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
                                                            log_mu.base+log_rho1 +log_iota2,
                                                            log_mu.base+log_iota1+log_iota2)]
   csub[,c("kappaij","log_mu.base"):=list(eC+log_decay,NULL)]
+  csub[,c("kappaij"):=list(eC+log_decay)]
   csub=rbind(csub[,.(name,id1,id2,distance,kappaij,count=contact.far,mu=exp(lmu.far))],
              csub[,.(name,id1,id2,distance,kappaij,count=contact.down,mu=exp(lmu.down))],
              csub[,.(name,id1,id2,distance,kappaij,count=contact.up,mu=exp(lmu.up))],
              csub[,.(name,id1,id2,distance,kappaij,count=contact.close,mu=exp(lmu.close))])
   csub[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
   #bin distances
-  stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
-  dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
+  dbins=cs@settings$dbins
   csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  #init$decay[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  #setkeyv(init$decay,key(zdecay))
   #collect all counts in these bins
-  csd = csub[,.(distance=exp(mean(log(distance))), kappahat=sum((z+kappaij)/var)/sum(1/var),
-                std=1/sqrt(sum(1/var)), weight=4*.N), keyby=c("name", "dbin")]
-  csd
+  csd.dense = csub[,.(distance=exp(mean(log(distance))), kappahat=sum((z+kappaij)/var)/sum(1/var),
+                std=1/sqrt(sum(1/var)), weight=.N), keyby=c("name", "dbin")]
+  #
+  csd = rbind(csub[count>0,.(name,dbin,z,kappaij,var,weight=1)],
+              zdecay[init$decay,.(name,dbin=bdist,z=-1,kappaij=kappa,var=1/exp(kappa)+1/init$alpha,weight=nzero)])
+  csd = csd[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
+               kappahat=weighted.mean(z+kappaij, weight/var),
+               std=1/sqrt(sum(weight/var)), weight=sum(weight)), keyby=c("name", "dbin")]
+  stopifnot(csd[,!is.na(distance)])
+  return(csd)
+  ggplot(merge(csd,csd.dense,suffixes=c(".s",".d")))+geom_point(aes(weight.d,4*weight.s))+stat_function(fun=identity)
 }
 
 #' Single-cpu simplified fitting for iota and rho
@@ -98,8 +108,8 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
   #optimize from scratch, to avoid getting stuck. Slower but more robust
   op=optimize_stan_model(model=csnorm:::stanmodels$gauss_decay, data=data, iter=cs@settings$iter,
                          verbose=verbose, init=0, init_alpha=init_alpha)
-  #make nice decay data table
-  dmat=csd[,.(name,distance,kappahat,std,ncounts=weight,kappa=op$par$log_mean_counts)]
+  #make decay data table, reused at next call
+  dmat=csd[,.(name,distance,dbin,kappahat,std,ncounts=weight,kappa=op$par$log_mean_counts)]
   setkey(dmat,name,distance)
   op$par$decay=dmat 
   #rewrite log_decay as if it were calculated for each count
