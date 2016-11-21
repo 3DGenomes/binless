@@ -27,17 +27,21 @@ fill_parameters = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.genomic
 #' Compute decay etahat and weights using data as initial guess
 #' @keywords internal
 #' 
-csnorm_gauss_decay_muhat_data = function(cs, pseudocount=1e-2) {
+csnorm_gauss_decay_muhat_data = function(cs, zdecay, pseudocount=1e-2) {
   #bin distances
-  stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
-  dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
-  csd=cs@counts[,.(name,distance,
-                dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12),
-                kappahat=log(contact.close+contact.far+contact.up+contact.down+pseudocount),
-                var=1/(contact.close+contact.far+contact.up+contact.down+pseudocount)+1/cs@par$alpha)]
-  csd = csd[,.(distance=exp(mean(log(distance))), kappahat=sum(kappahat/var)/sum(1/var),
-               std=1/sqrt(sum(1/var)), weight=4*.N), keyby=c("name", "dbin")]
-  csd
+  dbins=cs@settings$dbins
+  mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
+               variable.name = "category", value.name = "count")[count>0,.(name,distance,category,count)]
+  mcounts[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  #add zero counts
+  mcounts = rbind(mcounts[,.(name,dbin,category,count,weight=1)], zdecay[,.(name,dbin=bdist,category=NA,count=0,weight=nzero)])
+  #compute z-scores and sum counts
+  mcounts[,c("kappahat","var"):=list(log(count+pseudocount), 1/(count+pseudocount)+1/cs@par$alpha)]
+  csd = mcounts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
+                   kappahat=weighted.mean(kappahat, weight/var),
+                   std=1/sqrt(sum(weight/var)), weight=sum(weight)), keyby=c("name", "dbin")]
+  stopifnot(csd[,!is.na(distance)])
+  return(csd)
 }
 
 #' Compute decay etahat and weights using previous mean
@@ -78,11 +82,11 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7) {
+csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alpha=1e-7) {
   if (init.mean=="mean") {
-    csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
+    csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs, zdecay)
   } else {
-    csd = csnorm_gauss_decay_muhat_data(cs)
+    csd = csnorm_gauss_decay_muhat_data(cs, zdecay)
   }
   #run optimization
   Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
@@ -278,7 +282,7 @@ has_converged = function(cs) {
 #' 
 get_nzeros_per_decay = function(cs) {
   #bin distances
-  dbins=c(0,cs@settings$dbins) #also count those that are <=dmin
+  dbins=cs@settings$dbins
   stopifnot(cs@counts[id1>=id2,.N]==0)
   mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
                variable.name = "category", value.name = "count")[count>0]
@@ -293,6 +297,7 @@ get_nzeros_per_decay = function(cs) {
     stuff=c(cs@biases[i,.(name,id,pos)])
     dists=cs@biases[name==stuff$name & id>stuff$id,.(name,distance=abs(pos-stuff$pos))]
     if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
+    dists=dists[distance>=cs@settings$dmin]
     dists[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
     dists[,.(ncross=.N),keyby=c("name","bdist")]
   }
@@ -431,9 +436,9 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
   cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
   if(verbose==T) cat("Counting zeros for decay\n")
-  zdecay = get_nzeros_per_decay(cs)
+  zdecay = csnorm:::get_nzeros_per_decay(cs)
   if(verbose==T) cat("Counting zeros for bias\n")
-  zbias = get_nzeros_per_cutsite(cs)
+  zbias = csnorm:::get_nzeros_per_cutsite(cs)
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
   subcounts = csnorm:::subsample_counts(cs, ncounts)
@@ -459,7 +464,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     #fit diagonal decay given iota and rho
     if (fit.decay==T) {
       if (verbose==T) cat("Gibbs",i,": Decay ")
-      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean, init_alpha=init_alpha)))
+      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_decay(cs, zdecay, init.mean=init.mean, init_alpha=init_alpha)))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", out=output, runtime=a[1]+a[4])
       if (verbose==T) cat("log-likelihood = ",cs@par$value, "\n")
     }
