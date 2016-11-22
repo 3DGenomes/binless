@@ -146,26 +146,16 @@ csnorm_gauss_genomic_muhat_data = function(cs, zbias, pseudocount=1e-2) {
   cts[,c("etahat","var"):=list(log(count+pseudocount),(1/(count+pseudocount)+1/dispersion))]
   cts=cts[,.(etahat=weighted.mean(etahat,weight/var),std=sqrt(2/sum(weight/var)),weight=sum(weight)),
           keyby=c("id","pos","name","cat")]
-  return(list(cts=cts,bts=bts))
-  cts=rbind(cs@counts[,.(name,id=id1,pos=pos1, cat="contact R", etahat=log(contact.close+pseudocount), var=(1/(contact.close+pseudocount)+1/dispersion))],
-            cs@counts[,.(name,id=id1,pos=pos1, cat="contact L", etahat=log(contact.far+pseudocount), var=(1/(contact.far+pseudocount)+1/dispersion))],
-            cs@counts[,.(name,id=id1,pos=pos1, cat="contact R", etahat=log(contact.down+pseudocount), var=(1/(contact.down+pseudocount)+1/dispersion))],
-            cs@counts[,.(name,id=id1,pos=pos1, cat="contact L", etahat=log(contact.up+pseudocount), var=(1/(contact.up+pseudocount)+1/dispersion))],
-            cs@counts[,.(name,id=id2,pos=pos2, cat="contact R", etahat=log(contact.far+pseudocount), var=(1/(contact.far+pseudocount)+1/dispersion))],
-            cs@counts[,.(name,id=id2,pos=pos2, cat="contact L", etahat=log(contact.close+pseudocount), var=(1/(contact.close+pseudocount)+1/dispersion))],
-            cs@counts[,.(name,id=id2,pos=pos2, cat="contact R", etahat=log(contact.down+pseudocount), var=(1/(contact.down+pseudocount)+1/dispersion))],
-            cs@counts[,.(name,id=id2,pos=pos2, cat="contact L", etahat=log(contact.up+pseudocount), var=(1/(contact.up+pseudocount)+1/dispersion))])
-  cts=cts[,.(etahat=sum(etahat/var)/sum(1/var),std=sqrt(2/sum(1/var))),keyby=c("id","pos","name","cat")]
+  cts[,weight:=NULL] #not needed. Weights differ slightly because of dmin cutoff but it doesnt matter much
   setkeyv(cts,c("id","name","cat"))
   stopifnot(cts[,.N]==2*cs@biases[,.N])
-  cts.dense=cts
   return(list(cts=cts,bts=bts))
 }
 
 #' Compute genomic etahat and weights using previous mean
 #' @keywords internal
 #' 
-csnorm_gauss_genomic_muhat_mean = function(cs) {
+csnorm_gauss_genomic_muhat_mean = function(cs, zbias) {
   #compute bias means
   init=cs@par
   bsub=copy(cs@biases)
@@ -218,11 +208,11 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7) {
+csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alpha=1e-7) {
   if (init.mean=="mean") {
-    a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
+    a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs, zbias)
   } else {
-    a = csnorm_gauss_genomic_muhat_data(cs)
+    a = csnorm_gauss_genomic_muhat_data(cs, zbias)
   }
   bts=a$bts
   cts=a$cts
