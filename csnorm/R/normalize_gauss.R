@@ -124,13 +124,29 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
 #' Compute genomic etahat and weights using data as initial guess
 #' @keywords internal
 #' 
-csnorm_gauss_genomic_muhat_data = function(cs, pseudocount=1e-2) {
+csnorm_gauss_genomic_muhat_data = function(cs, zbias, pseudocount=1e-2) {
   dispersion=cs@par$alpha
+  #biases
   bts=rbind(cs@biases[,.(name,id,pos,cat="dangling L", etahat=log(dangling.L+pseudocount), std=sqrt(1/(dangling.L+pseudocount)+1/dispersion))],
             cs@biases[,.(name,id,pos,cat="dangling R", etahat=log(dangling.R+pseudocount), std=sqrt(1/(dangling.R+pseudocount)+1/dispersion))],
             cs@biases[,.(name,id,pos,cat="rejoined", etahat=log(rejoined+pseudocount), std=sqrt(1/(rejoined+pseudocount)+1/dispersion))])
   setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
+  #counts
+  cts=rbind(cs@counts[contact.close>0,.(name,id=id1,pos=pos1, cat="contact R", count=contact.close, weight=1)],
+            cs@counts[contact.far>0,  .(name,id=id1,pos=pos1, cat="contact L", count=contact.far, weight=1)],
+            cs@counts[contact.down>0, .(name,id=id1,pos=pos1, cat="contact R", count=contact.down, weight=1)],
+            cs@counts[contact.up>0,   .(name,id=id1,pos=pos1, cat="contact L", count=contact.up, weight=1)],
+            cs@counts[contact.far>0,  .(name,id=id2,pos=pos2, cat="contact R", count=contact.far, weight=1)],
+            cs@counts[contact.close>0,.(name,id=id2,pos=pos2, cat="contact L", count=contact.close, weight=1)],
+            cs@counts[contact.down>0, .(name,id=id2,pos=pos2, cat="contact R", count=contact.down, weight=1)],
+            cs@counts[contact.up>0,   .(name,id=id2,pos=pos2, cat="contact L", count=contact.up, weight=1)],
+            zbias[,.(name, id, pos, cat="contact L", count=0, weight=nzero.L)],
+            zbias[,.(name, id, pos, cat="contact R", count=0, weight=nzero.R)])
+  cts[,c("etahat","var"):=list(log(count+pseudocount),(1/(count+pseudocount)+1/dispersion))]
+  cts=cts[,.(etahat=weighted.mean(etahat,weight/var),std=sqrt(2/sum(weight/var)),weight=sum(weight)),
+          keyby=c("id","pos","name","cat")]
+  return(list(cts=cts,bts=bts))
   cts=rbind(cs@counts[,.(name,id=id1,pos=pos1, cat="contact R", etahat=log(contact.close+pseudocount), var=(1/(contact.close+pseudocount)+1/dispersion))],
             cs@counts[,.(name,id=id1,pos=pos1, cat="contact L", etahat=log(contact.far+pseudocount), var=(1/(contact.far+pseudocount)+1/dispersion))],
             cs@counts[,.(name,id=id1,pos=pos1, cat="contact R", etahat=log(contact.down+pseudocount), var=(1/(contact.down+pseudocount)+1/dispersion))],
@@ -142,6 +158,7 @@ csnorm_gauss_genomic_muhat_data = function(cs, pseudocount=1e-2) {
   cts=cts[,.(etahat=sum(etahat/var)/sum(1/var),std=sqrt(2/sum(1/var))),keyby=c("id","pos","name","cat")]
   setkeyv(cts,c("id","name","cat"))
   stopifnot(cts[,.N]==2*cs@biases[,.N])
+  cts.dense=cts
   return(list(cts=cts,bts=bts))
 }
 
@@ -319,19 +336,19 @@ get_nzeros_per_cutsite = function(cs) {
   mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
                variable.name = "category", value.name = "count")[count>0]
   ### accumulate counts
-  ci=mcounts[,.(name,id=id1,count,category)][,.N,by=c("name","id","category")]
-  cj=mcounts[,.(name,id=id2,count,category)][,.N,by=c("name","id","category")]
+  ci=mcounts[,.(name,id=id1,pos=pos1,count,category)][,.N,by=c("name","id","pos","category")]
+  cj=mcounts[,.(name,id=id2,pos=pos1,count,category)][,.N,by=c("name","id","pos","category")]
   ### count positive counts at each cut site
-  Nkl=dcast(rbind(ci[category=="contact.up",.(name,id,category="Ni.up",N)],
-                  ci[category=="contact.far",.(name,id,category="Ni.far",N)],
-                  cj[category=="contact.up",.(name,id,category="Nj.up",N)],
-                  cj[category=="contact.close",.(name,id,category="Nj.close",N)]),
-            ...~category, value.var="N", fill=0)[,.(name,id,nnzl=Ni.far+Ni.up+Nj.up+Nj.close)]
-  Nkr=dcast(rbind(ci[category=="contact.close",.(name,id,category="Ni.close",N)],
-                  ci[category=="contact.down",.(name,id,category="Ni.down",N)],
-                  cj[category=="contact.far",.(name,id,category="Nj.far",N)],
-                  cj[category=="contact.down",.(name,id,category="Nj.down",N)]),
-            ...~category, value.var="N", fill=0)[,.(name,id,nnzr=Ni.close+Ni.down+Nj.far+Nj.down)]
+  Nkl=dcast(rbind(ci[category=="contact.up",.(name,id,pos,category="Ni.up",N)],
+                  ci[category=="contact.far",.(name,id,pos,category="Ni.far",N)],
+                  cj[category=="contact.up",.(name,id,pos,category="Nj.up",N)],
+                  cj[category=="contact.close",.(name,id,pos,category="Nj.close",N)]),
+            ...~category, value.var="N", fill=0)[,.(name,id,pos,nnzl=Ni.far+Ni.up+Nj.up+Nj.close)]
+  Nkr=dcast(rbind(ci[category=="contact.close",.(name,id,pos,category="Ni.close",N)],
+                  ci[category=="contact.down",.(name,id,pos,category="Ni.down",N)],
+                  cj[category=="contact.far",.(name,id,pos,category="Nj.far",N)],
+                  cj[category=="contact.down",.(name,id,pos,category="Nj.down",N)]),
+            ...~category, value.var="N", fill=0)[,.(name,id,pos,nnzr=Ni.close+Ni.down+Nj.far+Nj.down)]
   zbias=merge(Nkl,Nkr,all=T)
   #count masked contacts where d<dmin
   masked = foreach(i=cs@biases[,1:.N], .combine=rbind) %do% {
