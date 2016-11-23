@@ -323,23 +323,19 @@ get_nzeros_per_decay = function(cs) {
 #' 
 get_nzeros_per_cutsite = function(cs) {
   stopifnot(cs@counts[id1>=id2,.N]==0)
-  mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
-               variable.name = "category", value.name = "count")[count>0]
-  ### accumulate counts
-  ci=mcounts[,.(name,id=id1,pos=pos1,count,category)][,.N,by=c("name","id","pos","category")]
-  cj=mcounts[,.(name,id=id2,pos=pos1,count,category)][,.N,by=c("name","id","pos","category")]
-  ### count positive counts at each cut site
-  Nkl=dcast(rbind(ci[category=="contact.up",.(name,id,pos,category="Ni.up",N)],
-                  ci[category=="contact.far",.(name,id,pos,category="Ni.far",N)],
-                  cj[category=="contact.up",.(name,id,pos,category="Nj.up",N)],
-                  cj[category=="contact.close",.(name,id,pos,category="Nj.close",N)]),
-            ...~category, value.var="N", fill=0)[,.(name,id,pos,nnzl=Ni.far+Ni.up+Nj.up+Nj.close)]
-  Nkr=dcast(rbind(ci[category=="contact.close",.(name,id,pos,category="Ni.close",N)],
-                  ci[category=="contact.down",.(name,id,pos,category="Ni.down",N)],
-                  cj[category=="contact.far",.(name,id,pos,category="Nj.far",N)],
-                  cj[category=="contact.down",.(name,id,pos,category="Nj.down",N)]),
-            ...~category, value.var="N", fill=0)[,.(name,id,pos,nnzr=Ni.close+Ni.down+Nj.far+Nj.down)]
-  zbias=merge(Nkl,Nkr,all=T)
+  cts=rbind(cs@counts[contact.close>0,.(name, id=id1, cat="contact R", count=contact.close)],
+            cs@counts[contact.far>0,  .(name, id=id1, cat="contact L", count=contact.far)],
+            cs@counts[contact.down>0, .(name, id=id1, cat="contact R", count=contact.down)],
+            cs@counts[contact.up>0,   .(name, id=id1, cat="contact L", count=contact.up)],
+            cs@counts[contact.far>0,  .(name, id=id2, cat="contact R", count=contact.far)],
+            cs@counts[contact.close>0,.(name, id=id2, cat="contact L", count=contact.close)],
+            cs@counts[contact.down>0, .(name, id=id2, cat="contact R", count=contact.down)],
+            cs@counts[contact.up>0,   .(name, id=id2, cat="contact L", count=contact.up)])
+  cts=cts[,.N,keyby=c("id","name","cat")]
+  zbias=rbind(cts[cat=="contact L"][cs@biases,.(name,id,pos,cat="contact L",nnz=N)],
+              cts[cat=="contact R"][cs@biases,.(name,id,pos,cat="contact R",nnz=N)])
+  zbias[is.na(nnz),nnz:=0]
+  setkey(zbias,id,name)
   #count masked contacts where d<dmin
   masked = foreach(i=cs@biases[,1:.N], .combine=rbind) %do% {
     stuff=c(cs@biases[i,.(name,id,pos)])
@@ -347,17 +343,53 @@ get_nzeros_per_cutsite = function(cs) {
     if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
     dists[distance<cs@settings$dmin,.(name=name[1],id=stuff$id,ncross.close=.N)]
   }
-  setkey(masked,name,id)
+  setkey(masked,id,name)
+  masked=masked[cs@biases,.(name,id,ncross.close)]
+  masked[is.na(ncross.close),ncross.close:=0]
   #deduce number of zero counts
-  zbias=merge(zbias,masked,all=T)
-  zbias[is.na(nnzl),nnzl:=0]
-  zbias[is.na(nnzr),nnzr:=0]
-  zbias[is.na(ncross.close),ncross.close:=0]
-  nsites=cs@biases[,.(ncs=.N-1),by=name]
-  zbias=merge(zbias,nsites)
-  zbias[,c("nzero.L","nzero.R"):=list(2*(ncs-ncross.close)-nnzl,2*(ncs-ncross.close)-nnzr)]
-  setkey(zbias,name,id)
+  zbias=masked[zbias]
+  zbias[,ncs:=(.N/2-1),by=name]
+  zbias[,nzero:=2*(ncs-ncross.close)-nnz]
+  stopifnot(zbias[,.N]==cs@biases[,.N*2])
+  setkey(zbias,id,name,cat)
   return(zbias)
+  
+  cts=rbind(cs@counts[contact.close==0,.(name, id=id1, cat="contact R", count=contact.close)],
+            cs@counts[contact.far==0,  .(name, id=id1, cat="contact L", count=contact.far)],
+            cs@counts[contact.down==0, .(name, id=id1, cat="contact R", count=contact.down)],
+            cs@counts[contact.up==0,   .(name, id=id1, cat="contact L", count=contact.up)],
+            cs@counts[contact.far==0,  .(name, id=id2, cat="contact R", count=contact.far)],
+            cs@counts[contact.close==0,.(name, id=id2, cat="contact L", count=contact.close)],
+            cs@counts[contact.down==0, .(name, id=id2, cat="contact R", count=contact.down)],
+            cs@counts[contact.up==0,   .(name, id=id2, cat="contact L", count=contact.up)])
+  cts=cts[,.N,keyby=c("id","name","cat")]
+  zbias.dense=rbind(cts[cat=="contact L"][cs@biases,.(name,id,pos,cat="contact L",nzero.d=N)],
+                    cts[cat=="contact R"][cs@biases,.(name,id,pos,cat="contact R",nzero.d=N)])
+  zbias.dense[is.na(nzero.d),nzero.d:=0]
+  ggplot(merge(zbias,zbias.dense,by=c("name","id","pos","cat")))+geom_point(aes(nzero,nzero.d))
+  a=merge(zbias,zbias.dense,by=c("name","id","pos","cat"))
+  a[,summary(nzero-nzero.d)]
+  a[,diff:=nzero-2*nzero.d]
+  ggplot(a)+geom_point(aes(diff,nnz+2*ncross.close))
+  a[,summary(nnz+2*ncross.close-diff)]
+  
+  #number of >0
+  cs@counts[name=="GM MboI 1" & id1==1 & contact.up>0,.N]+
+    cs@counts[name=="GM MboI 1" & id1==1 & contact.far>0,.N]+
+    cs@counts[name=="GM MboI 1" & id2==1 & contact.down>0,.N]+
+    cs@counts[name=="GM MboI 1" & id2==1 & contact.far>0,.N]
+  #number of 0
+  cs@counts[name=="GM MboI 1" & id1==1 & contact.up==0,.N]+
+    cs@counts[name=="GM MboI 1" & id1==1 & contact.far==0,.N]+
+    cs@counts[name=="GM MboI 1" & id2==1 & contact.down==0,.N]+
+    cs@counts[name=="GM MboI 1" & id2==1 & contact.far==0,.N]
+  #max number of 0
+  cs@biases[name=="GM MboI 1",2*(.N-1)]
+  #number of counts < dmin: using biases
+  pos1=cs@biases[id==1&name=="GM MboI 1",pos]
+  cs@biases[abs(pos-pos1)<cs@settings$dmin,.N-1]
+  #same using masked
+  masked[name=="GM MboI 1"&id==1]
 }
 
 #' Get the first ncounts/d of each of d datasets, including zeros 
