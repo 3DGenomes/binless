@@ -200,42 +200,13 @@ csnorm_gauss_genomic_muhat_mean = function(cs, zbias) {
             csub[contact.down>0, .(name, id=id2, pos=pos2, cat="contact R", count=contact.down,  mu=exp(lmu.down),  eta=eC + log_rho2,  weight=1)],
             csub[contact.up>0,   .(name, id=id2, pos=pos2, cat="contact L", count=contact.up,    mu=exp(lmu.up),    eta=eC + log_iota2, weight=1)],
             zeta[,.(name,id,pos,cat, count=0, mu=exp(eta), eta, weight=nzero)])
-  #rm(csub)
+  rm(csub)
   cts[,var:=1/mu+1/init$alpha]
   cts=cts[,.(etahat=weighted.mean(count/mu-1+eta, weight/var),std=sqrt(2/sum(weight/var))), by=c("name","id","pos","cat")]
   setkey(cts,id,name,cat)
   stopifnot(cts[,.N]==2*cs@biases[,.N])
   cts.sparse=cts
   return(list(bts=bts,cts=cts))
-  #collect all counts on left/right side
-  cts.dense=rbind(csub[,.(name, log_decay, id=id1, pos=pos1, R=contact.close, L=contact.far,  muR=exp(lmu.close), muL=exp(lmu.far),
-                    etaL=eC + log_iota1, etaR=eC + log_rho1)],
-            csub[,.(name, log_decay, id=id1, pos=pos1, R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
-                    etaL=eC + log_iota1, etaR=eC + log_rho1)],
-            csub[,.(name, log_decay, id=id2, pos=pos2, R=contact.far,   L=contact.close,muR=exp(lmu.far),   muL=exp(lmu.close),
-                    etaL=eC + log_iota2, etaR=eC + log_rho2)],
-            csub[,.(name, log_decay, id=id2, pos=pos2, R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
-                    etaL=eC + log_iota2, etaR=eC + log_rho2)])
-  #rm(csub)
-  #cts.dense[L==0,muL:=exp(etaL)]
-  #cts.dense[R==0,muR:=exp(etaR)]
-  cts.dense[,c("varL","varR"):=list(1/muL+1/init$alpha,1/muR+1/init$alpha)]
-  cts.dense=rbind(cts.dense[,.(cat="contact L", etahat=sum((L/muL-1+etaL)/varL)/sum(1/varL), std=sqrt(2/sum(1/varL))),by=c("name","id","pos")],
-                  cts.dense[,.(cat="contact R", etahat=sum((R/muR-1+etaR)/varR)/sum(1/varR), std=sqrt(2/sum(1/varR))),by=c("name","id","pos")])
-  #cts.dense=rbind(cts.dense[,.(cat="contact L", etahat=sum((L/muL-1+etaL)/varL)/sum(1/varL), std=sqrt(2/sum(1/varL))),by=c("name","id","pos")],
-  #          cts.dense[,.(cat="contact R", etahat=sum((R/muR-1+etaR)/varR)/sum(1/varR), std=sqrt(2/sum(1/varR))),by=c("name","id","pos")])
-  setkey(cts.dense,id,name,cat)
-  stopifnot(cts.dense[,.N]==2*cs@biases[,.N])
-  
-  cts=merge(cts.dense,cts.sparse,suffixes=c(".d",".s"))
-  ggplot(cts)+geom_point(aes(etahat.d,etahat.s,colour=name))+stat_function(fun=identity)
-  cts[,all(pos.d==pos.s)]
-  
-  merge(cts[cat=="contact L"&count>0,.(name,id,mu.s=mu,eta.s=eta,var.s=var)],
-        cts.dense[L>0,.(name,id,mu.d=muL,eta.d=etaL,var.d=varL)], by=c("name","id"))
-  ggplot(cts.dense[sample(.N,100000)])+
-    geom_point(aes(1/(1/etaL+1/init$alpha),1/(1/log(muL)+1/init$alpha)),alpha=0.1)+
-    stat_function(fun=identity)+ylim(1,5)
 }
 
 #' Single-cpu simplified fitting for iota and rho
