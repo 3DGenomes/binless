@@ -362,6 +362,9 @@ get_nzeros_per_cutsite = function(cs) {
 }
 
 #' Get the first ncounts/d of each of d datasets, including zeros 
+#' 
+#' count is always a bit smaller because we censor those that are <dmin without adding more counts
+#' 
 #' @keywords internal
 #' 
 subsample_counts = function(cs, ncounts, dset=NA) {
@@ -389,6 +392,7 @@ subsample_counts = function(cs, ncounts, dset=NA) {
     cts[is.na(contact.down),contact.down:=0]
     cts[is.na(contact.far),contact.far:=0]
     cts[is.na(contact.up),contact.up:=0]
+    cts = cts[distance>=cs@settings$dmin]
     if (cts[,uniqueN(c(contact.close,contact.far,contact.up,contact.down))]<2)
       stop("dataset too sparse, please increase ncounts")
     return(cts)
