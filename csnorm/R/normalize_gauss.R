@@ -141,8 +141,7 @@ csnorm_gauss_genomic_muhat_data = function(cs, zbias, pseudocount=1e-2) {
             cs@counts[contact.close>0,.(name,id=id2,pos=pos2, cat="contact L", count=contact.close, weight=1)],
             cs@counts[contact.down>0, .(name,id=id2,pos=pos2, cat="contact R", count=contact.down, weight=1)],
             cs@counts[contact.up>0,   .(name,id=id2,pos=pos2, cat="contact L", count=contact.up, weight=1)],
-            zbias[,.(name, id, pos, cat="contact L", count=0, weight=nzero.L)],
-            zbias[,.(name, id, pos, cat="contact R", count=0, weight=nzero.R)])
+            zbias[,.(name, id, pos, cat, count=0, weight=nzero)])
   cts[,c("etahat","var"):=list(log(count+pseudocount),(1/(count+pseudocount)+1/dispersion))]
   cts=cts[,.(etahat=weighted.mean(etahat,weight/var),std=sqrt(2/sum(weight/var)),weight=sum(weight)),
           keyby=c("id","pos","name","cat")]
@@ -461,8 +460,8 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     cs@diagnostics=list()
     laststep=0
     init.mean="data"
-    cs=fill_parameters(cs, dispersion=init.dispersion, fit.decay=fit.decay,
-                       fit.genomic=fit.genomic, fit.disp=fit.disp)
+    cs=csnorm:::fill_parameters(cs, dispersion=init.dispersion, fit.decay=fit.decay,
+                                fit.genomic=fit.genomic, fit.disp=fit.disp)
   } else {
     if (verbose==T) cat("Using provided initial guess\n")
     if (is.data.table(cs@diagnostics$params)) laststep = cs@diagnostics$params[,max(step)] else laststep = 0
