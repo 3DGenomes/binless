@@ -353,43 +353,6 @@ get_nzeros_per_cutsite = function(cs) {
   stopifnot(zbias[,.N]==cs@biases[,.N*2])
   setkey(zbias,id,name,cat)
   return(zbias)
-  
-  cts=rbind(cs@counts[contact.close==0,.(name, id=id1, cat="contact R", count=contact.close)],
-            cs@counts[contact.far==0,  .(name, id=id1, cat="contact L", count=contact.far)],
-            cs@counts[contact.down==0, .(name, id=id1, cat="contact R", count=contact.down)],
-            cs@counts[contact.up==0,   .(name, id=id1, cat="contact L", count=contact.up)],
-            cs@counts[contact.far==0,  .(name, id=id2, cat="contact R", count=contact.far)],
-            cs@counts[contact.close==0,.(name, id=id2, cat="contact L", count=contact.close)],
-            cs@counts[contact.down==0, .(name, id=id2, cat="contact R", count=contact.down)],
-            cs@counts[contact.up==0,   .(name, id=id2, cat="contact L", count=contact.up)])
-  cts=cts[,.N,keyby=c("id","name","cat")]
-  zbias.dense=rbind(cts[cat=="contact L"][cs@biases,.(name,id,pos,cat="contact L",nzero.d=N)],
-                    cts[cat=="contact R"][cs@biases,.(name,id,pos,cat="contact R",nzero.d=N)])
-  zbias.dense[is.na(nzero.d),nzero.d:=0]
-  ggplot(merge(zbias,zbias.dense,by=c("name","id","pos","cat")))+geom_point(aes(nzero,nzero.d))
-  a=merge(zbias,zbias.dense,by=c("name","id","pos","cat"))
-  a[,summary(nzero-nzero.d)]
-  a[,diff:=nzero-2*nzero.d]
-  ggplot(a)+geom_point(aes(diff,nnz+2*ncross.close))
-  a[,summary(nnz+2*ncross.close-diff)]
-  
-  #number of >0
-  cs@counts[name=="GM MboI 1" & id1==1 & contact.up>0,.N]+
-    cs@counts[name=="GM MboI 1" & id1==1 & contact.far>0,.N]+
-    cs@counts[name=="GM MboI 1" & id2==1 & contact.down>0,.N]+
-    cs@counts[name=="GM MboI 1" & id2==1 & contact.far>0,.N]
-  #number of 0
-  cs@counts[name=="GM MboI 1" & id1==1 & contact.up==0,.N]+
-    cs@counts[name=="GM MboI 1" & id1==1 & contact.far==0,.N]+
-    cs@counts[name=="GM MboI 1" & id2==1 & contact.down==0,.N]+
-    cs@counts[name=="GM MboI 1" & id2==1 & contact.far==0,.N]
-  #max number of 0
-  cs@biases[name=="GM MboI 1",2*(.N-1)]
-  #number of counts < dmin: using biases
-  pos1=cs@biases[id==1&name=="GM MboI 1",pos]
-  cs@biases[abs(pos-pos1)<cs@settings$dmin,.N-1]
-  #same using masked
-  masked[name=="GM MboI 1"&id==1]
 }
 
 #' Get the first ncounts/d of each of d datasets, including zeros 
