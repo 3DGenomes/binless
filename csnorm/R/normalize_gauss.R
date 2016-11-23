@@ -385,6 +385,7 @@ subsample_counts = function(cs, ncounts, dset=NA) {
     cts = merge(cts,cs@biases[,.(name,id,pos)],by.x=c("name","id2"),by.y=c("name","id"),suffixes=c("1","2"))
     cts[,distance:=abs(pos2-pos1)]
     if (cs@settings$circularize>0) cts[,distance:=pmin(distance, cs@settings$circularize+1-distance)] 
+    cts = cts[distance>=cs@settings$dmin]
     #merge counts
     setkey(cts, id1, id2, name)
     cts = merge(cts, cs@counts[,.(name,id1,id2,contact.close,contact.down,contact.far,contact.up)], all.x=T)
@@ -392,7 +393,6 @@ subsample_counts = function(cs, ncounts, dset=NA) {
     cts[is.na(contact.down),contact.down:=0]
     cts[is.na(contact.far),contact.far:=0]
     cts[is.na(contact.up),contact.up:=0]
-    cts = cts[distance>=cs@settings$dmin]
     if (cts[,uniqueN(c(contact.close,contact.far,contact.up,contact.down))]<2)
       stop("dataset too sparse, please increase ncounts")
     return(cts)
@@ -457,7 +457,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
   subcounts = csnorm:::subsample_counts(cs, ncounts)
-  subcounts.weight = merge(cs@counts[,.(nc=.N),keyby=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
+  subcounts.weight = merge(zdecay[,.(nc=sum(ncross)),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
   #initial guess
   if (is.null(init)) {
     if (verbose==T) cat("No initial guess provided\n")
@@ -486,7 +486,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     #fit iota and rho given diagonal decay
     if (fit.genomic==T) {
       if (verbose==T) cat("Gibbs",i,": Genomic ")
-      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean, init_alpha=init_alpha)))
+      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_genomic(cs, zbias, init.mean=init.mean, init_alpha=init_alpha)))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", out=output, runtime=a[1]+a[4])
       if (verbose==T) cat("log-likelihood = ",cs@par$value, "\n")
     }
