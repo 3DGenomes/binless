@@ -171,12 +171,17 @@ csnorm_gauss_genomic_muhat_mean = function(cs, zbias) {
   setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
   bsub=bsub[,.(id,log_iota,log_rho)]
-  #add bias informations to counts
+  #add bias informations to positive counts
   csub=copy(cs@counts)
   csub[,c("distance","log_decay"):=list(NULL,init$log_decay)]
   csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
   csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
   csub=merge(cbind(cs@design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
+  #add it to zero counts
+  zeta = merge(bsub, zbias, by="id")
+  zeta = merge(cbind(cs@design[,.(name)],eC=init$eC), zeta, by="name",all.x=F,all.y=T)
+  zeta[cat=="contact L",eta:=eC+log_iota]
+  zeta[cat=="contact R",eta:=eC+log_rho]
   rm(bsub)
   #compute means
   csub[,lmu.base:=eC + log_decay]
@@ -186,21 +191,51 @@ csnorm_gauss_genomic_muhat_mean = function(cs, zbias) {
                                                            lmu.base+log_iota1+log_iota2)]
   csub[,lmu.base:=NULL]
   #collect all counts on left/right side
-  cts=rbind(csub[,.(name, id=id1, pos=pos1, R=contact.close, L=contact.far,  muR=exp(lmu.close), muL=exp(lmu.far),
-                    etaL=eC + log_iota1, etaR=eC + log_rho1)],
-            csub[,.(name, id=id1, pos=pos1, R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
-                    etaL=eC + log_iota1, etaR=eC + log_rho1)],
-            csub[,.(name, id=id2, pos=pos2, R=contact.far,   L=contact.close,muR=exp(lmu.far),   muL=exp(lmu.close),
-                    etaL=eC + log_iota2, etaR=eC + log_rho2)],
-            csub[,.(name, id=id2, pos=pos2, R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
-                    etaL=eC + log_iota2, etaR=eC + log_rho2)])
-  rm(csub)
-  cts[,c("varL","varR"):=list(1/muL+1/init$alpha,1/muR+1/init$alpha)]
-  cts=rbind(cts[,.(cat="contact L", etahat=sum((L/muL-1+etaL)/varL)/sum(1/varL), std=sqrt(2/sum(1/varL))),by=c("name","id","pos")],
-            cts[,.(cat="contact R", etahat=sum((R/muR-1+etaR)/varR)/sum(1/varR), std=sqrt(2/sum(1/varR))),by=c("name","id","pos")])
+  cts=rbind(csub[contact.close>0,.(name, id=id1, pos=pos1, cat="contact R", count=contact.close, mu=exp(lmu.close), eta=eC + log_rho1,  weight=1)],
+            csub[contact.far>0,  .(name, id=id1, pos=pos1, cat="contact L", count=contact.far,   mu=exp(lmu.far),   eta=eC + log_iota1, weight=1)],
+            csub[contact.down>0, .(name, id=id1, pos=pos1, cat="contact R", count=contact.down,  mu=exp(lmu.down),  eta=eC + log_rho1,  weight=1)],
+            csub[contact.up>0,   .(name, id=id1, pos=pos1, cat="contact L", count=contact.up,    mu=exp(lmu.up),    eta=eC + log_iota1, weight=1)],
+            csub[contact.far>0,  .(name, id=id2, pos=pos2, cat="contact R", count=contact.far,   mu=exp(lmu.far),   eta=eC + log_rho2,  weight=1)],
+            csub[contact.close>0,.(name, id=id2, pos=pos2, cat="contact L", count=contact.close, mu=exp(lmu.close), eta=eC + log_iota2, weight=1)],
+            csub[contact.down>0, .(name, id=id2, pos=pos2, cat="contact R", count=contact.down,  mu=exp(lmu.down),  eta=eC + log_rho2,  weight=1)],
+            csub[contact.up>0,   .(name, id=id2, pos=pos2, cat="contact L", count=contact.up,    mu=exp(lmu.up),    eta=eC + log_iota2, weight=1)],
+            zeta[,.(name,id,pos,cat, count=0, mu=exp(eta), eta, weight=nzero)])
+  #rm(csub)
+  cts[,var:=1/mu+1/init$alpha]
+  cts=cts[,.(etahat=weighted.mean(count/mu-1+eta, weight/var),std=sqrt(2/sum(weight/var))), by=c("name","id","pos","cat")]
   setkey(cts,id,name,cat)
   stopifnot(cts[,.N]==2*cs@biases[,.N])
+  cts.sparse=cts
   return(list(bts=bts,cts=cts))
+  #collect all counts on left/right side
+  cts.dense=rbind(csub[,.(name, log_decay, id=id1, pos=pos1, R=contact.close, L=contact.far,  muR=exp(lmu.close), muL=exp(lmu.far),
+                    etaL=eC + log_iota1, etaR=eC + log_rho1)],
+            csub[,.(name, log_decay, id=id1, pos=pos1, R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
+                    etaL=eC + log_iota1, etaR=eC + log_rho1)],
+            csub[,.(name, log_decay, id=id2, pos=pos2, R=contact.far,   L=contact.close,muR=exp(lmu.far),   muL=exp(lmu.close),
+                    etaL=eC + log_iota2, etaR=eC + log_rho2)],
+            csub[,.(name, log_decay, id=id2, pos=pos2, R=contact.down,  L=contact.up,   muR=exp(lmu.down),  muL=exp(lmu.up),
+                    etaL=eC + log_iota2, etaR=eC + log_rho2)])
+  #rm(csub)
+  #cts.dense[L==0,muL:=exp(etaL)]
+  #cts.dense[R==0,muR:=exp(etaR)]
+  cts.dense[,c("varL","varR"):=list(1/muL+1/init$alpha,1/muR+1/init$alpha)]
+  cts.dense=rbind(cts.dense[,.(cat="contact L", etahat=sum((L/muL-1+etaL)/varL)/sum(1/varL), std=sqrt(2/sum(1/varL))),by=c("name","id","pos")],
+                  cts.dense[,.(cat="contact R", etahat=sum((R/muR-1+etaR)/varR)/sum(1/varR), std=sqrt(2/sum(1/varR))),by=c("name","id","pos")])
+  #cts.dense=rbind(cts.dense[,.(cat="contact L", etahat=sum((L/muL-1+etaL)/varL)/sum(1/varL), std=sqrt(2/sum(1/varL))),by=c("name","id","pos")],
+  #          cts.dense[,.(cat="contact R", etahat=sum((R/muR-1+etaR)/varR)/sum(1/varR), std=sqrt(2/sum(1/varR))),by=c("name","id","pos")])
+  setkey(cts.dense,id,name,cat)
+  stopifnot(cts.dense[,.N]==2*cs@biases[,.N])
+  
+  cts=merge(cts.dense,cts.sparse,suffixes=c(".d",".s"))
+  ggplot(cts)+geom_point(aes(etahat.d,etahat.s,colour=name))+stat_function(fun=identity)
+  cts[,all(pos.d==pos.s)]
+  
+  merge(cts[cat=="contact L"&count>0,.(name,id,mu.s=mu,eta.s=eta,var.s=var)],
+        cts.dense[L>0,.(name,id,mu.d=muL,eta.d=etaL,var.d=varL)], by=c("name","id"))
+  ggplot(cts.dense[sample(.N,100000)])+
+    geom_point(aes(1/(1/etaL+1/init$alpha),1/(1/log(muL)+1/init$alpha)),alpha=0.1)+
+    stat_function(fun=identity)+ylim(1,5)
 }
 
 #' Single-cpu simplified fitting for iota and rho
@@ -315,6 +350,7 @@ get_nzeros_per_decay = function(cs) {
   Nkz = merge(Nkz,Nkd,all=T)
   Nkz[is.na(nnz),nnz:=0]
   Nkz[,nzero:=4*ncross-nnz]
+  stopifnot(Nkz[,.N]==(length(dbins)-1)*cs@design[,.N])
   return(Nkz)
 }
 
