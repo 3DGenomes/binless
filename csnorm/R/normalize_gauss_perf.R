@@ -306,9 +306,9 @@ has_converged_perf = function(cs) {
 #' 
 #' @examples
 #' 
-run_gauss_performance = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
-                                 ngibbs = 3, iter=10000, fit.decay=T, fit.genomic=T, fit.disp=T,
-                                 verbose=T, ncounts=100000, init_alpha=1e-7, init.dispersion=10, tol.obj=1e-1) {
+run_gauss_perf = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
+                          ngibbs = 3, iter=10000, fit.decay=T, fit.genomic=T, fit.disp=T,
+                          verbose=T, ncounts=100000, init_alpha=1e-7, init.dispersion=10, tol.obj=1e-1) {
   #clean object if dirty
   cs@par=list() #in case we have a weird object
   cs@binned=list()

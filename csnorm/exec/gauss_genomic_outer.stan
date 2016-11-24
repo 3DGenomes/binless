@@ -27,6 +27,9 @@ data {
   vector<lower=0>[SD] sd_DR;
   vector<lower=0>[SD] sd_L;
   vector<lower=0>[SD] sd_R;
+  //stiffnesses
+  real<lower=0> lambda_iota[Biases];
+  real<lower=0> lambda_rho[Biases];
 }
 transformed data {
   //bias spline, sparse (iota and rho have the same design)
@@ -71,6 +74,7 @@ transformed data {
   
   //scaling factor
   lgfac = Krow;
+  
 }
 parameters {
   //exposures
@@ -80,9 +84,6 @@ parameters {
   //spline parameters
   vector[Krow-1] beta_iota[Biases];
   vector[Krow-1] beta_rho[Biases];
-  //stiffnesses
-  real<lower=0> lambda_iota[Biases];
-  real<lower=0> lambda_rho[Biases];
 }
 transformed parameters {
   //iota
@@ -164,8 +165,4 @@ model {
     beta_iota_diff[d] ~ normal(0,1/(lgfac*lambda_iota[XB[d]]));
     beta_rho_diff[d] ~ normal(0,1/(lgfac*lambda_rho[XB[d]]));
   }
-  
-  //// hyperprior
-  lambda_iota ~ normal(0,0.001);
-  lambda_rho ~ normal(0,0.001);
 }
