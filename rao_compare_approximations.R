@@ -28,6 +28,10 @@ dsets=c(paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_exact.RData")
 names=c("exact",
         "approximation")
 
+dsets=c("data/rao_HiCall_FOXP1_1.3M_csnorm_optimized_gauss.RData",
+        "data/rao_HiCall_FOXP1_1.3M_csnorm_optimized_gauss_bpk3_nofill.RData")
+names=c("gauss","nofill")
+
 #iota and rho
 iota = foreach(i=dsets,j=names,.combine=rbind) %do% {
   load(i)
@@ -57,10 +61,10 @@ decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
   if ("decay" %in% names(cs@par$decay)) {
     cs@par$decay[,.(method=j,dist,decay)]
   } else {
-    cs@par$decay[,.(method=j,dist=distance,decay=exp(kappa-cs@par$eC))]
+    cs@par$decay[,.(method=j,name,dist=distance,decay=exp(kappa))]
   }
 }
-ggplot(decay[,.SD[sample(.N,min(.N,100000))],by=method])+
+ggplot(decay[,.SD[sample(.N,min(.N,100000))],by=method])+facet_grid(~name)+
   geom_line(aes(dist,decay,colour=method))+scale_x_log10()+scale_y_log10()
 ggsave(filename="images/rao_HiCall_GM12878_SELP_150k_diagonal_decay.pdf", width=10, height=7)
 

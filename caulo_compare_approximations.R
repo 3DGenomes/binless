@@ -44,6 +44,9 @@ names=c("exact",
         #"exactig",
         "approximation")
 
+dsets=c("data/caulo_BglII_all_csnorm_optimized_gauss_bpk1_nooutliers.RData",
+        "data/caulo_BglII_all_csnorm_optimized_gauss_bpk1_nooutliers_nofill.RData")
+names=c("gauss","nofill")
 
 #nu and delta
 iota = foreach(i=dsets,j=names,.combine=rbind) %do% {
@@ -74,17 +77,17 @@ decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
   if ("decay" %in% names(cs@par$decay)) {
     cs@par$decay[,.(method=j,dist,decay)]
   } else {
-    cs@par$decay[,.(method=j,dist=distance,decay=exp(kappa-cs@par$eC))]
+    cs@par$decay[,.(method=j,name,dist=distance,decay=exp(kappa))]
   }
 }
-ggplot(decay[,.SD[sample(.N,min(.N,100000))],by=method])+
+ggplot(decay[,.SD[sample(.N,min(.N,100000))],by=method])+facet_grid(~ name)+
   geom_line(aes(dist,decay,colour=method))+scale_x_log10()+scale_y_log10()
 ggsave(filename="images/caulo_NcoI_500k_diagonal_decay.pdf", width=10, height=7)
 
 #parameters
 params = foreach(i=dsets,j=names,.combine=rbind) %do% {
   load(i)
-  data.table(method=j,eRJ=cs@par$eRJ,eDE=cs@par$eDE,eC=cs@par$eC,alpha=cs@par$alpha,lambda_iota=cs@par$lambda_iota,
+  data.table(method=j,name=cs@design[,name],eRJ=cs@par$eRJ,eDE=cs@par$eDE,eC=cs@par$eC,alpha=cs@par$alpha,lambda_iota=cs@par$lambda_iota,
              lambda_rho=cs@par$lambda_rho,lambda_diag=cs@par$lambda_diag,value=cs@par$value)
 }
 params
