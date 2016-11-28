@@ -248,11 +248,3 @@ model {
   lambda_rho ~ normal(0,0.001);
   lambda_diag ~ normal(0,1);
 }
-generated quantities {
-  vector[SD] liota;
-  vector[SD] lrho;
-  vector[N] ldecay;
-  liota = log_iota;
-  lrho = log_rho;
-  ldecay = log_decay;
-}
