@@ -114,7 +114,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
   if (init.mean=="mean") {
     csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs, zdecay)
   } else {
-    csd = csnorm_gauss_decay_muhat_data(cs, zdecay)
+    csd = csnorm:::csnorm_gauss_decay_muhat_data(cs, zdecay)
   }
   #run optimization
   Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
@@ -135,7 +135,8 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
   #make decay data table, reused at next call
   dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=op$par$log_mean_counts)]
   setkey(dmat,name,dbin)
-  op$par$decay=dmat 
+  op$par$decay=dmat
+  message("### decay: log decay mean is ",weighted.mean(op$par$log_decay,data$weight))
   #rewrite log_decay as if it were calculated for each count
   dbins=cs@settings$dbins
   csub=cs@counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
@@ -281,6 +282,8 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
   bout=rbind(bout,cout)
   setkey(bout, id, name, cat)
   op$par$biases=bout
+  message("### genomic: log iota mean is ",mean(op$par$log_iota))
+  message("### genomic: log rho mean is ",mean(op$par$log_rho))
   #update par slot
   op$par$value=op$value
   op$par$log_mean_DL=NULL
@@ -318,6 +321,9 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
     op=optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion_outer, data=data, iter=cs@settings$iter,
                            verbose=verbose, init=cs@par, init_alpha=init_alpha)
     op$par$value=op$value
+    message("### dispersion: log decay mean is ",mean(op$par$ldecay))
+    message("### dispersion: log iota mean is ",mean(op$par$liota))
+    message("### dispersion: log rho mean is ",mean(op$par$lrho))
     cs@par=modifyList(cs@par, op$par[c("alpha","value","lambda_iota","lambda_rho","lambda_diag")])
   } else {
     data$log_iota=cs@par$log_iota
