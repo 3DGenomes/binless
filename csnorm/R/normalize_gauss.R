@@ -318,14 +318,14 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
     op=optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion_outer, data=data, iter=cs@settings$iter,
                            verbose=verbose, init=cs@par, init_alpha=init_alpha)
     op$par$value=op$value
-    cs@par=modifyList(cs@par, op$par[c("eC","eRJ","eDE","alpha","value","lambda_iota","lambda_rho","lambda_diag")])
+    cs@par=modifyList(cs@par, op$par[c("alpha","value","lambda_iota","lambda_rho","lambda_diag")])
   } else {
     data$log_iota=cs@par$log_iota
     data$log_rho=cs@par$log_rho
     op=optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion_perf, data=data, iter=cs@settings$iter,
                            verbose=verbose, init=cs@par, init_alpha=init_alpha)
     op$par$value=op$value
-    cs@par=modifyList(cs@par, op$par[c("eC","eRJ","eDE","alpha","value")])
+    cs@par=modifyList(cs@par, op$par[c("alpha","value")])
   }
   return(cs)
 }
