@@ -98,6 +98,7 @@ csnorm_gauss_decay_muhat_mean = function(cs, zdecay) {
   dbins=cs@settings$dbins
   csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #collect all counts in these bins and add zeros
+  stopifnot(!is.null(init$decay))
   csd = rbind(csub[count>0,.(name,dbin,z,kappaij,var,weight=1)],
               zdecay[init$decay,.(name,dbin=bdist,z=-1,kappaij=kappa,var=1/exp(kappa)+1/init$alpha,weight=nzero)])
   csd = csd[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
@@ -554,7 +555,6 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     if (is.data.table(cs@diagnostics$params)) laststep = cs@diagnostics$params[,max(step)] else laststep = 0
     init$beta_diag = guarantee_beta_diag_increasing(init$beta_diag)
     init.mean="mean"
-    init$decay=NULL
     cs@par=init
   }
   #gibbs sampling
