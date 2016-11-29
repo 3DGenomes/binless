@@ -535,7 +535,7 @@ remove_suspicious_cut_sites = function(csd) {
   cts=cts[,.(value=sum(value)),by="id"]
   #get limits and filter out cut sites
   limits=cts[,quantile(value,c(csd@settings$qmin,csd@settings$qmax))]
-  bad_ids=cts[value>=limits[2]|value<=limits[1],id]
+  bad_ids=cts[value>limits[2]|value<limits[1],id]
   cat(csd@info$name, ": removed ", length(bad_ids), " extreme cut sites (", length(bad_ids)/cts[,.N]*100, " %)\n")
   biases=csd@biases[!(id%in%bad_ids)]
   counts=csd@counts[!(id1%in%bad_ids|id2%in% bad_ids)]
