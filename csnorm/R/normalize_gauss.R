@@ -104,29 +104,6 @@ csnorm_gauss_decay_muhat_mean = function(cs, zdecay) {
                kappahat=weighted.mean(z+kappaij, weight/var),
                std=1/sqrt(sum(weight/var)), weight=sum(weight)), keyby=c("name", "dbin")]
   stopifnot(csd[,!is.na(distance)])
-  #####
-  
-  csd.dense = csub[,.(name,dbin,z,kappaij,var,weight=1)][,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
-                                                            kappahat=weighted.mean(z+kappaij, weight/var),
-                                                            std=1/sqrt(sum(weight/var)), weight=sum(weight)), keyby=c("name", "dbin")]
-  csd.all=merge(csd,csd.dense,suffixes=c(".s",".d"))
-  p=ggplot(csd.all)+geom_point(aes(weight.d,weight.s))+stat_function(fun=identity)
-  ggsave(p,filename="images/rao_HiCall_SELP_150k_decay_mean_weight_correlation.png",width=10,height=8)
-  cat("decay mean weight max",csd.all[,max(abs(weight.d-weight.s))],"\n")
-  #
-  p=ggplot(csd.all)+geom_point(aes(distance.d,kappahat.s,colour="sparse"))+
-    geom_point(aes(distance.d,kappahat.d,colour="dense"))+scale_x_log10()
-  ggsave(p,filename="images/rao_HiCall_SELP_150k_decay_mean_kappahat.png",width=10,height=8)
-  p=ggplot(csd.all)+geom_point(aes(kappahat.d,kappahat.s,colour=name))+stat_function(fun=identity)
-  ggsave(p,filename="images/rao_HiCall_SELP_150k_decay_mean_kappahat_correlation.png",width=10,height=8)
-  cat("decay mean kappahat max",csd.all[,max(abs(kappahat.d-kappahat.s))],"\n")
-  #
-  p=ggplot(csd.all)+geom_point(aes(distance.d,1/std.s,colour="sparse"))+
-    geom_point(aes(distance.d,1/std.d,colour="dense"))+scale_x_log10()
-  ggsave(p,filename="images/rao_HiCall_SELP_150k_decay_mean_std.png",width=10,height=8)
-  p=ggplot(csd.all[std.d<1])+geom_point(aes(std.d,std.s,colour=name))+stat_function(fun=identity)
-  ggsave(p,filename="images/rao_HiCall_SELP_150k_decay_mean_std_correlation.png",width=10,height=8)
-  cat("decay mean std max",csd.all[,summary(abs(std.d-std.s))],"\n")
   return(csd)
 }
 
@@ -253,42 +230,10 @@ csnorm_gauss_genomic_muhat_mean = function(cs, zbias) {
             csub[contact.down>0, .(name, id=id2, pos=pos2, cat="contact R", count=contact.down,  mu=exp(lmu.down),  eta=eC + log_rho2,  weight=1)],
             csub[contact.up>0,   .(name, id=id2, pos=pos2, cat="contact L", count=contact.up,    mu=exp(lmu.up),    eta=eC + log_iota2, weight=1)],
             zeta[,.(name,id,pos,cat, count=0, mu=exp(eta), eta, weight=nzero)])
-  #rm(csub)
   cts[,var:=1/mu+1/init$alpha]
   cts=cts[,.(etahat=weighted.mean(count/mu-1+eta, weight/var),std=sqrt(2/sum(weight/var))), by=c("name","id","pos","cat")]
   setkey(cts,id,name,cat)
   stopifnot(cts[,.N]==2*cs@biases[,.N])
-  
-  cts.dense=rbind(csub[,.(name, id=id1, pos=pos1, cat="contact R", count=contact.close, mu=exp(lmu.close), eta=eC + log_rho1,  weight=1)],
-            csub[,  .(name, id=id1, pos=pos1, cat="contact L", count=contact.far,   mu=exp(lmu.far),   eta=eC + log_iota1, weight=1)],
-            csub[, .(name, id=id1, pos=pos1, cat="contact R", count=contact.down,  mu=exp(lmu.down),  eta=eC + log_rho1,  weight=1)],
-            csub[,   .(name, id=id1, pos=pos1, cat="contact L", count=contact.up,    mu=exp(lmu.up),    eta=eC + log_iota1, weight=1)],
-            csub[,  .(name, id=id2, pos=pos2, cat="contact R", count=contact.far,   mu=exp(lmu.far),   eta=eC + log_rho2,  weight=1)],
-            csub[,.(name, id=id2, pos=pos2, cat="contact L", count=contact.close, mu=exp(lmu.close), eta=eC + log_iota2, weight=1)],
-            csub[, .(name, id=id2, pos=pos2, cat="contact R", count=contact.down,  mu=exp(lmu.down),  eta=eC + log_rho2,  weight=1)],
-            csub[,   .(name, id=id2, pos=pos2, cat="contact L", count=contact.up,    mu=exp(lmu.up),    eta=eC + log_iota2, weight=1)])
-  #rm(csub)
-  cts.dense[,var:=1/mu+1/init$alpha]
-  cts.dense=cts.dense[,.(etahat=weighted.mean(count/mu-1+eta, weight/var),std=sqrt(2/sum(weight/var))), by=c("name","id","pos","cat")]
-  setkey(cts.dense,id,name,cat)
-  
-  
-  cts.all=merge(cts,cts.dense,suffixes=c(".s",".d"))
-  #
-  #p=ggplot(cts.all)+geom_point(aes(pos.d,etahat.s,colour="sparse"))+
-  #  geom_point(aes(pos.d,etahat.d,colour="dense"))+scale_x_log10()
-  #ggsave(p,filename="images/rao_HiCall_SELP_150k_decay_mean_etahat.png",width=10,height=8)
-  p=ggplot(cts.all)+geom_point(aes(etahat.d,etahat.s,colour=name))+stat_function(fun=identity)
-  ggsave(p,filename="images/rao_HiCall_SELP_150k_genomic_mean_etahat_correlation.png",width=10,height=8)
-  cat("decay mean etahat max",cts.all[,max(abs(etahat.d-etahat.s))],"\n")
-  #
-  #p=ggplot(cts.all)+geom_point(aes(pos.d,1/std.s,colour="sparse"))+
-  #  geom_point(aes(pos.d,1/std.d,colour="dense"))+scale_x_log10()
-  #ggsave(p,filename="images/rao_HiCall_SELP_150k_decay_mean_std.png",width=10,height=8)
-  p=ggplot(cts.all[std.d<1])+geom_point(aes(std.d,std.s,colour=name))+stat_function(fun=identity)
-  ggsave(p,filename="images/rao_HiCall_SELP_150k_genomic_mean_std_correlation.png",width=10,height=8)
-  cat("decay mean std max",cts.all[,summary(abs(std.d-std.s))],"\n")
-  
   return(list(bts=bts,cts=cts))
 }
 
