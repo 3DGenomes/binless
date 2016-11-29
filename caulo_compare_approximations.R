@@ -38,15 +38,15 @@ save(cs, file="data/caulo_NcoI_500k_csnorm_optimized_gauss_nofill_onego.RData")
 dsets=c(paste0("data/caulo_NcoI_500k_csnorm_optimized_exact.RData"),
         #paste0("data/caulo_NcoI_500k_csnorm_optimized_gauss_initexact.RData"),
         #paste0("data/caulo_NcoI_500k_csnorm_optimized_exact_initgauss.RData"),
-        paste0("data/caulo_NcoI_500k_csnorm_optimized_gauss.RData"))
+        paste0("data/caulo_NcoI_500k_csnorm_optimized_gauss_nofill_perf.RData"))
 names=c("exact",
         #"gaussie",
         #"exactig",
         "approximation")
 
-dsets=c("data/caulo_BglII_all_csnorm_optimized_gauss_bpk1_nooutliers.RData",
-        "data/caulo_BglII_all_csnorm_optimized_gauss_bpk1_nooutliers_nofill.RData")
-names=c("gauss","nofill")
+dsets=c("data/caulo_NcoI_500k_csnorm_optimized_gauss_nofill_perf.RData",
+        "data/caulo_NcoI_500k_csnorm_optimized_gauss_nofill_outer.RData")
+names=c("perf","outer")
 
 #nu and delta
 iota = foreach(i=dsets,j=names,.combine=rbind) %do% {
@@ -77,10 +77,10 @@ decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
   if ("decay" %in% names(cs@par$decay)) {
     cs@par$decay[,.(method=j,dist,decay)]
   } else {
-    cs@par$decay[,.(method=j,name,dist=distance,decay=exp(kappa))]
+    cs@par$decay[,.(method=j,dist=distance,decay=exp(kappa-cs@par$eC))]
   }
 }
-ggplot(decay[,.SD[sample(.N,min(.N,100000))],by=method])+facet_grid(~ name)+
+ggplot(decay[,.SD[sample(.N,min(.N,100000))],by=method])+
   geom_line(aes(dist,decay,colour=method))+scale_x_log10()+scale_y_log10()
 ggsave(filename="images/caulo_NcoI_500k_diagonal_decay.pdf", width=10, height=7)
 
