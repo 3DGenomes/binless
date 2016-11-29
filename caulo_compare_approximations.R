@@ -29,8 +29,8 @@ save(cs, file="data/caulo_NcoI_500k_csnorm_optimized_exact.RData")
 #approximation run
 load("data/caulo_NcoI_500k_csdata.RData")
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-cs = run_gauss(cs, bf_per_kb=1, bf_per_decade=10, bins_per_bf=10, ngibbs = 40, iter=100000, init_alpha=1e-7, ncounts = 1000000)
-save(cs, file="data/caulo_NcoI_500k_csnorm_optimized_gauss.RData")
+cs = run_gauss(cs, bf_per_kb=1, bf_per_decade=10, bins_per_bf=10, ngibbs = 20, iter=100000, init_alpha=1e-7, ncounts = 1000000, type="perf")
+save(cs, file="data/caulo_NcoI_500k_csnorm_optimized_gauss_nofill_onego.RData")
 
 
 

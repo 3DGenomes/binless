@@ -16,20 +16,22 @@ save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_exact.RD
 
 #approximate run
 load(paste0("data/rao_HiCall_GM12878_SELP_150k_csdata.RData"))
+csd@settings$qmin=0
+csd@settings$qmax=1
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-cs = run_gauss(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 40, iter=100000, init_alpha=1e-7, ncounts = 1000000)
-save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss.RData"))
+cs = run_gauss(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7, ncounts = 1000000, type="perf")
+save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_nofill.RData"))
 
 
 
 #plots
 dsets=c(paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_exact.RData"),
-        paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss.RData"))
+        paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_nofill.RData"))
 names=c("exact",
         "approximation")
 
-dsets=c("data/rao_HiCall_FOXP1_1.3M_csnorm_optimized_gauss.RData",
-        "data/rao_HiCall_FOXP1_1.3M_csnorm_optimized_gauss_bpk3_nofill.RData")
+dsets=c("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss.RData",
+        "data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_nofill.RData")
 names=c("gauss","nofill")
 
 #iota and rho
