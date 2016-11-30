@@ -14,7 +14,7 @@ cs=merge_cs_norm_datasets(list(csd), different.decays="none")
 cs = run_gauss(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 20, iter=100000, init_alpha=1e-7, ncounts = 1000000)
 save(cs,file=paste0("data/caulo_BglII_all_csnorm_optimized_gauss.RData"))
 
-load("data/caulo_BglII_all_csnorm_optimized_gauss_bpk1_nooutliers.RData")
+load("data/caulo_BglII_all_csnorm_optimized_gauss_bpk1_nooutliers_nofill_perf.RData")
 
 ggplot(cs@diagnostics$params[step>4,.(step,leg,value,out.last)])+
   geom_line(aes(step,value))+geom_point(aes(step,value,colour=out.last))+facet_wrap(~leg, scales = "free")+
