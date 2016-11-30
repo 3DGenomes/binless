@@ -108,11 +108,13 @@ csnorm_predict_binned = function(cs, resolution, group, ncores=1) {
   registerDoParallel(cores=ncores)
   mat = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
     #get zero-filled portion of counts and predict model on it
-    cts=counts[chunk1==i&chunk2==j]
+    cts=counts[chunk1==i&chunk2==j,.(name,id1,id2,pos1,pos2,contact.close,contact.down,contact.far,contact.up,distance)]
     biases1=biases[chunk==i] #just needed to fill the counts matrix
     biases2=biases[chunk==j]
     if (biases1[,.N]>0 & biases2[,.N]>0) {
       cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize,dmin=cs@settings$dmin)
+      cts=merge(cts,biases1[,.(name,id,pos,bin,ibin)],by.x=c("name","id1","pos1"),by.y=c("name","id","pos"))
+      cts=merge(cts,biases2[,.(name,id,pos,bin,ibin)],by.x=c("name","id2","pos2"),by.y=c("name","id","pos"),suffixes=c("1","2"))
       if (cts[,.N]>0) {
         csnorm:::estimate_signal(cs, cts, groups)
       }
@@ -163,11 +165,13 @@ get_signal_likelihood = function(mat, chunks, counts, biases, groups, ncores) {
   registerDoParallel(cores=ncores)
   liks = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
     #get zero-filled portion of counts and predict model on it
-    cts=counts[chunk1==i&chunk2==j]
+    cts=counts[chunk1==i&chunk2==j,.(name,id1,id2,pos1,pos2,contact.close,contact.down,contact.far,contact.up,distance)]
     biases1=biases[chunk==i] #just needed to fill the counts matrix
     biases2=biases[chunk==j]
     if (biases1[,.N]>0 & biases2[,.N]>0) {
       cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize,dmin=cs@settings$dmin)
+      cts=merge(cts,biases1[,.(name,id,pos,bin,ibin)],by.x=c("name","id1","pos1"),by.y=c("name","id","pos"))
+      cts=merge(cts,biases2[,.(name,id,pos,bin,ibin)],by.x=c("name","id2","pos2"),by.y=c("name","id","pos"),suffixes=c("1","2"))
       if (cts[,.N]>0) {
         setkey(cts,name,id1,id2)
         cts=csnorm_predict_all(cs, cts, verbose=F)
@@ -250,11 +254,13 @@ detection_binned = function(cs, resolution, group, ref="expected", threshold=0.9
   registerDoParallel(cores=ncores)
   mat = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
     #get zero-filled portion of counts and predict model on it
-    cts=copy(counts[chunk1==i&chunk2==j])
+    cts=counts[chunk1==i&chunk2==j,.(name,id1,id2,pos1,pos2,contact.close,contact.down,contact.far,contact.up,distance)]
     biases1=copy(biases[chunk==i]) #just needed to fill the counts matrix
     biases2=copy(biases[chunk==j])
     if (biases1[,.N]>0 & biases2[,.N]>0) {
       cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize,dmin=cs@settings$dmin)
+      cts=merge(cts,biases1[,.(name,id,pos,bin,ibin)],by.x=c("name","id1","pos1"),by.y=c("name","id","pos"))
+      cts=merge(cts,biases2[,.(name,id,pos,bin,ibin)],by.x=c("name","id2","pos2"),by.y=c("name","id","pos"),suffixes=c("1","2"))
       if (cts[,.N]>0) {
         setkey(cts,name,id1,id2)
         cts=csnorm_predict_all(cs, cts, verbose=F)
@@ -368,7 +374,7 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, verbose=T) {
     stop("Refusing to overwrite already existing matrices at ", resolution/1000,
          "kb. Use them or remove them from the cs@binned list")
   }
-  mat = bin_grouped_matrix(cs, resolution=resolution, group="all", ncores=ncores, ice=ice, verbose=verbose)
+  mat = csnorm:::bin_grouped_matrix(cs, resolution=resolution, group="all", ncores=ncores, ice=ice, verbose=verbose)
   #create CSmatrix and CSbinned object
   csm=new("CSmatrix", mat=mat, group="all", ice=(ice>0), ice.iterations=ice,
           names=as.character(mat[,unique(name)]))
