@@ -23,9 +23,12 @@ for (resolution in c(5000,20000)) {
   cs=detect_differences(cs, resolution=resolution, group="all", ncores=ncores, ref="GM MboI 1")
 }
 
+
+load("data/rao_HiCall_FOXP1_1.3M_csnorm_optimized_gauss_bpk3_nofill_perf.RData")
+
 #different matrices for GM MboI 1
 for (resolution in c(5000,20000)) {
-  mat=get_matrices(cs, resolution=resolution, group="all")[name=="GM MboI 1"]
+  mat=get_matrices(cs, resolution=resolution, group="condition")[name=="GM"]
   ggplot(mat)+
     geom_raster(aes(begin1,begin2,fill=log(normalized)))+
     geom_raster(aes(begin2,begin1,fill=log(normalized)))+
@@ -58,7 +61,7 @@ for (resolution in c(5000,20000)) {
 
 #Interactions at 20kb
 resolution=20000
-mat=get_interactions(cs, resolution=resolution, group="all", type="interactions", ref="expected", threshold=0.95)
+mat=get_interactions(cs, resolution=resolution, group="condition", type="interactions", ref="expected", threshold=0.95)
 #observed
 ggplot(mat)+facet_grid(~name)+
   geom_raster(aes(begin1,begin2,fill=log(normalized)))+
@@ -70,7 +73,7 @@ ggsave(filename=paste0("images/rao_HiCall_",sub,"_both_observed_",resolution/100
 ggplot(mat)+facet_grid(~name)+
   geom_raster(aes(begin1,begin2,fill=-log(signal)))+
   geom_raster(aes(begin2,begin1,fill=-log(signal)))+
-  geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])+
+  geom_point(aes(begin2,begin1,colour=signal.signif>1),data=mat[is.significant==T])+
   scale_fill_gradient2()+ scale_colour_manual(values = muted(c("blue","red")))+
   theme_bw()+theme(legend.position = "none", axis.title=element_blank())
 ggsave(filename=paste0("images/rao_HiCall_",sub,"_both_signal_",resolution/1000,"kb.pdf"), width=19,height=9)
@@ -78,7 +81,7 @@ ggsave(filename=paste0("images/rao_HiCall_",sub,"_both_signal_",resolution/1000,
 
 #Differences at 20kb
 resolution=20000
-mat=get_interactions(cs, resolution=resolution, group="all", type="differences", ref="GM MboI 1", threshold=0.95)
+mat=get_interactions(cs, resolution=resolution, group="condition", type="differences", ref="GM", threshold=0.95)
 ggplot(mat)+facet_grid(~name)+
   geom_raster(aes(begin1,begin2,fill=-log(signal)))+
   geom_raster(aes(begin2,begin1,fill=-log(ref.signal)))+
