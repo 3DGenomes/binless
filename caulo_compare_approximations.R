@@ -29,8 +29,8 @@ save(cs, file="data/caulo_NcoI_500k_csnorm_optimized_exact.RData")
 #approximation run
 load("data/caulo_NcoI_500k_csdata.RData")
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-cs = run_gauss(cs, bf_per_kb=1, bf_per_decade=10, bins_per_bf=10, ngibbs = 40, iter=100000, init_alpha=1e-7, ncounts = 1000000)
-save(cs, file="data/caulo_NcoI_500k_csnorm_optimized_gauss.RData")
+cs = run_gauss(cs, bf_per_kb=1, bf_per_decade=10, bins_per_bf=10, ngibbs = 20, iter=100000, init_alpha=1e-7, ncounts = 1000000, type="perf")
+save(cs, file="data/caulo_NcoI_500k_csnorm_optimized_gauss_nofill_onego.RData")
 
 
 
@@ -38,12 +38,15 @@ save(cs, file="data/caulo_NcoI_500k_csnorm_optimized_gauss.RData")
 dsets=c(paste0("data/caulo_NcoI_500k_csnorm_optimized_exact.RData"),
         #paste0("data/caulo_NcoI_500k_csnorm_optimized_gauss_initexact.RData"),
         #paste0("data/caulo_NcoI_500k_csnorm_optimized_exact_initgauss.RData"),
-        paste0("data/caulo_NcoI_500k_csnorm_optimized_gauss.RData"))
+        paste0("data/caulo_NcoI_500k_csnorm_optimized_gauss_nofill_perf.RData"))
 names=c("exact",
         #"gaussie",
         #"exactig",
         "approximation")
 
+dsets=c("data/caulo_NcoI_500k_csnorm_optimized_gauss_nofill_perf.RData",
+        "data/caulo_NcoI_500k_csnorm_optimized_gauss_nofill_outer.RData")
+names=c("perf","outer")
 
 #nu and delta
 iota = foreach(i=dsets,j=names,.combine=rbind) %do% {
@@ -84,7 +87,7 @@ ggsave(filename="images/caulo_NcoI_500k_diagonal_decay.pdf", width=10, height=7)
 #parameters
 params = foreach(i=dsets,j=names,.combine=rbind) %do% {
   load(i)
-  data.table(method=j,eRJ=cs@par$eRJ,eDE=cs@par$eDE,eC=cs@par$eC,alpha=cs@par$alpha,lambda_iota=cs@par$lambda_iota,
+  data.table(method=j,name=cs@design[,name],eRJ=cs@par$eRJ,eDE=cs@par$eDE,eC=cs@par$eC,alpha=cs@par$alpha,lambda_iota=cs@par$lambda_iota,
              lambda_rho=cs@par$lambda_rho,lambda_diag=cs@par$lambda_diag,value=cs@par$value)
 }
 params
