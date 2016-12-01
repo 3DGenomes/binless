@@ -38,15 +38,15 @@ save(cs, file="data/caulo_NcoI_500k_csnorm_optimized_gauss_nofill_onego.RData")
 dsets=c(paste0("data/caulo_NcoI_500k_csnorm_optimized_exact.RData"),
         #paste0("data/caulo_NcoI_500k_csnorm_optimized_gauss_initexact.RData"),
         #paste0("data/caulo_NcoI_500k_csnorm_optimized_exact_initgauss.RData"),
-        paste0("data/caulo_NcoI_500k_csnorm_optimized_gauss_nofill_perf.RData"))
+        paste0("data/caulo_NcoI_500k_csnorm_optimized_gauss.RData"))
 names=c("exact",
         #"gaussie",
         #"exactig",
         "approximation")
 
-dsets=c("data/caulo_NcoI_500k_csnorm_optimized_gauss_nofill_perf.RData",
-        "data/caulo_NcoI_500k_csnorm_optimized_gauss_nofill_outer.RData")
-names=c("perf","outer")
+dsets=c("data/discarded/caulo_NcoI_500k_csnorm_optimized_gauss_nofill_outer.RData",
+        "data/caulo_NcoI_500k_csnorm_optimized_gauss_nofill.RData")
+names=c("outer","perf")
 
 #nu and delta
 iota = foreach(i=dsets,j=names,.combine=rbind) %do% {

@@ -26,12 +26,12 @@ save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_no
 
 #plots
 dsets=c(paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_exact.RData"),
-        paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_bpk3_nofill_perf_eC.RData"))
+        paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss.RData"))
 names=c("exact",
         "approximation")
 
-dsets=c("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_bpk3_nofill_outer_eC.RData",
-        "data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_bpk3_nofill_perf_eC.RData")
+dsets=c("data/discarded/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_bpk3_nofill_outer_eC.RData",
+        "data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_bpk3.RData")
 names=c("outer","perf")
 
 #iota and rho
