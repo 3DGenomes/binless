@@ -16,9 +16,11 @@ save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_exact.RD
 
 #approximate run
 load(paste0("data/rao_HiCall_GM12878_SELP_150k_csdata.RData"))
+csd@settings$qmin=0
+csd@settings$qmax=1
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-cs = run_gauss(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 40, iter=100000, init_alpha=1e-7, ncounts = 1000000)
-save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss.RData"))
+cs = run_gauss(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7, ncounts = 1000000, type="perf")
+save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_nofill.RData"))
 
 
 
@@ -27,6 +29,10 @@ dsets=c(paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_exact.RData")
         paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss.RData"))
 names=c("exact",
         "approximation")
+
+dsets=c("data/discarded/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_bpk3_nofill_outer_eC.RData",
+        "data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_bpk3.RData")
+names=c("outer","perf")
 
 #iota and rho
 iota = foreach(i=dsets,j=names,.combine=rbind) %do% {
@@ -57,10 +63,10 @@ decay = foreach(i=dsets,j=names,.combine=rbind) %do% {
   if ("decay" %in% names(cs@par$decay)) {
     cs@par$decay[,.(method=j,dist,decay)]
   } else {
-    cs@par$decay[,.(method=j,dist=distance,decay=exp(kappa-cs@par$eC))]
+    cs@par$decay[,.(method=j,name,dist=distance,decay=exp(kappa))]
   }
 }
-ggplot(decay[,.SD[sample(.N,min(.N,100000))],by=method])+
+ggplot(decay[,.SD[sample(.N,min(.N,100000))],by=method])+facet_grid(~name)+
   geom_line(aes(dist,decay,colour=method))+scale_x_log10()+scale_y_log10()
 ggsave(filename="images/rao_HiCall_GM12878_SELP_150k_diagonal_decay.pdf", width=10, height=7)
 

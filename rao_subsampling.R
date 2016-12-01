@@ -44,8 +44,9 @@ names=c("1","10","10i","20","20i")
 registerDoParallel(cores=30)
 foreach(i=dsets,j=names) %dopar% {
   load(i)
-  ggsave(cs@diagnostics$plot, filename=paste0("diag_",j,"pc.pdf"), width=10, height=8)
-  ggsave(cs@diagnostics$plot2, filename=paste0("diag2_",j,"pc.pdf"), width=10, height=8)
+  a=plot_diagnostics(cs)
+  ggsave(a[[1]], filename=paste0("diag_",j,"pc.pdf"), width=10, height=8)
+  ggsave(a[[2]], filename=paste0("diag2_",j,"pc.pdf"), width=10, height=8)
 }
 
 #iota and rho
@@ -87,6 +88,7 @@ params = foreach(i=dsets,j=names,.combine=rbind) %dopar% {
              `log lambda_diag`=log(cs@par$lambda_diag),loglik=cs@par$value, logp=value, ngibbs=cs@diagnostics$params[,.N/3])
 }
 params
+params[,ngibbs:=NULL]
 ggplot(melt(params,id.vars = "subsampling"))+
   geom_line(aes(subsampling,value))+geom_point(aes(subsampling,value))+facet_wrap(~ variable, scales="free_y")
 ggsave(filename="images/rao_HiCall_SELP_150k_subs_parameters.pdf", width=10, height=7)
