@@ -421,7 +421,7 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", threshol
       stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
       flsa(submat[,value], connListObj=cmat, verbose=F)
     }
-    #cross-validate lambda1 and lambda2
+    #cross-validate lambda2 (lambda1=0 gives good results)
     mat[,cv.group:=as.character(((ibin2+ibin1*max(ibin1))%%cv.fold)+1)]
     cvgroups=as.character(1:cv.fold)
     #first, run lasso regressions
@@ -432,36 +432,41 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", threshol
         stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
         flsa(submat[,value], connListObj=cmat, verbose=F)
     }
-    #then, do a coarse scan
-    lambdas = unique(sort(c(sapply(res.ref,function(x){x$BeginLambda}),recursive=T)))
-    lrange = c(0,exp(seq(log(min(lambdas[lambdas>0])),log(max(lambdas)),length.out=cv.gridsize-1)))
-    cv = foreach (lambda1=lrange, .combine=rbind) %:% foreach (lambda2=lrange, .combine=rbind) %dopar%
-      csnorm:::genlasso_cross_validate(mat, res.cv, cvgroups, lambda1=lambda1, lambda2=lambda2)
-    bounds = merge(cv,cv[,.SD[mse==min(mse),.(mse.max=mse+2*mse.sd)],by=groupname],by="groupname")[
-      mse<mse.max,.(l1min=min(lambda1),l1max=max(lambda1),l2min=min(lambda2),l2max=max(lambda2)),by=groupname]
-    bounds[l1max==0,l1max:=1] #try at least [0,1] range for lambda1
-    #
-    #now, a finer scan
+    #then, try a few lambda values to define the interesting region
     cv = foreach (g=groupnames, .combine=rbind) %do% {
-      l1vals=bounds[groupname==g,seq(l1min,l1max,length.out=cv.gridsize)]
-      l2vals=bounds[groupname==g,seq(l2min,l2max,length.out=cv.gridsize)]
-      foreach (lambda1=l1vals, .combine=rbind) %:% foreach (lambda2=l2vals, .combine=rbind) %dopar%
-        csnorm:::genlasso_cross_validate(mat[groupname==g], res.cv, cvgroups, lambda1=lambda1, lambda2=lambda2)
+      l2vals=c(0,10^seq(log10(min(res.ref[[g]]$EndLambda)),log10(max(res.ref[[g]]$BeginLambda)),length.out=cv.gridsize))
+      foreach (lambda2=l2vals, .combine=rbind) %dopar%
+        csnorm:::genlasso_cross_validate(mat, res.cv, cvgroups, lambda1=0, lambda2=lambda2)
     }
-    bounds = merge(cv,cv[,.SD[mse==min(mse),.(mse.max=mse+2*mse.sd)],by=groupname],by="groupname")[
-      mse<mse.max,.(l1min=min(lambda1),l1max=max(lambda1),l2min=min(lambda2),l2max=max(lambda2)),by=groupname]
-    
-    ggplot(cv)+geom_raster(aes(lambda1,lambda2,fill=log(mse)))+facet_wrap(~groupname)
-    
-    #build cv curve
-
-    ggplot(cv)+geom_line(aes(lambda2,log(mse),group=lambda1,colour=lambda1))+facet_wrap(~groupname,scales="free")
-    ggplot(cv[,.SD[mse==min(mse),mse+sd]])+geom_raster(aes(lambda1,lambda2,fill=log(mse)))+facet_wrap(~groupname)
-    cv[,.SD[mse==min(mse)],by=groupname]
+    #ggplot(cv[lambda2>0.5&lambda2<3])+geom_line(aes(lambda2,mse))+geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
+    #  facet_wrap(~groupname,scales="free")#+scale_x_log10()
+    #lower bound is lambda one step below minimum mse
+    bounds=merge(cv,cv[,.SD[mse==min(mse),.(lambda2.max=lambda2,mse.max=mse+mse.sd)],by=groupname],by="groupname")
+    lmin=bounds[lambda2<lambda2.max,.(l2min=max(lambda2)),by=groupname]
+    #upper bound is lambda one step above mse+1sd 
+    lmax=bounds[,.SD[lambda2>=lambda2.max&mse>=mse.max,.(l2max=min(lambda2))],by=groupname]
+    bounds=merge(lmin,lmax,by="groupname")
+    #
+    #now, try all lambda values between these bounds
+    cv = foreach (g=groupnames, .combine=rbind) %do% {
+      l2vals=sort(unique(res.ref[[g]]$BeginLambda))
+      l2vals=bounds[groupname==g,l2vals[l2vals>=l2min & l2vals<=l2max]]
+      foreach (lambda2=l2vals, .combine=rbind) %dopar%
+        csnorm:::genlasso_cross_validate(mat[groupname==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
+    }
+    #ggplot(cv)+geom_line(aes(lambda2,mse))+#geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
+    #  facet_wrap(~groupname,scales="free")
+    #determine optimal lambda value and compute coefficients
+    l2vals=cv[,.SD[mse==min(mse),.(lambda2)],by=groupname]
+    for (g in groupnames)
+      mat[groupname==g,value:=flsaGetSolution(res.ref[[g]], lambda1=0, lambda2=l2vals[groupname==g,lambda2])[1,]]
+    mat[,c("cv.group","phi"):=list(NULL,value*sqrt(var))]
+    ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=value))+facet_wrap(~groupname)+scale_fill_gradient2()
+    mat
   }
-  counts[,c("bin1","bin2","ibin1","ibin2"):=list(NULL,NULL,NULL,NULL)]
-  biases[,c("bin","ibin"):=list(NULL,NULL)]
-  mat
+  counts[,c("bin1","bin2","ibin1","ibin2","chunk1","chunk2"):=list(NULL,NULL,NULL,NULL,NULL,NULL)]
+  biases[,c("bin","ibin","chunk"):=list(NULL,NULL,NULL)]
+  return(mat)
 }
 
 #' Generate iota and rho genomic biases on evenly spaced points along the genome
