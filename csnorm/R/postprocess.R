@@ -293,7 +293,7 @@ csnorm_detect_binned = function(cs, resolution, group, ref="expected", threshold
 
 #' group counts to compute signal by cross-validated lasso
 #' @keywords internal
-estimate_binless_signal = function(cs, cts, groups, mat, cv.fold=10) {
+estimate_binless_signal = function(cs, cts, groups, mat) {
   setkey(cts,name,id1,id2)
   cts=csnorm_predict_all(cs, cts, verbose=F)
   cts=groups[cts]
@@ -305,14 +305,9 @@ estimate_binless_signal = function(cs, cts, groups, mat, cv.fold=10) {
   cts[,var:=1/exp(log_mean)+1/cs@par$alpha]
   cts[,phihat:=(count/exp(log_mean)-1+phi)]
   #compute on all counts
-  all=cts[,.(cv.group="all",phihat=weighted.mean(phihat,1/var),var=1/sum(1/var),ncounts=.N),
+  ret=cts[,.(phihat=weighted.mean(phihat,1/var),var=1/sum(1/var),ncounts=.N),
           by=c("groupname","ibin1","ibin2","bin1","bin2","phi")]
-  #create cross-validation groups and compute on them
-  cts[,cv.group:=as.character((.I %% cv.fold)+1)]
-  cvd = foreach(cv=cts[,unique(cv.group)],.combine=rbind) %do%
-    cts[cv.group!=cv,.(cv.group=cv,phihat=weighted.mean(phihat,1/var),var=1/sum(1/var),ncounts=.N),
-            by=c("groupname","ibin1","ibin2","bin1","bin2","phi")]
-  return(rbind(all,cvd))
+  return(ret)
 }
 
 #' connectivity on a triangle
@@ -396,52 +391,59 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", threshol
         cts=merge(cts,biases2[,.(name,id,pos,bin,ibin)],by.x=c("name","id2","pos2"),by.y=c("name","id","pos"),suffixes=c("1","2"))
         if (cts[,.N]>0) {
           stopifnot(ref=="expected")
-          csnorm:::estimate_binless_signal(cs, cts, groups, mat, cv.fold=cv.fold)
+          csnorm:::estimate_binless_signal(cs, cts, groups, mat)
         }
       }
     }
-    setkey(mat,groupname,cv.group,ibin1,ibin2,bin1,bin2)
-    #ggplot(mat[groupname=="GM MboI 1"])+geom_raster(aes(ibin1,ibin2,fill=phihat))+facet_wrap(~cv.group)
+    #split into cross-validation groups and sort
+    mat[,cv.group:=as.character(((ibin2+ibin1*max(ibin1))%%cv.fold)+1)]
+    setkey(mat,groupname,ibin1,ibin2,bin1,bin2)
+    
+    #ggplot(mat[groupname=="GM MboI 1"])+geom_raster(aes(ibin1,ibin2,fill=phihat))
     #
     #perform one fused lasso per dataset and cv group
     cvgroups=as.character(1:cv.fold)
     groupnames=groups[,unique(groupname)]
     cmat = csnorm:::flsa_compute_connectivity(mat[,max(ibin2)+1])
     res.ref = foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
-      submat=mat[groupname==g&cv.group=="all"]
+      submat=mat[groupname==g]
       stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
       flsa(submat[,phihat/sqrt(var)], connListObj=cmat, verbose=F)
     }
     res.cv = foreach (cv=cvgroups, .final=function(x){setNames(x,cvgroups)}) %:%
       foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
-      submat=mat[groupname==g&cv.group==cv]
-      stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
-      flsa(submat[,phihat/sqrt(var)], connListObj=cmat, verbose=F)
+        submat=copy(mat[groupname==g])
+        submat[cv.group==cv,phihat:=0]
+        stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
+        flsa(submat[,phihat/sqrt(var)], connListObj=cmat, verbose=F)
     }
     #get grid values for lambda
-    #lambdas = unique(sort(c(sapply(res.ref,function(x){x$BeginLambda}),recursive=T)))
+    lambdas = unique(sort(c(sapply(res.ref,function(x){x$BeginLambda}),recursive=T)))
+    lambdas=lambdas[lambdas>7]
     lmin = log(min(c(sapply(res.ref,function(x){x$EndLambda}),recursive=T)))
     stopifnot(!is.na(lmin))
     lmax = log(max(c(sapply(res.ref,function(x){x$BeginLambda}),recursive=T)))
     lambdas = exp(seq(lmin,lmax,length.out=cv.gridsize))
     #build cv curve
-    cv = foreach (lambda2=lambdas, .combine=rbind) %:% foreach (lambda1=lambdas, .combine=rbind) %dopar% {
-      submat=mat[,.(groupname,cv.group,ibin1,ibin2,ncounts)]
+    cv = foreach (lambda2=lambdas, .combine=rbind) %dopar% {#} %:% foreach (lambda1=lambdas, .combine=rbind) %dopar% {
       #compute coefficients on each model
-      submat[cv.group=="all",value:=flsaGetSolution(res.ref[[groupname[1]]], lambda1=lambda1, lambda2=lambda2)[1,1,],by=groupname]
+      submat.all = mat[,.(groupname,ibin1,ibin2,ncounts)]
+      submat.all[,value.ref:=flsaGetSolution(res.ref[[groupname[1]]], lambda1=0, lambda2=lambda2)[1,],by=groupname]
       #compute cv coefs for each group, given lambda
-      submat[cv.group!="all",value:=flsaGetSolution(res.cv[[cv.group[1]]][[groupname[1]]],
-                                                  lambda1=lambda1, lambda2=lambda2)[1,1,],by=c("groupname","cv.group")]
-      #ggplot(submat[groupname=="GM MboI 1"])+geom_raster(aes(ibin1,ibin2,fill=value))+facet_wrap(~cv.group)
-      ret=merge(submat[cv.group!="all",.(groupname,ibin1,ibin2,value,ncounts)],
-            submat[cv.group=="all",.(groupname,ibin1,ibin2,value.ref=value,ncounts.ref=ncounts)],
-            all=T, by=c("groupname","ibin1","ibin2"), sort=F)
-      stopifnot(ret[,all(ncounts.ref>=ncounts)])
-      ret=ret[,.(mse=mean((value-value.ref)^2)*(ncounts.ref[1]-ncounts[1])),by=c("groupname","ibin1","ibin2")]
+      submat.cv = foreach(cv=cvgroups, .combine=rbind) %do% {
+        submat.cv = mat[,.(groupname,cv.group,ibin1,ibin2)]
+        submat.cv[,value:=flsaGetSolution(res.cv[[cv.group[1]]][[groupname[1]]],
+                                          lambda1=0, lambda2=lambda2)[1,],by=groupname]
+        submat.cv=submat.cv[cv.group==cv]
+      }
+      #ggplot(submat.cv)+geom_raster(aes(ibin1,ibin2,fill=value))+facet_grid(groupname~cv.group)
+      ggplot(submat.all)+geom_raster(aes(ibin1,ibin2,fill=value.ref))+facet_grid(~groupname)
+      ret=merge(submat.cv, submat.all, all.x=T, by=c("groupname","ibin1","ibin2"), sort=F)
+      ret=ret[,.(mse=mean((value-value.ref)^2)*ncounts[1]),by=c("groupname","ibin1","ibin2")]
       ret=ret[,.(mse=mean(mse)),by=groupname]
-      data.table(groupname=ret[,groupname], lambda1=lambda1, lambda2=lambda2, mse=ret[,mse])
+      ret[,.(groupname,lambda1=0,lambda2=lambda2,mse)]
     }
-    ggplot(cv)+geom_line(aes(lambda2,mse,group=log(lambda1)))+facet_wrap(~groupname,scales="free")#+scale_y_log10()
+    ggplot(cv[lambda1==0&lambda2>7])+geom_line(aes(lambda2,mse,group=log(lambda1)))+facet_wrap(~groupname,scales="free")+scale_y_log10()
     ggplot(cv)+geom_raster(aes(log(lambda1),log(lambda2),fill=mse))+facet_wrap(~groupname)
     
   }
