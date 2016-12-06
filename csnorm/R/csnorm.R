@@ -33,6 +33,8 @@
 #' @import foreach
 #' @import matrixStats
 #' @import ggplot2
+#' @import flsa
+#' @import abind
 #' @import methods
 #' @importFrom Hmisc cut2
 #' @importFrom dplyr ntile
@@ -113,6 +115,8 @@ setClass("CSinter",
 setMethod("show",signature="CSinter",definition=function(object) {
   if (object@type=="interactions") {
     cat("        Significant interactions wrt expected") 
+  } else if (object@type=="binteractions") {
+    cat("        Significant binless interactions wrt expected") 
   } else {
     cat("        Significant differences wrt ", object@ref)
   }
