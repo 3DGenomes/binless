@@ -312,35 +312,19 @@ estimate_binless_signal = function(cs, cts, groups, mat) {
 
 #' connectivity on a triangle
 #' @keywords internal
-flsa_compute_connectivity = function(nbins, start=0) {
-  stopifnot(start>=0,nbins>=2)
+genlasso_compute_connectivity = function(nbins, start=1) {
+  stopifnot(start>=1,nbins>=2)
   if (nbins==2) {
-    ret=sapply(list(start+1,c(start,start+2),start+1),as.integer)
-    names(ret) = c(start, start+1, start+2)
+    ret=graph(c(start,start+1,start+1,start+2), directed=F)
   } else {
-    upper.row = c(list(start+1),
-                  sapply((start+1):(start+nbins-2),function(x){c(x-1,x+1,x+nbins-1)},simplify=F),
-                  list(c(start+nbins-2,start+2*(nbins-1))))
-    names(upper.row) = start:(start+nbins-1)
-    lower.tri = flsa_compute_connectivity(nbins-1,start=start+nbins)
-    for (i in 1:(nbins-1))
-      lower.tri[[i]] = c(lower.tri[[i]], start+i)
-    ret = sapply(c(upper.row,lower.tri),as.integer)
+    upper.row = c(c(start,start+1),
+                  c(sapply((start+1):(start+nbins-2),function(x){c(x,x+1,x,x+nbins-1)},simplify=T)),
+                  c(start+nbins-1,start+2*(nbins-1)))
+    lower.tri = genlasso_compute_connectivity(nbins-1,start=start+nbins)
+    ret = add.edges(lower.tri,upper.row)
   }
-  class(ret) = "connListObj"
+  #plot(ret)
   return(ret)
-}
-
-#' return phi coefficients for a given value of lambda
-#' @keywords internal
-flsa_get_phi = function(res,lambda,mat) {
-  mat[,value:=flsaGetSolution(res, lambda1=0, lambda2=lambda)[1,]]
-  mat[,phi:=value*sqrt(var)]
-  return(sol)
-  #plot for a specific value of lambda
-  ggplot()+geom_raster(aes(ibin1,ibin2,fill=value),data=mat)
-  ggplot()+geom_raster(aes(ibin1,ibin2,fill=phi),data=mat)+
-    geom_raster(aes(ibin2,ibin1,fill=phihat),data=mat[groupname==groupname[1]])
 }
 
 #' Perform binless interaction detection using fused lasso
@@ -395,20 +379,16 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", threshol
         }
       }
     }
-    #split into cross-validation groups and sort
-    mat[,cv.group:=as.character(((ibin2+ibin1*max(ibin1))%%cv.fold)+1)]
-    setkey(mat,groupname,ibin1,ibin2,bin1,bin2)
-    
+    setkey(mat,groupname,ibin1,ibin2,bin1,bin2) #required to match the connectivity graph layout below
     #ggplot(mat[groupname=="GM MboI 1"])+geom_raster(aes(ibin1,ibin2,fill=phihat))
     #
-    #perform one fused lasso per dataset and cv group
-    cvgroups=as.character(1:cv.fold)
+    #perform one fused lasso per dataset
     groupnames=groups[,unique(groupname)]
-    cmat = csnorm:::flsa_compute_connectivity(mat[,max(ibin2)+1])
+    cmat = csnorm:::genlasso_compute_connectivity(mat[,max(ibin2)+1])
     res.ref = foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
       submat=mat[groupname==g]
-      stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
-      flsa(submat[,phihat/sqrt(var)], connListObj=cmat, verbose=F)
+      stopifnot(length(V(cmat))==submat[,.N]) #ibin indices have something wrong
+      fusedlasso(submat[,phihat/sqrt(var)], graph=cmat, verbose=F)
     }
     res.cv = foreach (cv=cvgroups, .final=function(x){setNames(x,cvgroups)}) %:%
       foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
