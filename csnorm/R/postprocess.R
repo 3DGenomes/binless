@@ -291,9 +291,7 @@ csnorm_detect_binned = function(cs, resolution, group, ref="expected", threshold
   mat
 }
 
-#' group counts to compute signal by cross-validated lasso
-#' @keywords internal
-estimate_binless_signal = function(cs, cts, groups, mat) {
+estimate_binless_common = function(cs, cts, groups) {
   setkey(cts,name,id1,id2)
   cts=csnorm_predict_all(cs, cts, verbose=F)
   cts=groups[cts]
@@ -301,13 +299,33 @@ estimate_binless_signal = function(cs, cts, groups, mat) {
             cts[,.(groupname,ibin1,ibin2,bin1,bin2,count=contact.far,log_mean=log_mean_cfar)],
             cts[,.(groupname,ibin1,ibin2,bin1,bin2,count=contact.up,log_mean=log_mean_cup)],
             cts[,.(groupname,ibin1,ibin2,bin1,bin2,count=contact.down,log_mean=log_mean_cdown)])
-  cts=mat[,.(groupname,ibin1,ibin2,phi)][cts,,on=c("groupname","ibin1","ibin2")]
   cts[,var:=1/exp(log_mean)+1/cs@par$alpha]
+  return(cts)
+}
+
+#' group counts to compute signal by cross-validated lasso
+#' @keywords internal
+estimate_binless_signal = function(cs, cts, groups, mat) {
+  cts=estimate_binless_common(cs, cts, groups)
+  cts=mat[,.(groupname,ibin1,ibin2,phi)][cts,,on=c("groupname","ibin1","ibin2")]
   cts[,phihat:=(count/exp(log_mean)-1+phi)]
-  #compute on all counts
   ret=cts[,.(phihat=weighted.mean(phihat,1/var),var=1/sum(1/var),ncounts=.N),
           by=c("groupname","ibin1","ibin2","bin1","bin2","phi")]
   ret[,value:=phihat/sqrt(var)]
+  return(ret)
+}
+
+#' group counts to compute signal difference by cross-validated lasso
+#' @keywords internal
+estimate_binless_differential = function(cs, cts, groups, mat, ref) {
+  cts=estimate_binless_common(cs, cts, groups)
+  cts[,z:=(count/exp(log_mean)-1)]
+  ret=cts[,.(zhat=weighted.mean(z,1/var),var=1/sum(1/var),ncounts=.N),
+          by=c("groupname","ibin1","ibin2","bin1","bin2")]
+  ret=merge(ret[groupname==ref,.(ibin1,ibin2,zhat.ref=zhat,var.ref=var)],ret[groupname!=ref],by=c("ibin1","ibin2"))
+  ret=mat[groupname!=ref,.(groupname,ibin1,ibin2,delta)][ret,,on=c("groupname","ibin1","ibin2")]
+  ret[,c("deltahat","var"):=list(delta + zhat-zhat.ref,var+var.ref)]
+  ret[,c("value","zhat","zhat.ref","var.ref"):=list(deltahat/sqrt(var),NULL,NULL)]
   return(ret)
 }
 
@@ -334,17 +352,17 @@ flsa_compute_connectivity = function(nbins, start=0) {
 
 #' compute cv error for a given value of of lambda1 and lambda2
 #' @keywords internal
-genlasso_cross_validate = function(mat, res.cv, cvgroups, lambda1, lambda2) {
+flsa_cross_validate = function(mat, res.cv, cvgroups, lambda1, lambda2) {
   #compute coefficients on each model
   submat.all = mat[,.(groupname,ibin1,ibin2,ncounts, value.ref=value)]
   #compute cv coefs for each group, given lambda
   submat.cv = foreach(cv=cvgroups, .combine=rbind) %do% {
     ret = mat[,.(groupname,cv.group,ibin1,ibin2)]
     if (lambda1>0) {
-      ret[,value:=flsaGetSolution(res.cv[[cv]][[groupname[1]]],
+      ret[,value:=flsaGetSolution(res.cv[[cv]][[as.character(groupname[1])]],
                                         lambda1=lambda1, lambda2=lambda2)[1,1,],by=groupname]
     } else {
-      ret[,value:=flsaGetSolution(res.cv[[cv]][[groupname[1]]],
+      ret[,value:=flsaGetSolution(res.cv[[cv]][[as.character(groupname[1])]],
                                         lambda1=lambda1, lambda2=lambda2)[1,],by=groupname]
     }
     ret[cv.group==cv]
@@ -390,9 +408,15 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
   }
   #fused lasso loop
   registerDoParallel(cores=ncores)
-  mat = biases[,CJ(groupname=groups[,unique(groupname)],
+  if (ref=="expected") {
+    mat = biases[,CJ(groupname=groups[,unique(groupname)],
                    ibin1=min(ibin):max(ibin),ibin2=min(ibin):max(ibin))][ibin1<=ibin2]
-  mat[,phi:=0]
+    mat[,phi:=0]
+  } else {
+    mat = biases[,CJ(groupname=groups[groupname!=ref,unique(groupname)],
+                     ibin1=min(ibin):max(ibin),ibin2=min(ibin):max(ibin))][ibin1<=ibin2]
+    mat[,delta:=0]  
+  }
   for (step in 1:niter) {
     cat("Main loop, step ",step,"\n")
     cat(" Estimate raw signal\n")
@@ -407,8 +431,10 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
         cts=merge(cts,biases1[,.(name,id,pos,bin,ibin)],by.x=c("name","id1","pos1"),by.y=c("name","id","pos"))
         cts=merge(cts,biases2[,.(name,id,pos,bin,ibin)],by.x=c("name","id2","pos2"),by.y=c("name","id","pos"),suffixes=c("1","2"))
         if (cts[,.N]>0) {
-          stopifnot(ref=="expected")
-          csnorm:::estimate_binless_signal(cs, cts, groups, mat)
+          if (ref=="expected")
+            csnorm:::estimate_binless_signal(cs, cts, groups, mat)
+          else
+            csnorm:::estimate_binless_differential(cs, cts, groups, mat, ref)
         }
       }
     }
@@ -416,7 +442,8 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
     #
     #perform fused lasso on whole dataset
     cat(" Fused lasso: estimation runs\n")
-    groupnames=groups[,unique(groupname)]
+    groupnames=groups[,levels(groupname)]
+    if (ref!="expected") groupnames=groupnames[groupnames!=ref]
     cmat = csnorm:::flsa_compute_connectivity(mat[,max(ibin2)+1])
     res.ref = foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
       submat=mat[groupname==g]
@@ -424,7 +451,7 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
       flsa(submat[,value], connListObj=cmat, verbose=F)
     }
     #fail if any has failed (flsa bugs)
-    if (any(sapply(groupnames, function(g){is.null(res.ref[[g]])}))) stop("one flsa run failed, aborting")
+    if (any(sapply(res.ref, is.null))) stop("one flsa run failed, aborting")
     #cross-validate lambda2 (lambda1=0 gives good results)
     mat[,cv.group:=as.character(((ibin2+ibin1*max(ibin1))%%cv.fold)+1)]
     cvgroups=as.character(1:cv.fold)
@@ -439,7 +466,7 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
       }
     #remove failed cv attempts (flsa bugs)
     cvgroups = foreach(cv=cvgroups, .combine=c) %do% {
-      if (any(sapply(groupnames, function(g){is.null(res.cv[[cv]][[g]])})))
+      if (any(sapply(res.cv[[cv]], is.null)))
         cat("removing CV group ",cv," due to failure of flsa!\n")
       else
         cv
@@ -449,7 +476,7 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
     cv = foreach (g=groupnames, .combine=rbind) %do% {
       l2vals=c(0,10^seq(log10(min(res.ref[[g]]$EndLambda)),log10(max(res.ref[[g]]$BeginLambda)),length.out=cv.gridsize))
       foreach (lambda2=l2vals, .combine=rbind) %dopar%
-        csnorm:::genlasso_cross_validate(mat[groupname==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
+        csnorm:::flsa_cross_validate(mat[groupname==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
     }
     #ggplot(cv)+geom_line(aes(lambda2,mse))+geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
     #  facet_wrap(~groupname,scales="free")+scale_x_log10()
@@ -466,7 +493,7 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
       l2vals=sort(unique(res.ref[[g]]$BeginLambda))
       l2vals=bounds[groupname==g,l2vals[l2vals>=l2min & l2vals<=l2max]]
       foreach (lambda2=l2vals, .combine=rbind) %dopar%
-        csnorm:::genlasso_cross_validate(mat[groupname==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
+        csnorm:::flsa_cross_validate(mat[groupname==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
     }
     #ggplot(cv)+geom_line(aes(lambda2,mse))+#geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
     #  facet_wrap(~groupname,scales="free")
@@ -475,8 +502,12 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
     l2vals=cv[,.SD[mse==min(mse),.(lambda2)],by=groupname]
     for (g in groupnames)
       mat[groupname==g,value:=flsaGetSolution(res.ref[[g]], lambda1=0, lambda2=l2vals[groupname==g,lambda2])[1,]]
-    mat[,c("cv.group","phi"):=list(NULL,value*sqrt(var))]
-    #ggplot(mat[ibin1>20&ibin2<240])+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~groupname)+scale_fill_gradient2(na.value = "white")
+    if (ref=="expected") {
+      mat[,c("cv.group","phi"):=list(NULL,value*sqrt(var))]
+    } else {
+      mat[,c("cv.group","delta"):=list(NULL,value*sqrt(var))]
+    }
+    #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~groupname)+scale_fill_gradient2(na.value = "white")
     mat
   }
   mat[,c("ibin1","ibin2","ncounts"):=list(NULL,NULL,NULL)]
@@ -598,15 +629,13 @@ detect_interactions = function(cs, resolution, group, threshold=0.95, ncores=1, 
   csm=csb@grouped[[idx2]]
   #check if interaction wasn't calculated already
   if (binless==T) {
-    if (get_cs_interaction_idx(csm, type="binteractions", threshold=threshold, ref="expected", raise=F)>0) {
+    if (get_cs_interaction_idx(csm, type="binteractions", threshold=-1, ref="expected", raise=F)>0)
       stop("Refusing to overwrite this already detected interaction")
-    }
     mat = csnorm_detect_binless(cs, resolution=resolution, group=group, ref="expected", ncores=ncores)
     csi=new("CSinter", mat=mat, type="binteractions", threshold=-1, ref="expected")
   } else {
-    if (get_cs_interaction_idx(csm, type="interactions", threshold=threshold, ref="expected", raise=F)>0) {
+    if (get_cs_interaction_idx(csm, type="interactions", threshold=threshold, ref="expected", raise=F)>0)
       stop("Refusing to overwrite this already detected interaction")
-    }
     mat = csnorm_detect_binned(cs, resolution=resolution, group=group, ref="expected", threshold=threshold, ncores=ncores)
     csi=new("CSinter", mat=mat, type="interactions", threshold=threshold, ref="expected")
   }
@@ -628,18 +657,23 @@ detect_interactions = function(cs, resolution, group, threshold=0.95, ncores=1, 
 #' @export
 #' 
 #' @examples
-detect_differences = function(cs, resolution, group, ref, threshold=0.95, ncores=1){
+detect_differences = function(cs, resolution, group, ref, threshold=0.95, ncores=1, binless=F){
   idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
   idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
-  #check if interaction wasn't calculated already
-  if (get_cs_interaction_idx(csm, type="differences", threshold=threshold, ref="expected", raise=F)>0) {
-    stop("Refusing to overwrite this already detected interaction")
+  if (binless==T) {
+    if (get_cs_interaction_idx(csm, type="bdifferences", threshold=-1, ref=ref, raise=F)>0)
+      stop("Refusing to overwrite this already detected interaction")
+    mat = csnorm_detect_binless(cs, resolution=resolution, group=group, ref=ref, ncores=ncores)
+    csi=new("CSinter", mat=mat, type="bdifferences", threshold=-1, ref=ref)
+  } else {
+    if (get_cs_interaction_idx(csm, type="differences", threshold=threshold, ref=ref, raise=F)>0)
+      stop("Refusing to overwrite this already detected interaction")
+    mat = csnorm_detect_binned(cs, resolution=resolution, group=group, ref=ref, threshold=threshold, ncores=ncores)
+    csi=new("CSinter", mat=mat, type="differences", threshold=threshold, ref=ref)
   }
-  mat=csnorm_detect_binned(cs, resolution=resolution, group=group, ref=ref, threshold=threshold, ncores=ncores)
   #add interaction to cs object
-  csi=new("CSinter", mat=mat, type="differences", threshold=threshold, ref=ref)
   csm@interactions=append(csm@interactions,list(csi))
   csb@grouped[[idx2]]=csm
   cs@binned[[idx1]]=csb

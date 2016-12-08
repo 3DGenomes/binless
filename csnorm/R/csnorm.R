@@ -118,9 +118,11 @@ setMethod("show",signature="CSinter",definition=function(object) {
     cat(" (threshold=", object@threshold,")\n")
   } else if (object@type=="binteractions") {
     cat("        Binless interactions wrt expected\n") 
-  } else {
+  } else if (object@type=="differences") {
     cat("        Significant differences wrt ", object@ref)
     cat(" (threshold=", object@threshold,")\n")
+  } else {
+    cat("        Binless differences wrt ", object@ref, "\n") 
   }
 })
 
