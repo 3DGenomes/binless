@@ -39,6 +39,7 @@ bin_and_chunk = function(cs, resolution, group, ncores) {
     groups=data.table(name=names,groupname=names)
   } else {
     groups=cs@experiments[,.(name,groupname=do.call(paste,mget(group))),by=group][,.(name,groupname)] #we already know groupname is unique
+    groups[,groupname:=ordered(groupname)] #same class as name
   }
   setkey(groups,name)
   #retrieve bin borders
