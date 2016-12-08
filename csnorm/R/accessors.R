@@ -114,7 +114,7 @@ get_interactions = function(cs, type, resolution, group,
   idx3=get_cs_interaction_idx(csm, type, threshold, ref)
   int=csm@interactions[[idx3]]@mat
   ret=merge(mat,int,by=c("name","bin1","bin2"))
-  if (type=="interactions") {
+  if (type=="interactions" | type=="binteractions") {
     return(ret)
   } else {
     ret=merge(ret, mat[name==ref,.(bin1,bin2,ref.observed=observed,ref.expected=expected,

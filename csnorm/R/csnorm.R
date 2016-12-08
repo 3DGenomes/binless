@@ -115,12 +115,13 @@ setClass("CSinter",
 setMethod("show",signature="CSinter",definition=function(object) {
   if (object@type=="interactions") {
     cat("        Significant interactions wrt expected") 
+    cat(" (threshold=", object@threshold,")\n")
   } else if (object@type=="binteractions") {
-    cat("        Significant binless interactions wrt expected") 
+    cat("        Binless interactions wrt expected\n") 
   } else {
     cat("        Significant differences wrt ", object@ref)
+    cat(" (threshold=", object@threshold,")\n")
   }
-  cat(" (threshold=", object@threshold,")\n")
 })
 
 #' Class for one binned matrix and its interaction detections

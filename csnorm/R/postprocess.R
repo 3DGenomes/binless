@@ -365,7 +365,6 @@ genlasso_cross_validate = function(mat, res.cv, cvgroups, lambda1, lambda2) {
 #' @param ref 
 #' @param resolution 
 #' @param group 
-#' @param threshold on the probability K/(1+K) where K is the Bayes factor
 #' @param ncores 
 #' @param niter number of IRLS iterations
 #' @param cv.fold perform x-fold cross-validation
@@ -376,8 +375,7 @@ genlasso_cross_validate = function(mat, res.cv, cvgroups, lambda1, lambda2) {
 #' @export
 #'
 #' @examples
-csnorm_detect_binless = function(cs, resolution, group, ref="expected", threshold=0.95, niter=1,
-                                 ncores=1, cv.fold=10, cv.gridsize=30) {
+csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1, ncores=1, cv.fold=10, cv.gridsize=30) {
   stuff = csnorm:::bin_and_chunk(cs, resolution, group, ncores)
   chunks=stuff$chunks
   counts=stuff$counts
@@ -436,7 +434,7 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", threshol
     cv = foreach (g=groupnames, .combine=rbind) %do% {
       l2vals=c(0,10^seq(log10(min(res.ref[[g]]$EndLambda)),log10(max(res.ref[[g]]$BeginLambda)),length.out=cv.gridsize))
       foreach (lambda2=l2vals, .combine=rbind) %dopar%
-        csnorm:::genlasso_cross_validate(mat, res.cv, cvgroups, lambda1=0, lambda2=lambda2)
+        csnorm:::genlasso_cross_validate(mat[groupname==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
     }
     #ggplot(cv[lambda2>0.5&lambda2<3])+geom_line(aes(lambda2,mse))+geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
     #  facet_wrap(~groupname,scales="free")#+scale_x_log10()
@@ -464,6 +462,8 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", threshol
     ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=value))+facet_wrap(~groupname)+scale_fill_gradient2()
     mat
   }
+  mat[,c("ibin1","ibin2","ncounts"):=list(NULL,NULL,NULL)]
+  setnames(mat,"groupname","name")
   counts[,c("bin1","bin2","ibin1","ibin2","chunk1","chunk2"):=list(NULL,NULL,NULL,NULL,NULL,NULL)]
   biases[,c("bin","ibin","chunk"):=list(NULL,NULL,NULL)]
   return(mat)
@@ -584,8 +584,8 @@ detect_interactions = function(cs, resolution, group, threshold=0.95, ncores=1, 
     if (get_cs_interaction_idx(csm, type="binteractions", threshold=threshold, ref="expected", raise=F)>0) {
       stop("Refusing to overwrite this already detected interaction")
     }
-    mat = csnorm_detect_binless(cs, resolution=resolution, group=group, ref="expected", threshold=threshold, ncores=ncores)
-    csi=new("CSinter", mat=mat, type="binteractions", threshold=threshold, ref="expected")
+    mat = csnorm_detect_binless(cs, resolution=resolution, group=group, ref="expected", ncores=ncores)
+    csi=new("CSinter", mat=mat, type="binteractions", threshold=-1, ref="expected")
   } else {
     if (get_cs_interaction_idx(csm, type="interactions", threshold=threshold, ref="expected", raise=F)>0) {
       stop("Refusing to overwrite this already detected interaction")
