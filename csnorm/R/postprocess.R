@@ -419,6 +419,8 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
       stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
       flsa(submat[,value], connListObj=cmat, verbose=F)
     }
+    #fail if any has failed (flsa bugs)
+    if (any(sapply(groupnames, function(g){is.null(res.ref[[g]])}))) stop("one flsa run failed, aborting")
     #cross-validate lambda2 (lambda1=0 gives good results)
     mat[,cv.group:=as.character(((ibin2+ibin1*max(ibin1))%%cv.fold)+1)]
     cvgroups=as.character(1:cv.fold)
