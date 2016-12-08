@@ -429,6 +429,13 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
         submat[cv.group==cv,value:=0]
         stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
         flsa(submat[,value], connListObj=cmat, verbose=F)
+      }
+    #remove failed cv attempts (flsa bugs)
+    cvgroups = foreach(cv=cvgroups, .combine=c) %do% {
+      if (any(sapply(groupnames, function(g){is.null(res.cv[[cv]][[g]])})))
+        cat("removing CV group ",cv," due to failure of flsa!\n")
+      else
+        cv
     }
     #then, try a few lambda values to define the interesting region
     cv = foreach (g=groupnames, .combine=rbind) %do% {
@@ -436,8 +443,8 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
       foreach (lambda2=l2vals, .combine=rbind) %dopar%
         csnorm:::genlasso_cross_validate(mat[groupname==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
     }
-    #ggplot(cv[lambda2>0.5&lambda2<3])+geom_line(aes(lambda2,mse))+geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
-    #  facet_wrap(~groupname,scales="free")#+scale_x_log10()
+    #ggplot(cv)+geom_line(aes(lambda2,mse))+geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
+    #  facet_wrap(~groupname,scales="free")+scale_x_log10()
     #lower bound is lambda one step below minimum mse
     bounds=merge(cv,cv[,.SD[mse==min(mse),.(lambda2.max=lambda2,mse.max=mse+mse.sd)],by=groupname],by="groupname")
     lmin=bounds[lambda2<lambda2.max,.(l2min=max(lambda2)),by=groupname]
@@ -459,7 +466,7 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
     for (g in groupnames)
       mat[groupname==g,value:=flsaGetSolution(res.ref[[g]], lambda1=0, lambda2=l2vals[groupname==g,lambda2])[1,]]
     mat[,c("cv.group","phi"):=list(NULL,value*sqrt(var))]
-    ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=value))+facet_wrap(~groupname)+scale_fill_gradient2()
+    #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=value))+facet_wrap(~groupname)+scale_fill_gradient2(na.value = "white")
     mat
   }
   mat[,c("ibin1","ibin2","ncounts"):=list(NULL,NULL,NULL)]
