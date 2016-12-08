@@ -454,10 +454,10 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
     #ggplot(cv)+geom_line(aes(lambda2,mse))+geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
     #  facet_wrap(~groupname,scales="free")+scale_x_log10()
     #lower bound is lambda one step below minimum mse
-    bounds=merge(cv,cv[,.SD[mse==min(mse),.(lambda2.max=lambda2,mse.max=mse+mse.sd)],by=groupname],by="groupname")
+    bounds=merge(cv,cv[,.SD[mse==min(mse),.(lambda2.max=lambda2)],by=groupname],by="groupname")
     lmin=bounds[lambda2<lambda2.max,.(l2min=max(lambda2)),by=groupname]
-    #upper bound is lambda one step above mse+1sd 
-    lmax=bounds[,.SD[lambda2>=lambda2.max&mse>=mse.max,.(l2max=min(lambda2))],by=groupname]
+    #upper bound is lambda one step above mse
+    lmax=bounds[,.SD[lambda2>lambda2.max,.(l2max=min(lambda2))],by=groupname]
     bounds=merge(lmin,lmax,by="groupname")
     #
     #now, try all lambda values between these bounds
@@ -476,7 +476,7 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
     for (g in groupnames)
       mat[groupname==g,value:=flsaGetSolution(res.ref[[g]], lambda1=0, lambda2=l2vals[groupname==g,lambda2])[1,]]
     mat[,c("cv.group","phi"):=list(NULL,value*sqrt(var))]
-    #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=value))+facet_wrap(~groupname)+scale_fill_gradient2(na.value = "white")
+    #ggplot(mat[ibin1>20&ibin2<240])+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~groupname)+scale_fill_gradient2(na.value = "white")
     mat
   }
   mat[,c("ibin1","ibin2","ncounts"):=list(NULL,NULL,NULL)]
