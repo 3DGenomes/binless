@@ -376,6 +376,7 @@ genlasso_cross_validate = function(mat, res.cv, cvgroups, lambda1, lambda2) {
 #'
 #' @examples
 csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1, ncores=1, cv.fold=10, cv.gridsize=30) {
+  cat("Binless detection with resolution=",resolution," group=",group," and ref=",ref,"\n")
   stuff = csnorm:::bin_and_chunk(cs, resolution, group, ncores)
   chunks=stuff$chunks
   counts=stuff$counts
@@ -393,6 +394,8 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
                    ibin1=min(ibin):max(ibin),ibin2=min(ibin):max(ibin))][ibin1<=ibin2]
   mat[,phi:=0]
   for (step in 1:niter) {
+    cat("Main loop, step ",step,"\n")
+    cat(" Estimate raw signal\n")
     #compute signal matrix and new weights in parallel
     mat = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
       #get zero-filled portion of counts and predict model on it
@@ -412,6 +415,7 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
     setkey(mat,groupname,ibin1,ibin2,bin1,bin2)
     #
     #perform fused lasso on whole dataset
+    cat(" Fused lasso: estimation runs\n")
     groupnames=groups[,unique(groupname)]
     cmat = csnorm:::flsa_compute_connectivity(mat[,max(ibin2)+1])
     res.ref = foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
@@ -425,6 +429,7 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
     mat[,cv.group:=as.character(((ibin2+ibin1*max(ibin1))%%cv.fold)+1)]
     cvgroups=as.character(1:cv.fold)
     #first, run lasso regressions
+    cat(" Fused lasso: cross-validation runs\n")
     res.cv = foreach (cv=cvgroups, .final=function(x){setNames(x,cvgroups)}) %:%
       foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
         submat=copy(mat[groupname==g])
@@ -440,6 +445,7 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
         cv
     }
     #then, try a few lambda values to define the interesting region
+    cat(" Fused lasso: coarse scan\n")
     cv = foreach (g=groupnames, .combine=rbind) %do% {
       l2vals=c(0,10^seq(log10(min(res.ref[[g]]$EndLambda)),log10(max(res.ref[[g]]$BeginLambda)),length.out=cv.gridsize))
       foreach (lambda2=l2vals, .combine=rbind) %dopar%
@@ -455,6 +461,7 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
     bounds=merge(lmin,lmax,by="groupname")
     #
     #now, try all lambda values between these bounds
+    cat(" Fused lasso: fine scan\n")
     cv = foreach (g=groupnames, .combine=rbind) %do% {
       l2vals=sort(unique(res.ref[[g]]$BeginLambda))
       l2vals=bounds[groupname==g,l2vals[l2vals>=l2min & l2vals<=l2max]]
@@ -464,6 +471,7 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
     #ggplot(cv)+geom_line(aes(lambda2,mse))+#geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
     #  facet_wrap(~groupname,scales="free")
     #determine optimal lambda value and compute coefficients
+    cat(" Fused lasso: report optimum\n")
     l2vals=cv[,.SD[mse==min(mse),.(lambda2)],by=groupname]
     for (g in groupnames)
       mat[groupname==g,value:=flsaGetSolution(res.ref[[g]], lambda1=0, lambda2=l2vals[groupname==g,lambda2])[1,]]
