@@ -33,6 +33,8 @@
 #' @import foreach
 #' @import matrixStats
 #' @import ggplot2
+#' @import flsa
+#' @import abind
 #' @import methods
 #' @importFrom Hmisc cut2
 #' @importFrom dplyr ntile
@@ -113,10 +115,15 @@ setClass("CSinter",
 setMethod("show",signature="CSinter",definition=function(object) {
   if (object@type=="interactions") {
     cat("        Significant interactions wrt expected") 
-  } else {
+    cat(" (threshold=", object@threshold,")\n")
+  } else if (object@type=="binteractions") {
+    cat("        Binless interactions wrt expected\n") 
+  } else if (object@type=="differences") {
     cat("        Significant differences wrt ", object@ref)
+    cat(" (threshold=", object@threshold,")\n")
+  } else {
+    cat("        Binless differences wrt ", object@ref, "\n") 
   }
-  cat(" (threshold=", object@threshold,")\n")
 })
 
 #' Class for one binned matrix and its interaction detections
