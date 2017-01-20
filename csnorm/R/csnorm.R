@@ -34,6 +34,7 @@
 #' @import matrixStats
 #' @import ggplot2
 #' @import flsa
+#' @import igraph
 #' @import abind
 #' @import methods
 #' @importFrom Hmisc cut2
