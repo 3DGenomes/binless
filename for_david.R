@@ -8,16 +8,17 @@ library(scales)
 #args=commandArgs(trailingOnly=TRUE)
 sub="SELP_150k"
 bpk=3
-type="perf"
+type="outer"
 
-setwd("/home/yannick/simulations/cs_norm")
+setwd("/scratch/workspace/csnorm")
 
 #merge datasets
-load(paste0("data/rao_HiCall_GM12878_",sub,"_csdata.RData"))
+load(paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_GM12878_",sub,"_csdata.RData"))
 csd1=csd
-load(paste0("data/rao_HiCall_IMR90_",sub,"_csdata.RData"))
+load(paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_IMR90_",sub,"_csdata.RData"))
 csd2=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
+#cs=merge_cs_norm_datasets(list(csd1), different.decays="none")
 
 #look at these objects
 csd1
@@ -26,7 +27,7 @@ cs
 
 #normalize using approximation
 cs = run_gauss(cs, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
-               ncounts = 1000000, type=type)
+               ncounts = 1000000, type=type, fit.disp = F)
 save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
 
 #look at the following objects

@@ -18,7 +18,8 @@ Imports:
     MASS,
     matrixStats,
     ggplot2,
-    dplyr
+    dplyr,
+    Matrix
 LinkingTo: StanHeaders (>= 2.11.0), rstan (>= 2.11.1), BH (>= 1.60.0), Rcpp (>=
     0.12.0), RcppEigen
 RoxygenNote: 5.0.1

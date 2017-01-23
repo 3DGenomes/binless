@@ -14,7 +14,12 @@ data {
   int<lower=4> Krow; //number of functions in spline base for row biases
   int<lower=1> SD; //number of cut sites across all datasets
   int<lower=1,upper=SD+1> bbegin[Dsets+1]; //bbegin[i]=j: dataset i starts at j
-  vector[SD] cutsitesD; //cut site locations, all data
+  //vector[SD] cutsitesD; //cut site locations, all data
+  //bias spline, sparse (iota and rho have the same design)
+  vector[nnz(SD)] XDrow_w;
+  int XDrow_v[nnz(SD)];
+  int XDrow_u[SD+1];
+  row_vector[Krow] prowD[Dsets];
   //reduced count sums and standard deviations
   vector[SD] eta_hat_RJ;
   vector[SD] eta_hat_DL;
@@ -29,46 +34,8 @@ data {
   vector<lower=0>[SD] sd_R;
 }
 transformed data {
-  //bias spline, sparse (iota and rho have the same design)
-  vector[nnz(SD)] XDrow_w;
-  int XDrow_v[nnz(SD)];
-  int XDrow_u[SD+1];
-  row_vector[Krow] prowD[Dsets];
   //scaling factor for genomic lambdas
   real lgfac;
-
-  //Bias GAM spline, sparse
-  {
-    vector[SD] row_weightsD;
-    int nnzs[Dsets+1];
-    row_weightsD = rep_vector(1, SD);
-    nnzs[1] = 1;
-    for (i in 1:Dsets) nnzs[i+1] = nnzs[i]+nnz(bbegin[i+1]-bbegin[i]);
-    
-    #compute design matrix and projector
-    for (d in 1:Dsets) {
-      int S;
-      S = bbegin[d+1]-bbegin[d];
-      {
-        vector[S] cutsites;
-        vector[nnz(S)] Xrow_w;
-        int Xrow_v[nnz(S)];
-        int Xrow_u[S+1];
-        vector[S] row_weights;
-        row_vector[Krow] prow;
-        cutsites = cutsitesD[bbegin[d]:(bbegin[d+1]-1)];
-        row_weights = row_weightsD[bbegin[d]:(bbegin[d+1]-1)];
-        #include "sparse_spline_construction.stan"
-        XDrow_w[nnzs[d]:(nnzs[d+1]-1)] = Xrow_w;
-        for (i in 1:size(Xrow_v)) Xrow_v[i] = Xrow_v[i] + Krow*(d-1);
-        XDrow_v[nnzs[d]:(nnzs[d+1]-1)] = Xrow_v;
-        prowD[d] = prow;
-      }
-    }
-    XDrow_u[1] = 1;
-    for (i in 1:SD) XDrow_u[i+1] = XDrow_u[i]+nnz(1);
-  }
-  
   //scaling factor
   lgfac = Krow;
 }
@@ -98,7 +65,7 @@ transformed parameters {
   //
   vector[SD] log_mean_cleft;
   vector[SD] log_mean_cright;
-
+  
   //iota
   {
     vector[Dsets*Krow] beta_iota_centered;
@@ -147,6 +114,7 @@ transformed parameters {
     log_mean_cleft  = counts_exposure + log_iota;
     log_mean_cright = counts_exposure + log_rho;
   }
+
 }
 model {
   //// likelihoods

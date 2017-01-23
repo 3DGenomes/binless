@@ -27,6 +27,7 @@
 #'
 #' @useDynLib csnorm, .registration = TRUE
 #' @import rstan
+#' @import splines
 #' @import mgcv
 #' @import data.table
 #' @import doParallel
@@ -34,6 +35,7 @@
 #' @import matrixStats
 #' @import ggplot2
 #' @import methods
+#' @import Matrix
 #' @importFrom Hmisc cut2
 #' @importFrom dplyr ntile
 #'
