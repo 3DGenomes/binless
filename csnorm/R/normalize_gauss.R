@@ -244,160 +244,203 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
   bts=a$bts
   cts=a$cts
   XB = as.array(cs@design[,genomic])
-  unique_XB = unique(XB)
+  
   #run optimization
   Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
-  bbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
+  Totalbbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
+  TotalDsets = cs@design[,.N]
   
-  #sparse spline design
-  splinedegree=3 #Cubic spline
-  cutsites = cs@biases[,pos][bbegin[1]:(bbegin[2]-1)]
-  dx = 1.01*(max(cutsites)-min(cutsites))/(Krow-splinedegree)
-  t = min(cutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
-  Bsp = spline.des(cutsites, knots = t, outer.ok = T, sparse=T)$design
-  X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
-  # do we really need this?
-  row_weights = rep.int(1,bbegin[2]-bbegin[1])
-  row_weights = row_weights/mean(row_weights)
-  # do we really need this?
-  prowD = crossprod(row_weights,Bsp)
-  prowD = prowD / sum(prowD)
-  #beta_iota = rep.int(0,bbegin[2]-bbegin[1])
-  diags = list(rep(1,Krow), rep(-2,Krow))
-  D1 = bandSparse(Krow-2, Krow, k=0:2, diagonals=c(diags, diags[1]))
-  lambda_iota = as.array(cs@par$lambda_iota)
-  lambda_rho = as.array(cs@par$lambda_rho)
-  D = bdiag(lambda_iota[XB[1]]*D1,lambda_rho[XB[1]]*D1)
-  DtD = crossprod(D,D)
-  SD = bbegin[2]-bbegin[1]
-  U_e = cbind(c(rep.int(1,SD),rep.int(0,4*SD)),c(rep.int(0,SD),rep.int(1,2*SD),rep.int(0,2*SD)),c(rep.int(0,3*SD),rep.int(1,2*SD)))
-  
-  #beta_rho_centered = beta_rho_prime - (prowD %*% beta_rho_prime)%*%rep.int(1,Krow)
-  Dsets = cs@design[,.N]
-  if (Dsets > 1) {
-    for (d in 2:Dsets) {
-      cutsites = cs@biases[,pos][bbegin[d]:(bbegin[d+1]-1)];
-      dx = 1.01*(max(cutsites)-min(cutsites))/(Krow-splinedegree)
-      t = min(cutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
-      nBsp = spline.des(cutsites, knots = t, outer.ok = T, sparse=T)$design
-      nX = rbind(cbind(nBsp/2,nBsp/2),bdiag(nBsp,nBsp),bdiag(nBsp,nBsp))
-      SD = bbegin[d+1]-bbegin[d]
-      row_weights = rep.int(1,SD)
-      row_weights = row_weights/mean(row_weights)
-      prow = crossprod(row_weights,nBsp)
-      prow = prow / sum(prow)
-      prowD = rbind(prowD,prow)
-      X = rbind(X,nX)
-      stanBsp = bdiag(Bsp,nBsp) # for stan
-      nU_e = cbind(c(rep.int(1,SD),rep.int(0,4*SD)),c(rep.int(0,SD),rep.int(1,2*SD),rep.int(0,2*SD)),c(rep.int(0,3*SD),rep.int(1,2*SD)))
-      U_e = bdiag(U_e,nU_e) 
+  for(uXB in unique(XB)) {
+    Dsets = 0
+    bbegin = c()
+    bbegin_stan = c(1)
+    for (d in 1:TotalDsets) {
+      if(XB[d] == uXB) {
+        bbegin = c(bbegin,Totalbbegin[d],Totalbbegin[d+1])
+        bbegin_stan = c(bbegin_stan,Totalbbegin[d+1])
+        Dsets = Dsets + 1
+      }
     }
-  } else {
-    stanBsp = Bsp
-  }
-  RBsp = as(stanBsp,"RsparseMatrix")  
-  
-  data=list(Dsets=cs@design[,.N], Biases=cs@design[,uniqueN(genomic)], XB=XB,
-            Krow=Krow, SD=cs@biases[,.N], bbegin=bbegin, XDrow_w=RBsp@x, XDrow_v=RBsp@j+1, XDrow_u=RBsp@p+1, prowD=as.matrix(prowD),
-            eta_hat_RJ=bts[cat=="rejoined",etahat], sd_RJ=bts[cat=="rejoined",std],
-            eta_hat_DL=bts[cat=="dangling L",etahat], sd_DL=bts[cat=="dangling L",std],
-            eta_hat_DR=bts[cat=="dangling R",etahat], sd_DR=bts[cat=="dangling R",std],
-            eta_hat_L=cts[cat=="contact L",etahat], sd_L=cts[cat=="contact L",std],
-            eta_hat_R=cts[cat=="contact R",etahat], sd_R=cts[cat=="contact R",std])
-  # data=list(Dsets=cs@design[,.N], Biases=cs@design[,uniqueN(genomic)], XB=as.array(cs@design[,genomic]),
-  #          Krow=Krow, SD=cs@biases[,.N], bbegin=bbegin, cutsitesD=cs@biases[,pos],
-  #          eta_hat_RJ=bts[cat=="rejoined",etahat], sd_RJ=bts[cat=="rejoined",std],
-  #          eta_hat_DL=bts[cat=="dangling L",etahat], sd_DL=bts[cat=="dangling L",std],
-  #          eta_hat_DR=bts[cat=="dangling R",etahat], sd_DR=bts[cat=="dangling R",std],
-  #          eta_hat_L=cts[cat=="contact L",etahat], sd_L=cts[cat=="contact L",std],
-  #          eta_hat_R=cts[cat=="contact R",etahat], sd_R=cts[cat=="contact R",std])
-  if (type=="outer") {
-    data$lambda_iota=as.array(cs@par$lambda_iota)
-    data$lambda_rho=as.array(cs@par$lambda_rho)
-    #D = data$lambda_rho[data$XB[1]]*D # same decay in all datasets, need to change
-    model=csnorm:::stanmodels$gauss_genomic_outer
-  } else {
-    model=csnorm:::stanmodels$gauss_genomic_perf
-  }
-  
-  #etas = c(data$eta_hat_RJ,data$eta_hat_DL,data$eta_hat_DR,data$eta_hat_L,data$eta_hat_R)
-  #S_m2 = bdiag(diag(1/(data$sd_RJ^2)),diag(1/(data$sd_DL^2)),diag(1/(data$sd_DR^2)),diag(1/(data$sd_L^2)),diag(1/(data$sd_R^2)))
-  SD = bbegin[2]-bbegin[1]
-  etas = c(data$eta_hat_RJ[1:SD],data$eta_hat_DL[1:SD],data$eta_hat_DR[1:SD],data$eta_hat_L[1:SD],data$eta_hat_R[1:SD])
-  sds = c((1/(data$sd_RJ[1:SD]^2)),(1/(data$sd_DL[1:SD]^2)),(1/(data$sd_DR[1:SD]^2)),(1/(data$sd_L[1:SD]^2)),(1/(data$sd_R[1:SD]^2)))
-  if (Dsets > 1) {
-    for (d in 2:Dsets) {
-      SDd = bbegin[d+1]-bbegin[d]
-      etas = c(etas,data$eta_hat_RJ[(SD+1):(SD+SDd)],data$eta_hat_DL[(SD+1):(SD+SDd)],data$eta_hat_DR[(SD+1):(SD+SDd)],data$eta_hat_L[(SD+1):(SD+SDd)],data$eta_hat_R[(SD+1):(SD+SDd)])
-      sds = c(sds,(1/(data$sd_RJ[(SD+1):(SD+SDd)]^2)),(1/(data$sd_DL[(SD+1):(SD+SDd)]^2)),(1/(data$sd_DR[(SD+1):(SD+SDd)]^2)),(1/(data$sd_L[(SD+1):(SD+SDd)]^2)),(1/(data$sd_R[(SD+1):(SD+SDd)]^2)))
-      SD = SD + SDd
+    SD = bbegin[2]-bbegin[1]
+    #sparse spline design
+    splinedegree=3 #Cubic spline
+    cutsites = cs@biases[,pos][bbegin[1]:(bbegin[2]-1)]
+    dx = 1.01*(max(cutsites)-min(cutsites))/(Krow-splinedegree)
+    t = min(cutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
+    Bsp = spline.des(cutsites, knots = t, outer.ok = T, sparse=T)$design
+    X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
+    # do we really need this?
+    row_weights = rep.int(1,SD)
+    row_weights = row_weights/mean(row_weights)
+    # do we really need this?
+    prowD = crossprod(row_weights,Bsp)
+    prowD = prowD / sum(prowD)
+    #beta_iota = rep.int(0,bbegin[2]-bbegin[1])
+    diags = list(rep(1,Krow), rep(-2,Krow))
+    D1 = bandSparse(Krow-2, Krow, k=0:2, diagonals=c(diags, diags[1]))
+    lambda_iota = as.array(cs@par$lambda_iota)
+    lambda_rho = as.array(cs@par$lambda_rho)
+    D = bdiag(lambda_iota[XB[1]]*D1,lambda_rho[XB[1]]*D1)
+    DtD = crossprod(D,D)
+    U_e = cbind(c(rep.int(1,SD),rep.int(0,4*SD)),c(rep.int(0,SD),rep.int(1,2*SD),rep.int(0,2*SD)),c(rep.int(0,3*SD),rep.int(1,2*SD)))
+    eta_hat_RJ=bts[cat=="rejoined",etahat][bbegin[1]:(bbegin[2]-1)]
+    sd_RJ=bts[cat=="rejoined",std][bbegin[1]:(bbegin[2]-1)]
+    eta_hat_DL=bts[cat=="dangling L",etahat][bbegin[1]:(bbegin[2]-1)]
+    sd_DL=bts[cat=="dangling L",std][bbegin[1]:(bbegin[2]-1)]
+    eta_hat_DR=bts[cat=="dangling R",etahat][bbegin[1]:(bbegin[2]-1)]
+    sd_DR=bts[cat=="dangling R",std][bbegin[1]:(bbegin[2]-1)]
+    eta_hat_L=cts[cat=="contact L",etahat][bbegin[1]:(bbegin[2]-1)]
+    sd_L=cts[cat=="contact L",std][bbegin[1]:(bbegin[2]-1)]
+    eta_hat_R=cts[cat=="contact R",etahat][bbegin[1]:(bbegin[2]-1)]
+    sd_R=cts[cat=="contact R",std][bbegin[1]:(bbegin[2]-1)]
+    
+    #beta_rho_centered = beta_rho_prime - (prowD %*% beta_rho_prime)%*%rep.int(1,Krow)
+    #Dsets = cs@design[,.N]
+    if (Dsets > 1) {
+      for (d in 2:Dsets) {
+        cutsites = cs@biases[,pos][bbegin[d+1]:(bbegin[d+2]-1)]
+        dx = 1.01*(max(cutsites)-min(cutsites))/(Krow-splinedegree)
+        t = min(cutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
+        nBsp = spline.des(cutsites, knots = t, outer.ok = T, sparse=T)$design
+        nX = rbind(cbind(nBsp/2,nBsp/2),bdiag(nBsp,nBsp),bdiag(nBsp,nBsp))
+        SD = bbegin[d+2]-bbegin[d+1]
+        row_weights = rep.int(1,SD)
+        row_weights = row_weights/mean(row_weights)
+        prow = crossprod(row_weights,nBsp)
+        prow = prow / sum(prow)
+        prowD = rbind(prowD,prow)
+        X = rbind(X,nX)
+        Bsp = bdiag(Bsp,nBsp) # for stan
+        nU_e = cbind(c(rep.int(1,SD),rep.int(0,4*SD)),c(rep.int(0,SD),rep.int(1,2*SD),rep.int(0,2*SD)),c(rep.int(0,3*SD),rep.int(1,2*SD)))
+        U_e = bdiag(U_e,nU_e) 
+        eta_hat_RJ=c(eta_hat_RJ,bts[cat=="rejoined",etahat][bbegin[d+1]:(bbegin[d+2]-1)])
+        sd_RJ=c(sd_RJ,bts[cat=="rejoined",std][bbegin[d+1]:(bbegin[d+2]-1)])
+        eta_hat_DL=c(eta_hat_DL,bts[cat=="dangling L",etahat][bbegin[d+1]:(bbegin[d+2]-1)])
+        sd_DL=c(sd_DL,bts[cat=="dangling L",std][bbegin[d+1]:(bbegin[d+2]-1)])
+        eta_hat_DR=c(eta_hat_DR,bts[cat=="dangling R",etahat][bbegin[d+1]:(bbegin[d+2]-1)])
+        sd_DR=c(sd_DR,bts[cat=="dangling R",std][bbegin[d+1]:(bbegin[d+2]-1)])
+        eta_hat_L=c(eta_hat_L,cts[cat=="contact L",etahat][bbegin[d+1]:(bbegin[d+2]-1)])
+        sd_L=c(sd_L,cts[cat=="contact L",std][bbegin[d+1]:(bbegin[d+2]-1)])
+        eta_hat_R=c(eta_hat_R,cts[cat=="contact R",etahat][bbegin[d+1]:(bbegin[d+2]-1)])
+        sd_R=c(sd_R,cts[cat=="contact R",std][bbegin[d+1]:(bbegin[d+2]-1)])
+        
+      }
+    } 
+    
+    RBsp = as(Bsp,"RsparseMatrix")  
+    
+    data=list(Dsets=cs@design[,.N], Biases=cs@design[,uniqueN(genomic)], XB=XB,
+              Krow=Krow, SD=cs@biases[,.N], bbegin=bbegin_stan, XDrow_w=RBsp@x, XDrow_v=RBsp@j+1, XDrow_u=RBsp@p+1, prowD=as.matrix(prowD),
+              eta_hat_RJ=eta_hat_RJ, sd_RJ=sd_RJ,
+              eta_hat_DL=eta_hat_DL, sd_DL=sd_DL,
+              eta_hat_DR=eta_hat_DR, sd_DR=sd_DR,
+              eta_hat_L=eta_hat_L, sd_L=sd_L,
+              eta_hat_R=eta_hat_R, sd_R=sd_R)
+    # data=list(Dsets=cs@design[,.N], Biases=cs@design[,uniqueN(genomic)], XB=as.array(cs@design[,genomic]),
+    #          Krow=Krow, SD=cs@biases[,.N], bbegin=bbegin, cutsitesD=cs@biases[,pos],
+    #          eta_hat_RJ=bts[cat=="rejoined",etahat], sd_RJ=bts[cat=="rejoined",std],
+    #          eta_hat_DL=bts[cat=="dangling L",etahat], sd_DL=bts[cat=="dangling L",std],
+    #          eta_hat_DR=bts[cat=="dangling R",etahat], sd_DR=bts[cat=="dangling R",std],
+    #          eta_hat_L=cts[cat=="contact L",etahat], sd_L=cts[cat=="contact L",std],
+    #          eta_hat_R=cts[cat=="contact R",etahat], sd_R=cts[cat=="contact R",std])
+    if (type=="outer") {
+      data$lambda_iota=as.array(cs@par$lambda_iota)
+      data$lambda_rho=as.array(cs@par$lambda_rho)
+      #D = data$lambda_rho[data$XB[1]]*D # same decay in all datasets, need to change
+      model=csnorm:::stanmodels$gauss_genomic_outer
+    } else {
+      model=csnorm:::stanmodels$gauss_genomic_perf
     }
-  }
-  S_m2 = Diagonal(x=sds)
-  tmpX_S_m2 = crossprod(X,S_m2)
-  tmp_A = tmpX_S_m2%*%X + Krow^2*DtD
-  cholA = Cholesky(tmp_A)
-   
-  op=optimize_stan_model(model=model, data=data, iter=cs@settings$iter,
-                         verbose=verbose, init=0, init_alpha=init_alpha)
-  
-  W=cbind(c(rep(0,3*data$SD),rep(1,data$SD),rep(0,data$SD)), c(rep(0,4*data$SD),rep(1,data$SD)))
-  tmp_Xt_W = crossprod(X,W)
-  Gamma_v = solve(t(tmp_Xt_W)%*%solve(cholA,tmp_Xt_W), t(solve(cholA,tmp_Xt_W)))
-  #Gamma=Diagonal(2*Krow) - Gamma%*%solve(t(Gamma)%*%solve(cholA,Gamma), t(solve(cholA,Gamma)))
-  #all(abs((Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)-(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v))<1e-5)
-  
-  beta_y=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%t(X)%*%S_m2%*%etas)
-  beta_U=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%t(X)%*%S_m2%*%U_e)
-  
-  e=solve(t(U_e)%*%S_m2%*%(U_e-X%*%beta_U),t(U_e)%*%S_m2%*%(etas-X%*%beta_y))
-  eRJ = array(0,dim=c(Dsets))
-  eDE = array(0,dim=c(Dsets))
-  eC = array(0,dim=c(Dsets))
-  for (d in 1:Dsets) {
-    eRJ[d] = e[(3*(d-1)+1)]
-    eDE[d] = e[(3*(d-1)+2)]
-    eC[d] = e[(3*(d-1)+3)]
-  }
-  
-  beta = beta_y - beta_U%*%e
-  #beta=solve(cholA, Gamma%*%t(X)%*%S_m2%*%(etas-U_e%*%e))
-  #t(W)%*%X%*%beta centered
-  
-  #mu=t(X)%*%W
-  #mu=solve(t(mu)%*%solve(cholA,mu), t(mu)%*%solve(cholA, t(X)%*%S_m2%*%(etas-U_e%*%e)))
-  beta_iota = beta[1:Krow]
-  beta_rho = beta[(Krow+1):(2*Krow)]
-  log_iota = Bsp%*%beta_iota
-  log_rho = Bsp%*%beta_rho
-  
-  log_mean = U_e %*% e + X%*%beta
-  SD = bbegin[2]-bbegin[1]
-  log_mean_RJ = log_mean[1:SD]
-  log_mean_DL = log_mean[(SD+1):(2*SD)]
-  log_mean_DR = log_mean[(2*SD+1):(3*SD)]
-  log_mean_cleft  = log_mean[(3*SD+1):(4*SD)]
-  log_mean_cright = log_mean[(4*SD+1):(5*SD)]
-  SD = 5*SD
-  if (Dsets > 1) {
-    for (d in 2:Dsets) {
-      SDd = bbegin[d+1]-bbegin[d]
-      log_mean_RJ = c(log_mean_RJ,log_mean[(SD+1):(SD+SDd)])
-      log_mean_DL = c(log_mean_DL,log_mean[(SD+(SDd+1)):(SD+(2*SDd))])
-      log_mean_DR = c(log_mean_DR,log_mean[(SD+(2*SDd+1)):(SD+(3*SDd))])
-      log_mean_cleft  = c(log_mean_cleft,log_mean[(SD+(3*SDd+1)):(SD+(4*SDd))])
-      log_mean_cright = c(log_mean_cright,log_mean[(SD+(4*SDd+1)):(SD+(5*SDd))])
-      SD = SD + SDd
+    
+    #etas = c(data$eta_hat_RJ,data$eta_hat_DL,data$eta_hat_DR,data$eta_hat_L,data$eta_hat_R)
+    #S_m2 = bdiag(diag(1/(data$sd_RJ^2)),diag(1/(data$sd_DL^2)),diag(1/(data$sd_DR^2)),diag(1/(data$sd_L^2)),diag(1/(data$sd_R^2)))
+    SD = bbegin[2]-bbegin[1]
+    etas = c(data$eta_hat_RJ[1:SD],data$eta_hat_DL[1:SD],data$eta_hat_DR[1:SD],data$eta_hat_L[1:SD],data$eta_hat_R[1:SD])
+    sds = c((1/(data$sd_RJ[1:SD]^2)),(1/(data$sd_DL[1:SD]^2)),(1/(data$sd_DR[1:SD]^2)),(1/(data$sd_L[1:SD]^2)),(1/(data$sd_R[1:SD]^2)))
+    if (Dsets > 1) {
+      for (d in 2:Dsets) {
+        SDd = bbegin[d+2]-bbegin[d+1]
+        etas = c(etas,data$eta_hat_RJ[(SD+1):(SD+SDd)],data$eta_hat_DL[(SD+1):(SD+SDd)],data$eta_hat_DR[(SD+1):(SD+SDd)],data$eta_hat_L[(SD+1):(SD+SDd)],data$eta_hat_R[(SD+1):(SD+SDd)])
+        sds = c(sds,(1/(data$sd_RJ[(SD+1):(SD+SDd)]^2)),(1/(data$sd_DL[(SD+1):(SD+SDd)]^2)),(1/(data$sd_DR[(SD+1):(SD+SDd)]^2)),(1/(data$sd_L[(SD+1):(SD+SDd)]^2)),(1/(data$sd_R[(SD+1):(SD+SDd)]^2)))
+        SD = SD + SDd
+      }
     }
+    S_m2 = Diagonal(x=sds)
+    tmpX_S_m2 = crossprod(X,S_m2)
+    tmp_A = tmpX_S_m2%*%X + Krow^2*DtD
+    cholA = Cholesky(tmp_A)
+     
+    op=optimize_stan_model(model=model, data=data, iter=cs@settings$iter,
+                           verbose=verbose, init=0, init_alpha=init_alpha)
+    
+    W=cbind(c(rep(0,3*data$SD),rep(1,data$SD),rep(0,data$SD)), c(rep(0,4*data$SD),rep(1,data$SD)))
+    tmp_Xt_W = crossprod(X,W)
+    Gamma_v = solve(t(tmp_Xt_W)%*%solve(cholA,tmp_Xt_W), t(solve(cholA,tmp_Xt_W)))
+    #Gamma=Diagonal(2*Krow) - Gamma%*%solve(t(Gamma)%*%solve(cholA,Gamma), t(solve(cholA,Gamma)))
+    #all(abs((Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)-(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v))<1e-5)
+    
+    beta_y=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%t(X)%*%S_m2%*%etas)
+    beta_U=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%t(X)%*%S_m2%*%U_e)
+    
+    e=solve(t(U_e)%*%S_m2%*%(U_e-X%*%beta_U),t(U_e)%*%S_m2%*%(etas-X%*%beta_y))
+    eRJ = array(0,dim=c(Dsets))
+    eDE = array(0,dim=c(Dsets))
+    eC = array(0,dim=c(Dsets))
+    for (d in 1:Dsets) {
+      eRJ[d] = e[(3*(d-1)+1)]
+      eDE[d] = e[(3*(d-1)+2)]
+      eC[d] = e[(3*(d-1)+3)]
+    }
+    
+    beta = beta_y - beta_U%*%e
+    #beta=solve(cholA, Gamma%*%t(X)%*%S_m2%*%(etas-U_e%*%e))
+    #t(W)%*%X%*%beta centered
+    
+    #mu=t(X)%*%W
+    #mu=solve(t(mu)%*%solve(cholA,mu), t(mu)%*%solve(cholA, t(X)%*%S_m2%*%(etas-U_e%*%e)))
+    beta_iota = beta[1:Krow]
+    beta_rho = beta[(Krow+1):(2*Krow)]
+    
+    log_mean = U_e %*% e + X%*%beta
+    SD = bbegin[2]-bbegin[1]
+    log_iota = Bsp[1:SD,1:Krow]%*%beta_iota
+    log_rho = Bsp[1:SD,1:Krow]%*%beta_rho
+
+    log_mean_RJ = log_mean[1:SD]
+    log_mean_DL = log_mean[(SD+1):(2*SD)]
+    log_mean_DR = log_mean[(2*SD+1):(3*SD)]
+    log_mean_cleft  = log_mean[(3*SD+1):(4*SD)]
+    log_mean_cright = log_mean[(4*SD+1):(5*SD)]
+    SD = 5*SD
+    if (Dsets > 1) {
+      for (d in 2:Dsets) {
+        SDd = bbegin[d+2]-bbegin[d+1]
+        
+        nlog_iota = Bsp[(SD/5+1):(SD/5+SDd),((d-1)*Krow+1):(d*Krow)]%*%beta_iota
+        nlog_rho = Bsp[(SD/5+1):(SD/5+SDd),((d-1)*Krow+1):(d*Krow)]%*%beta_rho
+        
+        log_iota = c(as.array(log_iota),as.array(nlog_iota))
+        log_rho = c(as.array(log_rho),as.array(nlog_rho))
+        
+        log_mean_RJ = c(log_mean_RJ,log_mean[(SD+1):(SD+SDd)])
+        log_mean_DL = c(log_mean_DL,log_mean[(SD+(SDd+1)):(SD+(2*SDd))])
+        log_mean_DR = c(log_mean_DR,log_mean[(SD+(2*SDd+1)):(SD+(3*SDd))])
+        log_mean_cleft  = c(log_mean_cleft,log_mean[(SD+(3*SDd+1)):(SD+(4*SDd))])
+        log_mean_cright = c(log_mean_cright,log_mean[(SD+(4*SDd+1)):(SD+(5*SDd))])
+        SD = SD + SDd
+      }
+      beta_iota = rep(beta_iota,Dsets)
+      beta_rho = rep(beta_rho,Dsets)
+    }
+    
   }
-  
 
   #make nice output table
-  #bout_stan=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_DL)],
-  #           bts[cat=="dangling R",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_DR)],
-  #           bts[cat=="rejoined",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_RJ)])
-  #cout_stan=rbind(cts[cat=="contact L",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_cleft)],
-  #           cts[cat=="contact R",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_cright)])
+  bout_stan=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_DL)],
+             bts[cat=="dangling R",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_DR)],
+             bts[cat=="rejoined",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_RJ)])
+  cout_stan=rbind(cts[cat=="contact L",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_cleft)],
+             cts[cat=="contact R",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_cright)])
   
   bout=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=as.array(log_mean_DL))],
              bts[cat=="dangling R",.(cat, name, id, pos, etahat, std, eta=as.array(log_mean_DR))],
