@@ -315,23 +315,26 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   data[,cat:=factor(cat)]
   #fit dispersion and offsets
   if (cs@experiments[,.N>1]) {
-    fit=glm.nb(y~offset(log(mu))+cat+name-1,data=data)
+    fit=glm.nb(y~offset(log(mu))+cat:name-1,data=data)
   } else {
     fit=glm.nb(y~offset(log(mu))+cat-1,data=data)
   }
-  eC=fit$coefficients[["catcount"]]+cs@par$eC
-  eDE=fit$coefficients[["catdangling"]]+cs@par$eDE
-  eRJ=fit$coefficients[["catrejoined"]]+cs@par$eRJ
+  eC=fit$coefficients[paste0("catcount:name",cs@experiments[,name])]+cs@par$eC
+  eDE=fit$coefficients[paste0("catdangling:name",cs@experiments[,name])]+cs@par$eDE
+  eRJ=fit$coefficients[paste0("catrejoined:name",cs@experiments[,name])]+cs@par$eRJ
   alpha=fit$theta
   cs@par=modifyList(cs@par,list(eC=eC,eRJ=eRJ,eDE=eDE,alpha=alpha))
   if (type=="outer") {
     #estimate lambdas
     Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
-    lambda_iota=sqrt((Krow-2)/(Krow^2*tcrossprod(cs@par$beta_iota_diff)+1e6)) #sigma=1e-3 for genomic
-    lambda_rho=sqrt((Krow-2)/(Krow^2*tcrossprod(cs@par$beta_rho_diff)+1e6))
+    lambdas = copy(cs@design)
+    lambdas[,lambda_iota:=sqrt((Krow-2)/(Krow^2*diag(tcrossprod(cs@par$beta_iota_diff))+1e6))] #sigma=1e-3 for genomic
+    lambdas[,lambda_rho:=sqrt((Krow-2)/(Krow^2*diag(tcrossprod(cs@par$beta_rho_diff))+1e6))]
     Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))* cs@settings$bf_per_decade)
-    lambda_diag=sqrt((Kdiag-2)/(Kdiag^2*tcrossprod(cs@par$beta_diag_diff)+1)) #sigma=1 for decay
-    cs@par=modifyList(cs@par, list(lambda_iota=lambda_iota, lambda_rho=lambda_rho, lambda_diag=lambda_diag))
+    lambdas[,lambda_diag:=sqrt((Kdiag-2)/(Kdiag^2*diag(tcrossprod(cs@par$beta_diag_diff))+1))] #sigma=1 for decay
+    cs@par$lambda_iota=lambdas[unique(genomic)][order(genomic),lambda_iota]
+    cs@par$lambda_rho=lambdas[unique(genomic)][order(genomic),lambda_rho]
+    cs@par$lambda_diag=lambdas[unique(decay)][order(decay),lambda_diag]
   }
   #compute logp
   cs@par$value = fit$twologlik/2 + (Krow-2)/2*sum(log(cs@par$lambda_iota/exp(1))+log(cs@par$lambda_rho/exp(1))) +
