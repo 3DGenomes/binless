@@ -323,8 +323,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   eDE=fit$coefficients[["catdangling"]]+cs@par$eDE
   eRJ=fit$coefficients[["catrejoined"]]+cs@par$eRJ
   alpha=fit$theta
-  value=-1
-  cs@par=modifyList(cs@par,list(eC=eC,eRJ=eRJ,eDE=eDE,alpha=alpha,value=value))
+  cs@par=modifyList(cs@par,list(eC=eC,eRJ=eRJ,eDE=eDE,alpha=alpha))
   if (type=="outer") {
     #estimate lambdas
     Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
@@ -334,6 +333,9 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
     lambda_diag=sqrt((Kdiag-2)/(Kdiag^2*tcrossprod(cs@par$beta_diag_diff)+1)) #sigma=1 for decay
     cs@par=modifyList(cs@par, list(lambda_iota=lambda_iota, lambda_rho=lambda_rho, lambda_diag=lambda_diag))
   }
+  #compute logp
+  cs@par$value = fit$twologlik/2 + (Krow-2)/2*sum(log(cs@par$lambda_iota/exp(1))+log(cs@par$lambda_rho/exp(1))) +
+                                   (Kdiag-2)/2*sum(log(cs@par$lambda_diag/exp(1)))
   return(cs)
 }
 
