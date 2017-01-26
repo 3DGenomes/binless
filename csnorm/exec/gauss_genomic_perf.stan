@@ -134,6 +134,7 @@ model {
   }
   
   //// hyperprior
+  
   lambda_iota ~ normal(0,0.001);
   lambda_rho ~ normal(0,0.001);
 }

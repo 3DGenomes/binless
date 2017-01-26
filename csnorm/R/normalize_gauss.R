@@ -234,7 +234,7 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7, type=c("perf","outer")) {
+csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7, type=c("perf","outer"), max_perf_iteration=1000, convergence_epsilon=1e-5) {
   type=match.arg(type)
   if (init.mean=="mean") {
     a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
@@ -259,6 +259,10 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
   all_log_mean_DR = c()
   all_log_mean_cleft  = c()
   all_log_mean_cright = c()
+  if (type=="perf") {
+    all_lambda_iota = c()
+    all_lambda_rho = c()
+  }
   
   for(uXB in unique(XB)) {
     Dsets = 0
@@ -268,7 +272,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
     for (d in 1:TotalDsets) {
       if(XB[d] == uXB) {
         bbegin = c(bbegin,Totalbbegin[d],Totalbbegin[d+1])
-        bbegin_stan = c(bbegin_stan,(Totalbbegin[d+1]-Totalbbegin[d]+1))
+        bbegin_stan = c(bbegin_stan,(Totalbbegin[d+1]-Totalbbegin[d]+tail(bbegin_stan, n=1)))
         Dsets = Dsets + 1
         stanXB = c(stanXB,1) 
       }
@@ -290,12 +294,15 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
     #beta_iota = rep.int(0,bbegin[2]-bbegin[1])
     diags = list(rep(1,Krow), rep(-2,Krow))
     D1 = bandSparse(Krow-2, Krow, k=0:2, diagonals=c(diags, diags[1]))
-    lambda_iota = as.array(cs@par$lambda_iota)
-    lambda_iota = lambda_iota[uXB]
-    lambda_rho = as.array(cs@par$lambda_rho)
-    lambda_rho = lambda_rho[uXB]
-    D = bdiag(lambda_iota*D1,lambda_rho*D1)
-    DtD = crossprod(D,D)
+    if (type=="outer" || (!is.null(cs@par$lambda_iota) && !is.null(cs@par$lambda_rho))) {
+      lambda_iota = as.array(cs@par$lambda_iota)
+      lambda_iota = lambda_iota[uXB]
+      lambda_rho = as.array(cs@par$lambda_rho)
+      lambda_rho = lambda_rho[uXB]
+    } else {
+      lambda_iota = 1 #0.0169
+      lambda_rho = 1 #0.0178
+    }
     U_e = cbind(c(rep.int(1,SD),rep.int(0,4*SD)),c(rep.int(0,SD),rep.int(1,2*SD),rep.int(0,2*SD)),c(rep.int(0,3*SD),rep.int(1,2*SD)))
     eta_hat_RJ=bts[cat=="rejoined",etahat][bbegin[1]:(bbegin[2]-1)]
     sd_RJ=bts[cat=="rejoined",std][bbegin[1]:(bbegin[2]-1)]
@@ -343,7 +350,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
     
     RBsp = as(Bsp,"RsparseMatrix")  
     
-    data=list(Dsets=Dsets, Biases=1, XB=as.array(stanXB),lambda_rho=as.array(lambda_rho), lambda_iota=as.array(lambda_iota),
+    data=list(Dsets=Dsets, Biases=1, XB=as.array(stanXB),
               Krow=Krow, SD=SD, bbegin=as.array(bbegin_stan), XDrow_w=RBsp@x, XDrow_v=RBsp@j+1, XDrow_u=RBsp@p+1, prowD=as.matrix(prowD),
               eta_hat_RJ=eta_hat_RJ, sd_RJ=sd_RJ,
               eta_hat_DL=eta_hat_DL, sd_DL=sd_DL,
@@ -359,6 +366,8 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
     #          eta_hat_R=cts[cat=="contact R",etahat], sd_R=cts[cat=="contact R",std])
     if (type=="outer") {
       model=csnorm:::stanmodels$gauss_genomic_outer
+      data$lambda_rho=as.array(lambda_rho)
+      data$lambda_iota=as.array(lambda_iota)
     } else {
       model=csnorm:::stanmodels$gauss_genomic_perf
     }
@@ -378,22 +387,46 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
     }
     S_m2 = Diagonal(x=sds)
     tmpX_S_m2 = crossprod(X,S_m2)
-    tmp_A = tmpX_S_m2%*%X + Krow^2*DtD
-    cholA = Cholesky(tmp_A)
-     
+    W=cbind(c(rep(0,3*data$SD),rep(1,data$SD),rep(0,data$SD)), c(rep(0,4*data$SD),rep(1,data$SD)))
+    tmp_Xt_W = crossprod(X,W)
+    
+    epsilon = 1
+    maxiter = 0
+    while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
+      D = bdiag(lambda_iota*D1,lambda_rho*D1)
+      DtD = crossprod(D,D)
+      tmp_A = tmpX_S_m2%*%X + Krow^2*DtD
+      cholA = Cholesky(tmp_A)
+      Gamma_v = solve(t(tmp_Xt_W)%*%solve(cholA,tmp_Xt_W), t(solve(cholA,tmp_Xt_W)))
+      #all(abs((Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)-(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v))<1e-5)
+      
+      beta_y=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%t(X)%*%S_m2%*%etas)
+      beta_U=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%t(X)%*%S_m2%*%U_e)
+      
+      e=solve(t(U_e)%*%S_m2%*%(U_e-X%*%beta_U),t(U_e)%*%S_m2%*%(etas-X%*%beta_y))
+      
+      beta = beta_y - beta_U%*%e
+      beta_iota = beta[1:Krow]
+      beta_rho = beta[(Krow+1):(2*Krow)]
+      
+      nlambda_iota = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_iota)+1e6)
+      nlambda_iota = sqrt(as.numeric(nlambda_iota))
+      nlambda_rho = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_rho)+1e6)
+      nlambda_rho = sqrt(as.numeric(nlambda_rho))
+      
+      epsilon = max(abs(lambda_iota-nlambda_iota),abs(lambda_rho-nlambda_rho))
+      lambda_iota = nlambda_iota
+      lambda_rho = nlambda_rho
+      maxiter = maxiter+1
+      
+      if(type == 'outer') break
+      
+    }
+    
     op=optimize_stan_model(model=model, data=data, iter=cs@settings$iter,
                            verbose=verbose, init=0, init_alpha=init_alpha)
     
-    W=cbind(c(rep(0,3*data$SD),rep(1,data$SD),rep(0,data$SD)), c(rep(0,4*data$SD),rep(1,data$SD)))
-    tmp_Xt_W = crossprod(X,W)
-    Gamma_v = solve(t(tmp_Xt_W)%*%solve(cholA,tmp_Xt_W), t(solve(cholA,tmp_Xt_W)))
-    #Gamma=Diagonal(2*Krow) - Gamma%*%solve(t(Gamma)%*%solve(cholA,Gamma), t(solve(cholA,Gamma)))
-    #all(abs((Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)-(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v))<1e-5)
     
-    beta_y=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%t(X)%*%S_m2%*%etas)
-    beta_U=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%t(X)%*%S_m2%*%U_e)
-    
-    e=solve(t(U_e)%*%S_m2%*%(U_e-X%*%beta_U),t(U_e)%*%S_m2%*%(etas-X%*%beta_y))
     eRJ = array(0,dim=c(Dsets))
     eDE = array(0,dim=c(Dsets))
     eC = array(0,dim=c(Dsets))
@@ -403,14 +436,10 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
       eC[d] = e[(3*(d-1)+3)]
     }
     
-    beta = beta_y - beta_U%*%e
-    #beta=solve(cholA, Gamma%*%t(X)%*%S_m2%*%(etas-U_e%*%e))
     #t(W)%*%X%*%beta centered
     
     #mu=t(X)%*%W
     #mu=solve(t(mu)%*%solve(cholA,mu), t(mu)%*%solve(cholA, t(X)%*%S_m2%*%(etas-U_e%*%e)))
-    beta_iota = beta[1:Krow]
-    beta_rho = beta[(Krow+1):(2*Krow)]
     
     log_mean = U_e %*% e + X%*%beta
     SD = bbegin[2]-bbegin[1]
@@ -442,6 +471,10 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
       }
       beta_iota = rep(beta_iota,Dsets)
       beta_rho = rep(beta_rho,Dsets)
+      if (type=="perf") {
+        lambda_iota = rep(lambda_iota,Dsets)
+        lambda_rho = rep(lambda_rho,Dsets)
+      }
     }
     
     all_beta_iota = c(all_beta_iota,as.array(beta_iota))
@@ -453,14 +486,18 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
     all_log_mean_DR = c(all_log_mean_DR,as.array(log_mean_DR))
     all_log_mean_cleft  = c(all_log_mean_cleft,as.array(log_mean_cleft))
     all_log_mean_cright = c(all_log_mean_cright,as.array(log_mean_cright))
+    if (type=="perf") {
+      all_lambda_iota = c(all_lambda_iota,lambda_iota)
+      all_lambda_rho = c(all_lambda_rho,lambda_rho)
+    }
   }
 
   #make nice output table
-  #bout_stan=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_DL)],
-  #           bts[cat=="dangling R",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_DR)],
-  #           bts[cat=="rejoined",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_RJ)])
-  #cout_stan=rbind(cts[cat=="contact L",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_cleft)],
-  #           cts[cat=="contact R",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_cright)])
+  bout_stan=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_DL)],
+             bts[cat=="dangling R",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_DR)],
+             bts[cat=="rejoined",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_RJ)])
+  cout_stan=rbind(cts[cat=="contact L",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_cleft)],
+             cts[cat=="contact R",.(cat, name, id, pos, etahat, std, eta=op$par$log_mean_cright)])
   
   bout=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=as.array(all_log_mean_DL))],
              bts[cat=="dangling R",.(cat, name, id, pos, etahat, std, eta=as.array(all_log_mean_DR))],
@@ -481,6 +518,12 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
   opr$par$beta_rho=as.array(all_beta_rho)
   opr$par$log_iota=as.array(all_log_iota)
   opr$par$log_rho=as.array(all_log_rho)
+  if (type=="perf") {
+    attr(opr$par,'lambda_iota')
+    attr(opr$par,'lambda_rho')
+    opr$par$lambda_iota = all_lambda_iota
+    opr$par$lambda_rho = all_lambda_rho
+  }
   attr(opr$par,'value')
   means = cbind(all_log_mean_RJ,all_log_mean_DL,all_log_mean_DR,all_log_mean_cleft,all_log_mean_cright)
   mus = cbind(data$sd_RJ,data$sd_DL,data$sd_DR,data$sd_L,data$sd_R)

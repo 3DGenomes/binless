@@ -8,7 +8,7 @@ library(scales)
 #args=commandArgs(trailingOnly=TRUE)
 sub="SELP_150k"
 bpk=3
-type="outer"
+type="perf"
 
 setwd("/scratch/workspace/csnorm")
 
