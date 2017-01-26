@@ -326,26 +326,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   value=-1
   cs@par=modifyList(cs@par,list(eC=eC,eRJ=eRJ,eDE=eDE,alpha=alpha,value=value))
   if (type=="outer") {
-    #Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))* cs@settings$bf_per_decade)
-    #bbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
-    #cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
-    #data = list( Dsets=cs@design[,.N], Biases=cs@design[,uniqueN(genomic)], Decays=cs@design[,uniqueN(decay)],
-    #             XB=as.array(cs@design[,genomic]), XD=as.array(cs@design[,decay]),
-    #             SD=cs@biases[,.N], bbegin=bbegin,
-    #             cutsitesD=cs@biases[,pos], rejoined=cs@biases[,rejoined],
-    #             danglingL=cs@biases[,dangling.L], danglingR=cs@biases[,dangling.R],
-    #             Kdiag=Kdiag, dmin=cs@settings$dmin, dmax=cs@settings$dmax,
-    #             N=counts[,.N], cbegin=cbegin,
-    #             cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
-    #             counts_close=counts[,contact.close], counts_far=counts[,contact.far],
-    #             counts_up=counts[,contact.up], counts_down=counts[,contact.down],
-    #             weight=as.array(weight[,wt]), beta_diag=cs@par$beta_diag)
-    #data$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
-    #data$beta_iota=cs@par$beta_iota
-    #data$beta_rho=cs@par$beta_rho
-    #op=optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion_outer, data=data, iter=cs@settings$iter,
-    #                       verbose=verbose, init=cs@par, init_alpha=init_alpha)
-    #op$par$value=op$value
+    #estimate lambdas
     Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
     lambda_iota=sqrt((Krow-2)/(Krow^2*tcrossprod(cs@par$beta_iota_diff)+1e6)) #sigma=1e-3 for genomic
     lambda_rho=sqrt((Krow-2)/(Krow^2*tcrossprod(cs@par$beta_rho_diff)+1e6))
