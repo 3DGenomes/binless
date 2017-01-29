@@ -35,6 +35,7 @@
 #' @import ggplot2
 #' @import flsa
 #' @import igraph
+#' @import MASS
 #' @import abind
 #' @import methods
 #' @importFrom Hmisc cut2
