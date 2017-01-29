@@ -323,20 +323,18 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   cs@par$eC=cs@par$eC+op$par$eC_sup
   #
   #estimate lambdas if outer iteration
+  Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
+  Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))* cs@settings$bf_per_decade)
   if (type=="outer") {
-    Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
     lambdas = copy(cs@design)
     lambdas[,lambda_iota:=sqrt((Krow-2)/(Krow^2*diag(tcrossprod(cs@par$beta_iota_diff))+1e6))] #sigma=1e-3 for genomic
     lambdas[,lambda_rho:=sqrt((Krow-2)/(Krow^2*diag(tcrossprod(cs@par$beta_rho_diff))+1e6))]
-    Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))* cs@settings$bf_per_decade)
     lambdas[,lambda_diag:=sqrt((Kdiag-2)/(Kdiag^2*diag(tcrossprod(cs@par$beta_diag_diff))+1))] #sigma=1 for decay
     cs@par$lambda_iota=lambdas[unique(genomic)][order(genomic),lambda_iota]
     cs@par$lambda_rho=lambdas[unique(genomic)][order(genomic),lambda_rho]
     cs@par$lambda_diag=lambdas[unique(decay)][order(decay),lambda_diag]
   }
   #
-  params.new=list(eC=cs@par$eC+op$par$eC_sup, eRJ=op$par$eRJ, eDE=op$par$eDE, alpha=op$par$alpha,
-                  lambdas=lambdas)
   #compute log-posterior
   cs@par$value = op$value + (Krow-2)/2*sum(log(cs@par$lambda_iota/exp(1))+log(cs@par$lambda_rho/exp(1))) +
                             (Kdiag-2)/2*sum(log(cs@par$lambda_diag/exp(1)))
