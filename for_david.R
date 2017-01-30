@@ -17,8 +17,9 @@ load(paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_GM12878_",sub,"_csda
 csd1=csd
 load(paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_IMR90_",sub,"_csdata.RData"))
 csd2=csd
-cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
-#cs=merge_cs_norm_datasets(list(csd1), different.decays="none")
+cs_stan=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
+cs_r=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
+cs_stan=merge_cs_norm_datasets(list(csd2), different.decays="none")
 
 #look at these objects
 csd1
@@ -26,8 +27,10 @@ csd2
 cs
 
 #normalize using approximation
-cs = run_gauss(cs, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
-               ncounts = 1000000, type=type, fit.disp = F)
+cs_stan = run_gauss(cs_stan, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
+                 ncounts = 1000000, type=type, fit_model="stan")
+cs_r = run_gauss(cs_r, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
+               ncounts = 1000000, type=type, fit_model="exact")
 save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
 
 #look at the following objects
