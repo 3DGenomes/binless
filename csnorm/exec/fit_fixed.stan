@@ -51,6 +51,9 @@ transformed data {
   //scaling factor for lambdas
   real lgfac;
   real ldfac;
+  //pointer to biases
+  int XBDset[Biases];
+  int XDDset[Decays];
   
   //Bias GAM spline, sparse
   {
@@ -116,6 +119,14 @@ transformed data {
   //scaling factor for lambdas
   lgfac = Krow;
   ldfac = Kdiag;
+
+  //pointer to biases
+  XBDset = rep_array(0,Biases); //raise error if value not replaced
+  XDDset = rep_array(0,Decays); //raise error if value not replaced
+  for (i in 1:Dsets) {
+    XBDset[XB[i]] = i;
+    XDDset[XD[i]] = i;
+  }
 }
 parameters {
   //exposures
@@ -233,12 +244,15 @@ model {
   }
   
   //// Priors
-  for (d in 1:Dsets) {
-    //P-spline prior on the differences (K-2 params)
-    //warning on jacobian can be ignored
-    //see GAM, Wood (2006), section 4.8.2 (p.187)
-    beta_iota_diff[d] ~ normal(0, 1/(lgfac*lambda_iota[XB[d]]));
-    beta_rho_diff[d] ~ normal(0, 1/(lgfac*lambda_rho[XB[d]]));
-    beta_diag_diff[d] ~ normal(0, 1/(ldfac*lambda_diag[XD[d]]));
+  //P-spline prior on the differences (K-2 params)
+  //warning on jacobian can be ignored
+  //see GAM, Wood (2006), section 4.8.2 (p.187)
+  for (b in 1:Biases) {
+    beta_iota_diff[XBDset[b]] ~ normal(0, 1/(lgfac*lambda_iota[b]));
+    beta_rho_diff[XBDset[b]] ~ normal(0, 1/(lgfac*lambda_rho[b]));
   }
+  for (d in 1:Decays)
+    beta_diag_diff[XDDset[d]] ~ normal(0, 1/(ldfac*lambda_diag[d]));
 }
+
+

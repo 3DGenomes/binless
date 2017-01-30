@@ -39,6 +39,8 @@ transformed data {
   row_vector[Krow] prowD[Dsets];
   //scaling factor for genomic lambdas
   real lgfac;
+  //pointer to biases
+  int XDset[Biases];
 
   //Bias GAM spline, sparse
   {
@@ -75,6 +77,9 @@ transformed data {
   //scaling factor
   lgfac = Krow;
   
+  //pointer to biases
+  XDset = rep_array(0,Biases); //raise error if value not replaced
+  for (i in 1:Dsets) XDset[XB[i]] = i;
 }
 parameters {
   //exposures
@@ -161,8 +166,8 @@ model {
   eta_hat_R ~ normal(log_mean_cright, sd_R);
   
   //// prior
-  for (d in 1:Dsets) {
-    beta_iota_diff[d] ~ normal(0,1/(lgfac*lambda_iota[XB[d]]));
-    beta_rho_diff[d] ~ normal(0,1/(lgfac*lambda_rho[XB[d]]));
+  for (b in 1:Biases) {
+    beta_iota_diff[XDset[b]] ~ normal(0,1/(lgfac*lambda_iota[b]));
+    beta_rho_diff[XDset[b]] ~ normal(0,1/(lgfac*lambda_rho[b]));
   }
 }
