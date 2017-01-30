@@ -53,8 +53,10 @@ csd@data[]
 #bin
 resolution=20000
 cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ice=1, ncores=ncores)
-cs=detect_interactions(cs, resolution=resolution, group="all", ncores=ncores)
-cs=detect_differences(cs, resolution=resolution, group="all", ncores=ncores, ref="GM MboI 1")
+cs=detect_interactions(cs, resolution=resolution, group="condition", ncores=ncores)
+cs=detect_interactions(cs, resolution=resolution, group="condition", ncores=ncores, binless=T)
+cs=detect_differences(cs, resolution=resolution, group="condition", ncores=ncores, ref="WT")
+cs=detect_differences(cs, resolution=resolution, group="condition", ncores=ncores, ref="WT", binless=T)
 
 mat=get_matrices(cs, resolution=resolution, group="all")
 ggplot(mat)+facet_wrap(~name)+

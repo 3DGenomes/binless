@@ -558,7 +558,11 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7
 #' 
 csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T, init_alpha=1e-7, type=c("outer","perf")) {
   type=match.arg(type)
-  Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))* cs@settings$bf_per_decade)
+  #predict all means and put into table
+  counts=csnorm:::csnorm_predict_all(cs,counts)
+  stopifnot(cs@biases[,.N]==length(cs@par$log_iota))
+  #
+  #fit dispersion and exposures
   bbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
   cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
   data = list( Dsets=cs@design[,.N], Biases=cs@design[,uniqueN(genomic)], Decays=cs@design[,uniqueN(decay)],
@@ -566,13 +570,24 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
                SD=cs@biases[,.N], bbegin=bbegin,
                cutsitesD=cs@biases[,pos], rejoined=cs@biases[,rejoined],
                danglingL=cs@biases[,dangling.L], danglingR=cs@biases[,dangling.R],
-               Kdiag=Kdiag, dmin=cs@settings$dmin, dmax=cs@settings$dmax,
                N=counts[,.N], cbegin=cbegin,
-               cidx=t(data.matrix(counts[,.(id1,id2)])), dist=counts[,distance],
                counts_close=counts[,contact.close], counts_far=counts[,contact.far],
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
-               weight=as.array(weight[,wt]), beta_diag=cs@par$beta_diag)
+               weight=as.array(weight[,wt]),
+               log_iota=cs@par$log_iota, log_rho=cs@par$log_rho,
+               log_mean_cclose=counts[,log_mean_cclose], log_mean_cfar=counts[,log_mean_cfar],
+               log_mean_cup=counts[,log_mean_cup], log_mean_cdown=counts[,log_mean_cdown])
+  init=list(eC_sup=array(0,dim=cs@experiments[,.N]), eRJ=cs@par$eRJ, eDE=cs@par$eDE, alpha=cs@par$alpha)
+  op=optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, data=data, iter=cs@settings$iter,
+                         verbose=verbose, init=init, init_alpha=init_alpha)
+  cs@par=modifyList(cs@par, op$par[c("eRJ","eDE","alpha")])
+  cs@par$eC=cs@par$eC+op$par$eC_sup
+  #
+  #estimate lambdas if outer iteration
+  Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
+  Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))* cs@settings$bf_per_decade)
   if (type=="outer") {
+<<<<<<< HEAD
     data$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
     data$beta_iota=cs@par$beta_iota
     data$beta_rho=cs@par$beta_rho
@@ -587,7 +602,20 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
                            verbose=verbose, init=cs@par, init_alpha=init_alpha)
     op$par$value=op$value
     cs@par=modifyList(cs@par, op$par[c("alpha","value")])
+=======
+    lambdas = copy(cs@design)
+    lambdas[,lambda_iota:=sqrt((Krow-2)/(Krow^2*diag(tcrossprod(cs@par$beta_iota_diff))+1e6))] #sigma=1e-3 for genomic
+    lambdas[,lambda_rho:=sqrt((Krow-2)/(Krow^2*diag(tcrossprod(cs@par$beta_rho_diff))+1e6))]
+    lambdas[,lambda_diag:=sqrt((Kdiag-2)/(Kdiag^2*diag(tcrossprod(cs@par$beta_diag_diff))+1))] #sigma=1 for decay
+    cs@par$lambda_iota=lambdas[unique(genomic)][order(genomic),lambda_iota]
+    cs@par$lambda_rho=lambdas[unique(genomic)][order(genomic),lambda_rho]
+    cs@par$lambda_diag=lambdas[unique(decay)][order(decay),lambda_diag]
+>>>>>>> develop
   }
+  #
+  #compute log-posterior
+  cs@par$value = op$value + (Krow-2)/2*sum(log(cs@par$lambda_iota/exp(1))+log(cs@par$lambda_rho/exp(1))) +
+                            (Kdiag-2)/2*sum(log(cs@par$lambda_diag/exp(1)))
   return(cs)
 }
 
@@ -697,7 +725,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     laststep=0
     init.mean="data"
     if (type=="outer") {
-      cs=fill_parameters_outer(cs, dispersion=init.dispersion, fit.decay=fit.decay,
+      cs=csnorm:::fill_parameters_outer(cs, dispersion=init.dispersion, fit.decay=fit.decay,
                                fit.genomic=fit.genomic, fit.disp=fit.disp)
     } else {
       cs=fill_parameters_perf(cs, dispersion=init.dispersion, fit.decay=fit.decay,

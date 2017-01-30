@@ -70,15 +70,15 @@ plot_raw(data, b1=1089000, e1=1094000)
 #The cs object is full of information, be sure to check it out at every step in this script.
 load("data/caulo_NcoI_all_csdata.RData")
 csd1=csd
-load("data/caulo_BglIIr1_150k_csdata.RData")
+load("data/caulo_BglIIr1_all_csdata.RData")
 csd2=csd
-load("data/caulo_BglIIr2_150k_csdata.RData")
+load("data/caulo_BglIIr2_all_csdata.RData")
 csd3=csd
 load("data/caulo_BglIIrif_150k_csdata.RData")
 csd4=csd
 load("data/caulo_BglIInov_all_csdata.RData")
 csd5=csd
-cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4), different.decays="enzyme")
+cs=merge_cs_norm_datasets(list(csd1,csd2,csd3), different.decays="all")
 save(cs, file="data/caulo_rif_150k_csnorm.RData")
 
 #The normalization is performed with a fast approximate Gibbs sampler to the full model
@@ -92,7 +92,7 @@ save(cs, file="data/caulo_rif_150k_csnorm.RData")
 #in the last runtime.bias and runtime.decay, you see "Convergence detected". Otherwise, the normalization was not successful.
 #You might either want to increase ngibbs or iter, or both.
 load("data/caulo_rif_150k_csnorm.RData")
-cs = run_gauss_stan_gibbs(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, init=0.1, ngibbs = 2, iter=10000, verbose=T)
+cs = run_gauss(cs, bf_per_kb=0.25, bf_per_decade=5, bins_per_bf=10, ngibbs = 1, iter=10000, init_alpha=1e-7, ncounts = 1000000)
 save(cs, file="data/caulo_rif_csnorm_optimized.RData")
 
 #Some diagnostics plots can be generated. The function generates 4 plots and also returns a data table.

@@ -78,6 +78,12 @@ ggplot(mat)+facet_grid(~name)+
   theme_bw()+theme(legend.position = "none", axis.title=element_blank())
 ggsave(filename=paste0("images/rao_HiCall_",sub,"_both_signal_",resolution/1000,"kb.pdf"), width=19,height=9)
 
+#Binless interactions at 20kb
+resolution=20000
+mat=get_interactions(cs, resolution=resolution, group="condition", type="binteractions", ref="expected", threshold=-1)
+plot_binless_matrix(mat)
+ggsave(filename=paste0("images/rao_HiCall_",sub,"_both_bsignal_",resolution/1000,"kb.pdf"), width=19,height=9)
+
 
 #Differences at 20kb
 resolution=20000
@@ -100,3 +106,8 @@ ggplot(mat)+facet_grid(~name)+
   theme_bw()+theme(legend.position = "none", axis.title=element_blank())
 ggsave(filename=paste0("images/rao_HiCall_",sub,"_both_diffsig_",resolution/1000,"kb.pdf"), width=10,height=9)
 
+#Binless differences at 20kb
+resolution=20000
+mat=get_interactions(cs, resolution=resolution, group="condition", type="bdifferences", ref="GM", threshold=-1)
+plot_binless_matrix(mat, minima=T)
+ggsave(filename=paste0("images/rao_HiCall_",sub,"_both_bdiffsig_",resolution/1000,"kb.pdf"), width=10,height=9)

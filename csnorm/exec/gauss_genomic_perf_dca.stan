@@ -32,15 +32,54 @@ data {
   vector<lower=0>[SD] sd_DR;
   vector<lower=0>[SD] sd_L;
   vector<lower=0>[SD] sd_R;
-  //stiffnesses
-  real<lower=0> lambda_iota[Biases];
-  real<lower=0> lambda_rho[Biases];
 }
 transformed data {
   //scaling factor for genomic lambdas
   real lgfac;
+<<<<<<< HEAD
+=======
+  //pointer to biases
+  int XDset[Biases];
+
+  //Bias GAM spline, sparse
+  {
+    vector[SD] row_weightsD;
+    int nnzs[Dsets+1];
+    row_weightsD = rep_vector(1, SD);
+    nnzs[1] = 1;
+    for (i in 1:Dsets) nnzs[i+1] = nnzs[i]+nnz(bbegin[i+1]-bbegin[i]);
+    
+    #compute design matrix and projector
+    for (d in 1:Dsets) {
+      int S;
+      S = bbegin[d+1]-bbegin[d];
+      {
+        vector[S] cutsites;
+        vector[nnz(S)] Xrow_w;
+        int Xrow_v[nnz(S)];
+        int Xrow_u[S+1];
+        vector[S] row_weights;
+        row_vector[Krow] prow;
+        cutsites = cutsitesD[bbegin[d]:(bbegin[d+1]-1)];
+        row_weights = row_weightsD[bbegin[d]:(bbegin[d+1]-1)];
+        #include "sparse_spline_construction.stan"
+        XDrow_w[nnzs[d]:(nnzs[d+1]-1)] = Xrow_w;
+        for (i in 1:size(Xrow_v)) Xrow_v[i] = Xrow_v[i] + Krow*(d-1);
+        XDrow_v[nnzs[d]:(nnzs[d+1]-1)] = Xrow_v;
+        prowD[d] = prow;
+      }
+    }
+    XDrow_u[1] = 1;
+    for (i in 1:SD) XDrow_u[i+1] = XDrow_u[i]+nnz(1);
+  }
+  
+>>>>>>> develop
   //scaling factor
   lgfac = Krow;
+  
+  //pointer to biases
+  XDset = rep_array(0,Biases); //raise error if value not replaced
+  for (i in 1:Dsets) XDset[XB[i]] = i;
 }
 parameters {
   //exposures
@@ -50,6 +89,9 @@ parameters {
   //spline parameters
   vector[Krow-1] beta_iota[Biases];
   vector[Krow-1] beta_rho[Biases];
+  //stiffnesses
+  real<lower=0> lambda_iota[Biases];
+  real<lower=0> lambda_rho[Biases];
 }
 transformed parameters {
   //iota
@@ -65,7 +107,7 @@ transformed parameters {
   //
   vector[SD] log_mean_cleft;
   vector[SD] log_mean_cright;
-
+  
   //iota
   {
     vector[Dsets*Krow] beta_iota_centered;
@@ -114,6 +156,7 @@ transformed parameters {
     log_mean_cleft  = counts_exposure + log_iota;
     log_mean_cright = counts_exposure + log_rho;
   }
+
 }
 model {
   //// likelihoods
@@ -127,8 +170,12 @@ model {
   eta_hat_R ~ normal(log_mean_cright, sd_R);
   
   //// prior
-  for (d in 1:Dsets) {
-    beta_iota_diff[d] ~ normal(0,1/(lgfac*lambda_iota[XB[d]]));
-    beta_rho_diff[d] ~ normal(0,1/(lgfac*lambda_rho[XB[d]]));
+  for (b in 1:Biases) {
+    beta_iota_diff[XDset[b]] ~ normal(0,1/(lgfac*lambda_iota[b]));
+    beta_rho_diff[XDset[b]] ~ normal(0,1/(lgfac*lambda_rho[b]));
   }
+  //// hyperprior
+  
+  lambda_iota ~ normal(0,0.001);
+  lambda_rho ~ normal(0,0.001);
 }
