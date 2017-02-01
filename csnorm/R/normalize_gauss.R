@@ -370,7 +370,7 @@ get_nzeros_per_decay = function(cs) {
   #stopifnot(Nkd[mdist<cs@settings$dmin,.N]==0) #otherwise cs@counts has not been censored properly
   #Count the number of crossings per distance bin
   #looping over IDs avoids building NxN matrix
-  Nkz = foreach(i=cs@biases[,1:.N], .combine=function(x,y){rbind(x,y)[,.(ncross=sum(ncross)),keyby=c("name","bdist")]}) %do% {
+  Nkz = foreach(i=cs@biases[,(1:.N)], .combine=function(x,y){rbind(x,y)[,.(ncross=sum(ncross)),keyby=c("name","bdist")]}) %do% {
     stuff=c(cs@biases[i,.(name,id,pos)])
     dists=cs@biases[name==stuff$name & id>stuff$id,.(name,distance=abs(pos-stuff$pos))]
     if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
@@ -405,7 +405,7 @@ get_nzeros_per_cutsite = function(cs) {
   zbias[is.na(nnz),nnz:=0]
   setkey(zbias,id,name)
   #count masked contacts where d<dmin
-  masked = foreach(i=cs@biases[,1:.N], .combine=rbind) %do% {
+  masked = foreach(i=cs@biases[,(1:.N)], .combine=rbind) %do% {
     stuff=c(cs@biases[i,.(name,id,pos)])
     dists=cs@biases[name==stuff$name & id!=stuff$id,.(name,distance=abs(pos-stuff$pos))]
     if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
