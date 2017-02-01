@@ -83,3 +83,24 @@ ggplot(mat)+
 
 
 
+
+#benchmark: vary sizes
+begin=149578594
+end=153679847
+load("data/ledily_T47D_es_60_csdata_with_data.RData")
+data=csd@data[re.closest1>=begin&re.closest1<=end&re.closest2>=begin&re.closest2<=end]
+cs_data = csnorm:::prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
+csd = new("CSdata", info=csd@info,
+          settings=list(circularize=-1,dmin=csd@settings$dmin,dmax=cs_data$biases[,max(pos)-min(pos)],
+                        qmax=csd@settings$qmax, qmin=csd@settings$qmin),
+          data=data, biases=cs_data$biases, counts=cs_data$counts)
+#save(csd, file=paste0("data/ledily_T47D_es_60_",begin,"-",end,"_csdata_with_data.RData"))
+csd@data=data.table()
+save(csd, file=paste0("data/ledily_T47D_es_60_",begin,"-",end,"_csdata.RData"))
+
+
+
+
+
+
+
