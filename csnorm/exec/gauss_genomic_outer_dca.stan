@@ -39,52 +39,8 @@ data {
 transformed data {
   //scaling factor for genomic lambdas
   real lgfac;
-<<<<<<< HEAD
   //scaling factor
   lgfac = Krow;
-=======
-  //pointer to biases
-  int XDset[Biases];
-
-  //Bias GAM spline, sparse
-  {
-    vector[SD] row_weightsD;
-    int nnzs[Dsets+1];
-    row_weightsD = rep_vector(1, SD);
-    nnzs[1] = 1;
-    for (i in 1:Dsets) nnzs[i+1] = nnzs[i]+nnz(bbegin[i+1]-bbegin[i]);
-    
-    #compute design matrix and projector
-    for (d in 1:Dsets) {
-      int S;
-      S = bbegin[d+1]-bbegin[d];
-      {
-        vector[S] cutsites;
-        vector[nnz(S)] Xrow_w;
-        int Xrow_v[nnz(S)];
-        int Xrow_u[S+1];
-        vector[S] row_weights;
-        row_vector[Krow] prow;
-        cutsites = cutsitesD[bbegin[d]:(bbegin[d+1]-1)];
-        row_weights = row_weightsD[bbegin[d]:(bbegin[d+1]-1)];
-        #include "sparse_spline_construction.stan"
-        XDrow_w[nnzs[d]:(nnzs[d+1]-1)] = Xrow_w;
-        for (i in 1:size(Xrow_v)) Xrow_v[i] = Xrow_v[i] + Krow*(d-1);
-        XDrow_v[nnzs[d]:(nnzs[d+1]-1)] = Xrow_v;
-        prowD[d] = prow;
-      }
-    }
-    XDrow_u[1] = 1;
-    for (i in 1:SD) XDrow_u[i+1] = XDrow_u[i]+nnz(1);
-  }
-  
-  //scaling factor
-  lgfac = Krow;
-  
-  //pointer to biases
-  XDset = rep_array(0,Biases); //raise error if value not replaced
-  for (i in 1:Dsets) XDset[XB[i]] = i;
->>>>>>> develop
 }
 parameters {
   //exposures
@@ -171,8 +127,8 @@ model {
   eta_hat_R ~ normal(log_mean_cright, sd_R);
   
   //// prior
-  for (b in 1:Biases) {
-    beta_iota_diff[XDset[b]] ~ normal(0,1/(lgfac*lambda_iota[b]));
-    beta_rho_diff[XDset[b]] ~ normal(0,1/(lgfac*lambda_rho[b]));
+  for (d in 1:Dsets) {
+    beta_iota_diff[d] ~ normal(0,1/(lgfac*lambda_iota[XB[d]]));
+    beta_rho_diff[d] ~ normal(0,1/(lgfac*lambda_rho[XB[d]]));
   }
 }

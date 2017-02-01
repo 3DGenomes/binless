@@ -19,14 +19,11 @@ data {
   int<lower=1,upper=N+1> cbegin[Dsets+1]; //cbegin[i]=j: dataset i starts at j
   vector[N] kappa_hat;
   vector<lower=0>[N] sdl;
-  //vector<lower=0>[N] dist;
-  // diagonal SCAM spline, dense
-  matrix[N,Kdiag] tmpXdiag;
+  vector<lower=0>[N] dist;
   //weight for spline centering
   vector<lower=0>[N] weight;
   //length scales
   real<lower=0> lambda_diag[Decays];
-  
 }
 transformed data {
   //diagonal SCAM spline, dense
@@ -40,8 +37,8 @@ transformed data {
   //diagonal SCAM spline, dense
   {
     {
-      //matrix[N,Kdiag] tmpXdiag;
-      //tmpXdiag = bspline(log(dist), Kdiag, splinedegree(), log(dmin), log(dmax));
+      matrix[N,Kdiag] tmpXdiag;
+      tmpXdiag = bspline(log(dist), Kdiag, splinedegree(), log(dmin), log(dmax));
       Xdiag = rep_matrix(0, N, Dsets*Kdiag);
       for (d in 1:Dsets) {
         Xdiag[cbegin[d]:(cbegin[d+1]-1),((d-1)*Kdiag+1):(d*Kdiag)] = tmpXdiag[cbegin[d]:(cbegin[d+1]-1),:];
