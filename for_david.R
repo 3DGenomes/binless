@@ -18,7 +18,7 @@ csd1=csd
 load(paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_IMR90_",sub,"_csdata.RData"))
 csd2=csd
 cs_stan=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
-cs_r=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
+cs_r=merge_cs_norm_datasets(list(csd2), different.decays="none")
 cs_stan=merge_cs_norm_datasets(list(csd2), different.decays="none")
 
 #look at these objects
@@ -38,16 +38,20 @@ cs
 a=plot_diagnostics(cs)
 a[1]
 a[2]
-cs@par$biases
+cs_r@par$biases
 cs@par$decay
 
 #plot biases and decay
-ggplot(cs@par$biases)+geom_pointrange(aes(pos,etahat,ymin=etahat-std,ymax=etahat+std,colour=cat),alpha=0.1)+
+ggplot(cs_r@par$biases)+geom_pointrange(aes(pos,etahat,ymin=etahat-std,ymax=etahat+std,colour=cat),alpha=0.1)+
   geom_line(aes(pos,eta))+facet_grid(name ~ cat)#+
 ggplot(cs@par$decay)+geom_line(aes(distance,kappa))+
   geom_pointrange(aes(distance,kappahat,ymin=kappahat-std,ymax=kappahat+std), alpha=0.1)+
   facet_wrap(~name,scales = "free")+scale_x_log10()
+ggplot(data.table(r=cs_r@par$biases[,etahat],stan=cs_stan@par$biases[,etahat],cat=cs_stan@par$biases[,cat]))+
+  geom_point(aes(r,stan))+facet_wrap(~cat)+stat_function(fun=identity)
 
+cs_r@par$alpha
+cs_stan@par$alpha
 
 
 #bin at 20kb
