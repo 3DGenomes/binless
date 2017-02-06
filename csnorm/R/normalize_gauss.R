@@ -295,10 +295,11 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
 #' 
-csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T, init_alpha=1e-7, type=c("outer","perf")) {
+csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T, init_alpha=1e-7, type=c("outer","perf"), ncores=1) {
   type=match.arg(type)
   #predict all means and put into table
-  counts=csnorm:::csnorm_predict_all(cs,counts)
+  counts=csnorm:::csnorm_predict_all_parallel(cs,counts,ncores = ncores)
+  setkeyv(counts,key(cs@counts))
   stopifnot(cs@biases[,.N]==length(cs@par$log_iota))
   #
   #fit dispersion and exposures
@@ -513,6 +514,7 @@ plot_diagnostics = function(cs) {
 #'   penalties with the dispersion parameter. The performance iteration ("perf") optimizes penalties with
 #'   the biases. It is recommended to try performance iteration, but if convergence fails to revert to outer
 #'   iteration.
+#' @param ncores positive integer (default 1). For the dispersion step, number of cores to use to predict the means.
 #'   
 #' @return A csnorm object
 #' @export
@@ -522,7 +524,7 @@ plot_diagnostics = function(cs) {
 run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
                      ngibbs = 3, iter=10000, fit.decay=T, fit.genomic=T, fit.disp=T,
                      verbose=T, ncounts=100000, init_alpha=1e-7, init.dispersion=10,
-                     tol.obj=1e-1, type="outer") {
+                     tol.obj=1e-1, type="outer", ncores=1) {
   type=match.arg(type,c("outer","perf"))
   if (verbose==T) cat("Normalization with fast approximation and ",type,"iteration\n")
   #clean object if dirty
@@ -558,7 +560,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
       cs=csnorm:::fill_parameters_outer(cs, dispersion=init.dispersion, fit.decay=fit.decay,
                                fit.genomic=fit.genomic, fit.disp=fit.disp)
     } else {
-      cs=fill_parameters_perf(cs, dispersion=init.dispersion, fit.decay=fit.decay,
+      cs=csnorm:::fill_parameters_perf(cs, dispersion=init.dispersion, fit.decay=fit.decay,
                                fit.genomic=fit.genomic, fit.disp=fit.disp)
     }
   } else {
