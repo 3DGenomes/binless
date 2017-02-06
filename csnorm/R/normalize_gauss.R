@@ -244,7 +244,7 @@ csnorm_gauss_genomic_muhat_mean = function(cs, zbias) {
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alpha=1e-7, type=c("perf","outer"),fit_model=c('stan','exact'), max_perf_iteration=1000, convergence_epsilon=1e-5) {
+csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alpha=1e-7, type=c("perf","outer"),fit_model=c('stan','nostan'), max_perf_iteration=1000, convergence_epsilon=1e-5) {
   type=match.arg(type)
   fit_model=match.arg(fit_model)
   if (init.mean=="mean") {
@@ -396,11 +396,12 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
       
       epsilon = 1
       maxiter = 0
+      D = bdiag(lambda_iota*D1,lambda_rho*D1)
+      DtD = crossprod(D,D)
+      tmp_X_S_m2_X = tmpX_S_m2%*%X
+      cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD)
       while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
-        D = bdiag(lambda_iota*D1,lambda_rho*D1)
-        DtD = crossprod(D,D)
-        tmp_A = tmpX_S_m2%*%X + Krow^2*DtD
-        cholA = Cholesky(tmp_A)
+        
         Gamma_v = solve(t(tmp_Xt_W)%*%solve(cholA,tmp_Xt_W), t(solve(cholA,tmp_Xt_W)))
         #all(abs((Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)-(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v))<1e-5)
         
@@ -424,6 +425,10 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
         maxiter = maxiter+1
         
         if(type == 'outer') break
+        
+        D = bdiag(lambda_iota*D1,lambda_rho*D1)
+        DtD = crossprod(D,D)
+        update(cholA,tmp_X_S_m2_X + Krow^2*DtD)
         
       }
       
@@ -560,10 +565,10 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
 #' 
-csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T, init_alpha=1e-7, type=c("outer","perf")) {
+csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T, init_alpha=1e-7, type=c("outer","perf"), ncores=ncores) {
   type=match.arg(type)
   #predict all means and put into table
-  counts=csnorm:::csnorm_predict_all(cs,counts)
+  counts=csnorm:::csnorm_predict_all_parallel(cs,counts,ncores=ncores)
   stopifnot(cs@biases[,.N]==length(cs@par$log_iota))
   #
   #fit dispersion and exposures
@@ -787,9 +792,9 @@ plot_diagnostics = function(cs) {
 run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
                      ngibbs = 3, iter=10000, fit.decay=T, fit.genomic=T, fit.disp=T,
                      verbose=T, ncounts=100000, init_alpha=1e-7, init.dispersion=10,
-                     tol.obj=1e-1, type="outer",fit_model="exact") {
+                     tol.obj=1e-1, type="outer",fit_model="nostan", ncores_dispersion=1) {
   type=match.arg(type,c("outer","perf"))
-  fit_model=match.arg(fit_model,c("stan","exact"))
+  fit_model=match.arg(fit_model,c("stan","nostan"))
   if (verbose==T) cat("Normalization with fast approximation and ",type,"iteration\n")
   #clean object if dirty
   cs@par=list() #in case we have a weird object
@@ -858,7 +863,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
       #fit exposures and dispersion
       if (verbose==T) cat("Gibbs",i,": Remaining parameters ")
       a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight,
-                                                                                    init_alpha=init_alpha, type=type)))
+                                                                                    init_alpha=init_alpha, type=type, ncores = ncores_dispersion)))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", out=output, runtime=a[1]+a[4], type=type)
       if (verbose==T) cat("log-likelihood = ",cs@par$value,"\n")
     }
