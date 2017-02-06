@@ -317,7 +317,12 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
                log_iota=cs@par$log_iota, log_rho=cs@par$log_rho,
                log_mean_cclose=counts[,log_mean_cclose], log_mean_cfar=counts[,log_mean_cfar],
                log_mean_cup=counts[,log_mean_cup], log_mean_cdown=counts[,log_mean_cdown])
-  init=list(eC_sup=array(0,dim=cs@experiments[,.N]), eRJ=cs@par$eRJ, eDE=cs@par$eDE, alpha=cs@par$alpha)
+  init=list(eC_sup=counts[,log(mean(contact.close/exp(log_mean_cclose))),by=name][,V1],
+            eRJ=cs@biases[,.(name,frac=rejoined/exp((cs@par$log_iota+cs@par$log_rho)/2))][,log(mean(frac)),by=name][,V1],
+            eDE=cs@par$eDE)
+  init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],log_mean_cclose]))
+  init$alpha=1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu)
+  init$mu=NULL
   op=optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, data=data, iter=cs@settings$iter,
                          verbose=verbose, init=init, init_alpha=init_alpha)
   cs@par=modifyList(cs@par, op$par[c("eRJ","eDE","alpha")])
