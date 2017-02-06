@@ -28,7 +28,7 @@ load("data/rao_HiCall_FOXP1_1.3M_csnorm_optimized_gauss_bpk3_nofill_perf.RData")
 
 #different matrices for GM MboI 1
 for (resolution in c(5000,20000)) {
-  mat=get_matrices(cs, resolution=resolution, group="condition")[name=="GM"]
+  mat=get_matrices(cs, resolution=resolution, group="condition")#[name=="GM"]
   ggplot(mat)+
     geom_raster(aes(begin1,begin2,fill=log(normalized)))+
     geom_raster(aes(begin2,begin1,fill=log(normalized)))+
@@ -41,7 +41,7 @@ for (resolution in c(5000,20000)) {
     geom_raster(aes(begin2,begin1,fill=-log(signal)))+
     theme_bw()+theme(legend.position = "none", axis.title=element_blank())+
     #scale_fill_gradient(low="black", high="white")
-    scale_fill_gradient2()
+    scale_fill_gradient2()+facet_wrap(~name)
   ggsave(filename=paste0("images/rao_HiCall_",sub,"_signal_",resolution/1000,"kb.pdf"), width=10,height=9)
   #observed
   ggplot(mat)+

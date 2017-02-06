@@ -16,19 +16,23 @@ save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_exact.RD
 
 #approximate run
 load(paste0("data/rao_HiCall_GM12878_SELP_150k_csdata.RData"))
-csd@settings$qmin=0
-csd@settings$qmax=1
+#csd@settings$qmin=0
+#csd@settings$qmax=1
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-cs = run_gauss(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7, ncounts = 1000000, type="perf")
-save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_nofill.RData"))
+cs = run_gauss(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=10000, init_alpha=1e-7,
+               ncounts = 1000000, type="perf", fit_model="exact")
+save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_stan.RData"))
+#save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_nofill.RData"))
 
 
 
 #plots
-dsets=c(paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_exact.RData"),
-        paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss.RData"))
-names=c("exact",
-        "approximation")
+dsets=c(paste0("data/rao_HiCall_FOXP1_1.3M_csnorm_optimized_gauss_bpk3_nofill_perf.RData"),
+        paste0("data/rao_HiCall_FOXP1_1.3M_csnorm_optimized_gauss_bpk3_nofill_perf_nostan.RData"))
+#dsets=c(paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_stan.RData"),
+#        paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_nostan.RData"))
+names=c("stan",
+        "nostan")
 
 dsets=c("data/discarded/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_bpk3_nofill_outer_eC.RData",
         "data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_bpk3.RData")
@@ -39,7 +43,7 @@ iota = foreach(i=dsets,j=names,.combine=rbind) %do% {
   load(i)
   data.table(pos=cs@biases[,pos],iota=exp(cs@par$log_iota),rho=exp(cs@par$log_rho),method=j)
 }
-ggplot(iota)+geom_line(aes(pos,iota,colour=method))
+ggplot(iota)+geom_line(aes(pos,iota,colour=method))+xlim(70800000,70900000)
 ggsave(filename = "images/rao_HiCall_GM12878_SELP_150k_iota_bias.pdf", width=10, height=7)
 ggplot(iota)+geom_line(aes(pos,rho,colour=method))
 ggsave(filename = "images/rao_HiCall_GM12878_SELP_150k_rho_bias.pdf", width=10, height=7)
