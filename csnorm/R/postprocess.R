@@ -55,7 +55,7 @@ bin_and_chunk = function(cs, resolution, group, ncores) {
   stepsize=max(2,ceiling(length(bins)/(5*ncores)))
   counts[,c("chunk1","chunk2"):=list(ibin1 %/% stepsize, ibin2 %/% stepsize)]
   biases[,chunk:=ibin %/% stepsize]
-  chunks=CJ(biases[,min(chunk):max(chunk)],biases[,min(chunk):max(chunk)])[V1<=V2]
+  chunks=CJ(biases[,(min(chunk):max(chunk))],biases[,(min(chunk):max(chunk))])[V1<=V2]
   return(list(counts=counts,biases=biases,chunks=chunks,groups=groups))
 }
 
@@ -374,7 +374,7 @@ flsa_cross_validate = function(mat, res.cv, cvgroups, lambda1, lambda2) {
   ret[,mse:=ncounts*(value-value.ref)^2]
   ret=ret[,.(mse=mean(mse),ncounts=.N),by=c("groupname","cv.group")]
   ret=ret[,.(mse=weighted.mean(mse,ncounts),mse.sd=sd(mse)),by=groupname]
-  ret[,.(groupname,lambda1=lambda1,lambda2=lambda2,mse,mse.sd,fold=cv.fold)]
+  ret[,.(groupname,lambda1=lambda1,lambda2=lambda2,mse,mse.sd)]
 }
 
 #' connectivity on a triangle
