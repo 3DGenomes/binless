@@ -52,7 +52,7 @@ bin_and_chunk = function(cs, resolution, group, ncores) {
   biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
   biases[,ibin:=as.integer(bin)-1]
   #split across cores
-  stepsize=max(2,ceiling(length(bins)/(5*ncores)))
+  stepsize=max(2,ceiling(length(bins)/ncores))
   counts[,c("chunk1","chunk2"):=list(ibin1 %/% stepsize, ibin2 %/% stepsize)]
   biases[,chunk:=ibin %/% stepsize]
   chunks=CJ(biases[,(min(chunk):max(chunk))],biases[,(min(chunk):max(chunk))])[V1<=V2]
