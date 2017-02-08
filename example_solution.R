@@ -1,7 +1,10 @@
 library(ggplot2)
 library(data.table)
 library(splines)
+library(Matrix)
+library(quadprog)
 
+### genomic spline
 #sparse spline design
 splinedegree=3 #Cubic spline
 Krow=100
@@ -72,5 +75,61 @@ ggplot(result)+
   geom_line(aes(x,muU,colour="mu U"))+
   geom_line(aes(x,muy,colour="mu y"))+
   geom_line(aes(x,mid,colour="mid"))
+
+
+
+
+### decay spline
+splinedegree=3 #Cubic spline
+Kdiag=50
+dbins=10**seq(0,5,length.out=1000)
+nbins=length(dbins)
+dx = 1.01*(max(log(dbins))-min(log(dbins)))/(Kdiag-splinedegree)
+t = min(log(dbins)) - dx*0.01 + dx * seq(-splinedegree,Kdiag-splinedegree+3)
+X = spline.des(log(dbins), knots = t, outer.ok = T, sparse=T)$design
+X = rbind(X,X)
+U=cbind(c(rep(1,nbins),rep(0,nbins)),c(rep(0,nbins),rep(1,nbins)))
+ggplot(as.data.table(melt(as.matrix(U))))+geom_raster(aes(Var1,Var2,fill=value))
+Xt = cbind(U,X)
+Sm2=Diagonal(2*nbins,x=c(rnorm(nbins)^2,2*rnorm(nbins)^2))
+ggplot(as.data.table(melt(as.matrix(Xt))))+geom_raster(aes(Var1,Var2,fill=value))
+#
+w=matrix(c(1:nbins,rep(0,nbins)),ncol=1)
+#
+ldecay=5*exp(-(log(dbins)-5)^2/10)
+y=matrix(c(5+ldecay+rnorm(nbins,sd=0.1),1+ldecay+rnorm(nbins,sd=0.1)),ncol=1)
+ggplot(data.table(x=dbins,y=y[,1],dset=c(rep(c(0,1),each=nbins))))+geom_point(aes(x,y))+scale_x_log10()+facet_wrap(~dset)
+data.table(x=dbins,y=y[,1],dset=c(rep(c(0,1),each=nbins)))[,mean(y),by=dset]
+#
+diags = list(rep(1,Kdiag), rep(-2,Kdiag))
+D = bandSparse(Kdiag-2, Kdiag, k=0:2, diagonals=c(diags, diags[1]))
+Dt = cbind(matrix(0,ncol=2, nrow=Kdiag-2),D)
+ggplot(as.data.table(melt(as.matrix(Dt))))+geom_raster(aes(Var1,Var2,fill=value))
+#
+At=crossprod(crossprod(Sm2,Xt),Xt)+Kdiag*1*crossprod(Dt)
+#
+C=-bandSparse(Kdiag, Kdiag-1, k=c(0,-1),diagonals=list(diags[[1]],-diags[[1]]))
+Ct=rbind(matrix(0,nrow=2,ncol=Kdiag), cbind(t(X)%*%w,C))
+ggplot(as.data.table(melt(as.matrix(Ct)==0)))+geom_raster(aes(Var1,Var2,fill=value))
+#
+fit = solve.QP(At, t(Xt)%*%Sm2%*%y, -Ct, meq = 2)
+betat = fit$solution
+#
+e=betat[1:2]
+beta=betat[3:(Kdiag+2)]
+
+###
+result = data.table(x=log(dbins), y1=y[1:nbins,1], y2=y[(nbins+1):(2*nbins),1],
+                    mu=as.matrix(X%*%beta)[,1],
+                    mid1=rep(e[1],nbins), mid2=rep(e[2],nbins))
+ggplot(result)+
+  geom_point(aes(x,y1))+geom_point(aes(x,y2))+
+  geom_line(aes(x,mu+mid1),colour="red")+geom_line(aes(x,mu+mid2),colour="green")
+ggplot(result)+
+  geom_point(aes(x,y1))+
+  geom_line(aes(x,mu+mid1,colour="Xbeta+e1"))+
+  geom_line(aes(x,mu,colour="Xbeta"))+
+  geom_line(aes(x,mu_c,colour="Xbeta_c"))+
+  geom_line(aes(x,mu_y,colour="Xbeta_y"))
 
 
