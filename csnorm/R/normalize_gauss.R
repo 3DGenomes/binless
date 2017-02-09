@@ -111,8 +111,9 @@ csnorm_gauss_decay_muhat_mean = function(cs, zdecay) {
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alpha=1e-7, type=c("outer","perf")) {
+csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alpha=1e-7, type=c("outer","perf"), fit_model=c('stan','nostan'), max_perf_iteration=1000, convergence_epsilon=1e-5) {
   type=match.arg(type)
+  fit_model=match.arg(fit_model)
   if (init.mean=="mean") {
     csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs, zdecay)
   } else {
@@ -120,7 +121,22 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
   }
   #run optimization
   Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
+  Totalcbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
   cbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
+  TotalDsets = cs@design[,.N]
+  
+  all_beta_diag = c()
+  all_log_decay = c()
+  if (type=="perf") {
+    all_lambda = c()
+  }
+  
+  x = log(csd[,distance])
+  q = 3
+  dx = 1.01*(max(x)-min(x))/(Kdiag-q)
+  t = min(x) - dx*0.01 + dx * seq(-q,Kdiag-q+3)
+  Bsp = spline.des(x, knots = t, outer.ok = T, sparse=F)$design
+  
   data=list(Dsets=cs@design[,.N], Decays=cs@design[,uniqueN(decay)], XD=as.array(cs@design[,decay]),
             Kdiag=Kdiag, dmin=cs@settings$dmin, dmax=cs@settings$dmax, N=csd[,.N], cbegin=cbegin,
             kappa_hat=csd[,kappahat], sdl=csd[,std], dist=csd[,distance],
@@ -301,13 +317,12 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
     t = min(cutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
     Bsp = spline.des(cutsites, knots = t, outer.ok = T, sparse=T)$design
     X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
+    W=Matrix(cbind(c(rep(0,3*SD),rep(1,SD),rep(0,SD)), c(rep(0,4*SD),rep(1,SD))), sparse = T)
     diags = list(rep(1,Krow), rep(-2,Krow))
     D1 = bandSparse(Krow-2, Krow, k=0:2, diagonals=c(diags, diags[1]))
     if (type=="outer" || (!is.null(cs@par$lambda_iota) && !is.null(cs@par$lambda_rho))) {
-      lambda_iota = as.array(cs@par$lambda_iota)
-      lambda_iota = lambda_iota[uXB]
-      lambda_rho = as.array(cs@par$lambda_rho)
-      lambda_rho = lambda_rho[uXB]
+      lambda_iota = cs@par$lambda_iota[uXB]
+      lambda_rho = cs@par$lambda_rho[uXB]
     } else {
       lambda_iota = 1 
       lambda_rho = 1 
@@ -335,6 +350,7 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
         SDd = bbegin[d+2]-bbegin[d+1]
         X = rbind(X,nX)
         Bsp = bdiag(Bsp,nBsp)
+        W = rbind(W,cbind(rep(0,5*SDd),rep(0,5*SDd)))
         nU_e = cbind(c(rep.int(1,SDd),rep.int(0,4*SDd)),c(rep.int(0,SDd),rep.int(1,2*SDd),rep.int(0,2*SDd)),c(rep.int(0,3*SDd),rep.int(1,2*SDd)))
         U_e = bdiag(U_e,nU_e) 
         eta_hat_RJ=c(eta_hat_RJ,bts[cat=="rejoined",etahat][bbegin[d+1]:(bbegin[d+2]-1)])
@@ -372,47 +388,43 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
                              verbose=verbose, init=0, init_alpha=init_alpha)
       
     } else {
-      if (type=="outer") {
-        lambda_rho=as.array(lambda_rho)
-        lambda_iota=as.array(lambda_iota)
-      } 
-      
+    
       SD = bbegin[2]-bbegin[1]
       etas = c(eta_hat_RJ[1:SD],eta_hat_DL[1:SD],eta_hat_DR[1:SD],eta_hat_L[1:SD],eta_hat_R[1:SD])
-      sds = c((1/(sd_RJ[1:SD]^2)),(1/(sd_DL[1:SD]^2)),(1/(sd_DR[1:SD]^2)),(1/(sd_L[1:SD]^2)),(1/(sd_R[1:SD]^2)))
+      sds = c((1/(sd_RJ[1:SD])),(1/(sd_DL[1:SD])),(1/(sd_DR[1:SD])),(1/(sd_L[1:SD])),(1/(sd_R[1:SD])))
       if (Dsets > 1) {
         for (d in 2:Dsets) {
           SDd = bbegin[d+2]-bbegin[d+1]
           etas = c(etas,eta_hat_RJ[(SD+1):(SD+SDd)],eta_hat_DL[(SD+1):(SD+SDd)],eta_hat_DR[(SD+1):(SD+SDd)],eta_hat_L[(SD+1):(SD+SDd)],eta_hat_R[(SD+1):(SD+SDd)])
-          sds = c(sds,(1/(sd_RJ[(SD+1):(SD+SDd)]^2)),(1/(sd_DL[(SD+1):(SD+SDd)]^2)),(1/(sd_DR[(SD+1):(SD+SDd)]^2)),(1/(sd_L[(SD+1):(SD+SDd)]^2)),(1/(sd_R[(SD+1):(SD+SDd)]^2)))
+          sds = c(sds,(1/(sd_RJ[(SD+1):(SD+SDd)])),(1/(sd_DL[(SD+1):(SD+SDd)])),(1/(sd_DR[(SD+1):(SD+SDd)])),(1/(sd_L[(SD+1):(SD+SDd)])),(1/(sd_R[(SD+1):(SD+SDd)])))
           SD = SD + SDd
         }
       }
       
-      S_m2 = Diagonal(x=sds)
-      tmpX_S_m2 = crossprod(X,S_m2)
-      W=cbind(c(rep(0,3*SD),rep(1,SD),rep(0,SD)), c(rep(0,4*SD),rep(1,SD)))
+      S_m2 = Diagonal(x=sds^2)
+      tmp_X_S_m2_X = crossprod(Diagonal(x=sds)%*%X)
       tmp_Xt_W = crossprod(X,W)
       
       epsilon = 1
       maxiter = 0
       D = bdiag(lambda_iota*D1,lambda_rho*D1)
-      DtD = crossprod(D,D)
-      tmp_X_S_m2_X = tmpX_S_m2%*%X
+      DtD = crossprod(D)
       cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD)
       while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
         
         Gamma_v = solve(t(tmp_Xt_W)%*%solve(cholA,tmp_Xt_W), t(solve(cholA,tmp_Xt_W)))
         #all(abs((Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)-(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v))<1e-5)
         
-        beta_y=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%t(X)%*%S_m2%*%etas)
-        beta_U=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%t(X)%*%S_m2%*%U_e)
+        beta_y=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%crossprod(X,S_m2%*%etas))
+        beta_U=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%crossprod(X,S_m2%*%U_e))
         
         e=solve(t(U_e)%*%S_m2%*%(U_e-X%*%beta_U),t(U_e)%*%S_m2%*%(etas-X%*%beta_y))
         
         beta = beta_y - beta_U%*%e
         beta_iota = beta[1:Krow]
         beta_rho = beta[(Krow+1):(2*Krow)]
+        
+        if(type == 'outer') break
         
         nlambda_iota = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_iota)+1e6)
         nlambda_iota = sqrt(as.numeric(nlambda_iota))
@@ -424,11 +436,9 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
         lambda_rho = nlambda_rho
         maxiter = maxiter+1
         
-        if(type == 'outer') break
-        
         D = bdiag(lambda_iota*D1,lambda_rho*D1)
-        DtD = crossprod(D,D)
-        update(cholA,tmp_X_S_m2_X + Krow^2*DtD)
+        DtD = crossprod(D)
+        cholA = update(cholA,tmp_X_S_m2_X + Krow^2*DtD)
         
       }
       
@@ -852,7 +862,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     if (fit.decay==T) {
       if (verbose==T) cat("Gibbs",i,": Decay ")
       a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_decay(cs, zdecay, init.mean=init.mean,
-                                                                               init_alpha=init_alpha, type=type)))
+                                                                               init_alpha=init_alpha, type=type,fit_model=fit_model)))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", out=output, runtime=a[1]+a[4], type=type)
       if (verbose==T) cat("log-likelihood = ",cs@par$value, "\n")
     }
