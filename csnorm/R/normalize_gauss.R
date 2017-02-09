@@ -341,28 +341,28 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
     
     if (Dsets > 1) {
       for (d in 2:Dsets) {
-        ncutsites = cs@biases[,pos][bbegin[d+1]:(bbegin[d+2]-1)]
+        ncutsites = cs@biases[,pos][bbegin[(2*d-1)]:(bbegin[2*d]-1)]
         dx = 1.01*(max(ncutsites)-min(ncutsites))/(Krow-splinedegree)
         t = min(ncutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
         nBsp = spline.des(ncutsites, knots = t, outer.ok = T, sparse=T)$design
         cutsites = c(cutsites,ncutsites)
         nX = rbind(cbind(nBsp/2,nBsp/2),bdiag(nBsp,nBsp),bdiag(nBsp,nBsp))
-        SDd = bbegin[d+2]-bbegin[d+1]
+        SDd = bbegin[2*d]-bbegin[(2*d-1)]
         X = rbind(X,nX)
         Bsp = bdiag(Bsp,nBsp)
         W = rbind(W,cbind(rep(0,5*SDd),rep(0,5*SDd)))
         nU_e = cbind(c(rep.int(1,SDd),rep.int(0,4*SDd)),c(rep.int(0,SDd),rep.int(1,2*SDd),rep.int(0,2*SDd)),c(rep.int(0,3*SDd),rep.int(1,2*SDd)))
         U_e = bdiag(U_e,nU_e) 
-        eta_hat_RJ=c(eta_hat_RJ,bts[cat=="rejoined",etahat][bbegin[d+1]:(bbegin[d+2]-1)])
-        sd_RJ=c(sd_RJ,bts[cat=="rejoined",std][bbegin[d+1]:(bbegin[d+2]-1)])
-        eta_hat_DL=c(eta_hat_DL,bts[cat=="dangling L",etahat][bbegin[d+1]:(bbegin[d+2]-1)])
-        sd_DL=c(sd_DL,bts[cat=="dangling L",std][bbegin[d+1]:(bbegin[d+2]-1)])
-        eta_hat_DR=c(eta_hat_DR,bts[cat=="dangling R",etahat][bbegin[d+1]:(bbegin[d+2]-1)])
-        sd_DR=c(sd_DR,bts[cat=="dangling R",std][bbegin[d+1]:(bbegin[d+2]-1)])
-        eta_hat_L=c(eta_hat_L,cts[cat=="contact L",etahat][bbegin[d+1]:(bbegin[d+2]-1)])
-        sd_L=c(sd_L,cts[cat=="contact L",std][bbegin[d+1]:(bbegin[d+2]-1)])
-        eta_hat_R=c(eta_hat_R,cts[cat=="contact R",etahat][bbegin[d+1]:(bbegin[d+2]-1)])
-        sd_R=c(sd_R,cts[cat=="contact R",std][bbegin[d+1]:(bbegin[d+2]-1)])
+        eta_hat_RJ=c(eta_hat_RJ,bts[cat=="rejoined",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        sd_RJ=c(sd_RJ,bts[cat=="rejoined",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        eta_hat_DL=c(eta_hat_DL,bts[cat=="dangling L",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        sd_DL=c(sd_DL,bts[cat=="dangling L",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        eta_hat_DR=c(eta_hat_DR,bts[cat=="dangling R",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        sd_DR=c(sd_DR,bts[cat=="dangling R",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        eta_hat_L=c(eta_hat_L,cts[cat=="contact L",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        sd_L=c(sd_L,cts[cat=="contact L",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        eta_hat_R=c(eta_hat_R,cts[cat=="contact R",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        sd_R=c(sd_R,cts[cat=="contact R",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
         SD = SD + SDd
       }
     } 
@@ -394,7 +394,7 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
       sds = c((1/(sd_RJ[1:SD])),(1/(sd_DL[1:SD])),(1/(sd_DR[1:SD])),(1/(sd_L[1:SD])),(1/(sd_R[1:SD])))
       if (Dsets > 1) {
         for (d in 2:Dsets) {
-          SDd = bbegin[d+2]-bbegin[d+1]
+          SDd = bbegin[2*d]-bbegin[(2*d-1)]
           etas = c(etas,eta_hat_RJ[(SD+1):(SD+SDd)],eta_hat_DL[(SD+1):(SD+SDd)],eta_hat_DR[(SD+1):(SD+SDd)],eta_hat_L[(SD+1):(SD+SDd)],eta_hat_R[(SD+1):(SD+SDd)])
           sds = c(sds,(1/(sd_RJ[(SD+1):(SD+SDd)])),(1/(sd_DL[(SD+1):(SD+SDd)])),(1/(sd_DR[(SD+1):(SD+SDd)])),(1/(sd_L[(SD+1):(SD+SDd)])),(1/(sd_R[(SD+1):(SD+SDd)])))
           SD = SD + SDd
@@ -464,7 +464,7 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
       SD = 5*SD
       if (Dsets > 1) {
         for (d in 2:Dsets) {
-          SDd = bbegin[d+2]-bbegin[d+1]
+          SDd = bbegin[2*d]-bbegin[(2*d-1)]
           
           nlog_iota = Bsp[(SD/5+1):(SD/5+SDd),((d-1)*Krow+1):(d*Krow)]%*%beta_iota
           nlog_rho = Bsp[(SD/5+1):(SD/5+SDd),((d-1)*Krow+1):(d*Krow)]%*%beta_rho
