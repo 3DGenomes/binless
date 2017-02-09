@@ -5,6 +5,18 @@ library(doParallel)
 library(foreach)
 library(scales)
 
+
+# load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIIdSMC_all_csdata.RData"))
+# csd1 = csd
+# load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIInov_all_csdata.RData"))
+# csd2 = csd
+# load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIIr1_all_csdata.RData"))
+# csd3 = csd
+# load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIIr2_all_csdata.RData"))
+# csd4 = csd
+# load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIIrif_all_csdata.RData"))
+# csd5 = csd
+
 #args=commandArgs(trailingOnly=TRUE)
 sub="SELP_150k"
 bpk=3
@@ -15,9 +27,19 @@ setwd("/scratch/workspace/csnorm")
 #merge datasets
 load(paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_GM12878_",sub,"_csdata.RData"))
 csd1=csd
+csd3 = csd
+csd3@info$replicate="1"
+csd3@info$name="T47D es 60 MboI 2"
+csd5 = csd
+csd5@info$replicate="1"
+csd5@info$name="T47D es 60 MboI 4"
 load(paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_IMR90_",sub,"_csdata.RData"))
 csd2=csd
-cs_stan=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
+csd4 = csd
+csd4@info$replicate="1"
+csd4@info$name="T47D es 60 MboI 3"
+
+cs_r=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
 cs_r=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
 cs_stan=merge_cs_norm_datasets(list(csd2), different.decays="none")
 
@@ -25,17 +47,17 @@ cs_stan=merge_cs_norm_datasets(list(csd2), different.decays="none")
 csd1
 csd2
 cs
-
+cs_stan = cs_r
 #normalize using approximation
 cs_stan = run_gauss(cs_stan, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
                  ncounts = 1000000, type=type, fit_model="stan")
 cs_r = run_gauss(cs_r, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
-               ncounts = 1000000, type=type, fit_model="nostan")
+               ncounts = 1000000, type=type, fit_model="nostan", fit.disp = F)
 save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
 
 #look at the following objects
 cs
-a=plot_diagnostics(cs)
+a=plot_diagnostics(cs_r)
 a[1]
 a[2]
 cs_r@par$biases

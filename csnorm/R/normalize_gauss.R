@@ -477,7 +477,7 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
           log_mean_DR = c(log_mean_DR,log_mean[(SD+(2*SDd+1)):(SD+(3*SDd))])
           log_mean_cleft  = c(log_mean_cleft,log_mean[(SD+(3*SDd+1)):(SD+(4*SDd))])
           log_mean_cright = c(log_mean_cright,log_mean[(SD+(4*SDd+1)):(SD+(5*SDd))])
-          SD = SD + SDd
+          SD = SD + 5*SDd
         }
       }
     }
