@@ -40,6 +40,7 @@
 #' @import abind
 #' @import methods
 #' @import Matrix
+#' @import quadprog
 #' @importFrom Hmisc cut2
 #' @importFrom dplyr ntile
 #'

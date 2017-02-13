@@ -41,7 +41,7 @@ csd4@info$name="T47D es 60 MboI 3"
 
 cs_r=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
 cs_r=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
-cs_stan=merge_cs_norm_datasets(list(csd2), different.decays="none")
+cs_stan=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
 
 #look at these objects
 csd1
@@ -50,7 +50,7 @@ cs
 cs_stan = cs_r
 #normalize using approximation
 cs_stan = run_gauss(cs_stan, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
-                 ncounts = 1000000, type=type, fit_model="stan")
+                 ncounts = 1000000, type=type, fit_model="stan", fit.disp = F)
 cs_r = run_gauss(cs_r, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
                ncounts = 1000000, type=type, fit_model="nostan", fit.disp = F)
 save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
@@ -66,7 +66,7 @@ cs@par$decay
 #plot biases and decay
 ggplot(cs_r@par$biases)+geom_pointrange(aes(pos,etahat,ymin=etahat-std,ymax=etahat+std,colour=cat),alpha=0.1)+
   geom_line(aes(pos,eta))+facet_grid(name ~ cat)#+
-ggplot(cs@par$decay)+geom_line(aes(distance,kappa))+
+ggplot(cs_r@par$decay)+geom_line(aes(distance,kappa))+
   geom_pointrange(aes(distance,kappahat,ymin=kappahat-std,ymax=kappahat+std), alpha=0.1)+
   facet_wrap(~name,scales = "free")+scale_x_log10()
 ggplot(data.table(r=cs_r@par$biases[,etahat],stan=cs_stan@par$biases[,etahat],cat=cs_stan@par$biases[,cat]))+

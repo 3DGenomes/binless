@@ -122,49 +122,180 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
   #run optimization
   Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
   Totalcbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
-  cbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
+  #cbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
   TotalDsets = cs@design[,.N]
+  XD=as.array(cs@design[,decay])
   
   all_beta_diag = c()
   all_log_decay = c()
+  all_log_mean_counts = c()
+  all_eC = c()
   if (type=="perf") {
-    all_lambda = c()
+    all_lambda_diag = c()
+  }
+  for(uXD in unique(XD)) {
+    Dsets = 0
+    cbegin = c()
+    cbegin_stan = c(1)
+    stanXD = c()
+    for (d in 1:TotalDsets) {
+      if(XD[d] == uXD) {
+        cbegin = c(cbegin,Totalcbegin[d],Totalcbegin[d+1])
+        cbegin_stan = c(cbegin_stan,(Totalcbegin[d+1]-Totalcbegin[d]+tail(cbegin_stan, n=1)))
+        Dsets = Dsets + 1
+        stanXD = c(stanXD,1) 
+      }
+    }
+    SD = cbegin[2]-cbegin[1]
+    #sparse spline design
+    cutsites = csd[,distance][cbegin[1]:(cbegin[2]-1)]
+    q = 3
+    dx = 1.01*(max(log(cutsites))-min(log(cutsites)))/(Kdiag-q)
+    t = min(log(cutsites)) - dx*0.01 + dx * seq(-q,Kdiag-q+3)
+    X = spline.des(log(cutsites), knots = t, outer.ok = T, sparse=F)$design
+    #W=Matrix(rep.int(1,SD),ncol=1)
+    W=csd[,weight][cbegin[1]:(cbegin[2]-1)]
+    diags = list(rep(1,Kdiag), rep(-2,Kdiag))
+    D = bandSparse(Kdiag-2, Kdiag, k=0:2, diagonals=c(diags, diags[1]))
+    if (type=="outer" || (!is.null(cs@par$lambda_diag))) {
+      lambda_diag = cs@par$lambda_diag[uXD]
+    } else {
+      lambda_diag = 1
+    }
+    U_e=Matrix(rep.int(1,SD),ncol=1)
+    kappa_hat=csd[,kappahat][cbegin[1]:(cbegin[2]-1)]
+    sdl=csd[,std][cbegin[1]:(cbegin[2]-1)]
+    if (Dsets > 1) {
+      for (d in 2:Dsets) {
+        ncutsites = csd[,distance][cbegin[(2*d-1)]:(cbegin[2*d]-1)]
+        dx = 1.01*(max(log(ncutsites))-min(log(ncutsites)))/(Kdiag-q)
+        t = min(log(ncutsites)) - dx*0.01 + dx * seq(-q,Kdiag-q+3)
+        nBsp = spline.des(log(ncutsites), knots = t, outer.ok = T, sparse=F)$design
+        cutsites = c(cutsites,ncutsites)
+        X = rbind(X,nBsp)
+        SDd = cbegin[2*d]-cbegin[(2*d-1)]
+        W = c(W,c(rep(0,SDd)))
+        nU_e = Matrix(rep.int(1,SDd),ncol=1)
+        U_e = bdiag(U_e,nU_e) 
+        kappa_hat=c(kappa_hat,csd[,kappahat][cbegin[(2*d-1)]:(cbegin[2*d]-1)])
+        sdl=c(sdl,csd[,std][cbegin[(2*d-1)]:(cbegin[2*d]-1)])
+        SD = SD + SDd
+      }
+    } 
+    if(fit_model=='stan') {
+      
+      data=list(Dsets=Dsets, Decays=1, XD=as.array(stanXD),
+                Kdiag=Kdiag, dmin=cs@settings$dmin, dmax=cs@settings$dmax, N=SD, cbegin=as.array(cbegin_stan),
+                kappa_hat=kappa_hat, sdl=sdl, dist=cutsites,
+                weight=csd[,weight])
+      if (type=="outer") {
+        data$lambda_diag=as.array(lambda_diag)
+        model=csnorm:::stanmodels$gauss_decay_outer
+      } else {
+        model=csnorm:::stanmodels$gauss_decay_perf
+      }
+      #optimize from scratch, to avoid getting stuck. Slower but more robust
+      op=optimize_stan_model(model=model, data=data, iter=cs@settings$iter,
+                             verbose=verbose, init=0, init_alpha=init_alpha)
+      
+    } else {
+      S_m2 = Diagonal(x=1/sdl^2)
+      
+      Xt = cbind(U_e,X)
+      Dt = cbind(matrix(0,ncol=Dsets, nrow=Kdiag-2),D)
+      tmp_X_S_m2_X = crossprod(Diagonal(x=1/sdl)%*%Xt)
+      tmp_X_S_m2_k = t(Xt)%*%S_m2%*%kappa_hat
+      DtD = crossprod(Dt)
+      diags = list(rep(1,Kdiag), rep(-2,Kdiag))
+      C=-bandSparse(Kdiag, Kdiag-1, k=c(0,-1),diagonals=list(diags[[1]],-diags[[1]]))
+      Ct=rbind(matrix(0,nrow=Dsets,ncol=Kdiag), cbind(crossprod(X,W),C))
+      
+      epsilon = 1
+      maxiter = 0
+      
+      while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
+        
+        At = tmp_X_S_m2_X + Kdiag^2*lambda_diag^2*DtD
+          
+        fit = solve.QP(nearPD(At)$mat, tmp_X_S_m2_k, -Ct, meq = Dsets)
+        betat = fit$solution
+        
+        eC=as.array(betat[1:Dsets])
+        beta=betat[(Dsets+1):(Kdiag+Dsets)]
+        
+        if(type == 'outer') break
+        
+        nlambda_diag = (Kdiag - 2)/((Kdiag^2)*crossprod(D%*%beta)+1)
+        nlambda_diag = sqrt(as.numeric(nlambda_diag))
+        
+        epsilon = abs(lambda_diag-nlambda_diag)
+        lambda_diag = nlambda_diag
+        maxiter = maxiter+1
+   
+      }
+      
+      log_decay = X%*%beta
+      log_mean_counts = log_decay
+      for (d in 1:Dsets) {
+        SDd = cbegin[2*d]-cbegin[(2*d-1)]
+        log_mean_counts[cbegin[(2*d-1)]:(cbegin[2*d]-1)] = log_mean_counts[cbegin[(2*d-1)]:(cbegin[2*d]-1)] + rep(eC[d],SDd)
+      }
+      
+      
+    }
+    
+    if(fit_model=='stan') {
+      all_log_mean_counts = c(all_log_mean_counts,as.array(op$par$log_mean_counts))
+      all_log_decay = c(all_log_decay,op$par$log_decay)
+      all_eC = c(all_eC,op$par$eC)
+      
+      if (type=="perf") {
+        all_lambda_diag = c(all_lambda_diag,op$par$lambda_diag)
+      }
+      #update par slot
+      op$par$value=op$value
+      op$par$log_mean_counts=NULL
+      op$par$beta_diag=guarantee_beta_diag_increasing(op$par$beta_diag)
+      
+    } else {
+      all_beta_diag = c(all_beta_diag,as.array(beta))
+      all_log_mean_counts = c(all_log_mean_counts,as.array(log_mean_counts))
+      all_log_decay = c(all_log_decay,log_decay)
+      all_eC = c(all_eC,eC)
+      if (type=="perf") {
+        all_lambda_diag = c(all_lambda_diag,lambda_diag)
+      }
+      op = list()
+      attr(op,'par')
+      for(nattr in list('beta_diag','log_decay','log_mean_counts','eC','lambda_diag','value')) {
+        attr(op$par,nattr)
+      }
+      op$par$beta_diag=as.array(all_beta_diag)
+      op$par$log_mean_counts=as.array(all_log_mean_counts)
+      op$par$log_decay=as.array(all_log_decay)
+      op$par$eC=as.array(all_eC)
+      if (type=="perf") {
+        attr(op$par,'lambda_diag')
+        op$par$lambda_diag = all_lambda_diag
+      }
+      mus = sdl
+      op$par$value = mean(sapply(1:SD, function(i) sum(dnorm(kappa_hat, mean = as.array(all_log_mean_counts), sd = as.array(mus), log = TRUE))))
+    }
+    
   }
   
-  x = log(csd[,distance])
-  q = 3
-  dx = 1.01*(max(x)-min(x))/(Kdiag-q)
-  t = min(x) - dx*0.01 + dx * seq(-q,Kdiag-q+3)
-  Bsp = spline.des(x, knots = t, outer.ok = T, sparse=F)$design
-  
-  data=list(Dsets=cs@design[,.N], Decays=cs@design[,uniqueN(decay)], XD=as.array(cs@design[,decay]),
-            Kdiag=Kdiag, dmin=cs@settings$dmin, dmax=cs@settings$dmax, N=csd[,.N], cbegin=cbegin,
-            kappa_hat=csd[,kappahat], sdl=csd[,std], dist=csd[,distance],
-            weight=csd[,weight])
-  if (type=="outer") {
-    data$lambda_diag=as.array(cs@par$lambda_diag)
-    model=csnorm:::stanmodels$gauss_decay_outer
-  } else {
-    model=csnorm:::stanmodels$gauss_decay_perf
-  }
-  #optimize from scratch, to avoid getting stuck. Slower but more robust
-  op=optimize_stan_model(model=model, data=data, iter=cs@settings$iter,
-                         verbose=verbose, init=0, init_alpha=init_alpha)
   #make decay data table, reused at next call
-  dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=op$par$log_mean_counts)]
+  dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=all_log_mean_counts)]
   setkey(dmat,name,dbin)
   op$par$decay=dmat 
   #rewrite log_decay as if it were calculated for each count
   dbins=cs@settings$dbins
   csub=cs@counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
-  csd[,log_decay:=op$par$log_decay]
+  csd[,log_decay:=all_log_decay]
   a=csd[csub,.(name,id1,id2,log_decay),on=key(csd)]
   setkeyv(a,key(cs@counts))
   op$par$log_decay=a[,log_decay]
   #update par slot
-  op$par$value=op$value
-  op$par$beta_diag=guarantee_beta_diag_increasing(op$par$beta_diag)
-  op$par$log_mean_counts=NULL
   cs@par=modifyList(cs@par, op$par)
   return(cs)
 }
@@ -863,6 +994,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
       if (verbose==T) cat("Gibbs",i,": Decay ")
       a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_decay(cs, zdecay, init.mean=init.mean,
                                                                                init_alpha=init_alpha, type=type,fit_model=fit_model)))
+      if(length(output) == 0) { output = 'ok' }
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", out=output, runtime=a[1]+a[4], type=type)
       if (verbose==T) cat("log-likelihood = ",cs@par$value, "\n")
     }
