@@ -564,7 +564,8 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
     lmin=bounds[lambda2<lambda2.max,.(l2min=max(lambda2)),by=groupname]
     #upper bound is lambda one step above mse
     lmax=bounds[,.SD[lambda2>lambda2.max,.(l2max=min(lambda2))],by=groupname]
-    bounds=merge(lmin,lmax,by="groupname")
+    bounds=merge(lmin,lmax,by="groupname", all=T)
+    bounds[,l2max:=pmin(l2max, sapply(as.character(groupname),FUN=function(g){max(res.ref[[g]]$BeginLambda)}), na.rm=T)]
     #
     #now, try all lambda values between these bounds
     cat(" Fused lasso: fine scan\n")
