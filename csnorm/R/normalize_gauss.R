@@ -267,10 +267,10 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
       }
       op = list()
       attr(op,'par')
-      for(nattr in list('beta_diag','log_decay','log_mean_counts','eC','lambda_diag','value')) {
+      for(nattr in list('beta_diag_centered','log_decay','log_mean_counts','eC','lambda_diag','value')) {
         attr(op$par,nattr)
       }
-      op$par$beta_diag=as.array(all_beta_diag)
+      op$par$beta_diag_centered=as.array(all_beta_diag)
       op$par$log_mean_counts=as.array(all_log_mean_counts)
       op$par$log_decay=as.array(all_log_decay)
       op$par$eC=as.array(all_eC)
@@ -570,7 +570,7 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
         D = bdiag(lambda_iota*D1,lambda_rho*D1)
         DtD = crossprod(D)
         cholA = update(cholA,tmp_X_S_m2_X + Krow^2*DtD)
-        
+
       }
       
       eRJ = array(0,dim=c(Dsets))
@@ -700,6 +700,7 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
   setkey(bout, id, name, cat)
   op$par$biases=bout
   cs@par=modifyList(cs@par, op$par)
+  gc()
   return(cs)
 }
 
