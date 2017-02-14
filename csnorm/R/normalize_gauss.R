@@ -127,6 +127,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
   XD=as.array(cs@design[,decay])
   
   all_beta_diag = c()
+  all_beta_diag_diff = c()
   all_log_decay = c()
   all_log_mean_counts = c()
   all_eC = c()
@@ -258,7 +259,8 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
       op$par$beta_diag=guarantee_beta_diag_increasing(op$par$beta_diag)
       
     } else {
-      all_beta_diag = c(all_beta_diag,as.array(beta))
+      all_beta_diag = c(all_beta_diag,as.array(rep(beta,Dsets)))
+      all_beta_diag_diff = c(all_beta_diag_diff,as.array(D%*%beta))
       all_log_mean_counts = c(all_log_mean_counts,as.array(log_mean_counts))
       all_log_decay = c(all_log_decay,log_decay)
       all_eC = c(all_eC,eC)
@@ -271,6 +273,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
         attr(op$par,nattr)
       }
       op$par$beta_diag_centered=as.array(all_beta_diag)
+      op$par$beta_diag_diff=as.array(all_beta_diag_diff)
       op$par$log_mean_counts=as.array(all_log_mean_counts)
       op$par$log_decay=as.array(all_log_decay)
       op$par$eC=as.array(all_eC)
@@ -729,9 +732,9 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
                log_iota=cs@par$log_iota, log_rho=cs@par$log_rho,
                log_mean_cclose=counts[,log_mean_cclose], log_mean_cfar=counts[,log_mean_cfar],
                log_mean_cup=counts[,log_mean_cup], log_mean_cdown=counts[,log_mean_cdown])
-  init=list(eC_sup=counts[,log(mean(contact.close/exp(log_mean_cclose))),by=name][,V1],
-            eRJ=cs@biases[,.(name,frac=rejoined/exp((cs@par$log_iota+cs@par$log_rho)/2))][,log(mean(frac)),by=name][,V1],
-            eDE=cs@par$eDE)
+  init=list(eC_sup=as.array(counts[,log(mean(contact.close/exp(log_mean_cclose))),by=name][,V1]),
+            eRJ=as.array(cs@biases[,.(name,frac=rejoined/exp((cs@par$log_iota+cs@par$log_rho)/2))][,log(mean(frac)),by=name][,V1]),
+            eDE=as.array(cs@par$eDE))
   init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],log_mean_cclose]))
   init$alpha=1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu)
   init$mu=NULL
