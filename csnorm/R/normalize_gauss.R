@@ -734,7 +734,8 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
                log_mean_cup=counts[,log_mean_cup], log_mean_cdown=counts[,log_mean_cdown])
   init=list(eC_sup=as.array(counts[,log(mean(contact.close/exp(log_mean_cclose))),by=name][,V1]),
             eRJ=as.array(cs@biases[,.(name,frac=rejoined/exp((cs@par$log_iota+cs@par$log_rho)/2))][,log(mean(frac)),by=name][,V1]),
-            eDE=as.array(cs@par$eDE))
+            eDE=as.array(cs@biases[,.(name,frac=(dangling.L/exp(cs@par$log_iota)+dangling.R/exp(cs@par$log_rho))/2)][
+              ,log(mean(frac)),by=name][,V1]))
   init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],log_mean_cclose]))
   init$alpha=1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu)
   init$mu=NULL

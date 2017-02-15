@@ -52,7 +52,7 @@ bin_and_chunk = function(cs, resolution, group, ncores) {
   biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
   biases[,ibin:=as.integer(bin)-1]
   #split across cores
-  stepsize=max(2,ceiling(length(bins)/(5*ncores)))
+  stepsize=max(2,ceiling(length(bins)/ncores))
   counts[,c("chunk1","chunk2"):=list(ibin1 %/% stepsize, ibin2 %/% stepsize)]
   biases[,chunk:=ibin %/% stepsize]
   chunks=CJ(biases[,(min(chunk):max(chunk))],biases[,(min(chunk):max(chunk))])[V1<=V2]
@@ -564,7 +564,8 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1,
     lmin=bounds[lambda2<lambda2.max,.(l2min=max(lambda2)),by=groupname]
     #upper bound is lambda one step above mse
     lmax=bounds[,.SD[lambda2>lambda2.max,.(l2max=min(lambda2))],by=groupname]
-    bounds=merge(lmin,lmax,by="groupname")
+    bounds=merge(lmin,lmax,by="groupname", all=T)
+    bounds[,l2max:=pmin(l2max, sapply(as.character(groupname),FUN=function(g){max(res.ref[[g]]$BeginLambda)}), na.rm=T)]
     #
     #now, try all lambda values between these bounds
     cat(" Fused lasso: fine scan\n")
