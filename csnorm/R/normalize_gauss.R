@@ -256,7 +256,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
       #update par slot
       op$par$value=op$value
       op$par$log_mean_counts=NULL
-      op$par$beta_diag=guarantee_beta_diag_increasing(op$par$beta_diag)
+      if (fit_model=="stan") op$par$beta_diag=guarantee_beta_diag_increasing(op$par$beta_diag)
       
     } else {
       all_beta_diag = c(all_beta_diag,as.array(rep(beta,Dsets)))
@@ -987,7 +987,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   } else {
     if (verbose==T) cat("Using provided initial guess\n")
     if (is.data.table(cs@diagnostics$params)) laststep = cs@diagnostics$params[,max(step)] else laststep = 0
-    init$beta_diag = guarantee_beta_diag_increasing(init$beta_diag)
+    if (fit_model=="stan") init$beta_diag = guarantee_beta_diag_increasing(init$beta_diag)
     init.mean="mean"
     cs@par=init
   }
