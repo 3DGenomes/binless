@@ -779,7 +779,7 @@ has_converged = function(cs) {
 #' count number of zeros in each decay bin
 #' @keywords internal
 #' 
-get_nzeros_per_decay = function(cs) {
+get_nzeros_per_decay = function(cs, ncores=1) {
   #bin distances
   dbins=cs@settings$dbins
   stopifnot(cs@counts[id1>=id2,.N]==0)
@@ -792,7 +792,9 @@ get_nzeros_per_decay = function(cs) {
   #stopifnot(Nkd[mdist<cs@settings$dmin,.N]==0) #otherwise cs@counts has not been censored properly
   #Count the number of crossings per distance bin
   #looping over IDs avoids building NxN matrix
-  Nkz = foreach(i=cs@biases[,(1:.N)], .combine=function(x,y){rbind(x,y)[,.(ncross=sum(ncross)),keyby=c("name","bdist")]}) %do% {
+  registerDoParallel(cores=ncores)
+  Nkz = foreach(i=cs@biases[,(1:.N)], .multicombine = T,
+                .combine=function(...){rbind(...)[,.(ncross=sum(ncross)),keyby=c("name","bdist")]}) %dopar% {
     stuff=c(cs@biases[i,.(name,id,pos)])
     dists=cs@biases[name==stuff$name & id>stuff$id,.(name,distance=abs(pos-stuff$pos))]
     if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
@@ -811,7 +813,7 @@ get_nzeros_per_decay = function(cs) {
 #' count number of zeros in each decay bin
 #' @keywords internal
 #' 
-get_nzeros_per_cutsite = function(cs) {
+get_nzeros_per_cutsite = function(cs, ncores=1) {
   stopifnot(cs@counts[id1>=id2,.N]==0)
   cts=rbind(cs@counts[contact.close>0,.(name, id=id1, cat="contact R", count=contact.close)],
             cs@counts[contact.far>0,  .(name, id=id1, cat="contact L", count=contact.far)],
@@ -827,7 +829,8 @@ get_nzeros_per_cutsite = function(cs) {
   zbias[is.na(nnz),nnz:=0]
   setkey(zbias,id,name)
   #count masked contacts where d<dmin
-  masked = foreach(i=cs@biases[,(1:.N)], .combine=rbind) %do% {
+  registerDoParallel(cores=ncores)
+  masked = foreach(i=cs@biases[,(1:.N)], .combine=rbind) %dopar% {
     stuff=c(cs@biases[i,.(name,id,pos)])
     dists=cs@biases[name==stuff$name & id!=stuff$id,.(name,distance=abs(pos-stuff$pos))]
     if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
@@ -935,7 +938,7 @@ plot_diagnostics = function(cs) {
 #'   penalties with the dispersion parameter. The performance iteration ("perf") optimizes penalties with
 #'   the biases. It is recommended to try performance iteration, but if convergence fails to revert to outer
 #'   iteration.
-#' @param ncores positive integer (default 1). For the dispersion step, number of cores to use to predict the means.
+#' @param ncores positive integer (default 1). Number of cores to use for initialization and dispersion step.
 #'   
 #' @return A csnorm object
 #' @export
@@ -945,7 +948,7 @@ plot_diagnostics = function(cs) {
 run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
                      ngibbs = 3, iter=10000, fit.decay=T, fit.genomic=T, fit.disp=T,
                      verbose=T, ncounts=100000, init_alpha=1e-7, init.dispersion=10,
-                     tol.obj=1e-1, type="outer",fit_model="nostan", ncores_dispersion=1) {
+                     tol.obj=1e-1, type="outer",fit_model="nostan", ncores=1) {
   type=match.arg(type,c("outer","perf"))
   fit_model=match.arg(fit_model,c("stan","nostan"))
   if (verbose==T) cat("Normalization with fast approximation and ",type,"iteration\n")
@@ -965,9 +968,9 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
   cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
   if(verbose==T) cat("Counting zeros for decay\n")
-  zdecay = csnorm:::get_nzeros_per_decay(cs)
+  zdecay = csnorm:::get_nzeros_per_decay(cs, ncores=ncores)
   if(verbose==T) cat("Counting zeros for bias\n")
-  zbias = csnorm:::get_nzeros_per_cutsite(cs)
+  zbias = csnorm:::get_nzeros_per_cutsite(cs, ncores=ncores)
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
   subcounts = csnorm:::subsample_counts(cs, ncounts)
@@ -1017,7 +1020,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
       #fit exposures and dispersion
       if (verbose==T) cat("Gibbs",i,": Remaining parameters ")
       a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight,
-                                                                                    init_alpha=init_alpha, type=type, ncores = ncores_dispersion)))
+                                                                                    init_alpha=init_alpha, type=type, ncores = ncores)))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", out=output, runtime=a[1]+a[4], type=type)
       if (verbose==T) cat("log-likelihood = ",cs@par$value,"\n")
     }
