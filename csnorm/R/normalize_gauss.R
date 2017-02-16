@@ -806,7 +806,6 @@ get_nzeros_per_decay = function(cs, ncores=1) {
   Nkz = merge(Nkz,Nkd,all=T)
   Nkz[is.na(nnz),nnz:=0]
   Nkz[,nzero:=4*ncross-nnz]
-  stopifnot(Nkz[,.N]==(length(dbins)-1)*cs@design[,.N])
   return(Nkz)
 }
 
