@@ -16,10 +16,11 @@ library(scales)
 # csd4 = csd
 # load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIIrif_all_csdata.RData"))
 # csd5 = csd
+load('cs_r_3_5_ledily.RData')
 
 #args=commandArgs(trailingOnly=TRUE)
 sub="SELP_150k"
-bpk=3
+bpk=6
 type="perf"
 
 setwd("/scratch/workspace/csnorm")
@@ -52,7 +53,7 @@ cs_stan = cs_r
 cs_stan = run_gauss(cs_stan, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
                  ncounts = 1000000, type=type, fit_model="stan", fit.disp = T)
 cs_r = run_gauss(cs_r, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
-               ncounts = 1000000, type=type, fit_model="nostan", fit.disp = T)
+               ncounts = 1000000, type=type, fit_model="nostan", fit.disp = F, fit.genomic = T, init.dispersion=0.2)
 save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
 
 #look at the following objects

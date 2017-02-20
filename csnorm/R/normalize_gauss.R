@@ -241,8 +241,6 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
         SDd = cbegin[2*d]-cbegin[(2*d-1)]
         log_mean_counts[cbegin[(2*d-1)]:(cbegin[2*d]-1)] = log_mean_counts[cbegin[(2*d-1)]:(cbegin[2*d]-1)] + rep(eC[d],SDd)
       }
-      
-      
     }
     
     if(fit_model=='stan') {
