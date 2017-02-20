@@ -217,8 +217,9 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
       while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
         
         At = tmp_X_S_m2_X + Kdiag^2*lambda_diag^2*DtD
-          
-        fit = solve.QP(nearPD(At)$mat, tmp_X_S_m2_k, -Ct, meq = Dsets)
+        
+        At.PD = nearPD(At)$mat  
+        fit = solve.QP(At.PD, tmp_X_S_m2_k, -Ct, meq = Dsets)
         betat = fit$solution
         
         eC=as.array(betat[1:Dsets])
@@ -280,7 +281,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
         op$par$lambda_diag = all_lambda_diag
       }
       mus = sdl
-      op$par$value = mean(sapply(1:SD, function(i) sum(dnorm(kappa_hat, mean = as.array(all_log_mean_counts), sd = as.array(mus), log = TRUE))))
+      op$par$value = sum(dnorm(kappa_hat, mean = as.array(all_log_mean_counts), sd = as.array(mus), log = TRUE))
     }
     
   }
@@ -543,12 +544,18 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
       DtD = crossprod(D)
       cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD)
       while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
+        tmp_WtXAm1 = t(solve(cholA,tmp_Xt_W)) #2xK
         
-        Gamma_v = solve(t(tmp_Xt_W)%*%solve(cholA,tmp_Xt_W), t(solve(cholA,tmp_Xt_W)))
+        Gamma_v = solve(tmp_WtXAm1 %*% tmp_Xt_W, tmp_WtXAm1) #2xK
         #all(abs((Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)-(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v))<1e-5)
         
-        beta_y=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%crossprod(X,S_m2%*%etas))
-        beta_U=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%crossprod(X,S_m2%*%U_e))
+        tmp_Xt_Sm2_etas = crossprod(X,S_m2%*%etas) #Kx1
+        beta_y = solve(cholA, tmp_Xt_Sm2_etas)
+        beta_y = beta_y - solve(cholA, tmp_Xt_W) %*% (Gamma_v %*% tmp_Xt_Sm2_etas)
+        
+        tmp_Xt_Sm2_U = crossprod(X,S_m2%*%U_e)
+        beta_U = solve(cholA, tmp_Xt_Sm2_U)
+        beta_U = beta_U - solve(cholA, tmp_Xt_W) %*% (Gamma_v %*% tmp_Xt_Sm2_U)
         
         e=solve(t(U_e)%*%S_m2%*%(U_e-X%*%beta_U),t(U_e)%*%S_m2%*%(etas-X%*%beta_y))
         
@@ -687,7 +694,7 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
       }
       means = cbind(all_log_mean_RJ,all_log_mean_DL,all_log_mean_DR,all_log_mean_cleft,all_log_mean_cright)
       mus = cbind(sd_RJ,sd_DL,sd_DR,sd_L,sd_R)
-      op$par$value = mean(sapply(1:SD, function(i) sum(dnorm(etas, mean = as.array(means), sd = as.array(mus), log = TRUE))))
+      op$par$value = sum(dnorm(etas, mean = as.array(means), sd = as.array(mus), log = TRUE))
     }
   }
   
@@ -735,7 +742,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
             eDE=as.array(cs@biases[,.(name,frac=(dangling.L/exp(cs@par$log_iota)+dangling.R/exp(cs@par$log_rho))/2)][
               ,log(mean(frac)),by=name][,V1]))
   init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],log_mean_cclose]))
-  init$alpha=1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu)
+  init$alpha=max(0.001,1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu))
   init$mu=NULL
   op=optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, data=data, iter=cs@settings$iter,
                          verbose=verbose, init=init, init_alpha=init_alpha)
@@ -777,7 +784,7 @@ has_converged = function(cs) {
 #' count number of zeros in each decay bin
 #' @keywords internal
 #' 
-get_nzeros_per_decay = function(cs) {
+get_nzeros_per_decay = function(cs, ncores=1) {
   #bin distances
   dbins=cs@settings$dbins
   stopifnot(cs@counts[id1>=id2,.N]==0)
@@ -790,7 +797,9 @@ get_nzeros_per_decay = function(cs) {
   #stopifnot(Nkd[mdist<cs@settings$dmin,.N]==0) #otherwise cs@counts has not been censored properly
   #Count the number of crossings per distance bin
   #looping over IDs avoids building NxN matrix
-  Nkz = foreach(i=cs@biases[,(1:.N)], .combine=function(x,y){rbind(x,y)[,.(ncross=sum(ncross)),keyby=c("name","bdist")]}) %do% {
+  registerDoParallel(cores=ncores)
+  Nkz = foreach(i=cs@biases[,(1:.N)], .multicombine = T,
+                .combine=function(...){rbind(...)[,.(ncross=sum(ncross)),keyby=c("name","bdist")]}) %dopar% {
     stuff=c(cs@biases[i,.(name,id,pos)])
     dists=cs@biases[name==stuff$name & id>stuff$id,.(name,distance=abs(pos-stuff$pos))]
     if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
@@ -802,14 +811,13 @@ get_nzeros_per_decay = function(cs) {
   Nkz = merge(Nkz,Nkd,all=T)
   Nkz[is.na(nnz),nnz:=0]
   Nkz[,nzero:=4*ncross-nnz]
-  stopifnot(Nkz[,.N]==(length(dbins)-1)*cs@design[,.N])
   return(Nkz)
 }
 
 #' count number of zeros in each decay bin
 #' @keywords internal
 #' 
-get_nzeros_per_cutsite = function(cs) {
+get_nzeros_per_cutsite = function(cs, ncores=1) {
   stopifnot(cs@counts[id1>=id2,.N]==0)
   cts=rbind(cs@counts[contact.close>0,.(name, id=id1, cat="contact R", count=contact.close)],
             cs@counts[contact.far>0,  .(name, id=id1, cat="contact L", count=contact.far)],
@@ -825,7 +833,8 @@ get_nzeros_per_cutsite = function(cs) {
   zbias[is.na(nnz),nnz:=0]
   setkey(zbias,id,name)
   #count masked contacts where d<dmin
-  masked = foreach(i=cs@biases[,(1:.N)], .combine=rbind) %do% {
+  registerDoParallel(cores=ncores)
+  masked = foreach(i=cs@biases[,(1:.N)], .combine=rbind) %dopar% {
     stuff=c(cs@biases[i,.(name,id,pos)])
     dists=cs@biases[name==stuff$name & id!=stuff$id,.(name,distance=abs(pos-stuff$pos))]
     if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
@@ -933,7 +942,7 @@ plot_diagnostics = function(cs) {
 #'   penalties with the dispersion parameter. The performance iteration ("perf") optimizes penalties with
 #'   the biases. It is recommended to try performance iteration, but if convergence fails to revert to outer
 #'   iteration.
-#' @param ncores positive integer (default 1). For the dispersion step, number of cores to use to predict the means.
+#' @param ncores positive integer (default 1). Number of cores to use for initialization and dispersion step.
 #'   
 #' @return A csnorm object
 #' @export
@@ -943,7 +952,7 @@ plot_diagnostics = function(cs) {
 run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
                      ngibbs = 3, iter=10000, fit.decay=T, fit.genomic=T, fit.disp=T,
                      verbose=T, ncounts=100000, init_alpha=1e-7, init.dispersion=10,
-                     tol.obj=1e-1, type="outer",fit_model="nostan", ncores_dispersion=1) {
+                     tol.obj=1e-1, type="outer",fit_model="nostan", ncores=1) {
   type=match.arg(type,c("outer","perf"))
   fit_model=match.arg(fit_model,c("stan","nostan"))
   if (verbose==T) cat("Normalization with fast approximation and ",type,"iteration\n")
@@ -963,9 +972,9 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
   cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
   if(verbose==T) cat("Counting zeros for decay\n")
-  zdecay = csnorm:::get_nzeros_per_decay(cs)
+  zdecay = csnorm:::get_nzeros_per_decay(cs, ncores=ncores)
   if(verbose==T) cat("Counting zeros for bias\n")
-  zbias = csnorm:::get_nzeros_per_cutsite(cs)
+  zbias = csnorm:::get_nzeros_per_cutsite(cs, ncores=ncores)
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
   subcounts = csnorm:::subsample_counts(cs, ncounts)
@@ -1015,7 +1024,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
       #fit exposures and dispersion
       if (verbose==T) cat("Gibbs",i,": Remaining parameters ")
       a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight,
-                                                                                    init_alpha=init_alpha, type=type, ncores = ncores_dispersion)))
+                                                                                    init_alpha=init_alpha, type=type, ncores = ncores)))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", out=output, runtime=a[1]+a[4], type=type)
       if (verbose==T) cat("log-likelihood = ",cs@par$value,"\n")
     }
