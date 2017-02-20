@@ -282,7 +282,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
         op$par$lambda_diag = all_lambda_diag
       }
       mus = sdl
-      op$par$value = mean(sapply(1:SD, function(i) sum(dnorm(kappa_hat, mean = as.array(all_log_mean_counts), sd = as.array(mus), log = TRUE))))
+      op$par$value = sum(dnorm(kappa_hat, mean = as.array(all_log_mean_counts), sd = as.array(mus), log = TRUE))
     }
     
   }
@@ -695,7 +695,7 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
       }
       means = cbind(all_log_mean_RJ,all_log_mean_DL,all_log_mean_DR,all_log_mean_cleft,all_log_mean_cright)
       mus = cbind(sd_RJ,sd_DL,sd_DR,sd_L,sd_R)
-      op$par$value = mean(sapply(1:SD, function(i) sum(dnorm(etas, mean = as.array(means), sd = as.array(mus), log = TRUE))))
+      op$par$value = sum(dnorm(etas, mean = as.array(means), sd = as.array(mus), log = TRUE))
     }
   }
   
