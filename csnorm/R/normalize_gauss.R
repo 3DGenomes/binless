@@ -737,7 +737,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
             eDE=as.array(cs@biases[,.(name,frac=(dangling.L/exp(cs@par$log_iota)+dangling.R/exp(cs@par$log_rho))/2)][
               ,log(mean(frac)),by=name][,V1]))
   init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],log_mean_cclose]))
-  init$alpha=1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu)
+  init$alpha=max(0.001,1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu))
   init$mu=NULL
   op=optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, data=data, iter=cs@settings$iter,
                          verbose=verbose, init=init, init_alpha=init_alpha)
