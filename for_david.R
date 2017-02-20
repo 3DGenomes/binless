@@ -16,15 +16,15 @@ library(scales)
 # csd4 = csd
 # load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIIrif_all_csdata.RData"))
 # csd5 = csd
-load('cs_r_3_5_ledily.RData')
+
 
 #args=commandArgs(trailingOnly=TRUE)
 sub="SELP_150k"
-bpk=6
+bpk=3
 type="perf"
 
 setwd("/scratch/workspace/csnorm")
-
+load('cs_r_3_5_ledily.RData')
 #merge datasets
 load(paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_GM12878_",sub,"_csdata.RData"))
 csd1=csd
@@ -41,7 +41,7 @@ csd4@info$replicate="1"
 csd4@info$name="T47D es 60 MboI 3"
 
 cs_r=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
-cs_r=merge_cs_norm_datasets(list(csd1), different.decays="none")
+cs_r=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
 cs_stan=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
 
 #look at these objects
@@ -53,7 +53,7 @@ cs_stan = cs_r
 cs_stan = run_gauss(cs_stan, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
                  ncounts = 1000000, type=type, fit_model="stan", fit.disp = T)
 cs_r = run_gauss(cs_r, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
-               ncounts = 1000000, type=type, fit_model="nostan", fit.disp = F, fit.genomic = T, init.dispersion=0.2)
+               ncounts = 1000000, type=type, fit_model="nostan", fit.disp = T, fit.genomic = T, init.dispersion=10)
 save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
 
 #look at the following objects
