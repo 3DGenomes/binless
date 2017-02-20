@@ -217,8 +217,9 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
       while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
         
         At = tmp_X_S_m2_X + Kdiag^2*lambda_diag^2*DtD
-          
-        fit = solve.QP(nearPD(At)$mat, tmp_X_S_m2_k, -Ct, meq = Dsets)
+        
+        At.PD = nearPD(At)$mat  
+        fit = solve.QP(At.PD, tmp_X_S_m2_k, -Ct, meq = Dsets)
         betat = fit$solution
         
         eC=as.array(betat[1:Dsets])
