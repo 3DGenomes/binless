@@ -545,12 +545,18 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
       DtD = crossprod(D)
       cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD)
       while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
+        tmp_WtXAm1 = t(solve(cholA,tmp_Xt_W)) #2xK
         
-        Gamma_v = solve(t(tmp_Xt_W)%*%solve(cholA,tmp_Xt_W), t(solve(cholA,tmp_Xt_W)))
+        Gamma_v = solve(tmp_WtXAm1 %*% tmp_Xt_W, tmp_WtXAm1) #2xK
         #all(abs((Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)-(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v))<1e-5)
         
-        beta_y=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%crossprod(X,S_m2%*%etas))
-        beta_U=solve(cholA, (Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%crossprod(X,S_m2%*%U_e))
+        tmp_Xt_Sm2_etas = crossprod(X,S_m2%*%etas) #Kx1
+        beta_y = solve(cholA, tmp_Xt_Sm2_etas)
+        beta_y = beta_y - solve(cholA, tmp_Xt_W) %*% (Gamma_v %*% tmp_Xt_Sm2_etas)
+        
+        tmp_Xt_Sm2_U = crossprod(X,S_m2%*%U_e)
+        beta_U = solve(cholA, tmp_Xt_Sm2_U)
+        beta_U = beta_U - solve(cholA, tmp_Xt_W) %*% (Gamma_v %*% tmp_Xt_Sm2_U)
         
         e=solve(t(U_e)%*%S_m2%*%(U_e-X%*%beta_U),t(U_e)%*%S_m2%*%(etas-X%*%beta_y))
         
