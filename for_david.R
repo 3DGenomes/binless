@@ -41,8 +41,8 @@ csd4@info$replicate="1"
 csd4@info$name="T47D es 60 MboI 3"
 
 cs_r=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
-cs_r=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
-cs_stan=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
+cs_r=merge_cs_norm_datasets(list(csd1,csd2), different.decays="all")
+cs_stan=merge_cs_norm_datasets(list(csd1,csd2), different.decays="all")
 
 #look at these objects
 csd1
@@ -50,15 +50,15 @@ csd2
 cs
 cs_stan = cs_r
 #normalize using approximation
-cs_stan = run_gauss(cs_stan, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
-                 ncounts = 1000000, type=type, fit_model="stan", fit.disp = T)
-cs_r = run_gauss(cs_r, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
-               ncounts = 1000000, type=type, fit_model="nostan", fit.disp = T, fit.genomic = T, init.dispersion=10)
+cs_stan = run_gauss(cs_stan, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 8, iter=100000, init_alpha=1e-7,
+                 ncounts = 1000000, type=type, fit_model="stan", fit.disp = T, ncores = 8)
+cs_r = run_gauss(cs_r, bf_per_kb=bpk, bf_per_decade=30, bins_per_bf=30, ngibbs = 8, iter=100000, init_alpha=1e-7,
+               ncounts = 1000000, type=type, fit_model="nostan", fit.disp = T, fit.genomic = T, init.dispersion=10, ncores = 8)
 save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
 
 #look at the following objects
 cs
-a=plot_diagnostics(cs_r)
+a=plot_diagnostics(cs_stan)
 a[1]
 a[2]
 cs_r@par$biases

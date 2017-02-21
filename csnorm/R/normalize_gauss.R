@@ -126,11 +126,13 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
   TotalDsets = cs@design[,.N]
   XD=as.array(cs@design[,decay])
   
-  all_beta_diag = c()
-  all_beta_diag_diff = c()
+  all_beta_diag = matrix(0,nrow=TotalDsets,ncol=Kdiag)
+  all_beta_diag_diff = matrix(0,nrow=TotalDsets,ncol=Kdiag-2)
+  all_beta_diag_centered = c()
   all_log_decay = c()
   all_log_mean_counts = c()
   all_eC = c()
+  all_value = 0
   if (type=="perf") {
     all_lambda_diag = c()
   }
@@ -154,8 +156,8 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
     dx = 1.01*(max(log(cutsites))-min(log(cutsites)))/(Kdiag-q)
     t = min(log(cutsites)) - dx*0.01 + dx * seq(-q,Kdiag-q+3)
     X = spline.des(log(cutsites), knots = t, outer.ok = T, sparse=F)$design
-    #W=Matrix(rep.int(1,SD),ncol=1)
     W=csd[,weight][cbegin[1]:(cbegin[2]-1)]
+    stan_W = W
     diags = list(rep(1,Kdiag), rep(-2,Kdiag))
     D = bandSparse(Kdiag-2, Kdiag, k=0:2, diagonals=c(diags, diags[1]))
     if (type=="outer" || (!is.null(cs@par$lambda_diag))) {
@@ -176,6 +178,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
         X = rbind(X,nBsp)
         SDd = cbegin[2*d]-cbegin[(2*d-1)]
         W = c(W,c(rep(0,SDd)))
+        stan_W=c(stan_W,csd[,weight][cbegin[(2*d-1)]:(cbegin[2*d]-1)])
         nU_e = Matrix(rep.int(1,SDd),ncol=1)
         U_e = bdiag(U_e,nU_e) 
         kappa_hat=c(kappa_hat,csd[,kappahat][cbegin[(2*d-1)]:(cbegin[2*d]-1)])
@@ -188,7 +191,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
       data=list(Dsets=Dsets, Decays=1, XD=as.array(stanXD),
                 Kdiag=Kdiag, dmin=cs@settings$dmin, dmax=cs@settings$dmax, N=SD, cbegin=as.array(cbegin_stan),
                 kappa_hat=kappa_hat, sdl=sdl, dist=cutsites,
-                weight=csd[,weight])
+                weight=stan_W)
       if (type=="outer") {
         data$lambda_diag=as.array(lambda_diag)
         model=csnorm:::stanmodels$gauss_decay_outer
@@ -196,7 +199,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
         model=csnorm:::stanmodels$gauss_decay_perf
       }
       #optimize from scratch, to avoid getting stuck. Slower but more robust
-      op=optimize_stan_model(model=model, data=data, iter=cs@settings$iter,
+      ops=optimize_stan_model(model=model, data=data, iter=cs@settings$iter,
                              verbose=verbose, init=0, init_alpha=init_alpha)
       
     } else {
@@ -238,54 +241,78 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
       
       log_decay = X%*%beta
       log_mean_counts = log_decay
-      for (d in 1:Dsets) {
-        SDd = cbegin[2*d]-cbegin[(2*d-1)]
-        log_mean_counts[cbegin[(2*d-1)]:(cbegin[2*d]-1)] = log_mean_counts[cbegin[(2*d-1)]:(cbegin[2*d]-1)] + rep(eC[d],SDd)
+      SD = cbegin[2]-cbegin[1]
+      log_mean_counts[1:SD] = log_mean_counts[1:SD] + rep(eC[1],SD)
+      if (Dsets > 1) {
+        for (d in 2:Dsets) {
+          SDd = cbegin[2*d]-cbegin[(2*d-1)]
+          log_mean_counts[(SD+1):(SD+SDd)] = log_mean_counts[(SD+1):(SD+SDd)] + rep(eC[d],SDd)
+          SD = SD + SDd
+        }
       }
     }
     
     if(fit_model=='stan') {
-      all_log_mean_counts = c(all_log_mean_counts,as.array(op$par$log_mean_counts))
-      all_log_decay = c(all_log_decay,op$par$log_decay)
-      all_eC = c(all_eC,op$par$eC)
+      all_log_mean_counts = c(all_log_mean_counts,as.array(ops$par$log_mean_counts))
+      all_log_decay = c(all_log_decay,ops$par$log_decay)
+      all_beta_diag_centered = c(all_beta_diag_centered,ops$par$beta_diag_centered)
+      d = 1
+      valid_beta_diag = guarantee_beta_diag_increasing(ops$par$beta_diag)
+      for (d2 in 1:TotalDsets) {
+        if(XD[d2] == uXD) {
+          all_beta_diag[d2,] = c(0,valid_beta_diag)
+          all_beta_diag_diff[d2,] = ops$par$beta_diag_diff[d,]
+          d = d + 1
+        }
+      }
+      all_eC = c(all_eC,ops$par$eC)
       
       if (type=="perf") {
-        all_lambda_diag = c(all_lambda_diag,op$par$lambda_diag)
+        all_lambda_diag = c(all_lambda_diag,ops$par$lambda_diag)
       }
       #update par slot
-      op$par$value=op$value
-      op$par$log_mean_counts=NULL
-      if (fit_model=="stan") op$par$beta_diag=guarantee_beta_diag_increasing(op$par$beta_diag)
+      #ops$par$value=ops$value
+      all_value = ops$value
+      
+      ops$par$log_mean_counts=NULL
       
     } else {
-      all_beta_diag = c(all_beta_diag,as.array(rep(beta,Dsets)))
-      all_beta_diag_diff = c(all_beta_diag_diff,as.array(D%*%beta))
+      for (d2 in 1:TotalDsets) {
+        if(XD[d2] == uXD) {
+          all_beta_diag[d2,] = as.array(beta)
+          all_beta_diag_diff[d2,] = as.array(D%*%beta)
+          all_beta_diag_centered = c(all_beta_diag_centered,as.array(beta))
+        }
+      }
       all_log_mean_counts = c(all_log_mean_counts,as.array(log_mean_counts))
       all_log_decay = c(all_log_decay,log_decay)
       all_eC = c(all_eC,eC)
       if (type=="perf") {
         all_lambda_diag = c(all_lambda_diag,lambda_diag)
       }
-      op = list()
-      attr(op,'par')
-      for(nattr in list('beta_diag_centered','log_decay','log_mean_counts','eC','lambda_diag','value')) {
-        attr(op$par,nattr)
-      }
-      op$par$beta_diag_centered=as.array(all_beta_diag)
-      op$par$beta_diag_diff=as.array(all_beta_diag_diff)
-      op$par$log_mean_counts=as.array(all_log_mean_counts)
-      op$par$log_decay=as.array(all_log_decay)
-      op$par$eC=as.array(all_eC)
-      if (type=="perf") {
-        attr(op$par,'lambda_diag')
-        op$par$lambda_diag = all_lambda_diag
-      }
+      
       mus = sdl
-      op$par$value = sum(dnorm(kappa_hat, mean = as.array(all_log_mean_counts), sd = as.array(mus), log = TRUE))
+      all_value = sum(dnorm(kappa_hat, mean = as.array(all_log_mean_counts), sd = as.array(mus), log = TRUE))
+      
     }
     
   }
-  
+  op = list()
+  attr(op,'par')
+  for(nattr in list('beta_diag_centered','beta_diag','beta_diag_diff','log_decay','log_mean_counts','eC','lambda_diag','value','decay')) {
+    attr(op$par,nattr)
+  }
+  op$par$beta_diag_centered=as.array(all_beta_diag_centered)
+  op$par$beta_diag=as.matrix(all_beta_diag)
+  op$par$beta_diag_diff=as.matrix(all_beta_diag_diff)
+  op$par$log_mean_counts=as.array(all_log_mean_counts)
+  op$par$log_decay=as.array(all_log_decay)
+  op$par$eC=as.array(all_eC)
+  if (type=="perf") {
+    attr(op$par,'lambda_diag')
+    op$par$lambda_diag = all_lambda_diag
+  }
+  op$par$value = all_value
   #make decay data table, reused at next call
   dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=all_log_mean_counts)]
   setkey(dmat,name,dbin)
@@ -412,8 +439,8 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
   
   all_beta_iota = c()
   all_beta_rho = c()
-  all_beta_iota_diff = c()
-  all_beta_rho_diff = c()
+  all_beta_iota_diff = matrix(0, nrow = TotalDsets, ncol = Krow-2)
+  all_beta_rho_diff = matrix(0, nrow = TotalDsets, ncol = Krow-2)
   all_log_iota = c()
   all_log_rho = c()
   all_log_mean_RJ = c()
@@ -624,8 +651,14 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
     if(fit_model=='stan') {
       all_beta_iota = c(all_beta_iota,as.array(op$par$beta_iota))
       all_beta_rho = c(all_beta_rho,as.array(op$par$beta_rho))
-      all_beta_iota_diff = c(all_beta_iota_diff,op$par$beta_iota_diff)
-      all_beta_rho_diff = c(all_beta_rho_diff,op$par$beta_rho_diff)
+      d = 1
+      for (d2 in 1:TotalDsets) {
+        if(XB[d2] == uXB) {
+          all_beta_iota_diff[d2,] = op$par$beta_iota_diff[d,]
+          all_beta_rho_diff[d2,] = op$par$beta_rho_diff[d,]
+          d = d + 1
+        }
+      }
       all_log_iota = c(all_log_iota,as.array(op$par$log_iota))
       all_log_rho = c(all_log_rho,as.array(op$par$log_rho))
       all_log_mean_RJ = c(all_log_mean_RJ,as.array(op$par$log_mean_RJ))
@@ -656,8 +689,12 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
       # beta_rho = beta_rho[2:Krow]
       all_beta_iota = c(all_beta_iota,as.array(beta_iota))
       all_beta_rho = c(all_beta_rho,as.array(beta_rho))
-      all_beta_iota_diff = c(all_beta_iota_diff,as.array(D1%*%beta_iota))
-      all_beta_rho_diff = c(all_beta_rho_diff,as.array(D1%*%beta_rho))
+      for (d2 in 1:TotalDsets) {
+        if(XB[d2] == uXB) {
+          all_beta_iota_diff[d2,] = as.array(D1%*%beta_iota)
+          all_beta_rho_diff[d2,] = as.array(D1%*%beta_rho)
+        }
+      }
       all_log_iota = c(all_log_iota,as.array(log_iota))
       all_log_rho = c(all_log_rho,as.array(log_rho))
       all_log_mean_RJ = c(all_log_mean_RJ,as.array(log_mean_RJ))
@@ -679,8 +716,8 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
       }
       op$par$beta_iota=as.array(all_beta_iota)
       op$par$beta_rho=as.array(all_beta_rho)
-      op$par$beta_rho_diff=as.array(all_beta_rho_diff)
-      op$par$beta_iota_diff=as.array(all_beta_iota_diff)
+      op$par$beta_rho_diff=as.matrix(all_beta_rho_diff)
+      op$par$beta_iota_diff=as.matrix(all_beta_iota_diff)
       op$par$log_iota=as.array(all_log_iota)
       op$par$log_rho=as.array(all_log_rho)
       op$par$eC=as.array(all_eC)
@@ -757,9 +794,10 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
     lambdas[,lambda_iota:=sqrt((Krow-2)/(Krow^2*diag(tcrossprod(cs@par$beta_iota_diff))+1e6))] #sigma=1e-3 for genomic
     lambdas[,lambda_rho:=sqrt((Krow-2)/(Krow^2*diag(tcrossprod(cs@par$beta_rho_diff))+1e6))]
     lambdas[,lambda_diag:=sqrt((Kdiag-2)/(Kdiag^2*diag(tcrossprod(cs@par$beta_diag_diff))+1))] #sigma=1 for decay
-    cs@par$lambda_iota=lambdas[unique(genomic)][order(genomic),lambda_iota]
-    cs@par$lambda_rho=lambdas[unique(genomic)][order(genomic),lambda_rho]
-    cs@par$lambda_diag=lambdas[unique(decay)][order(decay),lambda_diag]
+    
+    cs@par$lambda_iota=as.array(lambdas[unique(genomic)][order(genomic),lambda_iota])
+    cs@par$lambda_rho=as.array(lambdas[unique(genomic)][order(genomic),lambda_rho])
+    cs@par$lambda_diag=as.array(lambdas[unique(decay)][order(decay),lambda_diag])
   }
   #
   #compute log-posterior
@@ -1017,7 +1055,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
       a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_genomic(cs, zbias, init.mean=init.mean,
                                                                                  init_alpha=init_alpha, type=type,fit_model=fit_model)))
       if(length(output) == 0) { output = 'ok' }
-      cs@par$eC = as.array(mean(decay_eC,cs@par$eC))
+      cs@par$eC = as.array(colMeans(rbind(decay_eC,cs@par$eC)))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", out=output, runtime=a[1]+a[4], type=type)
       if (verbose==T) cat("log-likelihood = ",cs@par$value, "\n")
     }
