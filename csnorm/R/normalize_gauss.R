@@ -709,11 +709,7 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
         all_lambda_iota = c(all_lambda_iota,lambda_iota)
         all_lambda_rho = c(all_lambda_rho,lambda_rho)
       }
-      op = list()
-      attr(op,'par')
-      for(nattr in list('biases','beta_iota','beta_rho','beta_iota_diff','beta_rho_diff','log_iota','log_rho','eC','eRJ','eDE','value')) {
-        attr(op$par,nattr)
-      }
+      op = list(par=list())
       op$par$beta_iota=as.array(all_beta_iota)
       op$par$beta_rho=as.array(all_beta_rho)
       op$par$beta_rho_diff=as.matrix(all_beta_rho_diff)
@@ -724,10 +720,8 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
       op$par$eRJ=as.array(all_eRJ)
       op$par$eDE=as.array(all_eDE)
       if (type=="perf") {
-        attr(op$par,'lambda_iota')
-        attr(op$par,'lambda_rho')
-        op$par$lambda_iota = all_lambda_iota
-        op$par$lambda_rho = all_lambda_rho
+        op$par$lambda_iota = as.array(all_lambda_iota)
+        op$par$lambda_rho = as.array(all_lambda_rho)
       }
       means = cbind(all_log_mean_RJ,all_log_mean_DL,all_log_mean_DR,all_log_mean_cleft,all_log_mean_cright)
       mus = cbind(sd_RJ,sd_DL,sd_DR,sd_L,sd_R)
