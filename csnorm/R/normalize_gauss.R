@@ -309,8 +309,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
   op$par$log_decay=as.array(all_log_decay)
   op$par$eC=as.array(all_eC)
   if (type=="perf") {
-    attr(op$par,'lambda_diag')
-    op$par$lambda_diag = all_lambda_diag
+    op$par$lambda_diag = as.array(all_lambda_diag)
   }
   op$par$value = all_value
   #make decay data table, reused at next call
@@ -936,8 +935,8 @@ plot_diagnostics = function(cs) {
   plot=ggplot(cs@diagnostics$params[,.(step,leg,value,out.last)])+
     geom_line(aes(step,value))+geom_point(aes(step,value,colour=out.last))+facet_wrap(~leg, scales = "free")+
     theme(legend.position="bottom")
-  vars=foreach(var=c("eC","eRJ","eDE","alpha","lambda_iota","lambda_rho"),
-               trans=(c("exp","exp","exp",NA,"log","log")),.combine=rbind) %do% get_all_values(cs,var,trans)
+  vars=foreach(var=c("eC","eRJ","eDE","alpha","lambda_iota","lambda_rho","lambda_diag"),
+               trans=(c("exp","exp","exp",NA,"log","log","log")),.combine=rbind) %do% get_all_values(cs,var,trans)
   plot2=ggplot(vars)+geom_line(aes(step,value))+
     geom_point(aes(step,value,colour=leg))+facet_wrap(~variable, scales = "free_y")
   return(list(plot=plot,plot2=plot2))
