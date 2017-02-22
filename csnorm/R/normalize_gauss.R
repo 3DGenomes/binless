@@ -200,7 +200,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
       }
       #optimize from scratch, to avoid getting stuck. Slower but more robust
       ops=optimize_stan_model(model=model, data=data, iter=cs@settings$iter,
-                             verbose=verbose, init=0, init_alpha=init_alpha)
+                              verbose=verbose, init=0, init_alpha=init_alpha)
       
     } else {
       S_m2 = Diagonal(x=1/sdl^2)
@@ -236,7 +236,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
         epsilon = abs(lambda_diag-nlambda_diag)
         lambda_diag = nlambda_diag
         maxiter = maxiter+1
-   
+        
       }
       
       log_decay = X%*%beta
@@ -547,7 +547,7 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
                              verbose=verbose, init=0, init_alpha=init_alpha)
       
     } else {
-    
+      
       SD = bbegin[2]-bbegin[1]
       etas = c(eta_hat_RJ[1:SD],eta_hat_DL[1:SD],eta_hat_DR[1:SD],eta_hat_L[1:SD],eta_hat_R[1:SD])
       sds = c((1/(sd_RJ[1:SD])),(1/(sd_DL[1:SD])),(1/(sd_DR[1:SD])),(1/(sd_L[1:SD])),(1/(sd_R[1:SD])))
@@ -604,7 +604,7 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
         D = bdiag(lambda_iota*D1,lambda_rho*D1)
         DtD = crossprod(D)
         cholA = update(cholA,tmp_X_S_m2_X + Krow^2*DtD)
-
+        
       }
       
       eRJ = array(0,dim=c(Dsets))
@@ -795,7 +795,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   #
   #compute log-posterior
   cs@par$value = op$value + (Krow-2)/2*sum(log(cs@par$lambda_iota/exp(1))+log(cs@par$lambda_rho/exp(1))) +
-                            (Kdiag-2)/2*sum(log(cs@par$lambda_diag/exp(1)))
+    (Kdiag-2)/2*sum(log(cs@par$lambda_diag/exp(1)))
   return(cs)
 }
 
@@ -843,18 +843,18 @@ get_nzeros = function(cs, ncores=1) {
   }
   setkey(zeros,id,name,bdist)
   stopifnot(zeros[,uniqueN(id)]==cs@biases[,.N])
-  zeros=rbind(cts[cat=="contact L"][zeros,.(name,id,bdist,cat="contact L",nnz,ncross,ids.other)],
-              cts[cat=="contact R"][zeros,.(name,id,bdist,cat="contact R",nnz,ncross,ids.other)])
+  zeros=rbind(cts[cat=="contact L"][zeros,.(name,id,bdist,cat="contact L",nnz,nposs=2*ncross,ids.other)],
+              cts[cat=="contact R"][zeros,.(name,id,bdist,cat="contact R",nnz,nposs=2*ncross,ids.other)])
   zeros[is.na(nnz),nnz:=0]
   setkey(zeros,id,name,bdist,cat)
-  zeros[,nzero:=2*ncross-nnz]
-  #Nkz=get_nzeros_per_decay(cs,ncores)
-  #all(zeros[,.(ncross=sum(ncross)/4,nnz=sum(nnz)/2,nzero=sum(nzero)/2),keyby=c("name","bdist")]==Nkz)
-  #zbias=get_nzeros_per_cutsite(cs,ncores)
+  zeros[,nzero:=nposs-nnz]
+  #Nkz=csnorm:::get_nzeros_per_decay(cs,ncores)
+  #all(zeros[,.(ncross=sum(nposs)/8,nnz=sum(nnz)/2,nzero=sum(nzero)/2),keyby=c("name","bdist")]==Nkz)
+  #zbias=csnorm:::get_nzeros_per_cutsite(cs,ncores)
   #all(zeros[,.(nnz=sum(nnz),nzero=sum(nzero)),keyby=c("name","id","cat")]==zbias[,.(name,id,cat,nnz,nzero)])
   return(zeros)
 }
-  
+
 
 #' count number of zeros in each decay bin
 #' @keywords internal
@@ -875,13 +875,13 @@ get_nzeros_per_decay = function(cs, ncores=1) {
   registerDoParallel(cores=ncores)
   Nkz = foreach(i=cs@biases[,(1:.N)], .multicombine = T,
                 .combine=function(...){rbind(...)[,.(ncross=sum(ncross)),keyby=c("name","bdist")]}) %dopar% {
-    stuff=c(cs@biases[i,.(name,id,pos)])
-    dists=cs@biases[name==stuff$name & id>stuff$id,.(name,distance=abs(pos-stuff$pos))]
-    if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
-    dists=dists[distance>=cs@settings$dmin]
-    dists[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-    dists[,.(ncross=.N),keyby=c("name","bdist")]
-  }
+                  stuff=c(cs@biases[i,.(name,id,pos)])
+                  dists=cs@biases[name==stuff$name & id>stuff$id,.(name,distance=abs(pos-stuff$pos))]
+                  if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
+                  dists=dists[distance>=cs@settings$dmin]
+                  dists[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+                  dists[,.(ncross=.N),keyby=c("name","bdist")]
+                }
   #deduce zero counts
   Nkz = merge(Nkz,Nkd,all=T)
   Nkz[is.na(nnz),nnz:=0]
@@ -1046,14 +1046,12 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   #get number of zeros along cut sites and decay
   stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
   cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
-  if(verbose==T) cat("Counting zeros for decay\n")
-  zdecay = csnorm:::get_nzeros_per_decay(cs, ncores=ncores)
-  if(verbose==T) cat("Counting zeros for bias\n")
-  zbias = csnorm:::get_nzeros_per_cutsite(cs, ncores=ncores)
+  if(verbose==T) cat("Counting zeros\n")
+  zeros = csnorm:::get_nzeros(cs, ncores=ncores)
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
   subcounts = csnorm:::subsample_counts(cs, ncounts)
-  subcounts.weight = merge(zdecay[,.(nc=sum(ncross)),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
+  subcounts.weight = merge(zeros[,.(nc=sum(nposs)/8),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
   #initial guess
   if (is.null(init)) {
     if (verbose==T) cat("No initial guess provided\n")
@@ -1062,10 +1060,10 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     init.mean="data"
     if (type=="outer") {
       cs=csnorm:::fill_parameters_outer(cs, dispersion=init.dispersion, fit.decay=fit.decay,
-                               fit.genomic=fit.genomic, fit.disp=fit.disp)
+                                        fit.genomic=fit.genomic, fit.disp=fit.disp)
     } else {
       cs=csnorm:::fill_parameters_perf(cs, dispersion=init.dispersion, fit.decay=fit.decay,
-                               fit.genomic=fit.genomic, fit.disp=fit.disp)
+                                       fit.genomic=fit.genomic, fit.disp=fit.disp)
     }
   } else {
     if (verbose==T) cat("Using provided initial guess\n")
@@ -1079,7 +1077,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     #fit diagonal decay given iota and rho
     if (fit.decay==T) {
       if (verbose==T) cat("Gibbs",i,": Decay ")
-      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_decay(cs, zdecay, init.mean=init.mean,
+      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_decay(cs, zeros, init.mean=init.mean,
                                                                                init_alpha=init_alpha, type=type,fit_model=fit_model)))
       if(length(output) == 0) { output = 'ok' }
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", out=output, runtime=a[1]+a[4], type=type)
@@ -1089,7 +1087,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     if (fit.genomic==T) {
       if (verbose==T) cat("Gibbs",i,": Genomic ")
       decay_eC = cs@par$eC
-      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_genomic(cs, zbias, init.mean=init.mean,
+      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_genomic(cs, zeros, init.mean=init.mean,
                                                                                  init_alpha=init_alpha, type=type,fit_model=fit_model)))
       if(length(output) == 0) { output = 'ok' }
       cs@par$eC = as.array(colMeans(rbind(decay_eC,cs@par$eC)))
