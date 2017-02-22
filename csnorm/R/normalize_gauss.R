@@ -812,6 +812,50 @@ has_converged = function(cs) {
   return(all(delta<tol))
 }
 
+#' count number of zeros in each decay and genomic bin
+#' @keywords internal
+#' 
+get_nzeros = function(cs, ncores=1) {
+  stopifnot(cs@counts[id1>=id2,.N]==0)
+  #count left and right
+  cts=rbind(cs@counts[contact.close>0,.(name, id=id1, distance, cat="contact R", count=contact.close)],
+            cs@counts[contact.far>0,  .(name, id=id1, distance, cat="contact L", count=contact.far)],
+            cs@counts[contact.down>0, .(name, id=id1, distance, cat="contact R", count=contact.down)],
+            cs@counts[contact.up>0,   .(name, id=id1, distance, cat="contact L", count=contact.up)],
+            cs@counts[contact.far>0,  .(name, id=id2, distance, cat="contact R", count=contact.far)],
+            cs@counts[contact.close>0,.(name, id=id2, distance, cat="contact L", count=contact.close)],
+            cs@counts[contact.down>0, .(name, id=id2, distance, cat="contact R", count=contact.down)],
+            cs@counts[contact.up>0,   .(name, id=id2, distance, cat="contact L", count=contact.up)])
+  #bin distances
+  dbins=cs@settings$dbins
+  cts[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  #count per cut site and distance bin
+  cts=cts[,.(nnz=.N),keyby=c("id","name","bdist","cat")]
+  #Count the number of crossings per distance bin
+  #looping over IDs avoids building NxN matrix
+  registerDoParallel(cores=ncores)
+  zeros = foreach(i=cs@biases[,(1:.N)], .combine=rbind) %dopar% {
+    stuff=c(cs@biases[i,.(name,id,pos)])
+    dists=cs@biases[name==stuff$name & id!=stuff$id,.(name,id,distance=abs(pos-stuff$pos))]
+    if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
+    dists[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+    dists[!is.na(bdist),.(name=name[1],id=stuff$id,ncross=.N,ids.other=list(id)),by=bdist]
+  }
+  setkey(zeros,id,name,bdist)
+  stopifnot(zeros[,uniqueN(id)]==cs@biases[,.N])
+  zeros=rbind(cts[cat=="contact L"][zeros,.(name,id,bdist,cat="contact L",nnz,ncross,ids.other)],
+              cts[cat=="contact R"][zeros,.(name,id,bdist,cat="contact R",nnz,ncross,ids.other)])
+  zeros[is.na(nnz),nnz:=0]
+  setkey(zeros,id,name,bdist,cat)
+  zeros[,nzero:=2*ncross-nnz]
+  #Nkz=get_nzeros_per_decay(cs,ncores)
+  #all(zeros[,.(ncross=sum(ncross)/4,nnz=sum(nnz)/2,nzero=sum(nzero)/2),keyby=c("name","bdist")]==Nkz)
+  #zbias=get_nzeros_per_cutsite(cs,ncores)
+  #all(zeros[,.(nnz=sum(nnz),nzero=sum(nzero)),keyby=c("name","id","cat")]==zbias[,.(name,id,cat,nnz,nzero)])
+  return(zeros)
+}
+  
+
 #' count number of zeros in each decay bin
 #' @keywords internal
 #' 
