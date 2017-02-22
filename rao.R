@@ -92,8 +92,8 @@ ggplot(cs@par$biases)+geom_pointrange(aes(pos,etahat,ymin=etahat-std,ymax=etahat
 
 
 #the diagonal decay can be plotted this way
-ggplot(cs@par$decay)+geom_line(aes(dist,log_decay))+
-  geom_pointrange(aes(dist,log_decay+z,ymin=log_decay+z-std,ymax=log_decay+z+std), alpha=0.1)+
+ggplot(cs@par$decay)+geom_line(aes(distance,kappa))+
+  geom_pointrange(aes(distance,kappahat,ymin=kappahat-std,ymax=kappahat+std), alpha=0.1)+
   facet_wrap(~name,scales = "free")+scale_x_log10()
 
 
