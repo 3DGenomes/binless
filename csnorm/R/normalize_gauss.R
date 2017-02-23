@@ -69,10 +69,73 @@ csnorm_gauss_decay_muhat_data = function(cs, zeros, pseudocount=1e-2) {
   return(csd)
 }
 
+#' Compute means for positive and zero counts using previous params
+#' @keywords internal
+#' 
+csnorm_gauss_common_muhat_mean = function(cs, zeros) {
+  init=cs@par
+  ### positive counts
+  #compute means
+  cpos=copy(cs@counts)
+  stopifnot(length(init$log_decay)==cpos[,.N])
+  cpos[,log_decay:=init$log_decay]
+  bsub=cs@biases[,.(id)]
+  bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
+  cpos=merge(bsub[,.(id1=id,log_iota,log_rho)],cpos,by="id1",all.x=F,all.y=T)
+  cpos=merge(bsub[,.(id2=id,log_iota,log_rho)],cpos,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
+  cpos=merge(cbind(cs@design[,.(name)],eC=init$eC), cpos, by="name",all.x=F,all.y=T)
+  cpos[,log_mu.base:=eC + log_decay]
+  cpos[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_iota1+log_rho2,
+                                                           log_mu.base+log_rho1 +log_rho2,
+                                                           log_mu.base+log_rho1 +log_iota2,
+                                                           log_mu.base+log_iota1+log_iota2)]
+  cpos[,log_mu.base:=NULL]
+  #collect all counts on left/right side, per distance
+  cpos=rbind(cpos[contact.close>0,.(name, id=id1, pos=pos1, distance, cat="contact R",
+                                    count=contact.close, mu=exp(lmu.close), weight=1, log_decay, log_bias=log_rho1)],
+             cpos[contact.far>0,  .(name, id=id1, pos=pos1, distance, cat="contact L",
+                                    count=contact.far,   mu=exp(lmu.far),   weight=1, log_decay, log_bias=log_iota1)],
+             cpos[contact.down>0, .(name, id=id1, pos=pos1, distance, cat="contact R",
+                                    count=contact.down,  mu=exp(lmu.down),  weight=1, log_decay, log_bias=log_rho1)],
+             cpos[contact.up>0,   .(name, id=id1, pos=pos1, distance, cat="contact L",
+                                    count=contact.up,    mu=exp(lmu.up),    weight=1, log_decay, log_bias=log_iota1)],
+             cpos[contact.far>0,  .(name, id=id2, pos=pos2, distance, cat="contact R",
+                                    count=contact.far,   mu=exp(lmu.far),   weight=1, log_decay, log_bias=log_rho2)],
+             cpos[contact.close>0,.(name, id=id2, pos=pos2, distance, cat="contact L",
+                                    count=contact.close, mu=exp(lmu.close), weight=1, log_decay, log_bias=log_iota2)],
+             cpos[contact.down>0, .(name, id=id2, pos=pos2, distance, cat="contact R",
+                                    count=contact.down,  mu=exp(lmu.down),  weight=1, log_decay, log_bias=log_rho2)],
+             cpos[contact.up>0,   .(name, id=id2, pos=pos2, distance, cat="contact L",
+                                    count=contact.up,    mu=exp(lmu.up),    weight=1, log_decay, log_bias=log_iota2)])
+  dbins=cs@settings$dbins
+  cpos[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  cpos[,c("pos","distance"):=list(NULL,NULL)]
+  ### zero counts
+  czero = merge(zeros, init$decay[,.(name,bdist=dbin,log_mu.base=kappa)], by=c("name","bdist"))
+  stopifnot(czero[is.na(log_mu.base),.N]==0)
+  czero = merge(bsub,czero,by="id",all.x=F,all.y=T)
+  czero[,log_bias:=ifelse(cat=="contact L",log_iota,log_rho)]
+  czero=merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
+  czero[,log_decay:=log_mu.base-eC]
+  czero[,c("eC","log_mu"):=list(NULL,log_mu.base + log_bias)] #we don't average over j
+  czero=czero[nzero>0,.(name,id,dbin=bdist,cat,count=0,mu=exp(log_mu),weight=nzero,log_bias,log_decay)]
+  cts=rbind(cpos,czero)
+  #ggplot(cts)+geom_line(aes(dbin,log_decay,colour=count>0,group=count>0))
+  return(cts)
+}
+
 #' Compute decay etahat and weights using previous mean
 #' @keywords internal
 #' 
 csnorm_gauss_decay_muhat_mean = function(cs, zeros) {
+  cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros)
+  cts[,]
+}
+
+#' Compute decay etahat and weights using previous mean
+#' @keywords internal
+#' 
+csnorm_gauss_decay_muhat_mean_old = function(cs, zeros) {
   zdecay = zeros[,.(ncross=sum(nposs)/8,nnz=sum(nnz)/2,nzero=sum(nzero)/2),keyby=c("name","bdist")]
   #add bias informations to counts
   init=cs@par
@@ -91,7 +154,6 @@ csnorm_gauss_decay_muhat_mean = function(cs, zeros) {
                                                            log_mu.base+log_rho1 +log_iota2,
                                                            log_mu.base+log_iota1+log_iota2)]
   csub[,c("kappaij","log_mu.base"):=list(eC+log_decay,NULL)]
-  csub[,c("kappaij"):=list(eC+log_decay)]
   csub=rbind(csub[,.(name,id1,id2,distance,kappaij,count=contact.far,mu=exp(lmu.far))],
              csub[,.(name,id1,id2,distance,kappaij,count=contact.down,mu=exp(lmu.down))],
              csub[,.(name,id1,id2,distance,kappaij,count=contact.up,mu=exp(lmu.up))],
