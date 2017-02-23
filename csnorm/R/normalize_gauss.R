@@ -11,7 +11,7 @@ fill_parameters_perf = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.ge
   if (fit.decay==F) {
     Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
-    init=c(init,list(beta_diag=beta_diag, lambda_diag=array(lambda,dim=Decays), log_decay=rep(0,cs@counts[,.N])))
+    init=c(init,list(beta_diag=beta_diag, lambda_diag=array(lambda,dim=Decays)))
   }
   if (fit.genomic==F) {
     init=c(init,list(log_iota=array(0,dim=cs@biases[,.N]), log_rho=array(0,dim=cs@biases[,.N]),
@@ -35,7 +35,7 @@ fill_parameters_outer = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.g
   if (fit.decay==F) {
     Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
-    init=c(init,list(beta_diag=beta_diag, log_decay=rep(0,cs@counts[,.N])))
+    init=c(init,list(beta_diag=beta_diag))
   }
   if (fit.genomic==F) {
     init=c(init,list(log_iota=array(0,dim=cs@biases[,.N]), log_rho=array(0,dim=cs@biases[,.N])))
@@ -139,13 +139,6 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
   dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=op$par$log_mean_counts,log_decay=op$par$log_decay)]
   setkey(dmat,name,dbin)
   op$par$decay=dmat 
-  #rewrite log_decay as if it were calculated for each count
-  dbins=cs@settings$dbins
-  csub=cs@counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
-  csd[,log_decay:=op$par$log_decay]
-  a=csd[csub,.(name,id1,id2,log_decay),on=key(csd)]
-  setkeyv(a,key(cs@counts))
-  op$par$log_decay=a[,log_decay]
   #update par slot
   op$par$value=op$value
   op$par$beta_diag=guarantee_beta_diag_increasing(op$par$beta_diag)
@@ -205,10 +198,13 @@ csnorm_gauss_genomic_muhat_mean = function(cs, zbias) {
   bsub=bsub[,.(id,log_iota,log_rho)]
   #add bias informations to positive counts
   csub=copy(cs@counts)
-  csub[,c("distance","log_decay"):=list(NULL,init$log_decay)]
   csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
   csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
   csub=merge(cbind(cs@design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
+  #bin distances and add decay
+  dbins=cs@settings$dbins
+  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  csub=merge(csub,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
   #add it to zero counts
   zeta = merge(bsub, zbias, by="id")
   zeta = merge(cbind(cs@design[,.(name)],eC=init$eC), zeta, by="name",all.x=F,all.y=T)
