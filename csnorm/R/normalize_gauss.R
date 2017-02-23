@@ -11,7 +11,7 @@ fill_parameters_perf = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.ge
   if (fit.decay==F) {
     Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
-    init=c(init,list(beta_diag=beta_diag, lambda_diag=array(lambda,dim=Decays), log_decay=rep(0,cs@counts[,.N])))
+    init=c(init,list(beta_diag=beta_diag, lambda_diag=array(lambda,dim=Decays)))
   }
   if (fit.genomic==F) {
     init=c(init,list(log_iota=array(0,dim=cs@biases[,.N]), log_rho=array(0,dim=cs@biases[,.N]),
@@ -35,7 +35,7 @@ fill_parameters_outer = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.g
   if (fit.decay==F) {
     Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
-    init=c(init,list(beta_diag=beta_diag, log_decay=rep(0,cs@counts[,.N])))
+    init=c(init,list(beta_diag=beta_diag))
   }
   if (fit.genomic==F) {
     init=c(init,list(log_iota=array(0,dim=cs@biases[,.N]), log_rho=array(0,dim=cs@biases[,.N])))
@@ -73,14 +73,17 @@ csnorm_gauss_decay_muhat_data = function(cs, zdecay, pseudocount=1e-2) {
 csnorm_gauss_decay_muhat_mean = function(cs, zdecay) {
   #add bias informations to counts
   init=cs@par
+  stopifnot(!is.null(init$decay))
   csub=copy(cs@counts)
-  stopifnot(length(init$log_decay)==csub[,.N])
-  csub[,log_decay:=init$log_decay]
   bsub=cs@biases[,.(id)]
   bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
   csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
   csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
   csub=merge(cbind(cs@design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
+  #bin distances and add decay
+  dbins=cs@settings$dbins
+  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  csub=merge(csub,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
   #add z-score and sd variables
   csub[,log_mu.base:=eC + log_decay]
   csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_iota1+log_rho2,
@@ -88,19 +91,17 @@ csnorm_gauss_decay_muhat_mean = function(cs, zdecay) {
                                                            log_mu.base+log_rho1 +log_iota2,
                                                            log_mu.base+log_iota1+log_iota2)]
   csub[,c("kappaij","log_mu.base"):=list(eC+log_decay,NULL)]
-  csub[,c("kappaij"):=list(eC+log_decay)]
-  csub=rbind(csub[,.(name,id1,id2,distance,kappaij,count=contact.far,mu=exp(lmu.far))],
-             csub[,.(name,id1,id2,distance,kappaij,count=contact.down,mu=exp(lmu.down))],
-             csub[,.(name,id1,id2,distance,kappaij,count=contact.up,mu=exp(lmu.up))],
-             csub[,.(name,id1,id2,distance,kappaij,count=contact.close,mu=exp(lmu.close))])
+  csub=rbind(csub[,.(name,id1,id2,dbin,kappaij,count=contact.far,mu=exp(lmu.far))],
+             csub[,.(name,id1,id2,dbin,kappaij,count=contact.down,mu=exp(lmu.down))],
+             csub[,.(name,id1,id2,dbin,kappaij,count=contact.up,mu=exp(lmu.up))],
+             csub[,.(name,id1,id2,dbin,kappaij,count=contact.close,mu=exp(lmu.close))])
   csub[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
-  #bin distances
-  dbins=cs@settings$dbins
-  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #collect all counts in these bins and add zeros
-  stopifnot(!is.null(init$decay))
+  czero = merge(zdecay[,.(name,dbin=bdist,nzero)],init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
+  czero = merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
   csd = rbind(csub[count>0,.(name,dbin,z,kappaij,var,weight=1)],
-              zdecay[init$decay,.(name,dbin=bdist,z=-1,kappaij=kappa,var=1/exp(kappa)+1/init$alpha,weight=nzero)])
+              czero[,.(name,dbin,z=-1,kappaij=eC+log_decay,var=1/exp(eC+log_decay)+1/init$alpha,weight=nzero)])
+  #ggplot(csd)+geom_line(aes(dbin,kappaij,colour=z>-1,group=z>-1))+facet_wrap(~name)
   csd = csd[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
                kappahat=weighted.mean(z+kappaij, weight/var),
                std=1/sqrt(sum(weight/var)), weight=sum(weight)), keyby=c("name", "dbin")]
@@ -313,16 +314,9 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
   }
   op$par$value = all_value
   #make decay data table, reused at next call
-  dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=all_log_mean_counts)]
+  dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=all_log_mean_counts,log_decay=all_log_decay)]
   setkey(dmat,name,dbin)
   op$par$decay=dmat 
-  #rewrite log_decay as if it were calculated for each count
-  dbins=cs@settings$dbins
-  csub=cs@counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
-  csd[,log_decay:=all_log_decay]
-  a=csd[csub,.(name,id1,id2,log_decay),on=key(csd)]
-  setkeyv(a,key(cs@counts))
-  op$par$log_decay=a[,log_decay]
   #update par slot
   cs@par=modifyList(cs@par, op$par)
   return(cs)
@@ -379,10 +373,13 @@ csnorm_gauss_genomic_muhat_mean = function(cs, zbias) {
   bsub=bsub[,.(id,log_iota,log_rho)]
   #add bias informations to positive counts
   csub=copy(cs@counts)
-  csub[,c("distance","log_decay"):=list(NULL,init$log_decay)]
   csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
   csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
   csub=merge(cbind(cs@design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
+  #bin distances and add decay
+  dbins=cs@settings$dbins
+  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  csub=merge(csub,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
   #add it to zero counts
   zeta = merge(bsub, zbias, by="id")
   zeta = merge(cbind(cs@design[,.(name)],eC=init$eC), zeta, by="name",all.x=F,all.y=T)
