@@ -93,33 +93,34 @@ csnorm_gauss_common_muhat_mean = function(cs, zeros) {
   cpos[,log_mu.base:=NULL]
   #collect all counts on left/right side, per distance
   cpos=rbind(cpos[contact.close>0,.(name, id=id1, pos=pos1, distance, cat="contact R",
-                                    count=contact.close, mu=exp(lmu.close), weight=1, log_decay, log_bias=log_rho1)],
+                                    count=contact.close, mu=exp(lmu.close), weight=1, eC, log_decay, log_bias=log_rho1)],
              cpos[contact.far>0,  .(name, id=id1, pos=pos1, distance, cat="contact L",
-                                    count=contact.far,   mu=exp(lmu.far),   weight=1, log_decay, log_bias=log_iota1)],
+                                    count=contact.far,   mu=exp(lmu.far),   weight=1, eC, log_decay, log_bias=log_iota1)],
              cpos[contact.down>0, .(name, id=id1, pos=pos1, distance, cat="contact R",
-                                    count=contact.down,  mu=exp(lmu.down),  weight=1, log_decay, log_bias=log_rho1)],
+                                    count=contact.down,  mu=exp(lmu.down),  weight=1, eC, log_decay, log_bias=log_rho1)],
              cpos[contact.up>0,   .(name, id=id1, pos=pos1, distance, cat="contact L",
-                                    count=contact.up,    mu=exp(lmu.up),    weight=1, log_decay, log_bias=log_iota1)],
+                                    count=contact.up,    mu=exp(lmu.up),    weight=1, eC, log_decay, log_bias=log_iota1)],
              cpos[contact.far>0,  .(name, id=id2, pos=pos2, distance, cat="contact R",
-                                    count=contact.far,   mu=exp(lmu.far),   weight=1, log_decay, log_bias=log_rho2)],
+                                    count=contact.far,   mu=exp(lmu.far),   weight=1, eC, log_decay, log_bias=log_rho2)],
              cpos[contact.close>0,.(name, id=id2, pos=pos2, distance, cat="contact L",
-                                    count=contact.close, mu=exp(lmu.close), weight=1, log_decay, log_bias=log_iota2)],
+                                    count=contact.close, mu=exp(lmu.close), weight=1, eC, log_decay, log_bias=log_iota2)],
              cpos[contact.down>0, .(name, id=id2, pos=pos2, distance, cat="contact R",
-                                    count=contact.down,  mu=exp(lmu.down),  weight=1, log_decay, log_bias=log_rho2)],
+                                    count=contact.down,  mu=exp(lmu.down),  weight=1, eC, log_decay, log_bias=log_rho2)],
              cpos[contact.up>0,   .(name, id=id2, pos=pos2, distance, cat="contact L",
-                                    count=contact.up,    mu=exp(lmu.up),    weight=1, log_decay, log_bias=log_iota2)])
+                                    count=contact.up,    mu=exp(lmu.up),    weight=1, eC, log_decay, log_bias=log_iota2)])
   dbins=cs@settings$dbins
   cpos[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   cpos[,c("pos","distance"):=list(NULL,NULL)]
   ### zero counts
-  czero = merge(zeros, init$decay[,.(name,dbin,log_decay)], by=c("name","dbin"))
+  czero = merge(init$decay[,.(name,dbin,log_decay)], zeros, by=c("name","dbin"))
   stopifnot(czero[is.na(log_decay),.N]==0)
   czero = merge(bsub,czero,by="id",all.x=F,all.y=T)
   czero[,log_bias:=ifelse(cat=="contact L",log_iota,log_rho)]
   czero = merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
   czero[,log_mu:=eC + log_decay + log_bias] #we don't average over j
-  czero = czero[nzero>0,.(name,id,dbin,cat,count=0,mu=exp(log_mu),weight=nzero,log_bias,log_decay)]
+  czero = czero[nzero>0,.(name,id,dbin,cat,count=0,mu=exp(log_mu),weight=nzero,log_bias,log_decay,eC)]
   cts=rbind(cpos,czero)
+  cts[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
   #ggplot(cts[name=="T47D es 60 MboI 1"&cat=="contact R"])+geom_line(aes(dbin,log_decay,colour=count>0,group=count>0))
   return(cts)
 }
@@ -129,7 +130,14 @@ csnorm_gauss_common_muhat_mean = function(cs, zeros) {
 #' 
 csnorm_gauss_decay_muhat_mean = function(cs, zeros) {
   cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros)
-  cts[,]
+  cts[,kappaij:=eC+log_decay]
+  csd = cts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
+               kappahat=weighted.mean(z+kappaij, weight/var),
+               std=1/sqrt(sum(weight/var)), weight=sum(weight)/2), keyby=c("name", "dbin")] #each count appears twice
+ return(csd)
+  csd.new[,ori:="new"]
+  csd[,ori:="old"]
+  ggplot(rbind(csd,csd.new))+geom_point(aes(dbin,weight,colour=ori))+facet_wrap(~name)
 }
 
 #' Compute decay etahat and weights using previous mean
