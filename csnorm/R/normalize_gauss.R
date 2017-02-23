@@ -392,71 +392,7 @@ csnorm_gauss_genomic_muhat_mean = function(cs, zeros) {
   cts = merge(cts,cs@biases[,.(name,id,pos)],by=c("name","id"))
   setkey(cts, id, name, cat)
   return(cts)
-  cts[,ori:="new"]
-  cts.old[,ori:="old"]
-  ggplot(rbind(cts,cts.old))+geom_point(aes(pos,std,colour=ori),alpha=0.1)+facet_wrap(cat~name)
 }
-
-
-#' Compute genomic etahat and weights using previous mean
-#' @keywords internal
-#' 
-csnorm_gauss_genomic_muhat_mean_old = function(cs, zeros) {
-  zbias = zeros[,.(nnz=sum(nnz),nzero=sum(nzero)),keyby=c("name","id","cat")]
-  #compute bias means
-  init=cs@par
-  bsub=copy(cs@biases)
-  bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
-  bsub=merge(cbind(cs@design[,.(name)],eRJ=init$eRJ,eDE=init$eDE), bsub, by="name",all.x=F,all.y=T)
-  bsub[,c("lmu.DL","lmu.DR","lmu.RJ"):=list(eDE+log_iota,eDE+log_rho,eRJ+(log_iota+log_rho)/2)]
-  bts=rbind(bsub[,.(name,id,pos,cat="dangling L", etahat=dangling.L/exp(lmu.DL)-1+lmu.DL,
-                    std=sqrt(1/exp(lmu.DL)+1/init$alpha))],
-            bsub[,.(name,id,pos,cat="dangling R", etahat=dangling.R/exp(lmu.DR)-1+lmu.DR,
-                    std=sqrt(1/exp(lmu.DR)+1/init$alpha))],
-            bsub[,.(name,id,pos,cat="rejoined", etahat=rejoined/exp(lmu.RJ)-1+lmu.RJ,
-                    std=sqrt(1/exp(lmu.RJ)+1/init$alpha))])
-  setkey(bts,id,name,cat)
-  stopifnot(bts[,.N]==3*cs@biases[,.N])
-  bsub=bsub[,.(id,pos,log_iota,log_rho)]
-  #add bias informations to positive counts
-  csub=copy(cs@counts)
-  csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
-  csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-  csub=merge(cbind(cs@design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
-  #bin distances and add decay
-  dbins=cs@settings$dbins
-  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-  csub=merge(csub,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
-  #add it to zero counts
-  zeta = merge(bsub, zbias, by="id")
-  zeta = merge(cbind(cs@design[,.(name)],eC=init$eC), zeta, by="name",all.x=F,all.y=T)
-  zeta[cat=="contact L",eta:=eC+log_iota]
-  zeta[cat=="contact R",eta:=eC+log_rho]
-  rm(bsub)
-  #compute means
-  csub[,lmu.base:=eC + log_decay]
-  csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(lmu.base+log_iota1+log_rho2,
-                                                           lmu.base+log_rho1 +log_rho2,
-                                                           lmu.base+log_rho1 +log_iota2,
-                                                           lmu.base+log_iota1+log_iota2)]
-  csub[,lmu.base:=NULL]
-  #collect all counts on left/right side
-  cts=rbind(csub[contact.close>0,.(name, id=id1, pos=pos1, cat="contact R", count=contact.close, mu=exp(lmu.close), eta=eC + log_rho1,  weight=1)],
-            csub[contact.far>0,  .(name, id=id1, pos=pos1, cat="contact L", count=contact.far,   mu=exp(lmu.far),   eta=eC + log_iota1, weight=1)],
-            csub[contact.down>0, .(name, id=id1, pos=pos1, cat="contact R", count=contact.down,  mu=exp(lmu.down),  eta=eC + log_rho1,  weight=1)],
-            csub[contact.up>0,   .(name, id=id1, pos=pos1, cat="contact L", count=contact.up,    mu=exp(lmu.up),    eta=eC + log_iota1, weight=1)],
-            csub[contact.far>0,  .(name, id=id2, pos=pos2, cat="contact R", count=contact.far,   mu=exp(lmu.far),   eta=eC + log_rho2,  weight=1)],
-            csub[contact.close>0,.(name, id=id2, pos=pos2, cat="contact L", count=contact.close, mu=exp(lmu.close), eta=eC + log_iota2, weight=1)],
-            csub[contact.down>0, .(name, id=id2, pos=pos2, cat="contact R", count=contact.down,  mu=exp(lmu.down),  eta=eC + log_rho2,  weight=1)],
-            csub[contact.up>0,   .(name, id=id2, pos=pos2, cat="contact L", count=contact.up,    mu=exp(lmu.up),    eta=eC + log_iota2, weight=1)],
-            zeta[,.(name,id,pos,cat, count=0, mu=exp(eta), eta, weight=nzero)])
-  cts[,var:=1/mu+1/init$alpha]
-  cts=cts[,.(etahat=weighted.mean(count/mu-1+eta, weight/var),std=sqrt(2/sum(weight/var))), by=c("name","id","pos","cat")]
-  setkey(cts,id,name,cat)
-  stopifnot(cts[,.N]==2*cs@biases[,.N])
-  return(list(bts=bts,cts=cts))
-}
-
 
 #' Single-cpu simplified fitting for iota and rho
 #' @param if a single value, use data for estimate of mu and that value as a
