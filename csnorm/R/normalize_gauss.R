@@ -131,6 +131,7 @@ csnorm_gauss_common_muhat_mean = function(cs, zeros) {
 csnorm_gauss_decay_muhat_mean = function(cs, zeros) {
   cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros)
   cts[,kappaij:=eC+log_decay]
+  dbins=cs@settings$dbins
   csd = cts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
                kappahat=weighted.mean(z+kappaij, weight/var),
                std=1/sqrt(sum(weight/var)), weight=sum(weight)/2), keyby=c("name", "dbin")] #each count appears twice
@@ -814,17 +815,22 @@ get_nzeros = function(cs, ncores=1) {
   #Count the number of crossings per distance bin
   #looping over IDs avoids building NxN matrix
   registerDoParallel(cores=ncores)
-  zeros = foreach(i=cs@biases[,(1:.N)], .combine=rbind) %dopar% {
-    stuff=c(cs@biases[i,.(name,id,pos)])
-    dists=cs@biases[name==stuff$name & id!=stuff$id,.(name,id,distance=abs(pos-stuff$pos))]
-    if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
-    dists[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-    dists[!is.na(dbin),.(name=name[1],id=stuff$id,ncross=.N,ids.other=list(id)),by=dbin]
+  chunksize=cs@biases[,ceiling(.N/(10*ncores))]
+  nchunks=cs@biases[,ceiling(.N/chunksize)]
+  zeros = foreach(chunk=1:nchunks, .combine=rbind) %dopar% {
+    bs=cs@biases[((chunk-1)*chunksize+1):min(.N,chunk*chunksize)]
+    dists = foreach(n=bs[,name], i=bs[,id], p=bs[,pos], .combine=rbind) %do% {
+      dists=cs@biases[name==n & id!=i,.(name,id,distance=abs(pos-p))]
+      if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
+      dists[,dbin:=cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+      dists[!is.na(dbin),.(name=n,id=i,ncross=.N),by=dbin]
+    }
+    dists
   }
   setkey(zeros,id,name,dbin)
   stopifnot(zeros[,uniqueN(id)]==cs@biases[,.N])
-  zeros=rbind(cts[cat=="contact L"][zeros,.(name,id,dbin,cat="contact L",nnz,nposs=2*ncross,ids.other)],
-              cts[cat=="contact R"][zeros,.(name,id,dbin,cat="contact R",nnz,nposs=2*ncross,ids.other)])
+  zeros=rbind(cts[cat=="contact L"][zeros,.(name,id,dbin,cat="contact L",nnz,nposs=2*ncross)],
+              cts[cat=="contact R"][zeros,.(name,id,dbin,cat="contact R",nnz,nposs=2*ncross)])
   zeros[is.na(nnz),nnz:=0]
   setkey(zeros,id,name,dbin,cat)
   zeros[,nzero:=nposs-nnz]
