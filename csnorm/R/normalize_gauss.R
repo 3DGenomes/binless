@@ -57,7 +57,7 @@ csnorm_gauss_decay_muhat_data = function(cs, zdecay, pseudocount=1e-2) {
                variable.name = "category", value.name = "count")[count>0,.(name,distance,category,count)]
   mcounts[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #add zero counts
-  mcounts = rbind(mcounts[,.(name,dbin,category,count,weight=1)], zdecay[,.(name,dbin=bdist,category=NA,count=0,weight=nzero)])
+  mcounts = rbind(mcounts[,.(name,dbin,category,count,weight=1)], zdecay[,.(name,dbin,category=NA,count=0,weight=nzero)])
   #compute z-scores and sum counts
   mcounts[,c("kappahat","var"):=list(log(count+pseudocount), 1/(count+pseudocount)+1/cs@par$alpha)]
   csd = mcounts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
@@ -97,7 +97,7 @@ csnorm_gauss_decay_muhat_mean = function(cs, zdecay) {
              csub[,.(name,id1,id2,dbin,kappaij,count=contact.close,mu=exp(lmu.close))])
   csub[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
   #collect all counts in these bins and add zeros
-  czero = merge(zdecay[,.(name,dbin=bdist,nzero)],init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
+  czero = merge(zdecay[,.(name,dbin,nzero)],init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
   czero = merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
   csd = rbind(csub[count>0,.(name,dbin,z,kappaij,var,weight=1)],
               czero[,.(name,dbin,z=-1,kappaij=eC+log_decay,var=1/exp(eC+log_decay)+1/init$alpha,weight=nzero)])
@@ -818,22 +818,22 @@ get_nzeros_per_decay = function(cs, ncores=1) {
   stopifnot(cs@counts[id1>=id2,.N]==0)
   mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
                variable.name = "category", value.name = "count")[count>0]
-  mcounts[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  mcounts[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #Count positive counts in these bins
-  Nkd = mcounts[,.(nnz=.N),keyby=c("name","bdist")]
-  #Nkd[,mdist:=sqrt(dbins[unclass(bdist)+1]*dbins[unclass(bdist)])] #cannot use dbins because some rows could be missing
+  Nkd = mcounts[,.(nnz=.N),keyby=c("name","dbin")]
+  #Nkd[,mdist:=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)])] #cannot use dbins because some rows could be missing
   #stopifnot(Nkd[mdist<cs@settings$dmin,.N]==0) #otherwise cs@counts has not been censored properly
   #Count the number of crossings per distance bin
   #looping over IDs avoids building NxN matrix
   registerDoParallel(cores=ncores)
   Nkz = foreach(i=cs@biases[,(1:.N)], .multicombine = T,
-                .combine=function(...){rbind(...)[,.(ncross=sum(ncross)),keyby=c("name","bdist")]}) %dopar% {
+                .combine=function(...){rbind(...)[,.(ncross=sum(ncross)),keyby=c("name","dbin")]}) %dopar% {
     stuff=c(cs@biases[i,.(name,id,pos)])
     dists=cs@biases[name==stuff$name & id>stuff$id,.(name,distance=abs(pos-stuff$pos))]
     if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
     dists=dists[distance>=cs@settings$dmin]
-    dists[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-    dists[,.(ncross=.N),keyby=c("name","bdist")]
+    dists[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+    dists[,.(ncross=.N),keyby=c("name","dbin")]
   }
   #deduce zero counts
   Nkz = merge(Nkz,Nkd,all=T)
