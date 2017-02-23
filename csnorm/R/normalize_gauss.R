@@ -11,7 +11,7 @@ fill_parameters_perf = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.ge
   if (fit.decay==F) {
     Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
-    init=c(init,list(beta_diag=beta_diag, lambda_diag=array(lambda,dim=Decays), log_decay=rep(0,cs@counts[,.N])))
+    init=c(init,list(beta_diag=beta_diag, lambda_diag=array(lambda,dim=Decays)))
   }
   if (fit.genomic==F) {
     init=c(init,list(log_iota=array(0,dim=cs@biases[,.N]), log_rho=array(0,dim=cs@biases[,.N]),
@@ -35,7 +35,7 @@ fill_parameters_outer = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.g
   if (fit.decay==F) {
     Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
-    init=c(init,list(beta_diag=beta_diag, log_decay=rep(0,cs@counts[,.N])))
+    init=c(init,list(beta_diag=beta_diag))
   }
   if (fit.genomic==F) {
     init=c(init,list(log_iota=array(0,dim=cs@biases[,.N]), log_rho=array(0,dim=cs@biases[,.N])))
@@ -59,7 +59,7 @@ csnorm_gauss_decay_muhat_data = function(cs, zeros, pseudocount=1e-2) {
   #add zero counts
   zdecay = zeros[,.(nzero=sum(nzero)/2),keyby=c("name","bdist")] #each contact is counted twice
   mcounts = rbind(mcounts[,.(name,dbin,category,count,weight=1)],
-                  zdecay[,.(name,dbin=bdist,category=NA,count=0,weight=nzero)])
+                  zdecay[,.(name,dbin,category=NA,count=0,weight=nzero)])
   #compute z-scores and sum counts
   mcounts[,c("kappahat","var"):=list(log(count+pseudocount), 1/(count+pseudocount)+1/cs@par$alpha)]
   csd = mcounts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
@@ -139,14 +139,17 @@ csnorm_gauss_decay_muhat_mean_old = function(cs, zeros) {
   zdecay = zeros[,.(ncross=sum(nposs)/8,nnz=sum(nnz)/2,nzero=sum(nzero)/2),keyby=c("name","bdist")]
   #add bias informations to counts
   init=cs@par
+  stopifnot(!is.null(init$decay))
   csub=copy(cs@counts)
-  stopifnot(length(init$log_decay)==csub[,.N])
-  csub[,log_decay:=init$log_decay]
   bsub=cs@biases[,.(id)]
   bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
   csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
   csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
   csub=merge(cbind(cs@design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
+  #bin distances and add decay
+  dbins=cs@settings$dbins
+  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  csub=merge(csub,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
   #add z-score and sd variables
   csub[,log_mu.base:=eC + log_decay]
   csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_iota1+log_rho2,
@@ -154,18 +157,17 @@ csnorm_gauss_decay_muhat_mean_old = function(cs, zeros) {
                                                            log_mu.base+log_rho1 +log_iota2,
                                                            log_mu.base+log_iota1+log_iota2)]
   csub[,c("kappaij","log_mu.base"):=list(eC+log_decay,NULL)]
-  csub=rbind(csub[,.(name,id1,id2,distance,kappaij,count=contact.far,mu=exp(lmu.far))],
-             csub[,.(name,id1,id2,distance,kappaij,count=contact.down,mu=exp(lmu.down))],
-             csub[,.(name,id1,id2,distance,kappaij,count=contact.up,mu=exp(lmu.up))],
-             csub[,.(name,id1,id2,distance,kappaij,count=contact.close,mu=exp(lmu.close))])
+  csub=rbind(csub[,.(name,id1,id2,dbin,kappaij,count=contact.far,mu=exp(lmu.far))],
+             csub[,.(name,id1,id2,dbin,kappaij,count=contact.down,mu=exp(lmu.down))],
+             csub[,.(name,id1,id2,dbin,kappaij,count=contact.up,mu=exp(lmu.up))],
+             csub[,.(name,id1,id2,dbin,kappaij,count=contact.close,mu=exp(lmu.close))])
   csub[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
-  #bin distances
-  dbins=cs@settings$dbins
-  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #collect all counts in these bins and add zeros
-  stopifnot(!is.null(init$decay))
+  czero = merge(zdecay[,.(name,dbin,nzero)],init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
+  czero = merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
   csd = rbind(csub[count>0,.(name,dbin,z,kappaij,var,weight=1)],
-              zdecay[init$decay,.(name,dbin=bdist,z=-1,kappaij=kappa,var=1/exp(kappa)+1/init$alpha,weight=nzero)])
+              czero[,.(name,dbin,z=-1,kappaij=eC+log_decay,var=1/exp(eC+log_decay)+1/init$alpha,weight=nzero)])
+  #ggplot(csd)+geom_line(aes(dbin,kappaij,colour=z>-1,group=z>-1))+facet_wrap(~name)
   csd = csd[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
                kappahat=weighted.mean(z+kappaij, weight/var),
                std=1/sqrt(sum(weight/var)), weight=sum(weight)), keyby=c("name", "dbin")]
@@ -378,16 +380,9 @@ csnorm_gauss_decay = function(cs, zeros, verbose=T, init.mean="mean", init_alpha
   }
   op$par$value = all_value
   #make decay data table, reused at next call
-  dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=all_log_mean_counts)]
+  dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=all_log_mean_counts,log_decay=all_log_decay)]
   setkey(dmat,name,dbin)
   op$par$decay=dmat 
-  #rewrite log_decay as if it were calculated for each count
-  dbins=cs@settings$dbins
-  csub=cs@counts[,.(name,id1,id2,dbin=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
-  csd[,log_decay:=all_log_decay]
-  a=csd[csub,.(name,id1,id2,log_decay),on=key(csd)]
-  setkeyv(a,key(cs@counts))
-  op$par$log_decay=a[,log_decay]
   #update par slot
   cs@par=modifyList(cs@par, op$par)
   return(cs)
@@ -446,10 +441,13 @@ csnorm_gauss_genomic_muhat_mean = function(cs, zeros) {
   bsub=bsub[,.(id,log_iota,log_rho)]
   #add bias informations to positive counts
   csub=copy(cs@counts)
-  csub[,c("distance","log_decay"):=list(NULL,init$log_decay)]
   csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
   csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
   csub=merge(cbind(cs@design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
+  #bin distances and add decay
+  dbins=cs@settings$dbins
+  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  csub=merge(csub,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
   #add it to zero counts
   zeta = merge(bsub, zbias, by="id")
   zeta = merge(cbind(cs@design[,.(name)],eC=init$eC), zeta, by="name",all.x=F,all.y=T)
@@ -932,23 +930,23 @@ get_nzeros_per_decay = function(cs, ncores=1) {
   stopifnot(cs@counts[id1>=id2,.N]==0)
   mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
                variable.name = "category", value.name = "count")[count>0]
-  mcounts[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  mcounts[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #Count positive counts in these bins
-  Nkd = mcounts[,.(nnz=.N),keyby=c("name","bdist")]
-  #Nkd[,mdist:=sqrt(dbins[unclass(bdist)+1]*dbins[unclass(bdist)])] #cannot use dbins because some rows could be missing
+  Nkd = mcounts[,.(nnz=.N),keyby=c("name","dbin")]
+  #Nkd[,mdist:=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)])] #cannot use dbins because some rows could be missing
   #stopifnot(Nkd[mdist<cs@settings$dmin,.N]==0) #otherwise cs@counts has not been censored properly
   #Count the number of crossings per distance bin
   #looping over IDs avoids building NxN matrix
   registerDoParallel(cores=ncores)
   Nkz = foreach(i=cs@biases[,(1:.N)], .multicombine = T,
-                .combine=function(...){rbind(...)[,.(ncross=sum(ncross)),keyby=c("name","bdist")]}) %dopar% {
-                  stuff=c(cs@biases[i,.(name,id,pos)])
-                  dists=cs@biases[name==stuff$name & id>stuff$id,.(name,distance=abs(pos-stuff$pos))]
-                  if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
-                  dists=dists[distance>=cs@settings$dmin]
-                  dists[,bdist:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-                  dists[,.(ncross=.N),keyby=c("name","bdist")]
-                }
+              .combine=function(...){rbind(...)[,.(ncross=sum(ncross)),keyby=c("name","dbin")]}) %dopar% {
+    stuff=c(cs@biases[i,.(name,id,pos)])
+    dists=cs@biases[name==stuff$name & id>stuff$id,.(name,distance=abs(pos-stuff$pos))]
+    if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
+    dists=dists[distance>=cs@settings$dmin]
+    dists[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+    dists[,.(ncross=.N),keyby=c("name","dbin")]
+  }
   #deduce zero counts
   Nkz = merge(Nkz,Nkd,all=T)
   Nkz[is.na(nnz),nnz:=0]
