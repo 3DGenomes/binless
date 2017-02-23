@@ -135,52 +135,6 @@ csnorm_gauss_decay_muhat_mean = function(cs, zeros) {
                kappahat=weighted.mean(z+kappaij, weight/var),
                std=1/sqrt(sum(weight/var)), weight=sum(weight)/2), keyby=c("name", "dbin")] #each count appears twice
  return(csd)
-  csd.new[,ori:="new"]
-  csd[,ori:="old"]
-  ggplot(rbind(csd,csd.new))+geom_point(aes(dbin,weight,colour=ori))+facet_wrap(~name)
-}
-
-#' Compute decay etahat and weights using previous mean
-#' @keywords internal
-#' 
-csnorm_gauss_decay_muhat_mean_old = function(cs, zeros) {
-  zdecay = zeros[,.(ncross=sum(nposs)/8,nnz=sum(nnz)/2,nzero=sum(nzero)/2),keyby=c("name","dbin")]
-  #add bias informations to counts
-  init=cs@par
-  stopifnot(!is.null(init$decay))
-  csub=copy(cs@counts)
-  bsub=cs@biases[,.(id)]
-  bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
-  csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
-  csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-  csub=merge(cbind(cs@design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
-  #bin distances and add decay
-  dbins=cs@settings$dbins
-  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-  csub=merge(csub,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
-  #add z-score and sd variables
-  csub[,log_mu.base:=eC + log_decay]
-  csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_iota1+log_rho2,
-                                                           log_mu.base+log_rho1 +log_rho2,
-                                                           log_mu.base+log_rho1 +log_iota2,
-                                                           log_mu.base+log_iota1+log_iota2)]
-  csub[,c("kappaij","log_mu.base"):=list(eC+log_decay,NULL)]
-  csub=rbind(csub[,.(name,id1,id2,dbin,kappaij,count=contact.far,mu=exp(lmu.far))],
-             csub[,.(name,id1,id2,dbin,kappaij,count=contact.down,mu=exp(lmu.down))],
-             csub[,.(name,id1,id2,dbin,kappaij,count=contact.up,mu=exp(lmu.up))],
-             csub[,.(name,id1,id2,dbin,kappaij,count=contact.close,mu=exp(lmu.close))])
-  csub[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
-  #collect all counts in these bins and add zeros
-  czero = merge(zdecay[,.(name,dbin,nzero)],init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
-  czero = merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
-  csd = rbind(csub[count>0,.(name,dbin,z,kappaij,var,weight=1)],
-              czero[,.(name,dbin,z=-1,kappaij=eC+log_decay,var=1/exp(eC+log_decay)+1/init$alpha,weight=nzero)])
-  #ggplot(csd)+geom_line(aes(dbin,kappaij,colour=z>-1,group=z>-1))+facet_wrap(~name)
-  csd = csd[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
-               kappahat=weighted.mean(z+kappaij, weight/var),
-               std=1/sqrt(sum(weight/var)), weight=sum(weight)), keyby=c("name", "dbin")]
-  stopifnot(csd[,!is.na(distance)])
-  return(csd)
 }
 
 #' Single-cpu simplified fitting for iota and rho
