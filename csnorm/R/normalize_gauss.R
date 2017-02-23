@@ -381,10 +381,27 @@ csnorm_gauss_genomic_muhat_data = function(cs, zeros, pseudocount=1e-2) {
   return(list(bts=bts,cts=cts))
 }
 
-#' Compute genomic etahat and weights using previous mean
+#' Compute decay etahat and weights using previous mean
 #' @keywords internal
 #' 
 csnorm_gauss_genomic_muhat_mean = function(cs, zeros) {
+  cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros)
+  cts.common[,etaij:=eC+log_bias]
+  cts = cts.common[,.(etahat=weighted.mean(z+etaij, weight/var),std=sqrt(2/sum(weight/var))),
+                   keyby=c("id","name","cat")]
+  cts = merge(cts,cs@biases[,.(name,id,pos)],by=c("name","id"))
+  setkey(cts, id, name, cat)
+  return(cts)
+  cts[,ori:="new"]
+  cts.old[,ori:="old"]
+  ggplot(rbind(cts,cts.old))+geom_point(aes(pos,std,colour=ori),alpha=0.1)+facet_wrap(cat~name)
+}
+
+
+#' Compute genomic etahat and weights using previous mean
+#' @keywords internal
+#' 
+csnorm_gauss_genomic_muhat_mean_old = function(cs, zeros) {
   zbias = zeros[,.(nnz=sum(nnz),nzero=sum(nzero)),keyby=c("name","id","cat")]
   #compute bias means
   init=cs@par
@@ -400,7 +417,7 @@ csnorm_gauss_genomic_muhat_mean = function(cs, zeros) {
                     std=sqrt(1/exp(lmu.RJ)+1/init$alpha))])
   setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
-  bsub=bsub[,.(id,log_iota,log_rho)]
+  bsub=bsub[,.(id,pos,log_iota,log_rho)]
   #add bias informations to positive counts
   csub=copy(cs@counts)
   csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
