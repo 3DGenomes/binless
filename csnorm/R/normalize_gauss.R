@@ -386,13 +386,28 @@ csnorm_gauss_genomic_muhat_data = function(cs, zeros, pseudocount=1e-2) {
 #' @keywords internal
 #' 
 csnorm_gauss_genomic_muhat_mean = function(cs, zeros) {
+  #biases
+  init=cs@par
+  bsub=copy(cs@biases)
+  bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
+  bsub=merge(cbind(cs@design[,.(name)],eRJ=init$eRJ,eDE=init$eDE), bsub, by="name",all.x=F,all.y=T)
+  bsub[,c("lmu.DL","lmu.DR","lmu.RJ"):=list(eDE+log_iota,eDE+log_rho,eRJ+(log_iota+log_rho)/2)]
+  bts=rbind(bsub[,.(name,id,pos,cat="dangling L", etahat=dangling.L/exp(lmu.DL)-1+lmu.DL,
+                    std=sqrt(1/exp(lmu.DL)+1/init$alpha))],
+            bsub[,.(name,id,pos,cat="dangling R", etahat=dangling.R/exp(lmu.DR)-1+lmu.DR,
+                    std=sqrt(1/exp(lmu.DR)+1/init$alpha))],
+            bsub[,.(name,id,pos,cat="rejoined", etahat=rejoined/exp(lmu.RJ)-1+lmu.RJ,
+                    std=sqrt(1/exp(lmu.RJ)+1/init$alpha))])
+  setkey(bts,id,name,cat)
+  stopifnot(bts[,.N]==3*cs@biases[,.N])
+  #counts
   cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros)
   cts.common[,etaij:=eC+log_bias]
   cts = cts.common[,.(etahat=weighted.mean(z+etaij, weight/var),std=sqrt(2/sum(weight/var))),
                    keyby=c("id","name","cat")]
   cts = merge(cts,cs@biases[,.(name,id,pos)],by=c("name","id"))
   setkey(cts, id, name, cat)
-  return(cts)
+  return(list(bts=bts,cts=cts))
 }
 
 #' Single-cpu simplified fitting for iota and rho
