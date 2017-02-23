@@ -73,14 +73,17 @@ csnorm_gauss_decay_muhat_data = function(cs, zdecay, pseudocount=1e-2) {
 csnorm_gauss_decay_muhat_mean = function(cs, zdecay) {
   #add bias informations to counts
   init=cs@par
+  stopifnot(!is.null(init$decay))
   csub=copy(cs@counts)
-  stopifnot(length(init$log_decay)==csub[,.N])
-  csub[,log_decay:=init$log_decay]
   bsub=cs@biases[,.(id)]
   bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
   csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
   csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
   csub=merge(cbind(cs@design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
+  #bin distances and add decay
+  dbins=cs@settings$dbins
+  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  csub=merge(csub,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
   #add z-score and sd variables
   csub[,log_mu.base:=eC + log_decay]
   csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_iota1+log_rho2,
@@ -88,19 +91,17 @@ csnorm_gauss_decay_muhat_mean = function(cs, zdecay) {
                                                            log_mu.base+log_rho1 +log_iota2,
                                                            log_mu.base+log_iota1+log_iota2)]
   csub[,c("kappaij","log_mu.base"):=list(eC+log_decay,NULL)]
-  csub[,c("kappaij"):=list(eC+log_decay)]
-  csub=rbind(csub[,.(name,id1,id2,distance,kappaij,count=contact.far,mu=exp(lmu.far))],
-             csub[,.(name,id1,id2,distance,kappaij,count=contact.down,mu=exp(lmu.down))],
-             csub[,.(name,id1,id2,distance,kappaij,count=contact.up,mu=exp(lmu.up))],
-             csub[,.(name,id1,id2,distance,kappaij,count=contact.close,mu=exp(lmu.close))])
+  csub=rbind(csub[,.(name,id1,id2,dbin,kappaij,count=contact.far,mu=exp(lmu.far))],
+             csub[,.(name,id1,id2,dbin,kappaij,count=contact.down,mu=exp(lmu.down))],
+             csub[,.(name,id1,id2,dbin,kappaij,count=contact.up,mu=exp(lmu.up))],
+             csub[,.(name,id1,id2,dbin,kappaij,count=contact.close,mu=exp(lmu.close))])
   csub[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
-  #bin distances
-  dbins=cs@settings$dbins
-  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #collect all counts in these bins and add zeros
-  stopifnot(!is.null(init$decay))
+  czero = merge(zdecay[,.(name,dbin=bdist,nzero)],init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
+  czero = merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
   csd = rbind(csub[count>0,.(name,dbin,z,kappaij,var,weight=1)],
-              zdecay[init$decay,.(name,dbin=bdist,z=-1,kappaij=kappa,var=1/exp(kappa)+1/init$alpha,weight=nzero)])
+              czero[,.(name,dbin,z=-1,kappaij=eC+log_decay,var=1/exp(eC+log_decay)+1/init$alpha,weight=nzero)])
+  #ggplot(csd)+geom_line(aes(dbin,kappaij,colour=z>-1,group=z>-1))+facet_wrap(~name)
   csd = csd[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
                kappahat=weighted.mean(z+kappaij, weight/var),
                std=1/sqrt(sum(weight/var)), weight=sum(weight)), keyby=c("name", "dbin")]
@@ -135,7 +136,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
   op=optimize_stan_model(model=model, data=data, iter=cs@settings$iter,
                          verbose=verbose, init=0, init_alpha=init_alpha)
   #make decay data table, reused at next call
-  dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=op$par$log_mean_counts)]
+  dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=op$par$log_mean_counts,log_decay=op$par$log_decay)]
   setkey(dmat,name,dbin)
   op$par$decay=dmat 
   #rewrite log_decay as if it were calculated for each count
