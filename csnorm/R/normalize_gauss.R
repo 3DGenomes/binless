@@ -50,14 +50,16 @@ fill_parameters_outer = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.g
 #' Compute decay etahat and weights using data as initial guess
 #' @keywords internal
 #' 
-csnorm_gauss_decay_muhat_data = function(cs, zdecay, pseudocount=1e-2) {
+csnorm_gauss_decay_muhat_data = function(cs, zeros, pseudocount=1e-2) {
   #bin distances
   dbins=cs@settings$dbins
   mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
                variable.name = "category", value.name = "count")[count>0,.(name,distance,category,count)]
   mcounts[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #add zero counts
-  mcounts = rbind(mcounts[,.(name,dbin,category,count,weight=1)], zdecay[,.(name,dbin,category=NA,count=0,weight=nzero)])
+  zdecay = zeros[,.(nzero=sum(nzero)/2),keyby=c("name","dbin")] #each contact is counted twice
+  mcounts = rbind(mcounts[,.(name,dbin,category,count,weight=1)],
+                  zdecay[,.(name,dbin,category=NA,count=0,weight=nzero)])
   #compute z-scores and sum counts
   mcounts[,c("kappahat","var"):=list(log(count+pseudocount), 1/(count+pseudocount)+1/cs@par$alpha)]
   csd = mcounts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
@@ -67,58 +69,85 @@ csnorm_gauss_decay_muhat_data = function(cs, zdecay, pseudocount=1e-2) {
   return(csd)
 }
 
-#' Compute decay etahat and weights using previous mean
+#' Compute means for positive and zero counts using previous params
 #' @keywords internal
 #' 
-csnorm_gauss_decay_muhat_mean = function(cs, zdecay) {
-  #add bias informations to counts
+csnorm_gauss_common_muhat_mean = function(cs, zeros) {
   init=cs@par
-  stopifnot(!is.null(init$decay))
-  csub=copy(cs@counts)
+  ### positive counts
+  #compute means
+  cpos=copy(cs@counts)
   bsub=cs@biases[,.(id)]
   bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
-  csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
-  csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-  csub=merge(cbind(cs@design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
-  #bin distances and add decay
+  cpos=merge(bsub[,.(id1=id,log_iota,log_rho)],cpos,by="id1",all.x=F,all.y=T)
+  cpos=merge(bsub[,.(id2=id,log_iota,log_rho)],cpos,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
+  cpos=merge(cbind(cs@design[,.(name)],eC=init$eC), cpos, by="name",all.x=F,all.y=T)
   dbins=cs@settings$dbins
-  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-  csub=merge(csub,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
-  #add z-score and sd variables
-  csub[,log_mu.base:=eC + log_decay]
-  csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_iota1+log_rho2,
+  cpos[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  cpos=merge(cpos,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
+  cpos[,log_mu.base:=eC + log_decay]
+  cpos[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_iota1+log_rho2,
                                                            log_mu.base+log_rho1 +log_rho2,
                                                            log_mu.base+log_rho1 +log_iota2,
                                                            log_mu.base+log_iota1+log_iota2)]
-  csub[,c("kappaij","log_mu.base"):=list(eC+log_decay,NULL)]
-  csub=rbind(csub[,.(name,id1,id2,dbin,kappaij,count=contact.far,mu=exp(lmu.far))],
-             csub[,.(name,id1,id2,dbin,kappaij,count=contact.down,mu=exp(lmu.down))],
-             csub[,.(name,id1,id2,dbin,kappaij,count=contact.up,mu=exp(lmu.up))],
-             csub[,.(name,id1,id2,dbin,kappaij,count=contact.close,mu=exp(lmu.close))])
-  csub[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
-  #collect all counts in these bins and add zeros
-  czero = merge(zdecay[,.(name,dbin,nzero)],init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
+  cpos[,log_mu.base:=NULL]
+  #collect all counts on left/right side, per distance
+  cpos=rbind(cpos[contact.close>0,.(name, id=id1, pos=pos1, distance, cat="contact R",
+                                    count=contact.close, mu=exp(lmu.close), weight=1, eC, log_decay, log_bias=log_rho1)],
+             cpos[contact.far>0,  .(name, id=id1, pos=pos1, distance, cat="contact L",
+                                    count=contact.far,   mu=exp(lmu.far),   weight=1, eC, log_decay, log_bias=log_iota1)],
+             cpos[contact.down>0, .(name, id=id1, pos=pos1, distance, cat="contact R",
+                                    count=contact.down,  mu=exp(lmu.down),  weight=1, eC, log_decay, log_bias=log_rho1)],
+             cpos[contact.up>0,   .(name, id=id1, pos=pos1, distance, cat="contact L",
+                                    count=contact.up,    mu=exp(lmu.up),    weight=1, eC, log_decay, log_bias=log_iota1)],
+             cpos[contact.far>0,  .(name, id=id2, pos=pos2, distance, cat="contact R",
+                                    count=contact.far,   mu=exp(lmu.far),   weight=1, eC, log_decay, log_bias=log_rho2)],
+             cpos[contact.close>0,.(name, id=id2, pos=pos2, distance, cat="contact L",
+                                    count=contact.close, mu=exp(lmu.close), weight=1, eC, log_decay, log_bias=log_iota2)],
+             cpos[contact.down>0, .(name, id=id2, pos=pos2, distance, cat="contact R",
+                                    count=contact.down,  mu=exp(lmu.down),  weight=1, eC, log_decay, log_bias=log_rho2)],
+             cpos[contact.up>0,   .(name, id=id2, pos=pos2, distance, cat="contact L",
+                                    count=contact.up,    mu=exp(lmu.up),    weight=1, eC, log_decay, log_bias=log_iota2)])
+  dbins=cs@settings$dbins
+  cpos[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  cpos[,c("pos","distance"):=list(NULL,NULL)]
+  ### zero counts
+  czero = merge(init$decay[,.(name,dbin,log_decay)], zeros, by=c("name","dbin"))
+  stopifnot(czero[is.na(log_decay),.N]==0)
+  czero = merge(bsub,czero,by="id",all.x=F,all.y=T)
+  czero[,log_bias:=ifelse(cat=="contact L",log_iota,log_rho)]
   czero = merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
-  csd = rbind(csub[count>0,.(name,dbin,z,kappaij,var,weight=1)],
-              czero[,.(name,dbin,z=-1,kappaij=eC+log_decay,var=1/exp(eC+log_decay)+1/init$alpha,weight=nzero)])
-  #ggplot(csd)+geom_line(aes(dbin,kappaij,colour=z>-1,group=z>-1))+facet_wrap(~name)
-  csd = csd[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
+  czero[,log_mu:=eC + log_decay + log_bias] #we don't average over j
+  czero = czero[nzero>0,.(name,id,dbin,cat,count=0,mu=exp(log_mu),weight=nzero,log_bias,log_decay,eC)]
+  cts=rbind(cpos,czero)
+  cts[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
+  #ggplot(cts[name=="T47D es 60 MboI 1"&cat=="contact R"])+geom_line(aes(dbin,log_decay,colour=count>0,group=count>0))
+  return(cts)
+}
+
+#' Compute decay etahat and weights using previous mean
+#' @keywords internal
+#' 
+csnorm_gauss_decay_muhat_mean = function(cs, zeros) {
+  cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros)
+  cts[,kappaij:=eC+log_decay]
+  dbins=cs@settings$dbins
+  csd = cts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
                kappahat=weighted.mean(z+kappaij, weight/var),
-               std=1/sqrt(sum(weight/var)), weight=sum(weight)), keyby=c("name", "dbin")]
-  stopifnot(csd[,!is.na(distance)])
-  return(csd)
+               std=1/sqrt(sum(weight/var)), weight=sum(weight)/2), keyby=c("name", "dbin")] #each count appears twice
+ return(csd)
 }
 
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alpha=1e-7, type=c("outer","perf"), fit_model=c('stan','nostan'), max_perf_iteration=1000, convergence_epsilon=1e-5) {
+csnorm_gauss_decay = function(cs, zeros, verbose=T, init.mean="mean", init_alpha=1e-7, type=c("outer","perf"), fit_model=c('stan','nostan'), max_perf_iteration=1000, convergence_epsilon=1e-5) {
   type=match.arg(type)
   fit_model=match.arg(fit_model)
   if (init.mean=="mean") {
-    csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs, zdecay)
+    csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs, zeros)
   } else {
-    csd = csnorm:::csnorm_gauss_decay_muhat_data(cs, zdecay)
+    csd = csnorm:::csnorm_gauss_decay_muhat_data(cs, zeros)
   }
   #run optimization
   Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
@@ -201,7 +230,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
       }
       #optimize from scratch, to avoid getting stuck. Slower but more robust
       ops=optimize_stan_model(model=model, data=data, iter=cs@settings$iter,
-                             verbose=verbose, init=0, init_alpha=init_alpha)
+                              verbose=verbose, init=0, init_alpha=init_alpha)
       
     } else {
       S_m2 = Diagonal(x=1/sdl^2)
@@ -237,7 +266,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
         epsilon = abs(lambda_diag-nlambda_diag)
         lambda_diag = nlambda_diag
         maxiter = maxiter+1
-   
+        
       }
       
       log_decay = X%*%beta
@@ -325,7 +354,7 @@ csnorm_gauss_decay = function(cs, zdecay, verbose=T, init.mean="mean", init_alph
 #' Compute genomic etahat and weights using data as initial guess
 #' @keywords internal
 #' 
-csnorm_gauss_genomic_muhat_data = function(cs, zbias, pseudocount=1e-2) {
+csnorm_gauss_genomic_muhat_data = function(cs, zeros, pseudocount=1e-2) {
   dispersion=cs@par$alpha
   #biases
   bts=rbind(cs@biases[,.(name,id,pos,cat="dangling L", etahat=log(dangling.L+pseudocount), std=sqrt(1/(dangling.L+pseudocount)+1/dispersion))],
@@ -334,6 +363,7 @@ csnorm_gauss_genomic_muhat_data = function(cs, zbias, pseudocount=1e-2) {
   setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
   #counts
+  zbias = zeros[,.(nzero=sum(nzero)),keyby=c("id","name","cat")][cs@biases[,.(name,id,pos)]]
   cts=rbind(cs@counts[contact.close>0,.(name,id=id1,pos=pos1, cat="contact R", count=contact.close, weight=1)],
             cs@counts[contact.far>0,  .(name,id=id1,pos=pos1, cat="contact L", count=contact.far, weight=1)],
             cs@counts[contact.down>0, .(name,id=id1,pos=pos1, cat="contact R", count=contact.down, weight=1)],
@@ -352,11 +382,11 @@ csnorm_gauss_genomic_muhat_data = function(cs, zbias, pseudocount=1e-2) {
   return(list(bts=bts,cts=cts))
 }
 
-#' Compute genomic etahat and weights using previous mean
+#' Compute decay etahat and weights using previous mean
 #' @keywords internal
 #' 
-csnorm_gauss_genomic_muhat_mean = function(cs, zbias) {
-  #compute bias means
+csnorm_gauss_genomic_muhat_mean = function(cs, zeros) {
+  #biases
   init=cs@par
   bsub=copy(cs@biases)
   bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
@@ -370,59 +400,28 @@ csnorm_gauss_genomic_muhat_mean = function(cs, zbias) {
                     std=sqrt(1/exp(lmu.RJ)+1/init$alpha))])
   setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
-  bsub=bsub[,.(id,log_iota,log_rho)]
-  #add bias informations to positive counts
-  csub=copy(cs@counts)
-  csub=merge(bsub[,.(id1=id,log_iota,log_rho)],csub,by="id1",all.x=F,all.y=T)
-  csub=merge(bsub[,.(id2=id,log_iota,log_rho)],csub,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-  csub=merge(cbind(cs@design[,.(name)],eC=init$eC), csub, by="name",all.x=F,all.y=T)
-  #bin distances and add decay
-  dbins=cs@settings$dbins
-  csub[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-  csub=merge(csub,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
-  #add it to zero counts
-  zeta = merge(bsub, zbias, by="id")
-  zeta = merge(cbind(cs@design[,.(name)],eC=init$eC), zeta, by="name",all.x=F,all.y=T)
-  zeta[cat=="contact L",eta:=eC+log_iota]
-  zeta[cat=="contact R",eta:=eC+log_rho]
-  rm(bsub)
-  #compute means
-  csub[,lmu.base:=eC + log_decay]
-  csub[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(lmu.base+log_iota1+log_rho2,
-                                                           lmu.base+log_rho1 +log_rho2,
-                                                           lmu.base+log_rho1 +log_iota2,
-                                                           lmu.base+log_iota1+log_iota2)]
-  csub[,lmu.base:=NULL]
-  #collect all counts on left/right side
-  cts=rbind(csub[contact.close>0,.(name, id=id1, pos=pos1, cat="contact R", count=contact.close, mu=exp(lmu.close), eta=eC + log_rho1,  weight=1)],
-            csub[contact.far>0,  .(name, id=id1, pos=pos1, cat="contact L", count=contact.far,   mu=exp(lmu.far),   eta=eC + log_iota1, weight=1)],
-            csub[contact.down>0, .(name, id=id1, pos=pos1, cat="contact R", count=contact.down,  mu=exp(lmu.down),  eta=eC + log_rho1,  weight=1)],
-            csub[contact.up>0,   .(name, id=id1, pos=pos1, cat="contact L", count=contact.up,    mu=exp(lmu.up),    eta=eC + log_iota1, weight=1)],
-            csub[contact.far>0,  .(name, id=id2, pos=pos2, cat="contact R", count=contact.far,   mu=exp(lmu.far),   eta=eC + log_rho2,  weight=1)],
-            csub[contact.close>0,.(name, id=id2, pos=pos2, cat="contact L", count=contact.close, mu=exp(lmu.close), eta=eC + log_iota2, weight=1)],
-            csub[contact.down>0, .(name, id=id2, pos=pos2, cat="contact R", count=contact.down,  mu=exp(lmu.down),  eta=eC + log_rho2,  weight=1)],
-            csub[contact.up>0,   .(name, id=id2, pos=pos2, cat="contact L", count=contact.up,    mu=exp(lmu.up),    eta=eC + log_iota2, weight=1)],
-            zeta[,.(name,id,pos,cat, count=0, mu=exp(eta), eta, weight=nzero)])
-  cts[,var:=1/mu+1/init$alpha]
-  cts=cts[,.(etahat=weighted.mean(count/mu-1+eta, weight/var),std=sqrt(2/sum(weight/var))), by=c("name","id","pos","cat")]
-  setkey(cts,id,name,cat)
-  stopifnot(cts[,.N]==2*cs@biases[,.N])
+  #counts
+  cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros)
+  cts.common[,etaij:=eC+log_bias]
+  cts = cts.common[,.(etahat=weighted.mean(z+etaij, weight/var),std=sqrt(2/sum(weight/var))),
+                   keyby=c("id","name","cat")]
+  cts = merge(cts,cs@biases[,.(name,id,pos)],by=c("name","id"))
+  setkey(cts, id, name, cat)
   return(list(bts=bts,cts=cts))
 }
-
 
 #' Single-cpu simplified fitting for iota and rho
 #' @param if a single value, use data for estimate of mu and that value as a
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alpha=1e-7, type=c("perf","outer"),fit_model=c('stan','nostan'), max_perf_iteration=1000, convergence_epsilon=1e-5) {
+csnorm_gauss_genomic = function(cs, zeros, verbose=T, init.mean="mean", init_alpha=1e-7, type=c("perf","outer"),fit_model=c('stan','nostan'), max_perf_iteration=1000, convergence_epsilon=1e-5) {
   type=match.arg(type)
   fit_model=match.arg(fit_model)
   if (init.mean=="mean") {
-    a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs, zbias)
+    a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs, zeros)
   } else {
-    a = csnorm_gauss_genomic_muhat_data(cs, zbias)
+    a = csnorm_gauss_genomic_muhat_data(cs, zeros)
   }
   bts=a$bts
   cts=a$cts
@@ -544,7 +543,7 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
                              verbose=verbose, init=0, init_alpha=init_alpha)
       
     } else {
-    
+      
       SD = bbegin[2]-bbegin[1]
       etas = c(eta_hat_RJ[1:SD],eta_hat_DL[1:SD],eta_hat_DR[1:SD],eta_hat_L[1:SD],eta_hat_R[1:SD])
       sds = c((1/(sd_RJ[1:SD])),(1/(sd_DL[1:SD])),(1/(sd_DR[1:SD])),(1/(sd_L[1:SD])),(1/(sd_R[1:SD])))
@@ -601,7 +600,7 @@ csnorm_gauss_genomic = function(cs, zbias, verbose=T, init.mean="mean", init_alp
         D = bdiag(lambda_iota*D1,lambda_rho*D1)
         DtD = crossprod(D)
         cholA = update(cholA,tmp_X_S_m2_X + Krow^2*DtD)
-
+        
       }
       
       eRJ = array(0,dim=c(Dsets))
@@ -792,7 +791,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   #
   #compute log-posterior
   cs@par$value = op$value + (Krow-2)/2*sum(log(cs@par$lambda_iota/exp(1))+log(cs@par$lambda_rho/exp(1))) +
-                            (Kdiag-2)/2*sum(log(cs@par$lambda_diag/exp(1)))
+    (Kdiag-2)/2*sum(log(cs@par$lambda_diag/exp(1)))
   return(cs)
 }
 
@@ -808,6 +807,55 @@ has_converged = function(cs) {
   delta=abs(params[step==laststep,value]-params[step==laststep-1,value])
   return(all(delta<tol))
 }
+
+#' count number of zeros in each decay and genomic bin
+#' @keywords internal
+#' 
+get_nzeros = function(cs, ncores=1) {
+  stopifnot(cs@counts[id1>=id2,.N]==0)
+  #count left and right
+  cts=rbind(cs@counts[contact.close>0,.(name, id=id1, distance, cat="contact R", count=contact.close)],
+            cs@counts[contact.far>0,  .(name, id=id1, distance, cat="contact L", count=contact.far)],
+            cs@counts[contact.down>0, .(name, id=id1, distance, cat="contact R", count=contact.down)],
+            cs@counts[contact.up>0,   .(name, id=id1, distance, cat="contact L", count=contact.up)],
+            cs@counts[contact.far>0,  .(name, id=id2, distance, cat="contact R", count=contact.far)],
+            cs@counts[contact.close>0,.(name, id=id2, distance, cat="contact L", count=contact.close)],
+            cs@counts[contact.down>0, .(name, id=id2, distance, cat="contact R", count=contact.down)],
+            cs@counts[contact.up>0,   .(name, id=id2, distance, cat="contact L", count=contact.up)])
+  #bin distances
+  dbins=cs@settings$dbins
+  cts[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  #count per cut site and distance bin
+  cts=cts[,.(nnz=.N),keyby=c("id","name","dbin","cat")]
+  #Count the number of crossings per distance bin
+  #looping over IDs avoids building NxN matrix
+  registerDoParallel(cores=ncores)
+  chunksize=cs@biases[,ceiling(.N/(10*ncores))]
+  nchunks=cs@biases[,ceiling(.N/chunksize)]
+  zeros = foreach(chunk=1:nchunks, .combine=rbind) %dopar% {
+    bs=cs@biases[((chunk-1)*chunksize+1):min(.N,chunk*chunksize)]
+    dists = foreach(n=bs[,name], i=bs[,id], p=bs[,pos], .combine=rbind) %do% {
+      dists=cs@biases[name==n & id!=i,.(name,id,distance=abs(pos-p))]
+      if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
+      dists[,dbin:=cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+      dists[!is.na(dbin),.(name=n,id=i,ncross=.N),by=dbin]
+    }
+    dists
+  }
+  setkey(zeros,id,name,dbin)
+  stopifnot(zeros[,uniqueN(id)]==cs@biases[,.N])
+  zeros=rbind(cts[cat=="contact L"][zeros,.(name,id,dbin,cat="contact L",nnz,nposs=2*ncross)],
+              cts[cat=="contact R"][zeros,.(name,id,dbin,cat="contact R",nnz,nposs=2*ncross)])
+  zeros[is.na(nnz),nnz:=0]
+  setkey(zeros,id,name,dbin,cat)
+  zeros[,nzero:=nposs-nnz]
+  #Nkz=csnorm:::get_nzeros_per_decay(cs,ncores)
+  #all(zeros[,.(ncross=sum(nposs)/8,nnz=sum(nnz)/2,nzero=sum(nzero)/2),keyby=c("name","dbin")]==Nkz)
+  #zbias=csnorm:::get_nzeros_per_cutsite(cs,ncores)
+  #all(zeros[,.(nnz=sum(nnz),nzero=sum(nzero)),keyby=c("name","id","cat")]==zbias[,.(name,id,cat,nnz,nzero)])
+  return(zeros)
+}
+
 
 #' count number of zeros in each decay bin
 #' @keywords internal
@@ -827,7 +875,7 @@ get_nzeros_per_decay = function(cs, ncores=1) {
   #looping over IDs avoids building NxN matrix
   registerDoParallel(cores=ncores)
   Nkz = foreach(i=cs@biases[,(1:.N)], .multicombine = T,
-                .combine=function(...){rbind(...)[,.(ncross=sum(ncross)),keyby=c("name","dbin")]}) %dopar% {
+              .combine=function(...){rbind(...)[,.(ncross=sum(ncross)),keyby=c("name","dbin")]}) %dopar% {
     stuff=c(cs@biases[i,.(name,id,pos)])
     dists=cs@biases[name==stuff$name & id>stuff$id,.(name,distance=abs(pos-stuff$pos))]
     if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
@@ -999,14 +1047,12 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   #get number of zeros along cut sites and decay
   stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
   cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
-  if(verbose==T) cat("Counting zeros for decay\n")
-  zdecay = csnorm:::get_nzeros_per_decay(cs, ncores=ncores)
-  if(verbose==T) cat("Counting zeros for bias\n")
-  zbias = csnorm:::get_nzeros_per_cutsite(cs, ncores=ncores)
+  if(verbose==T) cat("Counting zeros\n")
+  zeros = csnorm:::get_nzeros(cs, ncores=ncores)
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
   subcounts = csnorm:::subsample_counts(cs, ncounts)
-  subcounts.weight = merge(zdecay[,.(nc=sum(ncross)),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
+  subcounts.weight = merge(zeros[,.(nc=sum(nposs)/8),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
   #initial guess
   if (is.null(init)) {
     if (verbose==T) cat("No initial guess provided\n")
@@ -1015,10 +1061,10 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     init.mean="data"
     if (type=="outer") {
       cs=csnorm:::fill_parameters_outer(cs, dispersion=init.dispersion, fit.decay=fit.decay,
-                               fit.genomic=fit.genomic, fit.disp=fit.disp)
+                                        fit.genomic=fit.genomic, fit.disp=fit.disp)
     } else {
       cs=csnorm:::fill_parameters_perf(cs, dispersion=init.dispersion, fit.decay=fit.decay,
-                               fit.genomic=fit.genomic, fit.disp=fit.disp)
+                                       fit.genomic=fit.genomic, fit.disp=fit.disp)
     }
   } else {
     if (verbose==T) cat("Using provided initial guess\n")
@@ -1032,7 +1078,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     #fit diagonal decay given iota and rho
     if (fit.decay==T) {
       if (verbose==T) cat("Gibbs",i,": Decay ")
-      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_decay(cs, zdecay, init.mean=init.mean,
+      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_decay(cs, zeros, init.mean=init.mean,
                                                                                init_alpha=init_alpha, type=type,fit_model=fit_model)))
       if(length(output) == 0) { output = 'ok' }
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", out=output, runtime=a[1]+a[4], type=type)
@@ -1042,7 +1088,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     if (fit.genomic==T) {
       if (verbose==T) cat("Gibbs",i,": Genomic ")
       decay_eC = cs@par$eC
-      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_genomic(cs, zbias, init.mean=init.mean,
+      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_genomic(cs, zeros, init.mean=init.mean,
                                                                                  init_alpha=init_alpha, type=type,fit_model=fit_model)))
       if(length(output) == 0) { output = 'ok' }
       cs@par$eC = as.array(colMeans(rbind(decay_eC,cs@par$eC)))

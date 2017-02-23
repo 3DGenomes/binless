@@ -19,15 +19,18 @@ bs=rbind(bs,bs.new)
 ggplot(bs[cat=="contact L"&name=="GM MboI 1"])+
   geom_line(aes(pos,eta))+facet_grid(ori~.)
 
-ggplot(cs@par$biases)+facet_grid(name~cat)+
+biases=rbind(cs@par$biases[,.(name,cat,run="15",etahat,pos,eta)],
+             cs2@par$biases[,.(name,cat,run="16",etahat,pos,eta)])
+  
+ggplot(biases[name=="T47D es 60 MboI 1"])+facet_grid(run~cat)+
   geom_point(aes(pos,etahat,colour=cat),alpha=0.1)+
   geom_line(aes(pos,eta))
-  
+
 ggplot(cs@par$decay)+geom_point(aes(distance,kappahat,colour=name))+
   geom_line(aes(distance,kappa))+scale_x_log10()+facet_wrap(~name)
 
-decays = foreach(i=cs@diagnostics$params[leg=="decay",step], .combine=rbind) %do% {
-  a=cs@diagnostics$params[leg=="decay"&step==i,decay][[1]]
+decays = foreach(i=cs2@diagnostics$params[leg=="decay",step], .combine=rbind) %do% {
+  a=cs2@diagnostics$params[leg=="decay"&step==i,decay][[1]]
   a[,step:=i]
   a
 }
@@ -64,8 +67,8 @@ dbin.bad=decays[name=="T47D es 60 MboI 1"&step==10&distance>7e4&distance<8e4&guy
 biases = foreach(i=cs@diagnostics$params[leg=="bias",step], .combine=rbind) %do% {
   data.table(step=i,
              pos=1:length(cs@diagnostics$params[leg=="bias"&step==i,log_iota][[1]]),
-               log_iota=cs@diagnostics$params[leg=="bias"&step==i,log_iota][[1]],
-               log_rho=cs@diagnostics$params[leg=="bias"&step==i,log_rho][[1]])
+             log_iota=cs@diagnostics$params[leg=="bias"&step==i,log_iota][[1]],
+             log_rho=cs@diagnostics$params[leg=="bias"&step==i,log_rho][[1]])
 }
 
 ggplot(biases)+#[pos<1500&pos>1000])+
@@ -77,3 +80,13 @@ ggplot(counts[begin2<15100])+geom_raster(aes(begin1,begin2,fill=begin2-begin1>7.
 ggplot(counts[begin2<15100])+geom_raster(aes(begin1,begin2,fill=log(V1)))+facet_wrap(~name)
 decays
 
+
+zbias = csnorm:::get_nzeros_per_cutsite(cs, ncores=30)
+csb = csnorm:::csnorm_gauss_genomic_muhat_mean(cs, zbias)
+csb2 = csnorm:::csnorm_gauss_genomic_muhat_mean(cs2, zbias)
+csb=rbind(csb$cts[,.(name,id,pos,cat,etahat,std,run="15")],
+          csb2$cts[,.(name,id,pos,cat,etahat,std,run="16")])
+setkey(csb,name,run,pos,cat)
+ggplot(csb[name=="T47D es 60 MboI 1"])+geom_point(aes(pos,etahat,colour=cat),alpha=0.1)+facet_grid(cat~run)
+ggplot(cts[name=="T47D es 60 MboI 1"&cat=="contact L"])+
+  geom_point(aes(pos,eta),alpha=0.1)+facet_wrap(~weight>1)
