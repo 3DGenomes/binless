@@ -21,9 +21,12 @@
 #' @section Postprocessing:
 #' \code{\link{bin_all_datasets}}
 #' \code{\link{group_datasets}}
-#' \code{\link{detect_interactions}}
-#' \code{\link{detect_differences}}
+#' \code{\link{detect_binned_interactions}}
+#' \code{\link{detect_binned_differences}}
+#' \code{\link{detect_binless_interactions}}
+#' \code{\link{detect_binless_differences}}
 #' \code{\link{generate_genomic_biases}}
+#' \code{\link{plot_binless_matrix}}
 #'
 #' @useDynLib csnorm, .registration = TRUE
 #' @import rstan
