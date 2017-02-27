@@ -171,6 +171,62 @@ csnorm_predict_binned = function(cs, resolution, group, ncores=1) {
   mat
 }
 
+#' Predict approximate mean for zero and positive counts at a given binning
+#' @keywords internal
+csnorm_predict_binned_muhat_irls = function(cs, resolution, zeros) {
+  ### predict exact means for positive counts
+  init=cs@par
+  cpos=copy(cs@counts)
+  bsub=cs@biases[,.(name,id,pos)]
+  bins=seq(bsub[,min(pos)-1],bsub[,max(pos)+1+resolution],resolution)
+  bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
+  bsub[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
+  cpos=merge(bsub[,.(id1=id,bin,log_iota,log_rho)],cpos,by="id1",all.x=F,all.y=T)
+  cpos=merge(bsub[,.(id2=id,bin,log_iota,log_rho)],cpos,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
+  cpos=merge(cbind(cs@design[,.(name)],eC=init$eC), cpos, by="name",all.x=F,all.y=T)
+  dbins=cs@settings$dbins
+  cpos[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  cpos=merge(cpos,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
+  cpos[,log_mu.base:=eC + log_decay]
+  cpos[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_iota1+log_rho2,
+                                                           log_mu.base+log_rho1 +log_rho2,
+                                                           log_mu.base+log_rho1 +log_iota2,
+                                                           log_mu.base+log_iota1+log_iota2)]
+  cpos[,log_mu.base:=NULL]
+  #rewrite for each bin
+  cpos=rbind(cpos[contact.close>0,.(name, bin1, bin2, cat="close",
+                                    count=contact.close, mu=exp(lmu.close), decay=exp(log_decay), weight=1)],
+             cpos[contact.far>0,.(name, bin1, bin2, cat="far",
+                                  count=contact.far, mu=exp(lmu.far), decay=exp(log_decay), weight=1)],
+             cpos[contact.up>0,.(name, bin1, bin2, cat="up",
+                                 count=contact.up, mu=exp(lmu.up), decay=exp(log_decay), weight=1)],
+             cpos[contact.down>0,.(name, bin1, bin2, cat="down",
+                                   count=contact.down, mu=exp(lmu.down), decay=exp(log_decay), weight=1)])
+  ### predict approximate means for zero counts
+  #approximate decay
+  dbins = cs@settings$dbins
+  zeros[,dbin:=cut(dmin,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  zeros = merge(zeros,init$decay[,.(name,dbin,log_decay_min=log_decay)],by=c("name","dbin"))
+  zeros[,dbin:=cut(dmax,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  zeros = merge(zeros,init$decay[,.(name,dbin,log_decay_max=log_decay)],by=c("name","dbin"))
+  zeros[,dbin:=NULL]
+  zeros = merge(cbind(cs@design[,.(name)],eC=init$eC), zeros, by="name",all.x=F,all.y=T)
+  zeros[,log_mu.base:=eC + (log_decay_min+log_decay_max)/2]
+  #approximate bias
+  bsub = bsub[,.(log_iota=mean(log_iota),log_rho=mean(log_rho)),by=c("name","bin")]
+  zeros = merge(bsub[,.(name,bin1=bin,log_iota,log_rho)],zeros,by=c("name","bin1"),all.x=F,all.y=T)
+  zeros = merge(bsub[,.(name,bin2=bin,log_iota,log_rho)],zeros,by=c("name","bin2"),all.x=F,all.y=T, suffixes=c("2","1"))
+  zeros[,log_mu:=ifelse(cat=="far", log_mu.base+log_iota1+log_rho2,
+                        ifelse(cat=="down", log_mu.base+log_rho1 +log_rho2,
+                               ifelse(cat=="close", log_mu.base+log_rho1 +log_iota2,
+                                      log_mu.base+log_iota1+log_iota2)))]
+  zeros[,log_mu.base:=NULL]
+  zeros = zeros[nzero>0,.(name,bin1,bin2,cat,count=0,mu=exp(log_mu),decay=exp((log_decay_min+log_decay_max)/2),weight=nzero)]
+  cts=rbind(cpos,zeros)
+  cts[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
+  return(cts)
+}
+
 #' Perform peak and differential detection through model comparison
 #' 
 #' fast IRLS and zero counts approximation
@@ -185,9 +241,12 @@ csnorm_predict_binned = function(cs, resolution, group, ncores=1) {
 #'
 #' @examples
 csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1) {
-  #get zeros per bin
+  # get zeros per bin
   zeros = get_nzeros_binning(cs, resolution, ncores=ncores)
-  #predict exact means for positive counts
+  # predict means
+  cts = csnorm_predict_binned_muhat_irls(cs, resolution, zeros)
+  # 
+  return(cts)
 }
 
 #' Common call for binning
