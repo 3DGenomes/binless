@@ -223,7 +223,6 @@ csnorm_predict_binned_muhat_irls = function(cs, resolution, zeros) {
   zeros[,log_mu.base:=NULL]
   zeros = zeros[nzero>0,.(name,bin1,bin2,cat,count=0,mu=exp(log_mu),decay=exp((log_decay_min+log_decay_max)/2),weight=nzero)]
   cts=rbind(cpos,zeros)
-  cts[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
   return(cts)
 }
 
@@ -234,19 +233,67 @@ csnorm_predict_binned_muhat_irls = function(cs, resolution, zeros) {
 #' @param cs csnorm object
 #' @param resolution target resolution
 #' @param group if grouping is to be performed
+#' @param ncores integer. Number of cores for zero binning
+#' @param niter integer. Maximum number of IRLS iterations
+#' @param tol numeric. Convergence tolerance for IRLS objective
 #'
 #' @return
 #' @keywords internal
 #' @export
 #'
 #' @examples
-csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1) {
+csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100, tol=1e-3) {
   # get zeros per bin
-  zeros = get_nzeros_binning(cs, resolution, ncores=ncores)
+  zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores=ncores)
   # predict means
-  cts = csnorm_predict_binned_muhat_irls(cs, resolution, zeros)
-  # 
-  return(cts)
+  cts = csnorm:::csnorm_predict_binned_muhat_irls(cs, resolution, zeros)
+  # group
+  if (group=="all") {
+    names=cs@experiments[,unique(name)]
+    groups=data.table(name=names,groupname=names)
+  } else {
+    groups=cs@experiments[,.(name,groupname=do.call(paste,mget(group))),by=group][,.(name,groupname)] #we already know groupname is unique
+    groups[,groupname:=ordered(groupname)] #same class as name
+  }
+  setkey(groups,name)
+  cts = groups[cts]
+  cts[,name:=groupname]
+  #matrices
+  mat=cts[,.(ncounts=sum(weight),
+             observed=sum(count*weight),
+             expected=sum(mu*weight),
+             expected.sd=sqrt(sum((mu+mu^2/init$alpha)*weight)),
+             decaymat=sum(decay*weight)/sum(weight),
+             lpdf0=sum(dnbinom(count,mu=mu, size=init$alpha, log=T)*weight))
+          ,keyby=c("name","bin1","bin2")]
+  #signal matrix
+  cts[,signal:=1]
+  for (i in 1:niter) {
+    cts[,c("z","var","signal.old"):=list(count/(signal*mu)-1,(1/(signal*mu)+1/init$alpha),signal)]
+    cts[,signal:=exp(weighted.mean(z+log(signal), weight/var)),by=c("name","bin1","bin2")]
+    cts[,signal.sd:=signal[1]*sqrt(1/sum(weight/var)),by=c("name","bin1","bin2")]
+    if(cts[,all(abs(signal-signal.old)<tol)]) break
+  }
+  if (i==niter) message("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
+  mats = cts[,.(signal=signal[1],signal.sd=signal.sd[1],
+                lpdfs=sum(dnbinom(count,mu=mu*signal, size=init$alpha, log=T)*weight))
+             ,keyby=c("name","bin1","bin2")]
+  #normalized matrix
+  cts[,normalized:=1]
+  for (i in 1:niter) {
+    cts[,c("z","var","normalized.old"):=list(count/(normalized*mu/decay)-1,
+                                             (1/(normalized*mu/decay)+1/init$alpha),normalized)]
+    cts[,normalized:=exp(weighted.mean(z+log(normalized), weight/var)),by=c("name","bin1","bin2")]
+    cts[,normalized.sd:=normalized[1]*sqrt(1/sum(weight/var)),by=c("name","bin1","bin2")]
+    if(cts[,all(abs(normalized-normalized.old)<tol)]) break
+  }
+  if (i==niter) message("Warning: Maximum number of IRLS iterations reached for normalized estimation!\n")
+  matr = cts[,.(normalized=normalized[1],normalized.sd=normalized.sd[1],
+                lpdfr=sum(dnbinom(count,mu=mu*normalized/decay, size=init$alpha, log=T)*weight))
+             ,keyby=c("name","bin1","bin2")]
+  mat=mat[mats[matr]]
+  mat[observed==0,c("signal","normalized","signal.sd","normalized.sd"):=list(1,1,0,0)]
+  return(mat)
 }
 
 #' Common call for binning
