@@ -31,6 +31,52 @@ iterative_normalization = function(raw, niterations=100, namecol="name") {
   }
 }
 
+#' count number of zeros in each rectangular bin
+#' @keywords internal
+#' 
+get_nzeros_binning = function(cs, resolution, ncores=1) {
+  stopifnot(cs@counts[id1>=id2,.N]==0)
+  #count left and right
+  cts=melt(cs@counts[,.(name,pos1,pos2,contact.close,contact.down,contact.far,contact.up)],
+           id.vars=c("name","pos1","pos2"))[value>0]
+  #retrieve bin borders
+  biases=cs@biases
+  bins=seq(biases[,min(pos)-1],biases[,max(pos)+1+resolution],resolution)
+  biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
+  cts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+                              cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12))]
+  #count per bin
+  cts=cts[,.(nnz=.N),keyby=c("name","bin1","bin2","variable")]
+  #Count the number of crossings per distance bin
+  #looping over IDs avoids building NxN matrix
+  registerDoParallel(cores=ncores)
+  chunksize=cs@biases[,ceiling(.N/(10*ncores))]
+  nchunks=cs@biases[,ceiling(.N/chunksize)]
+  crossings = foreach(chunk=1:nchunks, .combine=rbind) %dopar% {
+    bs=biases[((chunk-1)*chunksize+1):min(.N,chunk*chunksize)]
+    foreach(n=bs[,name], p=bs[,pos], b=bs[,bin], .combine=rbind) %do% {
+      crossings = biases[name==n&pos>p,.(name,bin2=bin,distance=abs(pos-p))]
+      if (cs@settings$circularize>0)  crossings[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
+      crossings[distance>=cs@settings$dmin,.(bin1=b,ncross=.N,dmin=min(distance),dmax=max(distance)),by=c("name","bin2")]
+    }
+  }
+  crossings=crossings[,.(ncross=sum(ncross),dmin=min(dmin),dmax=max(dmax)),keyby=c("name","bin1","bin2")]
+  zeros = rbind(merge(crossings,cts[variable=="contact.close"],by=c("name","bin1","bin2"),all=T)[
+    ,.(name,bin1,bin2,cat="close",ncross,dmin,dmax,nnz)],
+    merge(crossings,cts[variable=="contact.far"],by=c("name","bin1","bin2"),all=T)[
+      ,.(name,bin1,bin2,cat="far",ncross,dmin,dmax,nnz)],
+    merge(crossings,cts[variable=="contact.down"],by=c("name","bin1","bin2"),all=T)[
+      ,.(name,bin1,bin2,cat="down",ncross,dmin,dmax,nnz)],
+    merge(crossings,cts[variable=="contact.up"],by=c("name","bin1","bin2"),all=T)[
+      ,.(name,bin1,bin2,cat="up",ncross,dmin,dmax,nnz)])
+  zeros[is.na(nnz),nnz:=0]
+  zeros[,nzero:=ncross-nnz]
+  stopifnot(zeros[is.na(ncross),.N==0])
+  stopifnot(zeros[nzero<0,.N==0])
+  return(zeros)
+}
+
+
 #' Prepare bins and organise into chunks for parallelization
 #' @keywords internal
 bin_and_chunk = function(cs, resolution, group, ncores) {
@@ -58,7 +104,6 @@ bin_and_chunk = function(cs, resolution, group, ncores) {
   chunks=CJ(biases[,(min(chunk):max(chunk))],biases[,(min(chunk):max(chunk))])[V1<=V2]
   return(list(counts=counts,biases=biases,chunks=chunks,groups=groups))
 }
-
 
 #' estimate signal and various matrices for these bins
 #' @keywords internal
@@ -124,6 +169,25 @@ csnorm_predict_binned = function(cs, resolution, group, ncores=1) {
   counts[,c("bin1","bin2","ibin1","ibin2"):=list(NULL,NULL,NULL,NULL)]
   biases[,c("bin","ibin"):=list(NULL,NULL)]
   mat
+}
+
+#' Perform peak and differential detection through model comparison
+#' 
+#' fast IRLS and zero counts approximation
+#'
+#' @param cs csnorm object
+#' @param resolution target resolution
+#' @param group if grouping is to be performed
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1) {
+  #get zeros per bin
+  zeros = get_nzeros_binning(cs, resolution, ncores=ncores)
+  #predict exact means for positive counts
 }
 
 #' Common call for binning
