@@ -50,8 +50,9 @@ generated quantities {
       tmp = exp(log_expected[i]);
       expected[g] = expected[g] + tmp;
       expected_sd[g] = expected_sd[g] + tmp + tmp*(tmp/alpha);
-      decaymat[g] = decaymat[g] + exp(log_expected[i] - log_decay[i]);
+      decaymat[g] = decaymat[g] + exp(log_decay[i]);
     }
     expected_sd[g] = sqrt(expected_sd[g]);
+    decaymat[g] = decaymat[g]/ncounts[g];
   }
 }
