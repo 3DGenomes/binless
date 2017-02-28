@@ -242,12 +242,15 @@ csnorm_predict_binned_muhat_irls = function(cs, resolution, zeros) {
 #' @export
 #'
 #' @examples
-csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100, tol=1e-3) {
+csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100, tol=1e-3, verbose=T) {
   # get zeros per bin
+  if (verbose==T) message("   Get zeros per bin\n")
   zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores=ncores)
   # predict means
+  if (verbose==T) message("   Predict means\n")
   cts = csnorm:::csnorm_predict_binned_muhat_irls(cs, resolution, zeros)
   # group
+  if (verbose==T) message("   Group\n")
   if (group=="all") {
     names=cs@experiments[,unique(name)]
     groups=data.table(name=names,groupname=names)
@@ -259,6 +262,7 @@ csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100
   cts = groups[cts]
   cts[,name:=groupname]
   #matrices
+  if (verbose==T) message("   Other matrices\n")
   mat=cts[,.(ncounts=sum(weight),
              observed=sum(count*weight),
              expected=sum(mu*weight),
@@ -267,6 +271,7 @@ csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100
              lpdf0=sum(dnbinom(count,mu=mu, size=init$alpha, log=T)*weight))
           ,keyby=c("name","bin1","bin2")]
   #signal matrix
+  if (verbose==T) message("   Signal matrix\n")
   cts[,signal:=1]
   for (i in 1:niter) {
     cts[,c("z","var","signal.old"):=list(count/(signal*mu)-1,(1/(signal*mu)+1/init$alpha),signal)]
@@ -279,6 +284,7 @@ csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100
                 lpdfs=sum(dnbinom(count,mu=mu*signal, size=init$alpha, log=T)*weight))
              ,keyby=c("name","bin1","bin2")]
   #normalized matrix
+  if (verbose==T) message("   Normalized matrix\n")
   cts[,normalized:=1]
   for (i in 1:niter) {
     cts[,c("z","var","normalized.old"):=list(count/(normalized*mu/decay)-1,
@@ -300,9 +306,10 @@ csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100
 #' @keywords internal
 #'
 #' @examples
-compute_grouped_matrices = function(cs, resolution, group, ncores, ice, verbose) {
+compute_grouped_matrices = function(cs, resolution, group, ncores, ice, verbose, niter=100, tol=1e-3) {
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
-  mat=csnorm_predict_binned(cs, resolution, group=group, ncores=ncores)
+  #mat=csnorm_predict_binned(cs, resolution, group=group, ncores=ncores)
+  mat=csnorm_predict_binned_irls(cs, resolution, group=group, ncores=ncores, niter=niter, tol=tol, verbose=verbose)
   setkey(mat,name,bin1,bin2)
   if (ice>0) {
     if (verbose==T) cat("*** iterative normalization with ",ice," iterations\n")
