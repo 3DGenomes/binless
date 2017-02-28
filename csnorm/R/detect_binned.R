@@ -134,6 +134,68 @@ csnorm_detect_binned = function(cs, resolution, group, ref="expected", threshold
   mat
 }
 
+#' Perform peak and differential detection through model comparison, irls approx
+#'
+#' @param cs 
+#' @param resolution 
+#' @param group 
+#' @param ref character. "expected" for interaction detection, the name of a group for difference detection.
+#' @param threshold on the probability K/(1+K) where K is the Bayes factor
+#' @param prior.sd 
+#' @param ncores 
+#' @param niter integer. Maximum number of IRLS iterations
+#' @param tol numeric. Convergence tolerance for IRLS objective
+#' @param verbose boolean.
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+csnorm_detect_binned_irls = function(cs, resolution, group, ref="expected",
+                                     threshold=0.95, prior.sd=5, ncores=1, niter=100, tol=1e-3, verbose=T) {
+  # get zeros per bin
+  if (verbose==T) message("   Get zeros per bin\n")
+  zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores=ncores)
+  # predict means
+  if (verbose==T) message("   Predict means\n")
+  cts = csnorm:::csnorm_predict_binned_muhat_irls(cs, resolution, zeros)
+  # group
+  if (verbose==T) message("   Group\n")
+  if (group=="all") {
+    names=cs@experiments[,unique(name)]
+    groups=data.table(name=names,groupname=names)
+  } else {
+    groups=cs@experiments[,.(name,groupname=do.call(paste,mget(group))),by=group][,.(name,groupname)] #we already know groupname is unique
+    groups[,groupname:=ordered(groupname)] #same class as name
+  }
+  setkey(groups,name)
+  cts = groups[cts]
+  cts[,name:=groupname]
+  #signal matrix
+  if (verbose==T) message("   Detection\n")
+  cts[,signal:=1]
+  for (i in 1:niter) {
+    cts[,c("z","var","signal.old"):=list(count/(signal*mu)-1,(1/(signal*mu)+1/init$alpha),signal)]
+    cts[,phihat:=weighted.mean(z+log(signal), weight/var),by=c("name","bin1","bin2")]
+    cts[,sigmasq:=1/sum(weight/var),by=c("name","bin1","bin2")]
+    cts[,signal:=exp(phihat/(1+2*sigmasq/prior.sd^2))]
+    if(cts[,all(abs(signal-signal.old)<tol)]) break
+  }
+  if (i==niter) message("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
+  mat = cts[,.(K=exp(dnorm(phihat[1],mean=0,sd=sqrt(sigmasq[1]+prior.sd^2/2), log=T)-
+                      dnorm(phihat[1],mean=0,sd=sqrt(sigmasq[1]), log=T)),
+                signal.signif=signal[1],signal.signif.sd=sqrt(sigmasq[1])*signal[1],
+                binned=sum(count)),keyby=c("name","bin1","bin2")]
+  mat[,direction:=ifelse(signal.signif>=1,"enriched","depleted")]
+  mat[binned==0,c("signal.signif","signal.signif.sd","K","direction"):=list(1,0,0,NA)]
+  mat[,prob.gt.expected:=K/(1+K)]
+  mat[,c("K","binned"):=list(NULL,NULL)]
+  mat[,is.significant:=prob.gt.expected > threshold]
+  mat
+}
+
+
 #' Binned detection of significant interactions wrt expected
 #' 
 #' @param cs CSnorm object
