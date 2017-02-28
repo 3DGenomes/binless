@@ -236,6 +236,7 @@ csnorm_predict_binned_muhat_irls = function(cs, resolution, zeros) {
 #' @param ncores integer. Number of cores for zero binning
 #' @param niter integer. Maximum number of IRLS iterations
 #' @param tol numeric. Convergence tolerance for IRLS objective
+#' @param verbose boolean.
 #'
 #' @return
 #' @keywords internal
@@ -244,13 +245,13 @@ csnorm_predict_binned_muhat_irls = function(cs, resolution, zeros) {
 #' @examples
 csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100, tol=1e-3, verbose=T) {
   # get zeros per bin
-  if (verbose==T) message("   Get zeros per bin\n")
+  if (verbose==T) cat("   Get zeros per bin\n")
   zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores=ncores)
   # predict means
-  if (verbose==T) message("   Predict means\n")
+  if (verbose==T) cat("   Predict means\n")
   cts = csnorm:::csnorm_predict_binned_muhat_irls(cs, resolution, zeros)
   # group
-  if (verbose==T) message("   Group\n")
+  if (verbose==T) cat("   Group\n")
   if (group=="all") {
     names=cs@experiments[,unique(name)]
     groups=data.table(name=names,groupname=names)
@@ -262,7 +263,7 @@ csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100
   cts = groups[cts]
   cts[,name:=groupname]
   #matrices
-  if (verbose==T) message("   Other matrices\n")
+  if (verbose==T) cat("   Other matrices\n")
   mat=cts[,.(ncounts=sum(weight),
              observed=sum(count*weight),
              expected=sum(mu*weight),
@@ -271,7 +272,7 @@ csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100
              lpdf0=sum(dnbinom(count,mu=mu, size=init$alpha, log=T)*weight))
           ,keyby=c("name","bin1","bin2")]
   #signal matrix
-  if (verbose==T) message("   Signal matrix\n")
+  if (verbose==T) cat("   Signal matrix\n")
   cts[,signal:=1]
   for (i in 1:niter) {
     cts[,c("z","var","signal.old"):=list(count/(signal*mu)-1,(1/(signal*mu)+1/init$alpha),signal)]
@@ -279,12 +280,12 @@ csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100
     cts[,signal.sd:=signal[1]*sqrt(1/sum(weight/var)),by=c("name","bin1","bin2")]
     if(cts[,all(abs(signal-signal.old)<tol)]) break
   }
-  if (i==niter) message("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
+  if (i==niter) cat("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
   mats = cts[,.(signal=signal[1],signal.sd=signal.sd[1],
                 lpdfs=sum(dnbinom(count,mu=mu*signal, size=init$alpha, log=T)*weight))
              ,keyby=c("name","bin1","bin2")]
   #normalized matrix
-  if (verbose==T) message("   Normalized matrix\n")
+  if (verbose==T) cat("   Normalized matrix\n")
   cts[,normalized:=1]
   for (i in 1:niter) {
     cts[,c("z","var","normalized.old"):=list(count/(normalized*mu/decay)-1,
@@ -293,7 +294,7 @@ csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100
     cts[,normalized.sd:=normalized[1]*sqrt(1/sum(weight/var)),by=c("name","bin1","bin2")]
     if(cts[,all(abs(normalized-normalized.old)<tol)]) break
   }
-  if (i==niter) message("Warning: Maximum number of IRLS iterations reached for normalized estimation!\n")
+  if (i==niter) cat("Warning: Maximum number of IRLS iterations reached for normalized estimation!\n")
   matr = cts[,.(normalized=normalized[1],normalized.sd=normalized.sd[1],
                 lpdfr=sum(dnbinom(count,mu=mu*normalized/decay, size=init$alpha, log=T)*weight))
              ,keyby=c("name","bin1","bin2")]
@@ -403,7 +404,8 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, verbose=T) {
 #' @export
 #'
 #' @examples
-group_datasets = function(cs, resolution, group=c("condition","replicate","enzyme","experiment"), ice=-1, verbose=T, ncores=1) {
+group_datasets = function(cs, resolution, group=c("condition","replicate","enzyme","experiment"),
+                          ice=-1, verbose=T, ncores=1) {
   #fetch and check inputs
   experiments=cs@experiments
   csbi=get_cs_binned_idx(cs, resolution=resolution, raise=T)
