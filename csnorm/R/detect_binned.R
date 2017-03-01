@@ -155,13 +155,13 @@ csnorm_detect_binned = function(cs, resolution, group, ref="expected", threshold
 csnorm_detect_binned_irls = function(cs, resolution, group, ref="expected",
                                      threshold=0.95, prior.sd=5, ncores=1, niter=100, tol=1e-3, verbose=T) {
   # get zeros per bin
-  if (verbose==T) message("   Get zeros per bin\n")
+  if (verbose==T) cat("   Get zeros per bin\n")
   zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores=ncores)
   # predict means
-  if (verbose==T) message("   Predict means\n")
+  if (verbose==T) cat("   Predict means\n")
   cts = csnorm:::csnorm_predict_binned_muhat_irls(cs, resolution, zeros)
   # group
-  if (verbose==T) message("   Group\n")
+  if (verbose==T) cat("   Group\n")
   if (group=="all") {
     names=cs@experiments[,unique(name)]
     groups=data.table(name=names,groupname=names)
@@ -173,7 +173,7 @@ csnorm_detect_binned_irls = function(cs, resolution, group, ref="expected",
   cts = groups[cts]
   cts[,name:=groupname]
   #signal matrix
-  if (verbose==T) message("   Detection\n")
+  if (verbose==T) cat("   Detection\n")
   cts[,signal:=1]
   for (i in 1:niter) {
     cts[,c("z","var","signal.old"):=list(count/(signal*mu)-1,(1/(signal*mu)+1/init$alpha),signal)]
