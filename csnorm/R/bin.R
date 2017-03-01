@@ -37,16 +37,18 @@ iterative_normalization = function(raw, niterations=100, namecol="name") {
 get_nzeros_binning = function(cs, resolution, ncores=1) {
   stopifnot(cs@counts[id1>=id2,.N]==0)
   #count left and right
-  cts=melt(cs@counts[,.(name,pos1,pos2,contact.close,contact.down,contact.far,contact.up)],
-           id.vars=c("name","pos1","pos2"))[value>0]
+  cts=melt(cs@counts[,.(name,pos1,pos2,distance,contact.close,contact.down,contact.far,contact.up)],
+           id.vars=c("name","pos1","pos2","distance"))[value>0]
   #retrieve bin borders
   biases=cs@biases
   bins=seq(biases[,min(pos)-1],biases[,max(pos)+1+resolution],resolution)
   biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
-  cts[,c("bin1","bin2"):=list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
-                              cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12))]
+  cts[,c("bin1","bin2","dbin"):=
+        list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+             cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+             cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
   #count per bin
-  cts=cts[,.(nnz=.N),keyby=c("name","bin1","bin2","variable")]
+  cts=cts[,.(nnz=.N),keyby=c("name","bin1","bin2","dbin","variable")]
   #Count the number of crossings per distance bin
   #looping over IDs avoids building NxN matrix
   registerDoParallel(cores=ncores)
@@ -57,18 +59,20 @@ get_nzeros_binning = function(cs, resolution, ncores=1) {
     foreach(n=bs[,name], p=bs[,pos], b=bs[,bin], .combine=rbind) %do% {
       crossings = biases[name==n&pos>p,.(name,bin2=bin,distance=abs(pos-p))]
       if (cs@settings$circularize>0)  crossings[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
-      crossings[distance>=cs@settings$dmin,.(bin1=b,ncross=.N,dmin=min(distance),dmax=max(distance)),by=c("name","bin2")]
+      crossings[,dbin:=cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+      crossings[distance>=cs@settings$dmin,.(bin1=b,ncross=.N),by=c("name","bin2","dbin")]
     }
   }
-  crossings=crossings[,.(ncross=sum(ncross),dmin=min(dmin),dmax=max(dmax)),keyby=c("name","bin1","bin2")]
-  zeros = rbind(merge(crossings,cts[variable=="contact.close"],by=c("name","bin1","bin2"),all=T)[
-    ,.(name,bin1,bin2,cat="close",ncross,dmin,dmax,nnz)],
-    merge(crossings,cts[variable=="contact.far"],by=c("name","bin1","bin2"),all=T)[
-      ,.(name,bin1,bin2,cat="far",ncross,dmin,dmax,nnz)],
-    merge(crossings,cts[variable=="contact.down"],by=c("name","bin1","bin2"),all=T)[
-      ,.(name,bin1,bin2,cat="down",ncross,dmin,dmax,nnz)],
-    merge(crossings,cts[variable=="contact.up"],by=c("name","bin1","bin2"),all=T)[
-      ,.(name,bin1,bin2,cat="up",ncross,dmin,dmax,nnz)])
+  crossings=crossings[,.(ncross=sum(ncross)),keyby=c("name","bin1","bin2","dbin")]
+  zeros = rbind(
+    merge(crossings,cts[variable=="contact.close"],by=c("name","bin1","bin2","dbin"),all=T)[
+    ,.(name,bin1,bin2,dbin,cat="close",ncross,nnz)],
+    merge(crossings,cts[variable=="contact.far"],by=c("name","bin1","bin2","dbin"),all=T)[
+      ,.(name,bin1,bin2,dbin,cat="far",ncross,nnz)],
+    merge(crossings,cts[variable=="contact.down"],by=c("name","bin1","bin2","dbin"),all=T)[
+      ,.(name,bin1,bin2,dbin,cat="down",ncross,nnz)],
+    merge(crossings,cts[variable=="contact.up"],by=c("name","bin1","bin2","dbin"),all=T)[
+      ,.(name,bin1,bin2,dbin,cat="up",ncross,nnz)])
   zeros[is.na(nnz),nnz:=0]
   zeros[,nzero:=ncross-nnz]
   stopifnot(zeros[is.na(ncross),.N==0])
@@ -204,25 +208,20 @@ csnorm_predict_binned_muhat_irls = function(cs, resolution, zeros) {
                                    count=contact.down, mu=exp(lmu.down), decay=exp(log_decay), weight=1)])
   ### predict approximate means for zero counts
   #approximate decay
-  dbins = cs@settings$dbins
-  zeros[,dbin:=cut(dmin,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-  zeros = merge(zeros,init$decay[,.(name,dbin,log_decay_min=log_decay)],by=c("name","dbin"))
-  zeros[,dbin:=cut(dmax,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-  zeros = merge(zeros,init$decay[,.(name,dbin,log_decay_max=log_decay)],by=c("name","dbin"))
-  zeros[,dbin:=NULL]
-  zeros = merge(cbind(cs@design[,.(name)],eC=init$eC), zeros, by="name",all.x=F,all.y=T)
-  zeros[,log_mu.base:=eC + (log_decay_min+log_decay_max)/2]
+  czero = merge(zeros,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
+  czero = merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
+  czero[,log_mu.base:=eC + log_decay]
   #approximate bias
   bsub = bsub[,.(log_iota=mean(log_iota),log_rho=mean(log_rho)),by=c("name","bin")]
-  zeros = merge(bsub[,.(name,bin1=bin,log_iota,log_rho)],zeros,by=c("name","bin1"),all.x=F,all.y=T)
-  zeros = merge(bsub[,.(name,bin2=bin,log_iota,log_rho)],zeros,by=c("name","bin2"),all.x=F,all.y=T, suffixes=c("2","1"))
-  zeros[,log_mu:=ifelse(cat=="far", log_mu.base+log_iota1+log_rho2,
+  czero = merge(bsub[,.(name,bin1=bin,log_iota,log_rho)],czero,by=c("name","bin1"),all.x=F,all.y=T)
+  czero = merge(bsub[,.(name,bin2=bin,log_iota,log_rho)],czero,by=c("name","bin2"),all.x=F,all.y=T, suffixes=c("2","1"))
+  czero[,log_mu:=ifelse(cat=="far", log_mu.base+log_iota1+log_rho2,
                         ifelse(cat=="down", log_mu.base+log_rho1 +log_rho2,
                                ifelse(cat=="close", log_mu.base+log_rho1 +log_iota2,
                                       log_mu.base+log_iota1+log_iota2)))]
-  zeros[,log_mu.base:=NULL]
-  zeros = zeros[nzero>0,.(name,bin1,bin2,cat,count=0,mu=exp(log_mu),decay=exp((log_decay_min+log_decay_max)/2),weight=nzero)]
-  cts=rbind(cpos,zeros)
+  czero[,log_mu.base:=NULL]
+  czero = czero[nzero>0,.(name,bin1,bin2,cat,count=0,mu=exp(log_mu),decay=exp(log_decay),weight=nzero)]
+  cts=rbind(cpos,czero)
   return(cts)
 }
 
@@ -285,7 +284,7 @@ csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100
                 lpdfs=sum(dnbinom(count,mu=mu*signal, size=init$alpha, log=T)*weight))
              ,keyby=c("name","bin1","bin2")]
   #normalized matrix
-  if (verbose==T) cat("   Normalized matrix\n")
+  if (verbose==T) cat("   'Normalized' matrix\n")
   cts[,normalized:=1]
   for (i in 1:niter) {
     cts[,c("z","var","normalized.old"):=list(count/(normalized*mu/decay)-1,
