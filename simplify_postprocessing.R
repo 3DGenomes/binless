@@ -25,7 +25,7 @@ mat.ori[,ori:="old"]
 mat.new = csnorm:::csnorm_predict_binned_irls(cs, resolution, "all", ncores=ncores)
 mat.new[,ori:="new"]
 mat=rbind(mat.new,mat.ori)
-ggplot(dcast(mat[,.(name,bin1,bin2,ori,log(expected.sd))],name+bin1+bin2~ori))+stat_function(fun=identity)+
+ggplot(dcast(mat[,.(name,bin1,bin2,ori,log(signal))],name+bin1+bin2~ori))+stat_function(fun=identity)+
   geom_point(aes(new,old,colour=name))
 ggplot(mat)+geom_raster(aes(bin1,bin2,fill=signal))+facet_grid(name~ori)
 ggplot(mat[,.(name,bin1,bin2,signal,ori,ratio=observed/expected)])+geom_point(aes(signal,ratio))+
@@ -37,11 +37,11 @@ mat.ori[,ori:="old"]
 mat.new = csnorm:::csnorm_detect_binned_irls(cs, resolution, "all", ref="expected", threshold=0.95, prior.sd=5, ncores=ncores)
 mat.new[,ori:="new"]
 mat=rbind(mat.new,mat.ori)
-ggplot(dcast(mat[,.(name,bin1,bin2,ori,signal.signif)],name+bin1+bin2~ori))+stat_function(fun=identity)+
+ggplot(dcast(mat[,.(name,bin1,bin2,ori,prob.gt.expected)],name+bin1+bin2~ori))+stat_function(fun=identity)+
   geom_point(aes(new,old,colour=name))
 ggplot(mat)+geom_raster(aes(bin1,bin2,fill=log(signal.signif)))+facet_grid(name~ori)+
   geom_point(aes(bin2,bin1,colour=direction),data=mat[is.significant==T])+scale_fill_gradient2()
 dcast(mat[,.(name,bin1,bin2,ori,is.significant)],name+bin1+bin2~ori)[,.N,by=c("new","old")]
 dcast(mat[,.(name,bin1,bin2,ori,direction)],name+bin1+bin2~ori)[,.N,by=c("new","old")]
-
+mat[is.na(direction)]
 
