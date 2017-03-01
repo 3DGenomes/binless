@@ -298,7 +298,7 @@ csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100
                 lpdfr=sum(dnbinom(count,mu=mu*normalized/decay, size=init$alpha, log=T)*weight))
              ,keyby=c("name","bin1","bin2")]
   mat=mat[mats[matr]]
-  mat[observed==0,c("signal","normalized","signal.sd","normalized.sd"):=list(1,1,0,0)]
+  mat[observed==0,c("signal","normalized","signal.sd","normalized.sd"):=list(0,0,NA,NA)]
   return(mat)
 }
 

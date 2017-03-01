@@ -188,7 +188,7 @@ csnorm_detect_binned_irls = function(cs, resolution, group, ref="expected",
                 signal.signif=signal[1],signal.signif.sd=sqrt(sigmasq[1])*signal[1],
                 binned=sum(count)),keyby=c("name","bin1","bin2")]
   mat[,direction:=ifelse(signal.signif>=1,"enriched","depleted")]
-  mat[binned==0,c("signal.signif","signal.signif.sd","K","direction"):=list(1,0,0,NA)]
+  mat[binned==0,c("signal.signif","signal.signif.sd","K","direction"):=list(0,NA,0,"depleted")]
   mat[,prob.gt.expected:=K/(1+K)]
   mat[,c("K","binned"):=list(NULL,NULL)]
   mat[,is.significant:=prob.gt.expected > threshold]
