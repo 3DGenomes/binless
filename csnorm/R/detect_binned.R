@@ -242,37 +242,10 @@ csnorm_detect_binned_differences_irls = function(cs, resolution, group, ref, thr
   mat[,binned:=NULL]
   mat=merge(mat[name!=ref],mat[name==ref],suffixes=c("",".ref"),by=c("bin1","bin2"))
   mat[,name.ref:=NULL]
-  #
-  #compute signals by fusing each dataset with the reference
-  if (verbose==T) cat("   Difference detection\n")
-  ctsref = cts[name==ref]
-  ctsmerge = foreach(n=cts[name!=ref,unique(name)],.combine=rbind) %do% {
-    tmp=rbind(cts[name==n],ctsref)
-    tmp[,name:=n]
-  }
-  ctsmerge[,signal.merged:=1]
-  for (i in 1:niter) {
-    ctsmerge[,c("z","var","signal.merged.old"):=list(count/(signal.merged*mu)-1,
-                                                     1/(signal.merged*mu)+1/init$alpha,signal.merged)]
-    ctsmerge[,phihat.merged:=weighted.mean(z+log(signal.merged), weight/var),by=c("name","bin1","bin2")]
-    ctsmerge[,sigmasq.merged:=1/sum(weight/var),by=c("name","bin1","bin2")]
-    ctsmerge[,signal.merged:=exp(phihat.merged/(1+sigmasq.merged/prior.sd^2))]
-    if(ctsmerge[,all(abs(signal.merged-signal.merged.old)<tol)]) break
-  }
-  if (i==niter) message("Warning: Maximum number of IRLS iterations reached for merged signal estimation!\n")
-  #
-  matmerge = ctsmerge[,.(phihat.merged=phihat.merged[1],sigmasq.merged=sigmasq.merged[1],
-               signal.merged=signal.merged[1],signal.sd.merged=sqrt(sigmasq.merged[1])*signal.merged[1],
-               binned=sum(count)),keyby=c("name","bin1","bin2")]
-  matmerge[binned==0,c("signal.merged","signal.sd.merged"):=list(0,NA)]
-  matmerge[,binned:=NULL]
-  mat = merge(mat,matmerge,by=c("name","bin1","bin2"))
-  mat = mat[,.(name,bin1,bin2,signal,signal.ref,signal.merged,
-               K=exp(dnorm(phihat,mean=0,sd=sqrt(sigmasq+prior.sd^2), log=T)+
-                        dnorm(phihat.ref,mean=0,sd=sqrt(sigmasq.ref+prior.sd^2), log=T)-
-                        dnorm(phihat.merged,mean=0,sd=sqrt(sigmasq.merged+prior.sd^2), log=T)),
-               #K=exp(dnorm(phihat-phihat.ref,mean=0,sd=sqrt(sigmasq+sigmasq.ref+prior.sd^2), log=T)-
-               #       dnorm(phihat-phihat.ref,mean=0,sd=sqrt(sigmasq+sigmasq.ref), log=T)),
+  #compare with reference and output
+  mat = mat[,.(name,bin1,bin2,
+               K=exp(dnorm(phihat-phihat.ref,mean=0,sd=sqrt(sigmasq+sigmasq.ref+prior.sd^2), log=T)-
+                      dnorm(phihat-phihat.ref,mean=0,sd=sqrt(sigmasq+sigmasq.ref), log=T)),
                difference=signal/signal.ref,
                difference.sd=(signal.sd*signal.ref-signal.sd.ref*signal)/(signal*signal.ref))]
   colname=paste0("prob.gt.",ref)
