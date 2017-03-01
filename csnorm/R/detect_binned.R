@@ -78,7 +78,8 @@ estimate_significant_differences_binned = function(cs, cts, groups, ref, thresho
   mat[,c(colname):=K/(1+K)]
   mat[,is.significant:=get(colname) > threshold]
   mat[,c("difference","difference.sd"):=list(signal/refsignal,(signal.sd*refsignal-refsignal.sd*signal)/(signal*refsignal))]
-  mat[,c("lpdm2","lpdms","K","signal","signal.sd","refsignal","refsignal.sd"):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
+  mat[,signal.ref:=refsignal]
+  mat[,c("lpdm2","lpdms","K","signal.sd","refsignal","refsignal.sd"):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
   mat
 }
 
@@ -134,26 +135,10 @@ csnorm_detect_binned = function(cs, resolution, group, ref="expected", threshold
   mat
 }
 
-#' Perform peak and differential detection through model comparison, irls approx
-#'
-#' @param cs 
-#' @param resolution 
-#' @param group 
-#' @param ref character. "expected" for interaction detection, the name of a group for difference detection.
-#' @param threshold on the probability K/(1+K) where K is the Bayes factor
-#' @param prior.sd 
-#' @param ncores 
-#' @param niter integer. Maximum number of IRLS iterations
-#' @param tol numeric. Convergence tolerance for IRLS objective
-#' @param verbose boolean.
-#'
-#' @return
+#' common calculation between interactions and differences
 #' @keywords internal
-#' @export
-#'
-#' @examples
-csnorm_detect_binned_irls = function(cs, resolution, group, ref="expected",
-                                     threshold=0.95, prior.sd=5, ncores=1, niter=100, tol=1e-3, verbose=T) {
+csnorm_detect_binned_common_irls = function(cs, resolution, group, ref="expected",
+                                            prior.sd=5, ncores=1, niter=100, tol=1e-3, verbose=T) {
   # get zeros per bin
   if (verbose==T) cat("   Get zeros per bin\n")
   zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores=ncores)
@@ -171,28 +156,130 @@ csnorm_detect_binned_irls = function(cs, resolution, group, ref="expected",
   }
   setkey(groups,name)
   cts = groups[cts]
-  cts[,name:=groupname]
-  #signal matrix
+  cts[,name:=NULL]
+  setnames(cts,"groupname","name")
+  #
+  if (ref != "expected") {
+    if (!(ref %in% groups[,groupname]))
+      stop("Reference group name not found! Valid names are: ",deparse(as.character(groups[,groupname])))
+    if (groups[groupname!=ref,.N]==0)
+      stop("There is no other group than ",ref, ", cannot compute differences!")
+  }
+  #interaction detection
   if (verbose==T) cat("   Detection\n")
   cts[,signal:=1]
   for (i in 1:niter) {
     cts[,c("z","var","signal.old"):=list(count/(signal*mu)-1,(1/(signal*mu)+1/init$alpha),signal)]
     cts[,phihat:=weighted.mean(z+log(signal), weight/var),by=c("name","bin1","bin2")]
     cts[,sigmasq:=1/sum(weight/var),by=c("name","bin1","bin2")]
-    cts[,signal:=exp(phihat/(1+2*sigmasq/prior.sd^2))]
+    cts[,signal:=exp(phihat/(1+sigmasq/prior.sd^2))]
     if(cts[,all(abs(signal-signal.old)<tol)]) break
   }
   if (i==niter) message("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
-  mat = cts[,.(K=exp(dnorm(phihat[1],mean=0,sd=sqrt(sigmasq[1]+prior.sd^2/2), log=T)-
-                      dnorm(phihat[1],mean=0,sd=sqrt(sigmasq[1]), log=T)),
-                signal.signif=signal[1],signal.signif.sd=sqrt(sigmasq[1])*signal[1],
-                binned=sum(count)),keyby=c("name","bin1","bin2")]
+  return(cts)
+}
+  
+#' Perform peak detection through model comparison, irls approx
+#'
+#' @param cs 
+#' @param resolution 
+#' @param group 
+#' @param threshold on the probability K/(1+K) where K is the Bayes factor
+#' @param prior.sd 
+#' @param ncores 
+#' @param niter integer. Maximum number of IRLS iterations
+#' @param tol numeric. Convergence tolerance for IRLS objective
+#' @param verbose boolean.
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+csnorm_detect_binned_interactions_irls = function(cs, resolution, group, threshold=0.95, prior.sd=5,
+                                                  ncores=1, niter=100, tol=1e-3, verbose=T) {
+  cts = csnorm_detect_binned_common_irls(cs, resolution, group, ref="expected", prior.sd=prior.sd,
+                                         ncores=ncores, niter=niter, tol=tol, verbose=verbose)
+  mat = cts[,.(K=exp(dnorm(phihat[1],mean=0,sd=sqrt(sigmasq[1]+prior.sd^2), log=T)-
+                     dnorm(phihat[1],mean=0,sd=sqrt(sigmasq[1]), log=T)),
+               signal.signif=signal[1],signal.signif.sd=sqrt(sigmasq[1])*signal[1],
+               binned=sum(count)),keyby=c("name","bin1","bin2")]
   mat[,direction:=ifelse(signal.signif>=1,"enriched","depleted")]
   mat[binned==0,c("signal.signif","signal.signif.sd","K","direction"):=list(0,NA,0,"depleted")]
   mat[,prob.gt.expected:=K/(1+K)]
   mat[,c("K","binned"):=list(NULL,NULL)]
   mat[,is.significant:=prob.gt.expected > threshold]
-  mat
+  return(mat)
+}
+
+#' Perform difference detection through model comparison, irls approx
+#'
+#' @param cs 
+#' @param resolution 
+#' @param group 
+#' @param ref character. The name of a reference group for difference detection.
+#' @param threshold on the probability K/(1+K) where K is the Bayes factor
+#' @param prior.sd 
+#' @param ncores 
+#' @param niter integer. Maximum number of IRLS iterations
+#' @param tol numeric. Convergence tolerance for IRLS objective
+#' @param verbose boolean.
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+csnorm_detect_binned_differences_irls = function(cs, resolution, group, ref, threshold=0.95, prior.sd=5,
+                                                  ncores=1, niter=100, tol=1e-3, verbose=T) {
+  #compute signals for each group separately
+  cts = csnorm:::csnorm_detect_binned_common_irls(cs, resolution, group, ref=ref, prior.sd=prior.sd,
+                                                  ncores=ncores, niter=niter, tol=tol, verbose=verbose)
+  mat = cts[,.(phihat=phihat[1],sigmasq=sigmasq[1],
+               signal=signal[1],signal.sd=sqrt(sigmasq[1])*signal[1],
+               binned=sum(count)),keyby=c("name","bin1","bin2")]
+  mat[binned==0,c("signal","signal.sd"):=list(0,NA)]
+  mat[,binned:=NULL]
+  mat=merge(mat[name!=ref],mat[name==ref],suffixes=c("",".ref"),by=c("bin1","bin2"))
+  mat[,name.ref:=NULL]
+  #
+  #compute signals by fusing each dataset with the reference
+  if (verbose==T) cat("   Difference detection\n")
+  ctsref = cts[name==ref]
+  ctsmerge = foreach(n=cts[name!=ref,unique(name)],.combine=rbind) %do% {
+    tmp=rbind(cts[name==n],ctsref)
+    tmp[,name:=n]
+  }
+  ctsmerge[,signal.merged:=1]
+  for (i in 1:niter) {
+    ctsmerge[,c("z","var","signal.merged.old"):=list(count/(signal.merged*mu)-1,
+                                                     1/(signal.merged*mu)+1/init$alpha,signal.merged)]
+    ctsmerge[,phihat.merged:=weighted.mean(z+log(signal.merged), weight/var),by=c("name","bin1","bin2")]
+    ctsmerge[,sigmasq.merged:=1/sum(weight/var),by=c("name","bin1","bin2")]
+    ctsmerge[,signal.merged:=exp(phihat.merged/(1+sigmasq.merged/prior.sd^2))]
+    if(ctsmerge[,all(abs(signal.merged-signal.merged.old)<tol)]) break
+  }
+  if (i==niter) message("Warning: Maximum number of IRLS iterations reached for merged signal estimation!\n")
+  #
+  matmerge = ctsmerge[,.(phihat.merged=phihat.merged[1],sigmasq.merged=sigmasq.merged[1],
+               signal.merged=signal.merged[1],signal.sd.merged=sqrt(sigmasq.merged[1])*signal.merged[1],
+               binned=sum(count)),keyby=c("name","bin1","bin2")]
+  matmerge[binned==0,c("signal.merged","signal.sd.merged"):=list(0,NA)]
+  matmerge[,binned:=NULL]
+  mat = merge(mat,matmerge,by=c("name","bin1","bin2"))
+  mat = mat[,.(name,bin1,bin2,signal,signal.ref,signal.merged,
+               K=exp(dnorm(phihat,mean=0,sd=sqrt(sigmasq+prior.sd^2), log=T)+
+                        dnorm(phihat.ref,mean=0,sd=sqrt(sigmasq.ref+prior.sd^2), log=T)-
+                        dnorm(phihat.merged,mean=0,sd=sqrt(sigmasq.merged+prior.sd^2), log=T)),
+               #K=exp(dnorm(phihat-phihat.ref,mean=0,sd=sqrt(sigmasq+sigmasq.ref+prior.sd^2), log=T)-
+               #       dnorm(phihat-phihat.ref,mean=0,sd=sqrt(sigmasq+sigmasq.ref), log=T)),
+               difference=signal/signal.ref,
+               difference.sd=(signal.sd*signal.ref-signal.sd.ref*signal)/(signal*signal.ref))]
+  colname=paste0("prob.gt.",ref)
+  mat[,c(colname):=K/(1+K)]
+  mat[,is.significant:=get(colname) > threshold]
+  mat[,c("direction","K"):=list(ifelse(difference>=1,"enriched","depleted"),NULL)]
+  return(mat)
 }
 
 
