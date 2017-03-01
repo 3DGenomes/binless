@@ -78,8 +78,7 @@ estimate_significant_differences_binned = function(cs, cts, groups, ref, thresho
   mat[,c(colname):=K/(1+K)]
   mat[,is.significant:=get(colname) > threshold]
   mat[,c("difference","difference.sd"):=list(signal/refsignal,(signal.sd*refsignal-refsignal.sd*signal)/(signal*refsignal))]
-  mat[,signal.ref:=refsignal]
-  mat[,c("lpdm2","lpdms","K","signal.sd","refsignal","refsignal.sd"):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
+  mat[,c("lpdm2","lpdms","K","signal","signal.sd","refsignal","refsignal.sd"):=list(NULL,NULL,NULL,NULL,NULL,NULL,NULL)]
   mat
 }
 
@@ -202,7 +201,7 @@ csnorm_detect_binned_interactions_irls = function(cs, resolution, group, thresho
                                          ncores=ncores, niter=niter, tol=tol, verbose=verbose)
   mat = cts[,.(K=exp(dnorm(phihat[1],mean=0,sd=sqrt(sigmasq[1]+prior.sd^2), log=T)-
                      dnorm(phihat[1],mean=0,sd=sqrt(sigmasq[1]), log=T)),
-               signal.signif=signal[1],signal.signif.sd=sqrt(sigmasq[1])*signal[1],
+               signal.signif=signal[1],signal.signif.sd=sqrt(1/(1/sigmasq[1]+1/prior.sd^2))*signal[1],
                binned=sum(count)),keyby=c("name","bin1","bin2")]
   mat[,direction:=ifelse(signal.signif>=1,"enriched","depleted")]
   mat[binned==0,c("signal.signif","signal.signif.sd","K","direction"):=list(0,NA,0,"depleted")]
@@ -246,8 +245,9 @@ csnorm_detect_binned_differences_irls = function(cs, resolution, group, ref, thr
   mat = mat[,.(name,bin1,bin2,
                K=exp(dnorm(phihat-phihat.ref,mean=0,sd=sqrt(sigmasq+sigmasq.ref+prior.sd^2), log=T)-
                       dnorm(phihat-phihat.ref,mean=0,sd=sqrt(sigmasq+sigmasq.ref), log=T)),
-               difference=signal/signal.ref,
-               difference.sd=(signal.sd*signal.ref-signal.sd.ref*signal)/(signal*signal.ref))]
+               difference=exp((phihat-phihat.ref)/(1+(sigmasq+sigmasq.ref)/prior.sd^2)),
+               difference.sd=sqrt(1/(1/(sigmasq+sigmasq.ref)+1/prior.sd^2)))]
+  mat[,difference.sd:=difference*difference.sd]
   colname=paste0("prob.gt.",ref)
   mat[,c(colname):=K/(1+K)]
   mat[,is.significant:=get(colname) > threshold]
