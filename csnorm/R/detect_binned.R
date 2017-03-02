@@ -164,6 +164,7 @@ csnorm_detect_binned_common_irls = function(cs, resolution, group, ref="expected
     if (groups[groupname!=ref,.N]==0)
       stop("There is no other group than ",ref, ", cannot compute differences!")
   }
+  setkeyv(cts,c("name","bin1","bin2"))
   return(cts)
 }
   
@@ -237,30 +238,48 @@ csnorm_detect_binned_differences_irls = function(cs, resolution, group, ref, thr
                                                   ncores=ncores, niter=niter, tol=tol, verbose=verbose)
   #difference detection
   if (verbose==T) cat("   Difference detection\n")
-  cts[,signal:=1]
+  #replicate reference counts for each case
+  ctsref = foreach(n=cts[name!=ref,unique(name)],.combine=rbind) %do%
+    cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
+  cts=cts[name!=ref]
+  mat=cts[,.(phi.ref=0,delta=0,diffsig=1),by=c("name","bin1","bin2")]
   for (i in 1:niter) {
-    cts[,c("z","var","signal.old"):=list(count/(signal*mu)-1,(1/(signal*mu)+1/init$alpha),signal)]
-    cts[,phihat:=weighted.mean(z+log(signal), weight/var),by=c("name","bin1","bin2")]
-    cts[,sigmasq:=1/sum(weight/var),by=c("name","bin1","bin2")]
-    cts[,signal:=exp(phihat/(1+sigmasq/prior.sd^2))]
-    if(cts[,all(abs(signal-signal.old)<tol)]) break
+    ctsref=mat[ctsref]
+    ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/init$alpha))]
+    mat=mat[ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
+                      sigmasq.ref=1/sum(weight/var)),keyby=c("name","bin1","bin2")]]
+    #
+    cts=mat[cts]
+    cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
+                            (1/(exp(phi.ref+delta)*mu)+1/init$alpha))]
+    mat=mat[cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
+                   sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
+    mat[,deltahat:=phihat-phihat.ref]
+    mat[,delta:=deltahat/(1+(sigmasq.ref+sigmasq)/prior.sd^2)]
+    mat[,diffsig.old:=diffsig]
+    mat[,diffsig:=exp(delta)]
+    if(mat[,all(abs(diffsig-diffsig.old)<tol)]) break
+    mat[,phi.ref:=(phihat.ref/sigmasq.ref + (phihat-delta)/sigmasq)/(1/sigmasq.ref+1/sigmasq)]
+    ctsref=ctsref[,.(name,bin1,bin2,count,mu,weight)]
+    cts=cts[,.(name,bin1,bin2,count,mu,weight)]
+    mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig,diffsig.old)]
   }
   if (i==niter) message("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
-  #put in matrix form
-  mat = cts[,.(phihat=phihat[1],sigmasq=sigmasq[1],
-               signal=signal[1],signal.sd=sqrt(sigmasq[1])*signal[1],
-               binned=sum(count)),keyby=c("name","bin1","bin2")]
-  mat[binned==0,c("signal","signal.sd"):=list(0,NA)]
-  mat[,binned:=NULL]
-  mat=merge(mat[name!=ref],mat[name==ref],suffixes=c("",".ref"),by=c("bin1","bin2"))
-  mat[,name.ref:=NULL]
-  #compare with reference and output
-  mat = mat[,.(name,bin1,bin2,
-               K=exp(dnorm(phihat-phihat.ref,mean=0,sd=sqrt(sigmasq+sigmasq.ref+prior.sd^2), log=T)-
-                      dnorm(phihat-phihat.ref,mean=0,sd=sqrt(sigmasq+sigmasq.ref), log=T)),
-               difference=exp((phihat-phihat.ref)/(1+(sigmasq+sigmasq.ref)/prior.sd^2)),
-               difference.sd=sqrt(1/(1/(sigmasq+sigmasq.ref)+1/prior.sd^2)))]
-  mat[,difference.sd:=difference*difference.sd]
+  #remove extra columns and compute Bayes factor
+  mat=mat[,.(name,bin1,bin2,difference=diffsig,
+             delta.sd=(sigmasq.ref+sigmasq)/(1+(sigmasq.ref+sigmasq)/prior.sd^2),
+             K=exp(dnorm(deltahat,mean=0,sd=sqrt(sigmasq+sigmasq.ref+prior.sd^2),log=T)-
+                   dnorm(deltahat,mean=0,sd=sqrt(sigmasq+sigmasq.ref),log=T)))]
+  mat[,difference.sd:=delta.sd*difference]
+  mat[,delta.sd:=NULL]
+  #treat limiting cases
+  mat=cts[,.(is.zero=sum(count)==0),by=c("name","bin1","bin2")][mat]
+  mat=ctsref[,.(is.zero.ref=sum(count)==0),by=c("name","bin1","bin2")][mat]
+  mat[is.zero==T,c("difference","difference.sd","K"):=list(0,NA,0)]
+  mat[is.zero.ref==T,c("difference","difference.sd","K"):=list(Inf,NA,Inf)]
+  mat[is.zero.ref==T&is.zero==T,c("difference","difference.sd","K"):=list(NA,NA,NA)]
+  mat[,c("is.zero","is.zero.ref"):=NULL]
+  #additional columns
   colname=paste0("prob.gt.",ref)
   mat[,c(colname):=K/(1+K)]
   mat[,is.significant:=get(colname) > threshold]
