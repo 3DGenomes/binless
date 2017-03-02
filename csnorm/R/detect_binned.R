@@ -264,13 +264,14 @@ csnorm_detect_binned_differences_irls = function(cs, resolution, group, ref, thr
 #'   identify the input matrices.
 #' @param threshold significance threshold, between 0 and 1
 #' @param ncores number of cores used for parallelization
+#' @param verbose boolean.
 #'   
 #' @return the binned matrix with additional information relating to these 
 #'   significant interactions
 #' @export
 #' 
 #' @examples
-detect_binned_interactions = function(cs, resolution, group, threshold=0.95, ncores=1){
+detect_binned_interactions = function(cs, resolution, group, threshold=0.95, ncores=1, verbose=T){
   #get CSmat object
   idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
@@ -279,7 +280,8 @@ detect_binned_interactions = function(cs, resolution, group, threshold=0.95, nco
   #check if interaction wasn't calculated already
   if (get_cs_interaction_idx(csm, type="interactions", threshold=threshold, ref="expected", raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
-  mat = csnorm_detect_binned(cs, resolution=resolution, group=group, ref="expected", threshold=threshold, ncores=ncores)
+  mat = csnorm_detect_binned_interactions_irls(cs, resolution, group, threshold=threshold,
+                                               ncores=ncores, verbose=verbose)
   csi=new("CSinter", mat=mat, type="interactions", threshold=threshold, ref="expected")
   #store back
   csm@interactions=append(csm@interactions,list(csi))
@@ -298,14 +300,15 @@ detect_binned_interactions = function(cs, resolution, group, threshold=0.95, nco
 #' @export
 #' 
 #' @examples
-detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95, ncores=1){
+detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95, ncores=1, verbose=T){
   idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
   idx2=get_cs_matrix_idx(csb, group, raise=T)
   csm=csb@grouped[[idx2]]
   if (get_cs_interaction_idx(csm, type="differences", threshold=threshold, ref=ref, raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
-  mat = csnorm_detect_binned(cs, resolution=resolution, group=group, ref=ref, threshold=threshold, ncores=ncores)
+  mat = csnorm_detect_binned_differences_irls(cs, resolution, group, ref=ref, threshold=threshold,
+                                              ncores=ncores, verbose=verbose)
   csi=new("CSinter", mat=mat, type="differences", threshold=threshold, ref=ref)
   #add interaction to cs object
   csm@interactions=append(csm@interactions,list(csi))
