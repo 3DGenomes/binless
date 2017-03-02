@@ -164,17 +164,6 @@ csnorm_detect_binned_common_irls = function(cs, resolution, group, ref="expected
     if (groups[groupname!=ref,.N]==0)
       stop("There is no other group than ",ref, ", cannot compute differences!")
   }
-  #interaction detection
-  if (verbose==T) cat("   Detection\n")
-  cts[,signal:=1]
-  for (i in 1:niter) {
-    cts[,c("z","var","signal.old"):=list(count/(signal*mu)-1,(1/(signal*mu)+1/init$alpha),signal)]
-    cts[,phihat:=weighted.mean(z+log(signal), weight/var),by=c("name","bin1","bin2")]
-    cts[,sigmasq:=1/sum(weight/var),by=c("name","bin1","bin2")]
-    cts[,signal:=exp(phihat/(1+sigmasq/prior.sd^2))]
-    if(cts[,all(abs(signal-signal.old)<tol)]) break
-  }
-  if (i==niter) message("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
   return(cts)
 }
   
@@ -199,6 +188,18 @@ csnorm_detect_binned_interactions_irls = function(cs, resolution, group, thresho
                                                   ncores=1, niter=100, tol=1e-3, verbose=T) {
   cts = csnorm_detect_binned_common_irls(cs, resolution, group, ref="expected", prior.sd=prior.sd,
                                          ncores=ncores, niter=niter, tol=tol, verbose=verbose)
+  #interaction detection
+  if (verbose==T) cat("   Interaction detection\n")
+  cts[,signal:=1]
+  for (i in 1:niter) {
+    cts[,c("z","var","signal.old"):=list(count/(signal*mu)-1,(1/(signal*mu)+1/init$alpha),signal)]
+    cts[,phihat:=weighted.mean(z+log(signal), weight/var),by=c("name","bin1","bin2")]
+    cts[,sigmasq:=1/sum(weight/var),by=c("name","bin1","bin2")]
+    cts[,signal:=exp(phihat/(1+sigmasq/prior.sd^2))]
+    if(cts[,all(abs(signal-signal.old)<tol)]) break
+  }
+  if (i==niter) message("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
+  #put in matrix form
   mat = cts[,.(K=exp(dnorm(phihat[1],mean=0,sd=sqrt(sigmasq[1]+prior.sd^2), log=T)-
                      dnorm(phihat[1],mean=0,sd=sqrt(sigmasq[1]), log=T)),
                signal.signif=signal[1],signal.signif.sd=sqrt(1/(1/sigmasq[1]+1/prior.sd^2))*signal[1],
@@ -234,6 +235,18 @@ csnorm_detect_binned_differences_irls = function(cs, resolution, group, ref, thr
   #compute signals for each group separately
   cts = csnorm:::csnorm_detect_binned_common_irls(cs, resolution, group, ref=ref, prior.sd=prior.sd,
                                                   ncores=ncores, niter=niter, tol=tol, verbose=verbose)
+  #difference detection
+  if (verbose==T) cat("   Difference detection\n")
+  cts[,signal:=1]
+  for (i in 1:niter) {
+    cts[,c("z","var","signal.old"):=list(count/(signal*mu)-1,(1/(signal*mu)+1/init$alpha),signal)]
+    cts[,phihat:=weighted.mean(z+log(signal), weight/var),by=c("name","bin1","bin2")]
+    cts[,sigmasq:=1/sum(weight/var),by=c("name","bin1","bin2")]
+    cts[,signal:=exp(phihat/(1+sigmasq/prior.sd^2))]
+    if(cts[,all(abs(signal-signal.old)<tol)]) break
+  }
+  if (i==niter) message("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
+  #put in matrix form
   mat = cts[,.(phihat=phihat[1],sigmasq=sigmasq[1],
                signal=signal[1],signal.sd=sqrt(sigmasq[1])*signal[1],
                binned=sum(count)),keyby=c("name","bin1","bin2")]
