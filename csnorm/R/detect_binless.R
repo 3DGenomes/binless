@@ -19,13 +19,13 @@ estimate_binless_common = function(cs, cts, groups) {
 #' @keywords internal
 estimate_binless_common_irls = function(cs, resolution, group, ref="expected", ncores=1, verbose=T) {
   # get zeros per bin
-  if (verbose==T) cat("   Get zeros per bin\n")
+  if (verbose==T) cat("  Get zeros per bin\n")
   zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores=ncores)
   # predict means
-  if (verbose==T) cat("   Predict means\n")
+  if (verbose==T) cat("  Predict means\n")
   cts = csnorm:::csnorm_predict_binned_muhat_irls(cs, resolution, zeros)
   # group
-  if (verbose==T) cat("   Group\n")
+  if (verbose==T) cat("  Group\n")
   if (group=="all") {
     names=cs@experiments[,unique(name)]
     groups=data.table(name=names,groupname=names)
@@ -65,12 +65,13 @@ estimate_binless_signal = function(cs, cts, groups, mat) {
 estimate_binless_signal_irls = function(cs, resolution, group, mat, verbose=T) {
   cts=csnorm:::estimate_binless_common_irls(cs, resolution, group, ref="expected",
                                        ncores=ncores, verbose=verbose)
-  if (verbose==T) cat("   Phi\n")
-  cts=mat[,.(name,bin1,bin2,phi)][cts,,on=c("name","bin1","bin2")]
+  if (verbose==T) cat("  Phi\n")
+  if (is.null(mat)) mat=cts[,.(phi=0,signal=1),by=c("name","bin1","bin2")]
+  cts=mat[,.(name,bin1,bin2,phi,signal)][cts,,on=c("name","bin1","bin2")]
   cts[,c("z","var"):=list(count/(exp(phi)*mu)-1,(1/(exp(phi)*mu)+1/init$alpha))]
   ret=cts[,.(phihat=weighted.mean(z+phi, weight/var),
-             var=1/sum(weight/var),ncounts=sum(weight)),by=c("name","bin1","bin2","phi")]
-  ret[,value:=phihat/sqrt(var)]
+             phihat.sd=sqrt(1/sum(weight/var)),ncounts=sum(weight)),by=c("name","bin1","bin2","phi","signal")]
+  ret[,value:=phihat/phihat.sd]
   return(ret)
 }
 
@@ -93,11 +94,12 @@ estimate_binless_differential = function(cs, cts, groups, mat, ref) {
 estimate_binless_differential_irls = function(cs, resolution, group, mat, ref, verbose=T) {
   cts=csnorm:::estimate_binless_common_irls(cs, resolution, group, ref=ref,
                                             ncores=ncores, verbose=verbose)
-  if (verbose==T) cat("   Delta\n")
+  if (verbose==T) cat("  Delta\n")
   ctsref = foreach(n=cts[name!=ref,unique(name)],.combine=rbind) %do%
     cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
   cts=cts[name!=ref]
-  #mat=cts[,.(phi.ref=0,delta=0,diffsig=1),by=c("name","bin1","bin2")]
+  #
+  if (is.null(mat)) mat=cts[,.(phi.ref=0,delta=0,diffsig=1,ncounts=sum(weight)),by=c("name","bin1","bin2")]
   ctsref=mat[ctsref]
   ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/init$alpha))]
   mat=mat[ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
@@ -138,26 +140,26 @@ flsa_compute_connectivity = function(nbins, start=0) {
 #' @keywords internal
 flsa_cross_validate = function(mat, res.cv, cvgroups, lambda1, lambda2) {
   #compute coefficients on each model
-  submat.all = mat[,.(groupname,ibin1,ibin2,ncounts, value.ref=value)]
+  submat.all = mat[,.(name,bin1,bin2,ncounts, value.ref=value)]
   #compute cv coefs for each group, given lambda
   submat.cv = foreach(cv=cvgroups, .combine=rbind) %do% {
-    ret = mat[,.(groupname,cv.group,ibin1,ibin2)]
+    ret = mat[,.(name,cv.group,bin1,bin2)]
     if (lambda1>0) {
-      ret[,value:=flsaGetSolution(res.cv[[cv]][[as.character(groupname[1])]],
-                                        lambda1=lambda1, lambda2=lambda2)[1,1,],by=groupname]
+      ret[,value:=flsaGetSolution(res.cv[[cv]][[as.character(name[1])]],
+                                        lambda1=lambda1, lambda2=lambda2)[1,1,],by=name]
     } else {
-      ret[,value:=flsaGetSolution(res.cv[[cv]][[as.character(groupname[1])]],
-                                        lambda1=lambda1, lambda2=lambda2)[1,],by=groupname]
+      ret[,value:=flsaGetSolution(res.cv[[cv]][[as.character(name[1])]],
+                                        lambda1=lambda1, lambda2=lambda2)[1,],by=name]
     }
     ret[cv.group==cv]
   }
   #ggplot(submat.cv)+geom_raster(aes(ibin1,ibin2,fill=value))+facet_grid(groupname~cv.group)
-  #ggplot(submat.all)+geom_raster(aes(ibin1,ibin2,fill=value.ref))+facet_grid(~groupname)#+scale_fill_gradient2()
-  ret=merge(submat.cv, submat.all, all.x=T, by=c("groupname","ibin1","ibin2"), sort=F)
+  #ggplot(submat.all)+geom_raster(aes(ibin1,ibin2,fill=value.ref))+facet_grid(~name)#+scale_fill_gradient2()
+  ret=merge(submat.cv, submat.all, all.x=T, by=c("name","bin1","bin2"), sort=F)
   ret[,mse:=ncounts*(value-value.ref)^2]
-  ret=ret[,.(mse=mean(mse),ncounts=.N),by=c("groupname","cv.group")]
-  ret=ret[,.(mse=weighted.mean(mse,ncounts),mse.sd=sd(mse)),by=groupname]
-  ret[,.(groupname,lambda1=lambda1,lambda2=lambda2,mse,mse.sd)]
+  ret=ret[,.(mse=mean(mse),ncounts=.N),by=c("name","cv.group")]
+  ret=ret[,.(mse=weighted.mean(mse,ncounts),mse.sd=sd(mse)),by=name]
+  ret[,.(name,lambda1=lambda1,lambda2=lambda2,mse,mse.sd)]
 }
 
 #' connectivity on a triangle
@@ -239,6 +241,75 @@ detect_binless_patches = function(mat) {
   return(mat)
 }
 
+#' run fused lasso on each dataset contained in mat, fusing 'value'
+#' 
+#' finds optimal lambda2 through k-fold cv. Uses lambda1=0
+#' @keywords internal
+csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
+  if (verbose==T) cat("  estimation runs\n")
+  groupnames=mat[,as.character(unique(name))]
+  cmat = csnorm:::flsa_compute_connectivity(mat[,nlevels(bin1)])
+  res.ref = foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
+    submat=mat[name==g]
+    stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
+    flsa(submat[,value], connListObj=cmat, verbose=F)
+  }
+  #fail if any has failed (flsa bugs)
+  if (any(sapply(res.ref, is.null))) stop("one flsa run failed, aborting")
+  #cross-validate lambda2 (lambda1=0 gives good results)
+  mat[,cv.group:=as.character(((unclass(bin2)+unclass(bin1)*max(unclass(bin1)))%%cv.fold)+1)]
+  cvgroups=as.character(1:cv.fold)
+  #first, run lasso regressions
+  if (verbose==T) cat("  cross-validation runs\n")
+  res.cv = foreach (cv=cvgroups, .final=function(x){setNames(x,cvgroups)}) %:%
+    foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
+      submat=copy(mat[name==g])
+      submat[cv.group==cv,value:=0]
+      stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
+      flsa(submat[,value], connListObj=cmat, verbose=F)
+    }
+  #remove failed cv attempts (flsa bugs)
+  cvgroups = foreach(cv=cvgroups, .combine=c) %do% {
+    if (any(sapply(res.cv[[cv]], is.null)))
+      cat("removing CV group ",cv," due to failure of flsa!\n")
+    else
+      cv
+  }
+  #then, try a few lambda values to define the interesting region
+  if (verbose==T) cat("  coarse scan\n")
+  cv = foreach (g=groupnames, .combine=rbind) %do% {
+    l2vals=c(0,10^seq(log10(min(res.ref[[g]]$EndLambda)),log10(max(res.ref[[g]]$BeginLambda)),length.out=cv.gridsize))
+    foreach (lambda2=l2vals, .combine=rbind) %dopar%
+      csnorm:::flsa_cross_validate(mat[name==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
+  }
+  #ggplot(cv)+geom_line(aes(lambda2,mse))+geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
+  #  facet_wrap(~name,scales="free")+scale_x_log10()
+  #lower bound is lambda one step below minimum mse
+  bounds=merge(cv,cv[,.SD[mse==min(mse),.(lambda2.max=lambda2)],by=name],by="name")
+  lmin=bounds[lambda2<lambda2.max,.(l2min=max(lambda2)),by=name]
+  #upper bound is lambda one step above mse
+  lmax=bounds[,.SD[lambda2>lambda2.max,.(l2max=min(lambda2))],by=name]
+  bounds=merge(lmin,lmax,by="name", all=T)
+  bounds[,l2max:=pmin(l2max, sapply(as.character(name),FUN=function(g){max(res.ref[[g]]$BeginLambda)}), na.rm=T)]
+  #
+  #now, try all lambda values between these bounds
+  if (verbose==T) cat("  fine scan\n")
+  cv = foreach (g=groupnames, .combine=rbind) %do% {
+    l2vals=sort(unique(res.ref[[g]]$BeginLambda))
+    l2vals=bounds[name==g,l2vals[l2vals>=l2min & l2vals<=l2max]]
+    foreach (lambda2=l2vals, .combine=rbind) %dopar%
+      csnorm:::flsa_cross_validate(mat[name==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
+  }
+  #ggplot(cv)+geom_line(aes(lambda2,mse))+#geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
+  #  facet_wrap(~name,scales="free")
+  #determine optimal lambda value and compute coefficients
+  if (verbose==T) cat("  report optimum\n")
+  l2vals=cv[,.SD[mse==min(mse),.(lambda2)],by=name]
+  for (g in groupnames)
+    mat[name==g,value:=flsaGetSolution(res.ref[[g]], lambda1=0, lambda2=l2vals[name==g,lambda2])[1,]]
+  return(mat)
+}
+
 #' Perform binless interaction detection using fused lasso
 #'
 #' @param cs 
@@ -255,128 +326,42 @@ detect_binless_patches = function(mat) {
 #' @export
 #'
 #' @examples
-csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=1, ncores=1, cv.fold=10, cv.gridsize=30) {
-  cat("Binless detection with resolution=",resolution," group=",group," and ref=",ref,"\n")
-  stuff = csnorm:::bin_and_chunk(cs, resolution, group, ncores)
-  chunks=stuff$chunks
-  counts=stuff$counts
-  biases=stuff$biases
-  groups=stuff$groups
-  if (ref != "expected") {
-    if (!(ref %in% groups[,groupname]))
-      stop("Reference group name not found! Valid names are: ",deparse(as.character(groups[,groupname])))
-    if (groups[groupname!=ref,.N]==0)
-      stop("There is no other group than ",ref, ", cannot compute differences!")
-  }
-  #fused lasso loop
-  registerDoParallel(cores=ncores)
-  if (ref=="expected") {
-    mat = biases[,CJ(groupname=groups[,unique(groupname)],
-                   ibin1=min(ibin):max(ibin),ibin2=min(ibin):max(ibin))][ibin1<=ibin2]
-    mat[,phi:=0]
-  } else {
-    mat = biases[,CJ(groupname=groups[groupname!=ref,unique(groupname)],
-                     ibin1=min(ibin):max(ibin),ibin2=min(ibin):max(ibin))][ibin1<=ibin2]
-    mat[,delta:=0]  
-  }
+csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=10, tol=1e-3, ncores=1,
+                                 cv.fold=10, cv.gridsize=30, verbose=T) {
+  if (verbose==T) cat("Binless detection with resolution=",resolution," group=",group," and ref=",ref,"\n")
+  mat=NULL
   for (step in 1:niter) {
-    cat("Main loop, step ",step,"\n")
-    cat(" Estimate raw signal\n")
-    #compute signal matrix and new weights in parallel
-    mat = foreach (i=chunks[,V1],j=chunks[,V2], .combine=rbind) %dopar% {
-      #get zero-filled portion of counts and predict model on it
-      cts=counts[chunk1==i&chunk2==j,.(name,id1,id2,pos1,pos2,contact.close,contact.down,contact.far,contact.up,distance)]
-      biases1=biases[chunk==i] #just needed to fill the counts matrix
-      biases2=biases[chunk==j]
-      if (biases1[,.N]>0 & biases2[,.N]>0) {
-        cts=fill_zeros(cts,biases1,biases2,circularize=cs@settings$circularize,dmin=cs@settings$dmin)
-        cts=merge(cts,biases1[,.(name,id,pos,bin,ibin)],by.x=c("name","id1","pos1"),by.y=c("name","id","pos"))
-        cts=merge(cts,biases2[,.(name,id,pos,bin,ibin)],by.x=c("name","id2","pos2"),by.y=c("name","id","pos"),suffixes=c("1","2"))
-        if (cts[,.N]>0) {
-          if (ref=="expected")
-            csnorm:::estimate_binless_signal(cs, cts, groups, mat)
-          else
-            csnorm:::estimate_binless_differential(cs, cts, groups, mat, ref)
-        }
-      }
-    }
-    setkey(mat,groupname,ibin1,ibin2,bin1,bin2)
-    #
-    #perform fused lasso on whole dataset
-    cat(" Fused lasso: estimation runs\n")
-    groupnames=groups[,levels(groupname)]
-    if (ref!="expected") groupnames=groupnames[groupnames!=ref]
-    cmat = csnorm:::flsa_compute_connectivity(mat[,max(ibin2)+1])
-    res.ref = foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
-      submat=mat[groupname==g]
-      stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
-      flsa(submat[,value], connListObj=cmat, verbose=F)
-    }
-    #fail if any has failed (flsa bugs)
-    if (any(sapply(res.ref, is.null))) stop("one flsa run failed, aborting")
-    #cross-validate lambda2 (lambda1=0 gives good results)
-    mat[,cv.group:=as.character(((ibin2+ibin1*max(ibin1))%%cv.fold)+1)]
-    cvgroups=as.character(1:cv.fold)
-    #first, run lasso regressions
-    cat(" Fused lasso: cross-validation runs\n")
-    res.cv = foreach (cv=cvgroups, .final=function(x){setNames(x,cvgroups)}) %:%
-      foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
-        submat=copy(mat[groupname==g])
-        submat[cv.group==cv,value:=0]
-        stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
-        flsa(submat[,value], connListObj=cmat, verbose=F)
-      }
-    #remove failed cv attempts (flsa bugs)
-    cvgroups = foreach(cv=cvgroups, .combine=c) %do% {
-      if (any(sapply(res.cv[[cv]], is.null)))
-        cat("removing CV group ",cv," due to failure of flsa!\n")
-      else
-        cv
-    }
-    #then, try a few lambda values to define the interesting region
-    cat(" Fused lasso: coarse scan\n")
-    cv = foreach (g=groupnames, .combine=rbind) %do% {
-      l2vals=c(0,10^seq(log10(min(res.ref[[g]]$EndLambda)),log10(max(res.ref[[g]]$BeginLambda)),length.out=cv.gridsize))
-      foreach (lambda2=l2vals, .combine=rbind) %dopar%
-        csnorm:::flsa_cross_validate(mat[groupname==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
-    }
-    #ggplot(cv)+geom_line(aes(lambda2,mse))+geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
-    #  facet_wrap(~groupname,scales="free")+scale_x_log10()
-    #lower bound is lambda one step below minimum mse
-    bounds=merge(cv,cv[,.SD[mse==min(mse),.(lambda2.max=lambda2)],by=groupname],by="groupname")
-    lmin=bounds[lambda2<lambda2.max,.(l2min=max(lambda2)),by=groupname]
-    #upper bound is lambda one step above mse
-    lmax=bounds[,.SD[lambda2>lambda2.max,.(l2max=min(lambda2))],by=groupname]
-    bounds=merge(lmin,lmax,by="groupname", all=T)
-    bounds[,l2max:=pmin(l2max, sapply(as.character(groupname),FUN=function(g){max(res.ref[[g]]$BeginLambda)}), na.rm=T)]
-    #
-    #now, try all lambda values between these bounds
-    cat(" Fused lasso: fine scan\n")
-    cv = foreach (g=groupnames, .combine=rbind) %do% {
-      l2vals=sort(unique(res.ref[[g]]$BeginLambda))
-      l2vals=bounds[groupname==g,l2vals[l2vals>=l2min & l2vals<=l2max]]
-      foreach (lambda2=l2vals, .combine=rbind) %dopar%
-        csnorm:::flsa_cross_validate(mat[groupname==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
-    }
-    #ggplot(cv)+geom_line(aes(lambda2,mse))+#geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
-    #  facet_wrap(~groupname,scales="free")
-    #determine optimal lambda value and compute coefficients
-    cat(" Fused lasso: report optimum\n")
-    l2vals=cv[,.SD[mse==min(mse),.(lambda2)],by=groupname]
-    for (g in groupnames)
-      mat[groupname==g,value:=flsaGetSolution(res.ref[[g]], lambda1=0, lambda2=l2vals[groupname==g,lambda2])[1,]]
+    if (verbose==T) cat("Main loop, step ",step,"\n")
+    if (verbose==T) cat(" Estimate raw signal\n")
     if (ref=="expected") {
-      mat[,c("cv.group","phi"):=list(NULL,value*sqrt(var))]
+      mat = csnorm:::estimate_binless_signal_irls(cs, resolution, group, mat, verbose)
     } else {
-      mat[,c("cv.group","delta"):=list(NULL,value*sqrt(var))]
+      mat = csnorm:::estimate_binless_differential_irls(cs, resolution, group, mat, ref, verbose)
     }
-    #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~groupname)+scale_fill_gradient2(na.value = "white")
-    mat
+    setkey(mat,name,bin1,bin2)
+    #
+    #perform fused lasso on signal to noise
+    if (verbose==T) cat(" Fused lasso\n")
+    mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, cv.gridsize=cv.gridsize)
+    #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~name)+scale_fill_gradient2(na.value = "white")
+    #
+    #convert back value to the actual signal
+    if (ref=="expected") {
+      mat[,c("cv.group","phi"):=list(NULL,value*phihat.sd)]
+      mat[,signal.old:=signal]
+      mat[,signal:=exp(phi)]
+      mat=mat[,.(name,bin1,bin2,phi,signal,signal.old,ncounts,value)]
+      if(mat[,all(abs(signal-signal.old)<tol)]) break
+    } else {
+      mat[,c("cv.group","delta"):=list(NULL,value*deltahat.sd)]
+      mat[,diffsig.old:=diffsig]
+      mat[,diffsig:=exp(delta)]
+      mat[,phi.ref:=(phihat.ref/sigmasq.ref + (phihat-delta)/sigmasq)/(1/sigmasq.ref+1/sigmasq)]
+      mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig,diffsig.old,ncounts,value)]
+      if(mat[,all(abs(diffsig-diffsig.old)<tol)]) break
+    }
   }
-  mat[,c("ibin1","ibin2","ncounts"):=list(NULL,NULL,NULL)]
-  setnames(mat,"groupname","name")
-  counts[,c("bin1","bin2","ibin1","ibin2","chunk1","chunk2"):=list(NULL,NULL,NULL,NULL,NULL,NULL)]
-  biases[,c("bin","ibin","chunk"):=list(NULL,NULL,NULL)]
+  mat[,ncounts:=NULL]
   mat = csnorm:::detect_binless_patches(mat)
   return(mat)
 }
