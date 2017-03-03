@@ -15,6 +15,39 @@ estimate_binless_common = function(cs, cts, groups) {
   return(cts)
 }
 
+#' common calculation between interactions and differences
+#' @keywords internal
+estimate_binless_common_irls = function(cs, resolution, group, ref="expected", ncores=1, verbose=T) {
+  # get zeros per bin
+  if (verbose==T) cat("   Get zeros per bin\n")
+  zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores=ncores)
+  # predict means
+  if (verbose==T) cat("   Predict means\n")
+  cts = csnorm:::csnorm_predict_binned_muhat_irls(cs, resolution, zeros)
+  # group
+  if (verbose==T) cat("   Group\n")
+  if (group=="all") {
+    names=cs@experiments[,unique(name)]
+    groups=data.table(name=names,groupname=names)
+  } else {
+    groups=cs@experiments[,.(name,groupname=do.call(paste,mget(group))),by=group][,.(name,groupname)] #we already know groupname is unique
+    groups[,groupname:=ordered(groupname)] #same class as name
+  }
+  setkey(groups,name)
+  cts = groups[cts]
+  cts[,name:=NULL]
+  setnames(cts,"groupname","name")
+  #
+  if (ref != "expected") {
+    if (!(ref %in% groups[,groupname]))
+      stop("Reference group name not found! Valid names are: ",deparse(as.character(groups[,groupname])))
+    if (groups[groupname!=ref,.N]==0)
+      stop("There is no other group than ",ref, ", cannot compute differences!")
+  }
+  setkeyv(cts,c("name","bin1","bin2"))
+  return(cts)
+}
+
 #' group counts to compute signal by cross-validated lasso
 #' @keywords internal
 estimate_binless_signal = function(cs, cts, groups, mat) {
@@ -23,6 +56,20 @@ estimate_binless_signal = function(cs, cts, groups, mat) {
   cts[,phihat:=(count/exp(log_mean)-1+phi)]
   ret=cts[,.(phihat=weighted.mean(phihat,1/var),var=1/sum(1/var),ncounts=.N),
           by=c("groupname","ibin1","ibin2","bin1","bin2","phi")]
+  ret[,value:=phihat/sqrt(var)]
+  return(ret)
+}
+
+#' group counts to compute signal by cross-validated lasso
+#' @keywords internal
+estimate_binless_signal_irls = function(cs, resolution, group, mat, verbose=T) {
+  cts=csnorm:::estimate_binless_common_irls(cs, resolution, group, ref="expected",
+                                       ncores=ncores, verbose=verbose)
+  if (verbose==T) cat("   Phi\n")
+  cts=mat[,.(name,bin1,bin2,phi)][cts,,on=c("name","bin1","bin2")]
+  cts[,c("z","var"):=list(count/(exp(phi)*mu)-1,(1/(exp(phi)*mu)+1/init$alpha))]
+  ret=cts[,.(phihat=weighted.mean(z+phi, weight/var),
+             var=1/sum(weight/var),ncounts=sum(weight)),by=c("name","bin1","bin2","phi")]
   ret[,value:=phihat/sqrt(var)]
   return(ret)
 }
@@ -39,6 +86,31 @@ estimate_binless_differential = function(cs, cts, groups, mat, ref) {
   ret[,c("deltahat","var"):=list(delta + zhat-zhat.ref,var+var.ref)]
   ret[,c("value","zhat","zhat.ref","var.ref"):=list(deltahat/sqrt(var),NULL,NULL)]
   return(ret)
+}
+
+#' group counts to compute signal by cross-validated lasso
+#' @keywords internal
+estimate_binless_differential_irls = function(cs, resolution, group, mat, ref, verbose=T) {
+  cts=csnorm:::estimate_binless_common_irls(cs, resolution, group, ref=ref,
+                                            ncores=ncores, verbose=verbose)
+  if (verbose==T) cat("   Delta\n")
+  ctsref = foreach(n=cts[name!=ref,unique(name)],.combine=rbind) %do%
+    cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
+  cts=cts[name!=ref]
+  #mat=cts[,.(phi.ref=0,delta=0,diffsig=1),by=c("name","bin1","bin2")]
+  ctsref=mat[ctsref]
+  ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/init$alpha))]
+  mat=mat[ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
+                    sigmasq.ref=1/sum(weight/var)),keyby=c("name","bin1","bin2")]]
+  #
+  cts=mat[cts]
+  cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
+                          (1/(exp(phi.ref+delta)*mu)+1/init$alpha))]
+  mat=mat[cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
+                 sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
+  mat[,c("deltahat","deltahat.sd"):=list(phihat-phihat.ref,sqrt(sigmasq+sigmasq.ref))]
+  mat[,value:=deltahat/deltahat.sd]
+  return(mat)
 }
 
 #' connectivity on a triangle
