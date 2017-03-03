@@ -373,7 +373,8 @@ plot_binless_matrix = function(mat, minima=F) {
 #' @export
 #' 
 #' @examples
-detect_binless_interactions = function(cs, resolution, group, ncores=1){
+detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol=1e-3,
+                                       cv.fold=10, cv.gridsize=30, verbose=T){
   #get CSmat object
   idx1=get_cs_binned_idx(cs, resolution, raise=T)
   csb=cs@binned[[idx1]]
@@ -382,7 +383,8 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1){
   #check if interaction wasn't calculated already
   if (get_cs_interaction_idx(csm, type="binteractions", threshold=-1, ref="expected", raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
-  mat = csnorm_detect_binless(cs, resolution=resolution, group=group, ref="expected", ncores=ncores)
+  mat = csnorm_detect_binless(cs, resolution=resolution, group=group, ref="expected", ncores=ncores,
+                              niter=niter, tol=tol, cv.fold=cv.fold, cv.gridsize=cv.gridsize, verbose=verbose)
   csi=new("CSinter", mat=mat, type="binteractions", threshold=-1, ref="expected")
   #store back
   csm@interactions=append(csm@interactions,list(csi))
