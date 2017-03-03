@@ -191,7 +191,7 @@ csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100
              ,keyby=c("name","bin1","bin2")]
   #normalized matrix
   if (verbose==T) cat("   'Normalized' matrix\n")
-  cts[,normalized:=1]
+  cts[,normalized:=decay]
   for (i in 1:niter) {
     cts[,c("z","var","normalized.old"):=list(count/(normalized*mu/decay)-1,
                                              (1/(normalized*mu/decay)+1/init$alpha),normalized)]
