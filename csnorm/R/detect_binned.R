@@ -58,6 +58,7 @@ csnorm_detect_binned_interactions_irls = function(cs, resolution, group, thresho
                                          ncores=ncores, niter=niter, tol=tol, verbose=verbose)
   #interaction detection
   if (verbose==T) cat("   Interaction detection\n")
+  init=cs@par
   cts[,signal:=1]
   for (i in 1:niter) {
     cts[,c("z","var","signal.old"):=list(count/(signal*mu)-1,(1/(signal*mu)+1/init$alpha),signal)]
@@ -105,6 +106,7 @@ csnorm_detect_binned_differences_irls = function(cs, resolution, group, ref, thr
                                                   ncores=ncores, niter=niter, tol=tol, verbose=verbose)
   #difference detection
   if (verbose==T) cat("   Difference detection\n")
+  init=cs@par
   #replicate reference counts for each case
   ctsref = foreach(n=cts[name!=ref,unique(name)],.combine=rbind) %do%
     cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]

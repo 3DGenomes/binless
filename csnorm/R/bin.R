@@ -168,6 +168,7 @@ csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100
   cts[,name:=groupname]
   #matrices
   if (verbose==T) cat("   Other matrices\n")
+  init=cs@par
   mat=cts[,.(ncounts=sum(weight),
              observed=sum(count*weight),
              expected=sum(mu*weight),

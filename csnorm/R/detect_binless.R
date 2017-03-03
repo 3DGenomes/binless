@@ -40,6 +40,7 @@ estimate_binless_signal_irls = function(cs, resolution, group, mat, verbose=T) {
   cts=csnorm:::estimate_binless_common_irls(cs, resolution, group, ref="expected",
                                        ncores=ncores, verbose=verbose)
   if (verbose==T) cat("  Phi\n")
+  init=cs@par
   if (is.null(mat)) mat=cts[,.(phi=0,signal=1),by=c("name","bin1","bin2")]
   cts=mat[,.(name,bin1,bin2,phi,signal)][cts,,on=c("name","bin1","bin2")]
   cts[,c("z","var"):=list(count/(exp(phi)*mu)-1,(1/(exp(phi)*mu)+1/init$alpha))]
@@ -55,6 +56,7 @@ estimate_binless_differential_irls = function(cs, resolution, group, mat, ref, v
   cts=csnorm:::estimate_binless_common_irls(cs, resolution, group, ref=ref,
                                             ncores=ncores, verbose=verbose)
   if (verbose==T) cat("  Delta\n")
+  init=cs@par
   ctsref = foreach(n=cts[name!=ref,unique(name)],.combine=rbind) %do%
     cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
   cts=cts[name!=ref]
