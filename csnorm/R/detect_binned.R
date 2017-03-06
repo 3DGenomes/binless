@@ -10,7 +10,7 @@ csnorm_detect_binned_common_irls = function(cs, resolution, group, ref="expected
   zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores=ncores)
   # predict means
   if (verbose==T) cat("   Predict means\n")
-  cts = csnorm:::csnorm_predict_binned_muhat_irls(cs, resolution, zeros)
+  cts = csnorm:::csnorm_predict_binned_counts_irls(cs, resolution, zeros)
   # group
   if (verbose==T) cat("   Group\n")
   if (group=="all") {

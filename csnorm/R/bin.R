@@ -89,7 +89,7 @@ get_nzeros_binning = function(cs, resolution, ncores=1) {
 
 #' Predict approximate mean for zero and positive counts at a given binning
 #' @keywords internal
-csnorm_predict_binned_muhat_irls = function(cs, resolution, zeros) {
+csnorm_predict_binned_counts_irls = function(cs, resolution, zeros) {
   ### predict exact means for positive counts
   init=cs@par
   cpos=copy(cs@counts)
@@ -137,13 +137,12 @@ csnorm_predict_binned_muhat_irls = function(cs, resolution, zeros) {
   return(cts)
 }
 
-#' Perform peak and differential detection through model comparison
+#' Perform binning of data
 #' 
 #' fast IRLS and zero counts approximation
 #'
-#' @param cs csnorm object
-#' @param resolution target resolution
-#' @param group if grouping is to be performed
+#' @param cts
+#' @param dispersion
 #' @param ncores integer. Number of cores for zero binning
 #' @param niter integer. Maximum number of IRLS iterations
 #' @param tol numeric. Convergence tolerance for IRLS objective
@@ -154,14 +153,77 @@ csnorm_predict_binned_muhat_irls = function(cs, resolution, zeros) {
 #' @export
 #'
 #' @examples
-csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100, tol=1e-3, verbose=T) {
-  # get zeros per bin
+csnorm_predict_binned_matrices_irls = function(cts, dispersion, ncores=1, niter=100, tol=1e-3, verbose=T) {
+  #matrices
+  if (verbose==T) cat("   Other matrices\n")
+  mat=cts[,.(ncounts=sum(weight),
+             observed=sum(count*weight),
+             expected=sum(mu*weight),
+             expected.sd=sqrt(sum((mu+mu^2/dispersion)*weight)),
+             decaymat=sum(decay*weight)/sum(weight),
+             lpdf0=sum(dnbinom(count,mu=mu, size=dispersion, log=T)*weight))
+          ,keyby=c("name","bin1","bin2")]
+  #signal matrix
+  if (verbose==T) cat("   Signal matrix\n")
+  cts[,signal:=1]
+  for (i in 1:niter) {
+    cts[,c("z","var","signal.old"):=list(count/(signal*mu)-1,(1/(signal*mu)+1/dispersion),signal)]
+    cts[,signal:=exp(weighted.mean(z+log(signal), weight/var)),by=c("name","bin1","bin2")]
+    cts[,signal.sd:=signal[1]*sqrt(1/sum(weight/var)),by=c("name","bin1","bin2")]
+    if(cts[,all(abs(signal-signal.old)<tol)]) break
+  }
+  if (i==niter) cat("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
+  mats = cts[,.(signal=signal[1],signal.sd=signal.sd[1],
+                lpdfs=sum(dnbinom(count,mu=mu*signal, size=dispersion, log=T)*weight))
+             ,keyby=c("name","bin1","bin2")]
+  #normalized matrix
+  if (verbose==T) cat("   'Normalized' matrix\n")
+  cts[,normalized:=decay]
+  for (i in 1:niter) {
+    cts[,c("z","var","normalized.old"):=list(count/(normalized*mu/decay)-1,
+                                             (1/(normalized*mu/decay)+1/dispersion),normalized)]
+    cts[,normalized:=exp(weighted.mean(z+log(normalized), weight/var)),by=c("name","bin1","bin2")]
+    cts[,normalized.sd:=normalized[1]*sqrt(1/sum(weight/var)),by=c("name","bin1","bin2")]
+    if(cts[,all(abs(normalized-normalized.old)<tol)]) break
+  }
+  if (i==niter) cat("Warning: Maximum number of IRLS iterations reached for normalized estimation!\n")
+  matr = cts[,.(normalized=normalized[1],normalized.sd=normalized.sd[1],
+                lpdfr=sum(dnbinom(count,mu=mu*normalized/decay, size=dispersion, log=T)*weight))
+             ,keyby=c("name","bin1","bin2")]
+  mat=mat[mats[matr]]
+  mat[observed==0,c("signal","normalized","signal.sd","normalized.sd"):=list(0,0,NA,NA)]
+  return(mat)
+}
+
+#' Group binned matrices of datasets
+#'
+#' @param cs CSnorm object, normalized.
+#' @param resolution integer. The desired resolution of the matrix.
+#' @param group The type of grouping to be performed. Any combination of the given arguments is possible.
+#' @param verbose
+#' @param ncores integer. The number of cores to parallelize on.
+#'
+#' @return CSnorm object
+#' @export
+#'
+#' @examples
+group_datasets = function(cs, resolution, group=c("condition","replicate","enzyme","experiment"),
+                          verbose=T, ncores=1, niter=100, tol=1e-3) {
+  ### fetch and check inputs
+  if (group!="all") group=match.arg(group, several.ok=T)
+  if (get_cs_group_idx(cs, resolution=resolution, group=group, raise=F)>0)
+    stop("Refusing to overwrite already existing ", group, " grouping.")
+  #
+  ### compute all matrices
+  if (verbose==T) cat("*** compute observed and expected quantities at",resolution,
+                      "kb with group=",group,"\n")
+  #
   if (verbose==T) cat("   Get zeros per bin\n")
-  zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores=ncores)
-  # predict means
+  zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores = ncores)
+  #
   if (verbose==T) cat("   Predict means\n")
-  cts = csnorm:::csnorm_predict_binned_muhat_irls(cs, resolution, zeros)
-  # group
+  cts = csnorm:::csnorm_predict_binned_counts_irls(cs, resolution, zeros)
+  #
   if (verbose==T) cat("   Group\n")
   if (group=="all") {
     names=cs@experiments[,unique(name)]
@@ -173,58 +235,11 @@ csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100
   setkey(groups,name)
   cts = groups[cts]
   cts[,name:=groupname]
-  #matrices
-  if (verbose==T) cat("   Other matrices\n")
-  init=cs@par
-  mat=cts[,.(ncounts=sum(weight),
-             observed=sum(count*weight),
-             expected=sum(mu*weight),
-             expected.sd=sqrt(sum((mu+mu^2/init$alpha)*weight)),
-             decaymat=sum(decay*weight)/sum(weight),
-             lpdf0=sum(dnbinom(count,mu=mu, size=init$alpha, log=T)*weight))
-          ,keyby=c("name","bin1","bin2")]
-  #signal matrix
-  if (verbose==T) cat("   Signal matrix\n")
-  cts[,signal:=1]
-  for (i in 1:niter) {
-    cts[,c("z","var","signal.old"):=list(count/(signal*mu)-1,(1/(signal*mu)+1/init$alpha),signal)]
-    cts[,signal:=exp(weighted.mean(z+log(signal), weight/var)),by=c("name","bin1","bin2")]
-    cts[,signal.sd:=signal[1]*sqrt(1/sum(weight/var)),by=c("name","bin1","bin2")]
-    if(cts[,all(abs(signal-signal.old)<tol)]) break
-  }
-  if (i==niter) cat("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
-  mats = cts[,.(signal=signal[1],signal.sd=signal.sd[1],
-                lpdfs=sum(dnbinom(count,mu=mu*signal, size=init$alpha, log=T)*weight))
-             ,keyby=c("name","bin1","bin2")]
-  #normalized matrix
-  if (verbose==T) cat("   'Normalized' matrix\n")
-  cts[,normalized:=decay]
-  for (i in 1:niter) {
-    cts[,c("z","var","normalized.old"):=list(count/(normalized*mu/decay)-1,
-                                             (1/(normalized*mu/decay)+1/init$alpha),normalized)]
-    cts[,normalized:=exp(weighted.mean(z+log(normalized), weight/var)),by=c("name","bin1","bin2")]
-    cts[,normalized.sd:=normalized[1]*sqrt(1/sum(weight/var)),by=c("name","bin1","bin2")]
-    if(cts[,all(abs(normalized-normalized.old)<tol)]) break
-  }
-  if (i==niter) cat("Warning: Maximum number of IRLS iterations reached for normalized estimation!\n")
-  matr = cts[,.(normalized=normalized[1],normalized.sd=normalized.sd[1],
-                lpdfr=sum(dnbinom(count,mu=mu*normalized/decay, size=init$alpha, log=T)*weight))
-             ,keyby=c("name","bin1","bin2")]
-  mat=mat[mats[matr]]
-  mat[observed==0,c("signal","normalized","signal.sd","normalized.sd"):=list(0,0,NA,NA)]
-  return(mat)
-}
-
-#' Common call for binning
-#' @keywords internal
-#'
-#' @examples
-compute_grouped_matrices = function(cs, resolution, group, ncores, verbose, niter=100, tol=1e-3) {
+  #
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
-  #mat=csnorm_predict_binned(cs, resolution, group=group, ncores=ncores)
-  mat=csnorm_predict_binned_irls(cs, resolution, group=group, ncores=ncores, niter=niter, tol=tol, verbose=verbose)
+  mat=csnorm_predict_binned_matrices_irls(cts, cs@par$alpha, ncores=ncores, niter=niter, tol=tol, verbose=verbose)
   setkey(mat,name,bin1,bin2)
-  #write begins/ends
+  #
   if (verbose==T) cat("*** write begin/end positions\n")
   bin1.begin=mat[,bin1]
   bin1.end=mat[,bin1]
@@ -238,7 +253,23 @@ compute_grouped_matrices = function(cs, resolution, group, ncores, verbose, nite
   mat[,end1:=as.integer(as.character(bin1.end))]
   mat[,begin2:=as.integer(as.character(bin2.begin))]
   mat[,end2:=as.integer(as.character(bin2.end))]
-  return(mat)
+  #
+  ### store matrices
+  csg=new("CSgroup", mat=mat, interactions=list(), resolution=resolution, group=group,
+          cts=cts, dispersion=cs@par$alpha, names=as.character(mat[,unique(name)]))
+  cs@groups=append(cs@groups,list(csg))
+  return(cs)
+}
+
+#' Bin normalized datasets
+#' 
+#' @inheritParams group_datasets
+#'   
+#' @export
+#' 
+#' @examples
+bin_all_datasets = function(cs, resolution=10000, ncores=1, verbose=T) {
+  group_datasets(cs, resolution=resolution, group="all", ncores=ncores, verbose=verbose)
 }
 
 #' Generate iota and rho genomic biases on evenly spaced points along the genome
@@ -261,47 +292,9 @@ generate_genomic_biases = function(biases, beta_iota, beta_rho, bf_per_kb=1, poi
   S=round(points_per_kb*genome_sz/1000)
   out <- capture.output(
     op<-optimizing(stanmodels$gen_genomic_biases, data=list(Krow=Krow, S=S, begin=begin, end=end,
-                                                         beta_iota=beta_iota, beta_rho=beta_rho),
-                as_vector=F, hessian=F, iter=1, verbose=F, init=0))
+                                                            beta_iota=beta_iota, beta_rho=beta_rho),
+                   as_vector=F, hessian=F, iter=1, verbose=F, init=0))
   dt=as.data.table(op$par)
   setkey(dt, pos)
   return(dt)
-}
-
-#' Group binned matrices of datasets
-#'
-#' @param cs CSnorm object, normalized.
-#' @param resolution integer. The desired resolution of the matrix.
-#' @param group The type of grouping to be performed. Any combination of the given arguments is possible.
-#' @param verbose
-#' @param ncores integer. The number of cores to parallelize on.
-#'
-#' @return CSnorm object
-#' @export
-#'
-#' @examples
-group_datasets = function(cs, resolution, group=c("condition","replicate","enzyme","experiment"),
-                          verbose=T, ncores=1) {
-  #fetch and check inputs
-  if (group!="all") group=match.arg(group, several.ok=T)
-  if (get_cs_group_idx(cs, resolution=resolution, group=group, raise=F)>0)
-    stop("Refusing to overwrite already existing ", group, " grouping.")
-  #
-  mat = compute_grouped_matrices(cs, resolution=resolution, group=group, ncores=ncores, verbose=verbose)
-  #store matrices
-  csg=new("CSgroup", mat=mat, cts=data.table(), group=group, resolution=resolution,
-          names=as.character(mat[,unique(name)]))
-  cs@groups=append(cs@groups,list(csg))
-  return(cs)
-}
-
-#' Bin normalized datasets
-#' 
-#' @inheritParams group_datasets
-#'   
-#' @export
-#' 
-#' @examples
-bin_all_datasets = function(cs, resolution=10000, ncores=1, verbose=T) {
-  group_datasets(cs, resolution=resolution, group="all", ncores=ncores, verbose=verbose)
 }
