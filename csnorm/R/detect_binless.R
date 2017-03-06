@@ -240,7 +240,9 @@ csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
   #then, try a few lambda values to define the interesting region
   if (verbose==T) cat("  coarse scan\n")
   cv = foreach (g=groupnames, .combine=rbind) %do% {
-    l2vals=c(0,10^seq(log10(min(res.ref[[g]]$EndLambda)),log10(max(res.ref[[g]]$BeginLambda)),length.out=cv.gridsize))
+    minlambda=min(res.ref[[g]]$EndLambda[res.ref[[g]]$EndLambda>0])
+    maxlambda=max(res.ref[[g]]$BeginLambda)
+    l2vals=c(0,10^seq(log10(minlambda),log10(maxlambda),length.out=cv.gridsize))
     foreach (lambda2=l2vals, .combine=rbind) %dopar%
       csnorm:::flsa_cross_validate(mat[name==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
   }
