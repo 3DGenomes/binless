@@ -141,8 +141,6 @@ setMethod("show",signature="CSinter",definition=function(object) {
 #' @slot resolution in bases.
 #' @slot group 
 #' @slot cts data.table. The counts and predicted means used in all calculations.
-#' @slot ice 
-#' @slot ice.iterations 
 #' @slot names 
 #'
 #' @return
@@ -156,8 +154,6 @@ setClass("CSgroup",
                       resolution="numeric",
                       group="character",
                       cts="data.table",
-                      ice="logical",
-                      ice.iterations="numeric",
                       names="character"))
 
 setMethod("show",signature="CSgroup",definition=function(object) {
@@ -165,9 +161,6 @@ setMethod("show",signature="CSgroup",definition=function(object) {
     cat("   *** Individual at", object@resolution/1000, "kb resolution") 
   } else {
     cat("   *** Group [", object@group,"] at", object@resolution/1000, "kb resolution")
-  }
-  if (object@ice==T) {
-    cat(" with ICE (", object@ice.iterations,"iterations)")
   }
   cat( " : ", object@names, "\n")
   if (length(object@interactions)==0) {

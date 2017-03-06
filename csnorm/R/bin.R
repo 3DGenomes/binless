@@ -2,15 +2,20 @@
 NULL
 
 #' Apply the ICE algorithm to a binned matrix
+#' 
+#' TODO
 #'
-#' @param csb a CSbinned object
+#' @param mat a matrix obtained by grouping
 #' @param niterations positive integer. Number of iterations to perform
 #'
 #' @return a CSbinned object containing the ICEd matrix
 #' @export
 #'
 #' @examples
-iterative_normalization = function(raw, niterations=100, namecol="name") {
+iterative_normalization = function(mat, niterations=100, namecol="name", verbose=T) {
+  if (verbose==T) cat("*** iterative normalization with ",niterations," iterations\n")
+  raw=mat[,.(name,bin1,bin2,observed)]
+  setkey(raw,name,bin1,bin2)
   binned = foreach (n=raw[,unique(get(namecol))], .combine="rbind") %do% {
     binned = raw[get(namecol)==n&bin1<bin2,.(bin1,bin2,N=observed)]
     binned = rbind(binned, binned[,.(bin1=bin2,bin2=bin1,N)])
@@ -29,6 +34,8 @@ iterative_normalization = function(raw, niterations=100, namecol="name") {
     binned[,c(namecol):=n]
     setkeyv(binned,c(namecol,"bin1","bin2"))
   }
+  setkey(binned,name,bin1,bin2)
+  binned
 }
 
 #' count number of zeros in each rectangular bin
@@ -212,19 +219,11 @@ csnorm_predict_binned_irls = function(cs, resolution, group, ncores=1, niter=100
 #' @keywords internal
 #'
 #' @examples
-compute_grouped_matrices = function(cs, resolution, group, ncores, ice, verbose, niter=100, tol=1e-3) {
+compute_grouped_matrices = function(cs, resolution, group, ncores, verbose, niter=100, tol=1e-3) {
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
   #mat=csnorm_predict_binned(cs, resolution, group=group, ncores=ncores)
   mat=csnorm_predict_binned_irls(cs, resolution, group=group, ncores=ncores, niter=niter, tol=tol, verbose=verbose)
   setkey(mat,name,bin1,bin2)
-  if (ice>0) {
-    if (verbose==T) cat("*** iterative normalization with ",ice," iterations\n")
-    raw=mat[,.(name,bin1,bin2,observed)]
-    setkey(raw,name,bin1,bin2)
-    iced=iterative_normalization(raw, niterations=ice, namecol="name")
-    setkey(iced,name,bin1,bin2)
-    mat=merge(mat,iced,all.x=T,all.y=F)
-  }
   #write begins/ends
   if (verbose==T) cat("*** write begin/end positions\n")
   bin1.begin=mat[,bin1]
@@ -274,9 +273,6 @@ generate_genomic_biases = function(biases, beta_iota, beta_rho, bf_per_kb=1, poi
 #' @param cs CSnorm object, normalized.
 #' @param resolution integer. The desired resolution of the matrix.
 #' @param group The type of grouping to be performed. Any combination of the given arguments is possible.
-#' @param ice integer. If positive, perform the optional Iterative Correction 
-#'   algorithm, useful for comparison purposes. The value determines the number
-#'   of iterations.
 #' @param verbose
 #' @param ncores integer. The number of cores to parallelize on.
 #'
@@ -285,15 +281,15 @@ generate_genomic_biases = function(biases, beta_iota, beta_rho, bf_per_kb=1, poi
 #'
 #' @examples
 group_datasets = function(cs, resolution, group=c("condition","replicate","enzyme","experiment"),
-                          ice=-1, verbose=T, ncores=1) {
+                          verbose=T, ncores=1) {
   #fetch and check inputs
   if (group!="all") group=match.arg(group, several.ok=T)
   if (get_cs_group_idx(cs, resolution=resolution, group=group, raise=F)>0)
     stop("Refusing to overwrite already existing ", group, " grouping.")
   #
-  mat = compute_grouped_matrices(cs, resolution=resolution, group=group, ncores=ncores, ice=ice, verbose=verbose)
+  mat = compute_grouped_matrices(cs, resolution=resolution, group=group, ncores=ncores, verbose=verbose)
   #store matrices
-  csg=new("CSgroup", mat=mat, cts=data.table(), group=group, resolution=resolution, ice=(ice>0), ice.iterations=ice,
+  csg=new("CSgroup", mat=mat, cts=data.table(), group=group, resolution=resolution,
           names=as.character(mat[,unique(name)]))
   cs@groups=append(cs@groups,list(csg))
   return(cs)
@@ -306,6 +302,6 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
 #' @export
 #' 
 #' @examples
-bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, verbose=T) {
-  group_datasets(cs, resolution=resolution, group="all", ncores=ncores, ice=ice, verbose=verbose)
+bin_all_datasets = function(cs, resolution=10000, ncores=1, verbose=T) {
+  group_datasets(cs, resolution=resolution, group="all", ncores=ncores, verbose=verbose)
 }
