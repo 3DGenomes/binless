@@ -2,11 +2,9 @@
 
 export(bin_all_datasets)
 export(check_fit)
-export(csnorm_detect_binned)
 export(csnorm_fit_fixed)
 export(csnorm_predict_all)
 export(csnorm_predict_all_parallel)
-export(csnorm_predict_binned)
 export(csnorm_predict_binned_matrices_irls)
 export(detect_binless_differences)
 export(detect_binless_interactions)
