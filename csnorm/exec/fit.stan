@@ -254,7 +254,7 @@ model {
   for (d in 1:Decays)
     beta_diag_diff[XDDset[d]] ~ normal(0, 1/(ldfac*lambda_diag[d]));
 
-  //cauchy hyperprior
+  //normal hyperprior
   lambda_iota ~ normal(0,0.001);
   lambda_rho ~ normal(0,0.001);
   lambda_diag ~ normal(0,1);

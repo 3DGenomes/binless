@@ -692,7 +692,7 @@ has_converged = function(cs) {
 #' count number of zeros in each decay and genomic bin
 #' @keywords internal
 #' 
-get_nzeros = function(cs, ncores=1) {
+get_nzeros_normalization = function(cs, ncores=1) {
   stopifnot(cs@counts[id1>=id2,.N]==0)
   #count left and right
   cts=rbind(cs@counts[contact.close>0,.(name, id=id1, distance, cat="contact R", count=contact.close)],
@@ -736,7 +736,6 @@ get_nzeros = function(cs, ncores=1) {
   #all(zeros[,.(nnz=sum(nnz),nzero=sum(nzero)),keyby=c("name","id","cat")]==zbias[,.(name,id,cat,nnz,nzero)])
   return(zeros)
 }
-
 
 #' count number of zeros in each decay bin
 #' @keywords internal
@@ -928,7 +927,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
   cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
   if(verbose==T) cat("Counting zeros\n")
-  zeros = csnorm:::get_nzeros(cs, ncores=ncores)
+  zeros = csnorm:::get_nzeros_normalization(cs, ncores=ncores)
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
   subcounts = csnorm:::subsample_counts(cs, ncounts)
