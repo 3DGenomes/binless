@@ -1,82 +1,6 @@
 #' @include csnorm.R
 NULL
 
-#' common calculation between interactions and differences
-#' @keywords internal
-estimate_binless_common_irls = function(cs, resolution, group, ref="expected", ncores=1, verbose=T) {
-  # get zeros per bin
-  if (verbose==T) cat("  Get zeros per bin\n")
-  zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores=ncores)
-  # predict means
-  if (verbose==T) cat("  Predict means\n")
-  cts = csnorm:::csnorm_predict_binned_counts_irls(cs, resolution, zeros)
-  # group
-  if (verbose==T) cat("  Group\n")
-  if (group=="all") {
-    names=cs@experiments[,unique(name)]
-    groups=data.table(name=names,groupname=names)
-  } else {
-    groups=cs@experiments[,.(name,groupname=do.call(paste,mget(group))),by=group][,.(name,groupname)] #we already know groupname is unique
-    groups[,groupname:=ordered(groupname)] #same class as name
-  }
-  setkey(groups,name)
-  cts = groups[cts]
-  cts[,name:=NULL]
-  setnames(cts,"groupname","name")
-  #
-  if (ref != "expected") {
-    if (!(ref %in% groups[,groupname]))
-      stop("Reference group name not found! Valid names are: ",deparse(as.character(groups[,groupname])))
-    if (groups[groupname!=ref,.N]==0)
-      stop("There is no other group than ",ref, ", cannot compute differences!")
-  }
-  setkeyv(cts,c("name","bin1","bin2"))
-  return(cts)
-}
-
-#' group counts to compute signal by cross-validated lasso
-#' @keywords internal
-estimate_binless_signal_irls = function(cs, resolution, group, mat, verbose=T) {
-  cts=csnorm:::estimate_binless_common_irls(cs, resolution, group, ref="expected",
-                                       ncores=ncores, verbose=verbose)
-  if (verbose==T) cat("  Phi\n")
-  init=cs@par
-  if (is.null(mat)) mat=cts[,.(phi=0,signal=1),by=c("name","bin1","bin2")]
-  cts=mat[,.(name,bin1,bin2,phi,signal)][cts,,on=c("name","bin1","bin2")]
-  cts[,c("z","var"):=list(count/(exp(phi)*mu)-1,(1/(exp(phi)*mu)+1/init$alpha))]
-  ret=cts[,.(phihat=weighted.mean(z+phi, weight/var),
-             phihat.sd=sqrt(1/sum(weight/var)),ncounts=sum(weight)),by=c("name","bin1","bin2","phi","signal")]
-  ret[,value:=phihat/phihat.sd]
-  return(ret)
-}
-
-#' group counts to compute signal by cross-validated lasso
-#' @keywords internal
-estimate_binless_differential_irls = function(cs, resolution, group, mat, ref, verbose=T) {
-  cts=csnorm:::estimate_binless_common_irls(cs, resolution, group, ref=ref,
-                                            ncores=ncores, verbose=verbose)
-  if (verbose==T) cat("  Delta\n")
-  init=cs@par
-  ctsref = foreach(n=cts[name!=ref,unique(name)],.combine=rbind) %do%
-    cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
-  cts=cts[name!=ref]
-  #
-  if (is.null(mat)) mat=cts[,.(phi.ref=0,delta=0,diffsig=1,ncounts=sum(weight)),by=c("name","bin1","bin2")]
-  ctsref=mat[ctsref]
-  ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/init$alpha))]
-  mat=mat[ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
-                    sigmasq.ref=1/sum(weight/var)),keyby=c("name","bin1","bin2")]]
-  #
-  cts=mat[cts]
-  cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
-                          (1/(exp(phi.ref+delta)*mu)+1/init$alpha))]
-  mat=mat[cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
-                 sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
-  mat[,c("deltahat","deltahat.sd"):=list(phihat-phihat.ref,sqrt(sigmasq+sigmasq.ref))]
-  mat[,value:=deltahat/deltahat.sd]
-  return(mat)
-}
-
 #' connectivity on a triangle
 #' @keywords internal
 flsa_compute_connectivity = function(nbins, start=0) {
@@ -284,24 +208,37 @@ csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
 #' @param niter number of IRLS iterations
 #' @param cv.fold perform x-fold cross-validation
 #' @param cv.gridsize compute possible values of log lambda on a grid
-#'
-#' @return
-#' @keywords internal
+#'   
+#' @return 
 #' @export
-#'
+#' 
 #' @examples
-csnorm_detect_binless_interactions_irls = function(cs, resolution, group, niter=10, tol=1e-3,
-                                                   ncores=1, cv.fold=10, cv.gridsize=30, verbose=T) {
+detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol=1e-3,
+                                       cv.fold=10, cv.gridsize=30, verbose=T){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
+  ### get CSgroup object
+  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+  csg=cs@groups[[idx1]]
+  #check if interaction wasn't calculated already
+  if (get_cs_interaction_idx(csg, type="binteractions", threshold=-1, ref="expected", raise=F)>0)
+    stop("Refusing to overwrite this already detected interaction")
+  #
+  ### build matrix
   mat=NULL
   for (step in 1:niter) {
-    if (verbose==T) cat("Main loop, step ",step,"\n")
-    if (verbose==T) cat(" Estimate raw signal\n")
-    mat = csnorm:::estimate_binless_signal_irls(cs, resolution, group, mat, verbose)
+    if (verbose==T) cat(" Main loop, step ",step,"\n")
+    if (verbose==T) cat("  Estimate raw signal\n")
+    cts = csg@cts
+    if (is.null(mat)) mat=cts[,.(phi=0,signal=1),by=c("name","bin1","bin2")]
+    cts = mat[,.(name,bin1,bin2,phi,signal)][cts,,on=c("name","bin1","bin2")]
+    cts[,c("z","var"):=list(count/(exp(phi)*mu)-1,(1/(exp(phi)*mu)+1/csg@dispersion))]
+    mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
+               phihat.sd=sqrt(1/sum(weight/var)),ncounts=sum(weight)),by=c("name","bin1","bin2","phi","signal")]
+    mat[,value:=phihat/phihat.sd]
     setkey(mat,name,bin1,bin2)
     #
     #perform fused lasso on signal to noise
-    if (verbose==T) cat(" Fused lasso\n")
+    if (verbose==T) cat("  Fused lasso\n")
     mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, cv.gridsize=cv.gridsize)
     #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~name)+scale_fill_gradient2(na.value = "white")
     #
@@ -313,32 +250,61 @@ csnorm_detect_binless_interactions_irls = function(cs, resolution, group, niter=
     if(mat[,all(abs(signal-signal.old)<tol)]) break
   }
   mat[,ncounts:=NULL]
+  if (verbose==T) cat(" Detect patches\n")
   mat = csnorm:::detect_binless_patches(mat)
-  return(mat)
+  #
+  ### store interaction
+  csi=new("CSinter", mat=mat, type="binteractions", threshold=-1, ref="expected")
+  #store back
+  csg@interactions=append(csg@interactions,list(csi))
+  cs@groups[[idx1]]=csg
+  return(cs)
 }
 
-#' Perform binless difference detection using fused lasso
-#'
-#' @inheritParams csnorm_detect_binless_interactions_irls
-#'
-#' @return
-#' @keywords internal
+
+#' Binless detection of significant differences with a reference
+#' 
+#' @inheritParams detect_binless_interactions
+#'   
+#' @return the binned matrix with additional information relating to these
+#'   significant interactions
 #' @export
-#'
+#' 
 #' @examples
-csnorm_detect_binless_differences_irls = function(cs, resolution, group, ref, niter=10, tol=1e-3,
-                                                  ncores=1, cv.fold=10, cv.gridsize=30, verbose=T) {
+detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=1e-3, ncores=1,
+                                      cv.fold=10, cv.gridsize=30, verbose=T){
   if (verbose==T) cat("Binless difference detection with resolution=",resolution,
                       " group=",group," and ref=",ref,"\n")
+  ### get CSgroup object
+  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+  csg=cs@groups[[idx1]]
+  if (get_cs_interaction_idx(csg, type="bdifferences", threshold=-1, ref=ref, raise=F)>0)
+    stop("Refusing to overwrite this already detected interaction")
   mat=NULL
   for (step in 1:niter) {
-    if (verbose==T) cat("Main loop, step ",step,"\n")
-    if (verbose==T) cat(" Estimate raw signal\n")
-    mat = csnorm:::estimate_binless_differential_irls(cs, resolution, group, mat, ref, verbose)
+    if (verbose==T) cat(" Main loop, step ",step,"\n")
+    if (verbose==T) cat("  Estimate raw signal\n")
+    ctsref = foreach(n=csg@cts[name!=ref,unique(name)],.combine=rbind) %do%
+      csg@cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
+    cts=csg@cts[name!=ref]
+    #
+    if (is.null(mat)) mat=cts[,.(phi.ref=0,delta=0,diffsig=1,ncounts=sum(weight)),by=c("name","bin1","bin2")]
+    ctsref=mat[ctsref]
+    ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@dispersion))]
+    mat=mat[ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
+                      sigmasq.ref=1/sum(weight/var)),keyby=c("name","bin1","bin2")]]
+    #
+    cts=mat[cts]
+    cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
+                            (1/(exp(phi.ref+delta)*mu)+1/csg@dispersion))]
+    mat=mat[cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
+                   sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
+    mat[,c("deltahat","deltahat.sd"):=list(phihat-phihat.ref,sqrt(sigmasq+sigmasq.ref))]
+    mat[,value:=deltahat/deltahat.sd]
     setkey(mat,name,bin1,bin2)
     #
     #perform fused lasso on signal to noise
-    if (verbose==T) cat(" Fused lasso\n")
+    if (verbose==T) cat("  Fused lasso\n")
     mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, cv.gridsize=cv.gridsize)
     #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~name)+scale_fill_gradient2(na.value = "white")
     #
@@ -351,10 +317,15 @@ csnorm_detect_binless_differences_irls = function(cs, resolution, group, ref, ni
     if(mat[,all(abs(diffsig-diffsig.old)<tol)]) break
   }
   mat[,ncounts:=NULL]
+  if (verbose==T) cat(" Detect patches\n")
   mat = csnorm:::detect_binless_patches(mat)
-  return(mat)
+  csi=new("CSinter", mat=mat, type="bdifferences", threshold=-1, ref=ref)
+  #store back
+  csg@interactions=append(csg@interactions,list(csi))
+  cs@groups[[idx1]]=csg
+  return(cs)
 }
-
+  
 #' make plot of binless matrix, with minima/maxima highlighted
 #'
 #' @param mat the binless matrix
@@ -386,60 +357,3 @@ plot_binless_matrix = function(mat, minima=F) {
   }
   print(p)
 }
-
-#' Binless detection of significant interactions wrt expected
-#' 
-#' @param cs CSnorm object
-#' @param resolution,group see
-#'   \code{\link{bin_all_datasets}} and \code{\link{group_datasets}}, used to
-#'   identify the input matrices.
-#' @param ncores number of cores used for parallelization
-#'   
-#' @return the binned matrix with additional information relating to these 
-#'   significant interactions
-#' @export
-#' 
-#' @examples
-detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol=1e-3,
-                                       cv.fold=10, cv.gridsize=30, verbose=T){
-  #get CSgroup object
-  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
-  csg=cs@groups[[idx1]]
-  #check if interaction wasn't calculated already
-  if (get_cs_interaction_idx(csg, type="binteractions", threshold=-1, ref="expected", raise=F)>0)
-    stop("Refusing to overwrite this already detected interaction")
-  mat = csnorm_detect_binless_interactions_irls(cs, resolution=resolution, group=group, ncores=ncores,
-                              niter=niter, tol=tol, cv.fold=cv.fold, cv.gridsize=cv.gridsize, verbose=verbose)
-  csi=new("CSinter", mat=mat, type="binteractions", threshold=-1, ref="expected")
-  #store back
-  csg@interactions=append(csg@interactions,list(csi))
-  cs@groups[[idx1]]=csg
-  return(cs)
-}
-
-
-#' Binless detection of significant differences with a reference
-#' 
-#' @inheritParams detect_binless_interactions
-#'   
-#' @return the binned matrix with additional information relating to these
-#'   significant interactions
-#' @export
-#' 
-#' @examples
-detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=1e-3, ncores=1,
-                                      cv.fold=10, cv.gridsize=30, verbose=T){
-  #get CSgroup object
-  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
-  csg=cs@groups[[idx1]]
-  if (get_cs_interaction_idx(csg, type="bdifferences", threshold=-1, ref=ref, raise=F)>0)
-    stop("Refusing to overwrite this already detected interaction")
-  mat = csnorm_detect_binless_differences_irls(cs, resolution=resolution, group=group, ref=ref, ncores=ncores,
-                              niter=niter, tol=tol, cv.fold=cv.fold, cv.gridsize=cv.gridsize, verbose=verbose)
-  csi=new("CSinter", mat=mat, type="bdifferences", threshold=-1, ref=ref)
-  #store back
-  csg@interactions=append(csg@interactions,list(csi))
-  cs@groups[[idx1]]=csg
-  return(cs)
-}
-  

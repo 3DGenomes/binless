@@ -2,8 +2,6 @@
 
 export(bin_all_datasets)
 export(check_fit)
-export(csnorm_detect_binless_differences_irls)
-export(csnorm_detect_binless_interactions_irls)
 export(csnorm_detect_binned)
 export(csnorm_fit_fixed)
 export(csnorm_predict_all)
