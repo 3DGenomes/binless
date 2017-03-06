@@ -127,12 +127,50 @@ detect_binless_patches = function(mat) {
   return(mat)
 }
 
+#' compute input to fused lasso
+#' @keywords internal
+csnorm_compute_raw_signal = function(csg, mat) {
+  cts = csg@cts
+  if (is.null(mat)) mat=cts[,.(phi=0,signal=1),by=c("name","bin1","bin2")]
+  cts = mat[,.(name,bin1,bin2,phi,signal)][cts,,on=c("name","bin1","bin2")]
+  cts[,c("z","var"):=list(count/(exp(phi)*mu)-1,(1/(exp(phi)*mu)+1/csg@dispersion))]
+  mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
+               phihat.sd=sqrt(1/sum(weight/var)),ncounts=sum(weight)),by=c("name","bin1","bin2","phi","signal")]
+  mat[,value:=phihat/phihat.sd]
+  setkey(mat,name,bin1,bin2)
+  return(mat)
+}
+
+#' compute input to fused lasso
+#' @keywords internal
+csnorm_compute_raw_differential = function(csg, mat, ref) {
+  ctsref = foreach(n=csg@cts[name!=ref,unique(name)],.combine=rbind) %do%
+    csg@cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
+  cts=csg@cts[name!=ref]
+  #
+  if (is.null(mat)) mat=cts[,.(phi.ref=0,delta=0,diffsig=1,ncounts=sum(weight)),by=c("name","bin1","bin2")]
+  ctsref=mat[ctsref]
+  ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@dispersion))]
+  mat=mat[ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
+                    sigmasq.ref=1/sum(weight/var)),keyby=c("name","bin1","bin2")]]
+  #
+  cts=mat[cts]
+  cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
+                          (1/(exp(phi.ref+delta)*mu)+1/csg@dispersion))]
+  mat=mat[cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
+                 sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
+  mat[,c("deltahat","deltahat.sd"):=list(phihat-phihat.ref,sqrt(sigmasq+sigmasq.ref))]
+  mat[,value:=deltahat/deltahat.sd]
+  setkey(mat,name,bin1,bin2)
+  return(mat)
+}
+
 #' run fused lasso on each dataset contained in mat, fusing 'value'
 #' 
 #' finds optimal lambda2 through k-fold cv. Uses lambda1=0
 #' @keywords internal
 csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
-  if (verbose==T) cat("  estimation runs\n")
+  if (verbose==T) cat("   estimation runs\n")
   groupnames=mat[,as.character(unique(name))]
   cmat = csnorm:::flsa_compute_connectivity(mat[,nlevels(bin1)])
   res.ref = foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
@@ -146,7 +184,7 @@ csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
   mat[,cv.group:=as.character(((unclass(bin2)+unclass(bin1)*max(unclass(bin1)))%%cv.fold)+1)]
   cvgroups=as.character(1:cv.fold)
   #first, run lasso regressions
-  if (verbose==T) cat("  cross-validation runs\n")
+  if (verbose==T) cat("   cross-validation runs\n")
   res.cv = foreach (cv=cvgroups, .final=function(x){setNames(x,cvgroups)}) %:%
     foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
       submat=copy(mat[name==g])
@@ -181,7 +219,7 @@ csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
   bounds[,l2max:=pmin(l2max, sapply(as.character(name),FUN=function(g){max(res.ref[[g]]$BeginLambda)}), na.rm=T)]
   #
   #now, try all lambda values between these bounds
-  if (verbose==T) cat("  fine scan\n")
+  if (verbose==T) cat("   fine scan\n")
   cv = foreach (g=groupnames, .combine=rbind) %do% {
     l2vals=sort(unique(res.ref[[g]]$BeginLambda))
     l2vals=bounds[name==g,l2vals[l2vals>=l2min & l2vals<=l2max]]
@@ -191,7 +229,7 @@ csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
   #ggplot(cv)+geom_line(aes(lambda2,mse))+#geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
   #  facet_wrap(~name,scales="free")
   #determine optimal lambda value and compute coefficients
-  if (verbose==T) cat("  report optimum\n")
+  if (verbose==T) cat("   report optimum\n")
   l2vals=cv[,.SD[mse==min(mse),.(lambda2)],by=name]
   for (g in groupnames)
     mat[name==g,value:=flsaGetSolution(res.ref[[g]], lambda1=0, lambda2=l2vals[name==g,lambda2])[1,]]
@@ -228,14 +266,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
   for (step in 1:niter) {
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
-    cts = csg@cts
-    if (is.null(mat)) mat=cts[,.(phi=0,signal=1),by=c("name","bin1","bin2")]
-    cts = mat[,.(name,bin1,bin2,phi,signal)][cts,,on=c("name","bin1","bin2")]
-    cts[,c("z","var"):=list(count/(exp(phi)*mu)-1,(1/(exp(phi)*mu)+1/csg@dispersion))]
-    mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
-               phihat.sd=sqrt(1/sum(weight/var)),ncounts=sum(weight)),by=c("name","bin1","bin2","phi","signal")]
-    mat[,value:=phihat/phihat.sd]
-    setkey(mat,name,bin1,bin2)
+    mat = csnorm_compute_raw_signal(csg, mat)
     #
     #perform fused lasso on signal to noise
     if (verbose==T) cat("  Fused lasso\n")
@@ -284,24 +315,7 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
   for (step in 1:niter) {
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
-    ctsref = foreach(n=csg@cts[name!=ref,unique(name)],.combine=rbind) %do%
-      csg@cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
-    cts=csg@cts[name!=ref]
-    #
-    if (is.null(mat)) mat=cts[,.(phi.ref=0,delta=0,diffsig=1,ncounts=sum(weight)),by=c("name","bin1","bin2")]
-    ctsref=mat[ctsref]
-    ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@dispersion))]
-    mat=mat[ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
-                      sigmasq.ref=1/sum(weight/var)),keyby=c("name","bin1","bin2")]]
-    #
-    cts=mat[cts]
-    cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
-                            (1/(exp(phi.ref+delta)*mu)+1/csg@dispersion))]
-    mat=mat[cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
-                   sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
-    mat[,c("deltahat","deltahat.sd"):=list(phihat-phihat.ref,sqrt(sigmasq+sigmasq.ref))]
-    mat[,value:=deltahat/deltahat.sd]
-    setkey(mat,name,bin1,bin2)
+    mat = csnorm_compute_raw_differential(csg, mat, ref)
     #
     #perform fused lasso on signal to noise
     if (verbose==T) cat("  Fused lasso\n")
