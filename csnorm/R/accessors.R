@@ -1,55 +1,34 @@
 #' @include csnorm.R
 NULL
 
-#' Fetch CSbinned indices from CSnorm object
+#' Fetch CSgroup indices from CSnorm object
 #'
 #' @param resolution 
+#' @param group
 #' @param raise boolean. If T raise an exception, otherwise return -1.
 #' @param cs CSnorm object
 #'
-#' @return CSbinned object index
+#' @return CSgroup object index
 #' @keywords internal
 #' @export
 #'
 #' @examples
-get_cs_binned_idx = function(cs, resolution, raise=T) {
-  if(length(cs@binned)>0) {
-    for (i in 1:length(cs@binned)) {
-      if (cs@binned[[i]]@resolution==resolution) return(i)
+get_cs_group_idx = function(cs, resolution, group, raise=T) {
+  if(length(cs@groups)>0) {
+    for (i in 1:length(cs@groups)) {
+      if (cs@groups[[i]]@resolution==resolution & cs@groups[[i]]@group==group) return(i)
     }
   }
   if (raise==T) {
-    stop("CSbinned not found. You must first call bin_all_datasets")
+    stop("CSgroup not found. You must first call bin_all_datasets or group_datasets")
   } else {
     return(-1)
   }
 }
 
-#' Fetch CSmatrix indices from CSbinned object
+#' Fetch CSinter object from CSgroup object
 #'
-#' @param csb CSbinned object
-#' @param group 
-#' @param raise boolean. If T raise an exception, otherwise return -1.
-#'
-#' @return CSmatrix object index
-#' @keywords internal
-#' @export
-#'
-#' @examples
-get_cs_matrix_idx = function(csb, group, raise=T) {
-  for (i in 1:length(csb@grouped)) {
-    if (all(csb@grouped[[i]]@group==group)) return(i)
-  }
-  if (raise==T) {
-    stop("CSmatrix not found. You must first call group_datasets")
-  } else {
-    return(-1)
-  }
-}
-
-#' Fetch CSinter object from CSmatrix object
-#'
-#' @param csm 
+#' @param csg
 #' @param type 
 #' @param threshold 
 #' @param ref 
@@ -60,21 +39,21 @@ get_cs_matrix_idx = function(csb, group, raise=T) {
 #' @export
 #'
 #' @examples
-get_cs_interaction_idx = function(csm, type, threshold, ref, raise=T) {
-  if(length(csm@interactions)>0) {
-    for (i in 1:length(csm@interactions)) {
-      if (csm@interactions[[i]]@type==type
-          && csm@interactions[[i]]@threshold==threshold && csm@interactions[[i]]@ref==ref) return(i)
+get_cs_interaction_idx = function(csg, type, threshold, ref, raise=T) {
+  if(length(csg@interactions)>0) {
+    for (i in 1:length(csg@interactions)) {
+      if (csg@interactions[[i]]@type==type
+          && csg@interactions[[i]]@threshold==threshold && csg@interactions[[i]]@ref==ref) return(i)
     }
   }
   if (raise==T) {
-    stop("CSinter not found. You must first call detect_interactions or detect_differences")
+    stop("CSinter not found. You must first detect the corresponding interactions and differences")
   } else {
     return(-1)
   }
 }
 
-#' Fetch binned matrix from CSnorm object
+#' Fetch grouped matrices from CSnorm object
 #' 
 #' 
 #' @param cs CSnorm object.
@@ -87,10 +66,9 @@ get_cs_interaction_idx = function(csm, type, threshold, ref, raise=T) {
 #' 
 #' @examples
 get_matrices = function(cs, resolution, group) {
-  idx1=get_cs_binned_idx(cs, resolution, raise=T)
-  csb=cs@binned[[idx1]]
-  idx2=get_cs_matrix_idx(csb, group, raise=T)
-  return(csb@grouped[[idx2]]@mat)
+  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+  csb=cs@groups[[idx1]]
+  return(csb@mat)
 }
 
 
@@ -104,15 +82,12 @@ get_matrices = function(cs, resolution, group) {
 #' @export
 #' 
 #' @examples
-get_interactions = function(cs, type, resolution, group,
-                            ref, threshold) {
-  idx1=get_cs_binned_idx(cs, resolution, raise=T)
-  csb=cs@binned[[idx1]]
-  idx2=get_cs_matrix_idx(csb, group, raise=T)
-  csm=csb@grouped[[idx2]]
-  mat=csm@mat
-  idx3=get_cs_interaction_idx(csm, type, threshold, ref)
-  int=csm@interactions[[idx3]]@mat
+get_interactions = function(cs, type, resolution, group, ref, threshold) {
+  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+  csg=cs@groups[[idx1]]
+  mat=csg@mat
+  idx2=get_cs_interaction_idx(csg, type, threshold, ref)
+  int=csg@interactions[[idx2]]@mat
   ret=merge(mat,int,by=c("name","bin1","bin2"))
   if (type=="interactions" | type=="binteractions") {
     return(ret)

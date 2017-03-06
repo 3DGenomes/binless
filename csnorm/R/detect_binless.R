@@ -402,21 +402,18 @@ plot_binless_matrix = function(mat, minima=F) {
 #' @examples
 detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol=1e-3,
                                        cv.fold=10, cv.gridsize=30, verbose=T){
-  #get CSmat object
-  idx1=get_cs_binned_idx(cs, resolution, raise=T)
-  csb=cs@binned[[idx1]]
-  idx2=get_cs_matrix_idx(csb, group, raise=T)
-  csm=csb@grouped[[idx2]]
+  #get CSgroup object
+  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+  csg=cs@groups[[idx1]]
   #check if interaction wasn't calculated already
-  if (get_cs_interaction_idx(csm, type="binteractions", threshold=-1, ref="expected", raise=F)>0)
+  if (get_cs_interaction_idx(csg, type="binteractions", threshold=-1, ref="expected", raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
   mat = csnorm_detect_binless_interactions_irls(cs, resolution=resolution, group=group, ncores=ncores,
                               niter=niter, tol=tol, cv.fold=cv.fold, cv.gridsize=cv.gridsize, verbose=verbose)
   csi=new("CSinter", mat=mat, type="binteractions", threshold=-1, ref="expected")
   #store back
-  csm@interactions=append(csm@interactions,list(csi))
-  csb@grouped[[idx2]]=csm
-  cs@binned[[idx1]]=csb
+  csg@interactions=append(csg@interactions,list(csi))
+  cs@groups[[idx1]]=csg
   return(cs)
 }
 
@@ -432,19 +429,17 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
 #' @examples
 detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=1e-3, ncores=1,
                                       cv.fold=10, cv.gridsize=30, verbose=T){
-  idx1=get_cs_binned_idx(cs, resolution, raise=T)
-  csb=cs@binned[[idx1]]
-  idx2=get_cs_matrix_idx(csb, group, raise=T)
-  csm=csb@grouped[[idx2]]
-  if (get_cs_interaction_idx(csm, type="bdifferences", threshold=-1, ref=ref, raise=F)>0)
+  #get CSgroup object
+  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+  csg=cs@groups[[idx1]]
+  if (get_cs_interaction_idx(csg, type="bdifferences", threshold=-1, ref=ref, raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
   mat = csnorm_detect_binless_differences_irls(cs, resolution=resolution, group=group, ref=ref, ncores=ncores,
                               niter=niter, tol=tol, cv.fold=cv.fold, cv.gridsize=cv.gridsize, verbose=verbose)
   csi=new("CSinter", mat=mat, type="bdifferences", threshold=-1, ref=ref)
-  #add interaction to cs object
-  csm@interactions=append(csm@interactions,list(csi))
-  csb@grouped[[idx2]]=csm
-  cs@binned[[idx1]]=csb
+  #store back
+  csg@interactions=append(csg@interactions,list(csi))
+  cs@groups[[idx1]]=csg
   return(cs)
 }
   

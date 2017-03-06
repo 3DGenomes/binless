@@ -269,41 +269,16 @@ generate_genomic_biases = function(biases, beta_iota, beta_rho, bf_per_kb=1, poi
   return(dt)
 }
 
-#' Bin normalized datasets
-#' 
-#' @param cs CSnorm object, optimized.
+#' Group binned matrices of datasets
+#'
+#' @param cs CSnorm object, normalized.
 #' @param resolution integer. The desired resolution of the matrix.
-#' @param ncores integer. The number of cores to parallelize on.
+#' @param group The type of grouping to be performed. Any combination of the given arguments is possible.
 #' @param ice integer. If positive, perform the optional Iterative Correction 
 #'   algorithm, useful for comparison purposes. The value determines the number
 #'   of iterations.
 #' @param verbose
-#'   
-#' @return A CSnorm object containing an additional CSbinned object in cs@binned
-#' @export
-#' 
-#' @examples
-bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, verbose=T) {
-  if (get_cs_binned_idx(cs,resolution,raise=F)>0) {
-    stop("Refusing to overwrite already existing matrices at ", resolution/1000,
-         "kb. Use them or remove them from the cs@binned list")
-  }
-  mat = csnorm:::compute_grouped_matrices(cs, resolution=resolution, group="all", ncores=ncores, ice=ice, verbose=verbose)
-  #create CSmatrix and CSbinned object
-  csm=new("CSmatrix", mat=mat, group="all", ice=(ice>0), ice.iterations=ice,
-          names=as.character(mat[,unique(name)]))
-  csb=new("CSbinned", resolution=resolution, grouped=list(csm),
-          individual=copy(mat))
-  cs@binned=append(cs@binned,csb)
-  cs
-}
-
-#' Group binned matrices of datasets
-#'
-#' @param cs CSnorm object
-#' @param resolution see \code{\link{bin_all_datasets}}, used to identify the input matrices.
-#' @param group The type of grouping to be performed. Any combination of the given arguments is possible.
-#' @inheritParams bin_all_datasets
+#' @param ncores integer. The number of cores to parallelize on.
 #'
 #' @return CSnorm object
 #' @export
@@ -312,21 +287,25 @@ bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, verbose=T) {
 group_datasets = function(cs, resolution, group=c("condition","replicate","enzyme","experiment"),
                           ice=-1, verbose=T, ncores=1) {
   #fetch and check inputs
-  experiments=cs@experiments
-  csbi=get_cs_binned_idx(cs, resolution=resolution, raise=T)
-  csb=cs@binned[[csbi]]
-  group=match.arg(group, several.ok=T)
-  if (get_cs_matrix_idx(csb, group, raise=F)>0) {
-    stop("Refusing to overwrite already existing ", group,
-         " group matrices. Use them or remove them from the cs@binned[[",csbi,
-         "]]@grouped list and @metadata table")
-  }
+  if (group!="all") group=match.arg(group, several.ok=T)
+  if (get_cs_group_idx(cs, resolution=resolution, group=group, raise=F)>0)
+    stop("Refusing to overwrite already existing ", group, " grouping.")
   #
   mat = compute_grouped_matrices(cs, resolution=resolution, group=group, ncores=ncores, ice=ice, verbose=verbose)
   #store matrices
-  csm=new("CSmatrix", mat=mat, group=group, ice=(ice>0), ice.iterations=ice,
+  csg=new("CSgroup", mat=mat, cts=data.table(), group=group, resolution=resolution, ice=(ice>0), ice.iterations=ice,
           names=as.character(mat[,unique(name)]))
-  csb@grouped=append(csb@grouped,list(csm))
-  cs@binned[[csbi]]=csb
+  cs@groups=append(cs@groups,list(csg))
   return(cs)
+}
+
+#' Bin normalized datasets
+#' 
+#' @inheritParams group_datasets
+#'   
+#' @export
+#' 
+#' @examples
+bin_all_datasets = function(cs, resolution=10000, ncores=1, ice=-1, verbose=T) {
+  group_datasets(cs, resolution=resolution, group="all", ncores=ncores, ice=ice, verbose=verbose)
 }
