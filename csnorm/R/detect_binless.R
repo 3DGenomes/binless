@@ -290,18 +290,14 @@ csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
 #' @export
 #'
 #' @examples
-csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=10, tol=1e-3, ncores=1,
-                                 cv.fold=10, cv.gridsize=30, verbose=T) {
-  if (verbose==T) cat("Binless detection with resolution=",resolution," group=",group," and ref=",ref,"\n")
+csnorm_detect_binless_interactions_irls = function(cs, resolution, group, niter=10, tol=1e-3,
+                                                   ncores=1, cv.fold=10, cv.gridsize=30, verbose=T) {
+  if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
   mat=NULL
   for (step in 1:niter) {
     if (verbose==T) cat("Main loop, step ",step,"\n")
     if (verbose==T) cat(" Estimate raw signal\n")
-    if (ref=="expected") {
-      mat = csnorm:::estimate_binless_signal_irls(cs, resolution, group, mat, verbose)
-    } else {
-      mat = csnorm:::estimate_binless_differential_irls(cs, resolution, group, mat, ref, verbose)
-    }
+    mat = csnorm:::estimate_binless_signal_irls(cs, resolution, group, mat, verbose)
     setkey(mat,name,bin1,bin2)
     #
     #perform fused lasso on signal to noise
@@ -310,20 +306,49 @@ csnorm_detect_binless = function(cs, resolution, group, ref="expected", niter=10
     #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~name)+scale_fill_gradient2(na.value = "white")
     #
     #convert back value to the actual signal
-    if (ref=="expected") {
-      mat[,c("cv.group","phi"):=list(NULL,value*phihat.sd)]
-      mat[,signal.old:=signal]
-      mat[,signal:=exp(phi)]
-      mat=mat[,.(name,bin1,bin2,phi,signal,signal.old,ncounts,value)]
-      if(mat[,all(abs(signal-signal.old)<tol)]) break
-    } else {
-      mat[,c("cv.group","delta"):=list(NULL,value*deltahat.sd)]
-      mat[,diffsig.old:=diffsig]
-      mat[,diffsig:=exp(delta)]
-      mat[,phi.ref:=(phihat.ref/sigmasq.ref + (phihat-delta)/sigmasq)/(1/sigmasq.ref+1/sigmasq)]
-      mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig,diffsig.old,ncounts,value)]
-      if(mat[,all(abs(diffsig-diffsig.old)<tol)]) break
-    }
+    mat[,c("cv.group","phi"):=list(NULL,value*phihat.sd)]
+    mat[,signal.old:=signal]
+    mat[,signal:=exp(phi)]
+    mat=mat[,.(name,bin1,bin2,phi,signal,signal.old,ncounts,value)]
+    if(mat[,all(abs(signal-signal.old)<tol)]) break
+  }
+  mat[,ncounts:=NULL]
+  mat = csnorm:::detect_binless_patches(mat)
+  return(mat)
+}
+
+#' Perform binless difference detection using fused lasso
+#'
+#' @inheritParams csnorm_detect_binless_interactions_irls
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+csnorm_detect_binless_differences_irls = function(cs, resolution, group, ref, niter=10, tol=1e-3,
+                                                  ncores=1, cv.fold=10, cv.gridsize=30, verbose=T) {
+  if (verbose==T) cat("Binless difference detection with resolution=",resolution,
+                      " group=",group," and ref=",ref,"\n")
+  mat=NULL
+  for (step in 1:niter) {
+    if (verbose==T) cat("Main loop, step ",step,"\n")
+    if (verbose==T) cat(" Estimate raw signal\n")
+    mat = csnorm:::estimate_binless_differential_irls(cs, resolution, group, mat, ref, verbose)
+    setkey(mat,name,bin1,bin2)
+    #
+    #perform fused lasso on signal to noise
+    if (verbose==T) cat(" Fused lasso\n")
+    mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, cv.gridsize=cv.gridsize)
+    #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~name)+scale_fill_gradient2(na.value = "white")
+    #
+    #convert back value to the actual signal
+    mat[,c("cv.group","delta"):=list(NULL,value*deltahat.sd)]
+    mat[,diffsig.old:=diffsig]
+    mat[,diffsig:=exp(delta)]
+    mat[,phi.ref:=(phihat.ref/sigmasq.ref + (phihat-delta)/sigmasq)/(1/sigmasq.ref+1/sigmasq)]
+    mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig,diffsig.old,ncounts,value)]
+    if(mat[,all(abs(diffsig-diffsig.old)<tol)]) break
   }
   mat[,ncounts:=NULL]
   mat = csnorm:::detect_binless_patches(mat)
@@ -385,7 +410,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
   #check if interaction wasn't calculated already
   if (get_cs_interaction_idx(csm, type="binteractions", threshold=-1, ref="expected", raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
-  mat = csnorm_detect_binless(cs, resolution=resolution, group=group, ref="expected", ncores=ncores,
+  mat = csnorm_detect_binless_interactions_irls(cs, resolution=resolution, group=group, ncores=ncores,
                               niter=niter, tol=tol, cv.fold=cv.fold, cv.gridsize=cv.gridsize, verbose=verbose)
   csi=new("CSinter", mat=mat, type="binteractions", threshold=-1, ref="expected")
   #store back
@@ -413,7 +438,7 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
   csm=csb@grouped[[idx2]]
   if (get_cs_interaction_idx(csm, type="bdifferences", threshold=-1, ref=ref, raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
-  mat = csnorm_detect_binless(cs, resolution=resolution, group=group, ref=ref, ncores=ncores,
+  mat = csnorm_detect_binless_differences_irls(cs, resolution=resolution, group=group, ref=ref, ncores=ncores,
                               niter=niter, tol=tol, cv.fold=cv.fold, cv.gridsize=cv.gridsize, verbose=verbose)
   csi=new("CSinter", mat=mat, type="bdifferences", threshold=-1, ref=ref)
   #add interaction to cs object
