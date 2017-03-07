@@ -5,50 +5,83 @@ library(doParallel)
 library(foreach)
 library(scales)
 
+
+# load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIIdSMC_all_csdata.RData"))
+# csd1 = csd
+# load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIInov_all_csdata.RData"))
+# csd2 = csd
+# load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIIr1_all_csdata.RData"))
+# csd3 = csd
+# load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIIr2_all_csdata.RData"))
+# csd4 = csd
+# load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIIrif_all_csdata.RData"))
+# csd5 = csd
+
+
 #args=commandArgs(trailingOnly=TRUE)
 sub="SELP_150k"
 bpk=3
 type="perf"
 
-setwd("/home/yannick/simulations/cs_norm")
-
+setwd("/scratch/workspace/csnorm")
+load('cs_r_3_5_ledily.RData')
 #merge datasets
-load(paste0("data/rao_HiCall_GM12878_",sub,"_csdata.RData"))
+load(paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_GM12878_",sub,"_csdata.RData"))
 csd1=csd
-load(paste0("data/rao_HiCall_IMR90_",sub,"_csdata.RData"))
+csd3 = csd
+csd3@info$replicate="1"
+csd3@info$name="T47D es 60 MboI 2"
+csd5 = csd
+csd5@info$replicate="1"
+csd5@info$name="T47D es 60 MboI 4"
+load(paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_IMR90_",sub,"_csdata.RData"))
 csd2=csd
-cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
+csd4 = csd
+csd4@info$replicate="1"
+csd4@info$name="T47D es 60 MboI 3"
+
+cs_r=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
+cs_r=merge_cs_norm_datasets(list(csd1), different.decays="none")
+cs_stan=merge_cs_norm_datasets(list(csd1), different.decays="none")
 
 #look at these objects
 csd1
 csd2
 cs
-
+cs_stan = cs_r
 #normalize using approximation
-cs = run_gauss(cs, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
-               ncounts = 1000000, type=type)
-save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
+cs_stan = run_gauss(cs_stan, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 8, iter=100000, init_alpha=1e-7,
+                 ncounts = 1000000, type=type, fit_model="stan", fit.disp = T, ncores = 8)
+cs_r = run_gauss(cs_r, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
+               ncounts = 1000000, type=type, fit.disp = T, fit.genomic = T, init.dispersion=10, ncores = 8)
+save(cs_r,file=paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
 
 #look at the following objects
 cs
-a=plot_diagnostics(cs)
+a=plot_diagnostics(cs_r)
 a[1]
 a[2]
-cs@par$biases
+cs_r@par$biases
 cs@par$decay
-
+cs_r=cs_stan
 #plot biases and decay
-ggplot(cs@par$biases)+geom_pointrange(aes(pos,etahat,ymin=etahat-std,ymax=etahat+std,colour=cat),alpha=0.1)+
+ggplot(cs_r@par$biases)+geom_pointrange(aes(pos,etahat,ymin=etahat-std,ymax=etahat+std,colour=cat),alpha=0.1)+
   geom_line(aes(pos,eta))+facet_grid(name ~ cat)#+
-ggplot(cs@par$decay)+geom_line(aes(distance,kappa))+
+ggplot(cs_r@par$decay)+geom_line(aes(distance,kappa))+
   geom_pointrange(aes(distance,kappahat,ymin=kappahat-std,ymax=kappahat+std), alpha=0.1)+
   facet_wrap(~name,scales = "free")+scale_x_log10()
+ggplot(data.table(r=cs_r@par$biases[,etahat],stan=cs_stan@par$biases[,etahat],cat=cs_stan@par$biases[,cat]))+
+  geom_point(aes(r,stan))+facet_wrap(~cat)+stat_function(fun=identity)
+
+cs_r@par$alpha
+cs_stan@par$alpha
 
 
-
+load(file=paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
+cs=cs_r
 #bin at 20kb
 resolution=5000
-ncores=30
+ncores=8
 cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ice=100, ncores=ncores)
 mat=get_matrices(cs, resolution=resolution, group="all")
 ggplot(mat)+
@@ -57,9 +90,11 @@ ggplot(mat)+
   scale_fill_gradient(low="white", high="black")+
   theme_bw()+theme(legend.position = "none")+facet_wrap(~name)
 
+save(cs,file=paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
+load(file=paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
 
 #detect significant interactions
-cs=detect_interactions(cs, resolution=resolution, group="all", threshold=0.95, ncores=ncores)
+cs=detect_interactions(cs, resolution=resolution, group="all", threshold=0.95, ncores=ncores, binless=T)
 mat=get_interactions(cs, type="interactions", resolution=resolution, group="all", threshold=0.95, ref="expected")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=-log(signal)))+

@@ -112,6 +112,7 @@ C=-bandSparse(Kdiag, Kdiag-1, k=c(0,-1),diagonals=list(diags[[1]],-diags[[1]]))
 Ct=rbind(matrix(0,nrow=2,ncol=Kdiag), cbind(t(X)%*%w,C))
 ggplot(as.data.table(melt(as.matrix(Ct)==0)))+geom_raster(aes(Var1,Var2,fill=value))
 #
+tmp2 = t(Xt)%*%Sm2%*%y
 fit = solve.QP(At, t(Xt)%*%Sm2%*%y, -Ct, meq = 2)
 betat = fit$solution
 #

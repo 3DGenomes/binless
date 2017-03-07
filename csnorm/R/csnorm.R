@@ -21,12 +21,16 @@
 #' @section Postprocessing:
 #' \code{\link{bin_all_datasets}}
 #' \code{\link{group_datasets}}
-#' \code{\link{detect_interactions}}
-#' \code{\link{detect_differences}}
+#' \code{\link{detect_binned_interactions}}
+#' \code{\link{detect_binned_differences}}
+#' \code{\link{detect_binless_interactions}}
+#' \code{\link{detect_binless_differences}}
 #' \code{\link{generate_genomic_biases}}
+#' \code{\link{plot_binless_matrix}}
 #'
 #' @useDynLib csnorm, .registration = TRUE
 #' @import rstan
+#' @import splines
 #' @import mgcv
 #' @import data.table
 #' @import doParallel
@@ -38,6 +42,8 @@
 #' @import MASS
 #' @import abind
 #' @import methods
+#' @import Matrix
+#' @import quadprog
 #' @importFrom Hmisc cut2
 #' @importFrom dplyr ntile
 #'
@@ -128,13 +134,14 @@ setMethod("show",signature="CSinter",definition=function(object) {
   }
 })
 
-#' Class for one binned matrix and its interaction detections
+#' Class for one dataset grouping at a given (base) resolution
 #'
 #' @slot mat data.table. 
 #' @slot interactions list. 
+#' @slot resolution in bases.
 #' @slot group 
-#' @slot ice 
-#' @slot ice.iterations 
+#' @slot cts data.table. The counts and predicted means used in all calculations.
+#' @slot dispersion
 #' @slot names 
 #'
 #' @return
@@ -142,22 +149,20 @@ setMethod("show",signature="CSinter",definition=function(object) {
 #' @export
 #'
 #' @examples
-setClass("CSmatrix",
+setClass("CSgroup",
          slots = list(mat="data.table",
                       interactions="list",
+                      resolution="numeric",
                       group="character",
-                      ice="logical",
-                      ice.iterations="numeric",
+                      cts="data.table",
+                      dispersion="numeric",
                       names="character"))
 
-setMethod("show",signature="CSmatrix",definition=function(object) {
+setMethod("show",signature="CSgroup",definition=function(object) {
   if (length(object@group)==1 && object@group=="all") {
-    cat("      * Individual") 
+    cat("   *** Individual at", object@resolution/1000, "kb resolution") 
   } else {
-    cat("      * Group [", object@group,"]")
-  }
-  if (object@ice==T) {
-    cat(" with ICE (", object@ice.iterations,"iterations)")
+    cat("   *** Group [", object@group,"] at", object@resolution/1000, "kb resolution")
   }
   cat( " : ", object@names, "\n")
   if (length(object@interactions)==0) {
@@ -167,27 +172,6 @@ setMethod("show",signature="CSmatrix",definition=function(object) {
   }
   cat("\n")
 })
-
-#' Class to hold binned matrices at a given resolution
-#'
-#' @slot resolution numeric. Matrix resolution, in bases
-#' @slot individual 
-#' @slot grouped 
-#'
-#' @return
-#' @export
-#'
-#' @examples
-setClass("CSbinned",
-         slots = list(resolution="numeric",
-                      individual="data.table",
-                      grouped="list"))
-
-setMethod("show",signature="CSbinned",definition=function(object) {
-  cat("   *** At", object@resolution/1000, "kb resolution:\n")
-  lapply(object@grouped, show)
-  cat("\n")
-  })
 
 #' Class to hold cut-site normalization data
 #'
@@ -214,7 +198,7 @@ setClass("CSnorm",
                       par="list",
                       diagnostics="list",
                       pred="list",
-                      binned="list"))
+                      groups="list"))
 
 setMethod("show",signature="CSnorm",definition=function(object) {
   cat("Cut-site normalization object\n")
@@ -243,12 +227,12 @@ setMethod("show",signature="CSnorm",definition=function(object) {
     cat(" Normalized dataset\n")
     cat("  lambda_iota: ",object@par$lambda_iota, "\n  lambda_rho: ",object@par$lambda_rho, "\n  lambda_diag: ",object@par$lambda_diag,"\n")
     cat("  dispersion: ",object@par$alpha,"\n log likelihood: ", object@par$value, "\n")
-    nbinned=length(object@binned)
-    if (nbinned==0) {
-      cat(" No binned matrix available")
+    ngroups=length(object@groups)
+    if (ngroups==0) {
+      cat(" No groupings available")
     } else {
-      cat("\n ### ", nbinned, " resolution available\n\n", sep="")
-      lapply(object@binned, show)
+      cat("\n ### ", ngroups, " groupings available\n\n", sep="")
+      lapply(object@groups, show)
     }
   }
 })
