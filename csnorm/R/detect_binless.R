@@ -169,7 +169,7 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
 #' 
 #' finds optimal lambda2 through k-fold cv. Uses lambda1=0
 #' @keywords internal
-csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
+csnorm_fused_lasso = function(mat, cv.fold=10, tol=1e-3, verbose=T) {
   if (verbose==T) cat("   estimation runs\n")
   groupnames=mat[,as.character(unique(name))]
   cmat = csnorm:::flsa_compute_connectivity(mat[,nlevels(bin1)])
@@ -199,38 +199,28 @@ csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
     else
       cv
   }
-  #then, try a few lambda values to define the interesting region
-  if (verbose==T) cat("  coarse scan\n")
-  cv = foreach (g=groupnames, .combine=rbind) %do% {
-    minlambda=min(res.ref[[g]]$EndLambda[res.ref[[g]]$EndLambda>0])
+  #determine optimal lambda2 value
+  if (verbose==T) cat("  determine lambda2\n")
+  obj = function(x,g){csnorm:::flsa_cross_validate(mat[name==g], res.cv, cvgroups, lambda1=0, lambda2=x)[,mse]}
+  l2vals = foreach(g=groupnames, .combine=rbind) %dopar% {
+    minlambda=0
     maxlambda=max(res.ref[[g]]$BeginLambda)
-    l2vals=c(0,10^seq(log10(minlambda),log10(maxlambda),length.out=cv.gridsize))
-    foreach (lambda2=l2vals, .combine=rbind) %dopar%
-      csnorm:::flsa_cross_validate(mat[name==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
+    op=optimize(obj, c(minlambda,maxlambda), g, tol=tol)
+    l2vals=sort(res.ref[[g]]$BeginLambda)
+    i=findInterval(op$minimum, l2vals)
+    if (i==length(l2vals)) {
+      lambda2=l2vals[i]
+    } else if (i==0) {
+      lambda2=0
+    } else if (obj(l2vals[i],g) <= obj(l2vals[i+1],g)) {
+        lambda2=l2vals[i]
+    } else {
+      lambda2=l2vals[i+1]
+    }
+    data.table(name=g, lambda2=lambda2)
   }
-  #ggplot(cv)+geom_line(aes(lambda2,mse))+geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
-  #  facet_wrap(~name,scales="free")+scale_x_log10()
-  #lower bound is lambda one step below minimum mse
-  bounds=merge(cv,cv[,.SD[mse==min(mse),.(lambda2.max=lambda2)],by=name],by="name")
-  lmin=bounds[lambda2<lambda2.max,.(l2min=max(lambda2)),by=name]
-  #upper bound is lambda one step above mse
-  lmax=bounds[,.SD[lambda2>lambda2.max,.(l2max=min(lambda2))],by=name]
-  bounds=merge(lmin,lmax,by="name", all=T)
-  bounds[,l2max:=pmin(l2max, sapply(as.character(name),FUN=function(g){max(res.ref[[g]]$BeginLambda)}), na.rm=T)]
   #
-  #now, try all lambda values between these bounds
-  if (verbose==T) cat("   fine scan\n")
-  cv = foreach (g=groupnames, .combine=rbind) %do% {
-    l2vals=sort(unique(res.ref[[g]]$BeginLambda))
-    l2vals=bounds[name==g,l2vals[l2vals>=l2min & l2vals<=l2max]]
-    foreach (lambda2=l2vals, .combine=rbind) %dopar%
-      csnorm:::flsa_cross_validate(mat[name==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
-  }
-  #ggplot(cv)+geom_line(aes(lambda2,mse))+#geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
-  #  facet_wrap(~name,scales="free")
-  #determine optimal lambda value and compute coefficients
   if (verbose==T) cat("   report optimum\n")
-  l2vals=cv[,.SD[mse==min(mse),.(lambda2)],by=name]
   for (g in groupnames)
     mat[name==g,value:=flsaGetSolution(res.ref[[g]], lambda1=0, lambda2=l2vals[name==g,lambda2])[1,]]
   return(mat)
@@ -252,7 +242,7 @@ csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
 #' 
 #' @examples
 detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol=1e-3,
-                                       cv.fold=10, cv.gridsize=30, verbose=T){
+                                       cv.fold=10, verbose=T){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
@@ -266,11 +256,11 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
   for (step in 1:niter) {
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
-    mat = csnorm_compute_raw_signal(csg, mat)
+    mat = csnorm:::csnorm_compute_raw_signal(csg, mat)
     #
     #perform fused lasso on signal to noise
     if (verbose==T) cat("  Fused lasso\n")
-    mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, cv.gridsize=cv.gridsize)
+    mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, tol=tol)
     #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~name)+scale_fill_gradient2(na.value = "white")
     #
     #convert back value to the actual signal
@@ -303,7 +293,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
 #' 
 #' @examples
 detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=1e-3, ncores=1,
-                                      cv.fold=10, cv.gridsize=30, verbose=T){
+                                      cv.fold=10, verbose=T){
   if (verbose==T) cat("Binless difference detection with resolution=",resolution,
                       " group=",group," and ref=",ref,"\n")
   ### get CSgroup object
@@ -319,7 +309,7 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
     #
     #perform fused lasso on signal to noise
     if (verbose==T) cat("  Fused lasso\n")
-    mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, cv.gridsize=cv.gridsize)
+    mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, tol=tol)
     #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~name)+scale_fill_gradient2(na.value = "white")
     #
     #convert back value to the actual signal
