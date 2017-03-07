@@ -737,77 +737,6 @@ get_nzeros_normalization = function(cs, ncores=1) {
   return(zeros)
 }
 
-#' count number of zeros in each decay bin
-#' @keywords internal
-#' 
-get_nzeros_per_decay = function(cs, ncores=1) {
-  #bin distances
-  dbins=cs@settings$dbins
-  stopifnot(cs@counts[id1>=id2,.N]==0)
-  mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
-               variable.name = "category", value.name = "count")[count>0]
-  mcounts[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-  #Count positive counts in these bins
-  Nkd = mcounts[,.(nnz=.N),keyby=c("name","dbin")]
-  #Nkd[,mdist:=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)])] #cannot use dbins because some rows could be missing
-  #stopifnot(Nkd[mdist<cs@settings$dmin,.N]==0) #otherwise cs@counts has not been censored properly
-  #Count the number of crossings per distance bin
-  #looping over IDs avoids building NxN matrix
-  registerDoParallel(cores=ncores)
-  Nkz = foreach(i=cs@biases[,(1:.N)], .multicombine = T,
-              .combine=function(...){rbind(...)[,.(ncross=sum(ncross)),keyby=c("name","dbin")]}) %dopar% {
-    stuff=c(cs@biases[i,.(name,id,pos)])
-    dists=cs@biases[name==stuff$name & id>stuff$id,.(name,distance=abs(pos-stuff$pos))]
-    if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
-    dists=dists[distance>=cs@settings$dmin]
-    dists[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-    dists[,.(ncross=.N),keyby=c("name","dbin")]
-  }
-  #deduce zero counts
-  Nkz = merge(Nkz,Nkd,all=T)
-  Nkz[is.na(nnz),nnz:=0]
-  Nkz[,nzero:=4*ncross-nnz]
-  return(Nkz)
-}
-
-#' count number of zeros in each decay bin
-#' @keywords internal
-#' 
-get_nzeros_per_cutsite = function(cs, ncores=1) {
-  stopifnot(cs@counts[id1>=id2,.N]==0)
-  cts=rbind(cs@counts[contact.close>0,.(name, id=id1, cat="contact R", count=contact.close)],
-            cs@counts[contact.far>0,  .(name, id=id1, cat="contact L", count=contact.far)],
-            cs@counts[contact.down>0, .(name, id=id1, cat="contact R", count=contact.down)],
-            cs@counts[contact.up>0,   .(name, id=id1, cat="contact L", count=contact.up)],
-            cs@counts[contact.far>0,  .(name, id=id2, cat="contact R", count=contact.far)],
-            cs@counts[contact.close>0,.(name, id=id2, cat="contact L", count=contact.close)],
-            cs@counts[contact.down>0, .(name, id=id2, cat="contact R", count=contact.down)],
-            cs@counts[contact.up>0,   .(name, id=id2, cat="contact L", count=contact.up)])
-  cts=cts[,.N,keyby=c("id","name","cat")]
-  zbias=rbind(cts[cat=="contact L"][cs@biases,.(name,id,pos,cat="contact L",nnz=N)],
-              cts[cat=="contact R"][cs@biases,.(name,id,pos,cat="contact R",nnz=N)])
-  zbias[is.na(nnz),nnz:=0]
-  setkey(zbias,id,name)
-  #count masked contacts where d<dmin
-  registerDoParallel(cores=ncores)
-  masked = foreach(i=cs@biases[,(1:.N)], .combine=rbind) %dopar% {
-    stuff=c(cs@biases[i,.(name,id,pos)])
-    dists=cs@biases[name==stuff$name & id!=stuff$id,.(name,distance=abs(pos-stuff$pos))]
-    if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
-    dists[distance<cs@settings$dmin,.(name=name[1],id=stuff$id,ncross.close=.N)]
-  }
-  setkey(masked,id,name)
-  masked=masked[cs@biases,.(name,id,ncross.close)]
-  masked[is.na(ncross.close),ncross.close:=0]
-  #deduce number of zero counts
-  zbias=masked[zbias]
-  zbias[,ncs:=(.N/2-1),by=name]
-  zbias[,nzero:=2*(ncs-ncross.close)-nnz]
-  stopifnot(zbias[,.N]==cs@biases[,.N*2])
-  setkey(zbias,id,name,cat)
-  return(zbias)
-}
-
 #' Get the first ncounts/d of each of d datasets, including zeros 
 #' 
 #' count is always a bit smaller because we censor those that are <dmin without adding more counts
@@ -913,7 +842,7 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
   if (verbose==T) cat("Normalization with fast approximation and ",type,"iteration\n")
   #clean object if dirty
   cs@par=list() #in case we have a weird object
-  cs@binned=list()
+  cs@groups=list()
   setkey(cs@biases, id, name)
   setkey(cs@counts, id1, id2, name)
   #basic checks
