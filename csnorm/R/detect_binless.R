@@ -22,30 +22,39 @@ flsa_compute_connectivity = function(nbins, start=0) {
   return(ret)
 }
 
+
 #' compute cv error for a given value of of lambda1 and lambda2
 #' @keywords internal
-flsa_cross_validate = function(mat, res.cv, cvgroups, lambda1, lambda2) {
+flsa_get_value = function(flsa.op, lambda1, lambda2, eCsd) {
+  #assume lambda1=0
+  value=flsaGetSolution(flsa.op, lambda1=0, lambda2=lambda2)[1,]-eCsd
+  #now soft-threshold manually around eCsd
+  value=sign(value)*pmax(abs(value)-lambda1, 0)
+  return(value)
+}
+
+#' compute cv error for a given value of of lambda1 and lambda2
+#' @keywords internal
+flsa_cross_validate = function(mat, res.ref, res.cv, cvgroups, lambda1, lambda2, eCsd) {
   #compute coefficients on each model
-  submat.all = mat[,.(name,bin1,bin2,ncounts, value.ref=value)]
+  submat.all = mat[name==g,.(name,bin1,bin2,ncounts,
+                      value.ref=csnorm:::flsa_get_value(res.ref[[as.character(name[1])]],
+                                               lambda1=lambda1, lambda2=lambda2, eCsd=eCsd))]
   #compute cv coefs for each group, given lambda
   submat.cv = foreach(cv=cvgroups, .combine=rbind) %do% {
-    ret = mat[,.(name,cv.group,bin1,bin2)]
-    if (lambda1>0) {
-      ret[,value:=flsaGetSolution(res.cv[[cv]][[as.character(name[1])]],
-                                        lambda1=lambda1, lambda2=lambda2)[1,1,],by=name]
-    } else {
-      ret[,value:=flsaGetSolution(res.cv[[cv]][[as.character(name[1])]],
-                                        lambda1=lambda1, lambda2=lambda2)[1,],by=name]
-    }
+    ret = mat[name==g,.(name,cv.group,bin1,bin2)]
+    ret[,value:=csnorm:::flsa_get_value(res.cv[[cv]][[as.character(name[1])]],
+                                lambda1=lambda1, lambda2=lambda2, eCsd=eCsd),by=name]
     ret[cv.group==cv]
   }
-  #ggplot(submat.cv)+geom_raster(aes(ibin1,ibin2,fill=value))+facet_grid(groupname~cv.group)
+  #ggplot(submat.cv)+geom_raster(aes(ibin1,ibin2,fill=value))+facet_grid(name~cv.group)
   #ggplot(submat.all)+geom_raster(aes(ibin1,ibin2,fill=value.ref))+facet_grid(~name)#+scale_fill_gradient2()
   ret=merge(submat.cv, submat.all, all.x=T, by=c("name","bin1","bin2"), sort=F)
+  ggplot(ret)+geom_raster(aes(bin1,bin2,fill=value))+geom_raster(aes(bin2,bin1,fill=value.ref))
   ret[,mse:=ncounts*(value-value.ref)^2]
   ret=ret[,.(mse=mean(mse),ncounts=.N),by=c("name","cv.group")]
   ret=ret[,.(mse=weighted.mean(mse,ncounts),mse.sd=sd(mse)),by=name]
-  ret[,.(name,lambda1=lambda1,lambda2=lambda2,mse,mse.sd)]
+  ret[,.(name,lambda1=lambda1,lambda2=lambda2,eCsd=eCsd,mse,mse.sd)]
 }
 
 #' connectivity on a triangle
@@ -131,14 +140,81 @@ detect_binless_patches = function(mat) {
 #' @keywords internal
 csnorm_compute_raw_signal = function(csg, mat) {
   cts = csg@cts
-  if (is.null(mat)) mat=cts[,.(phi=0,signal=1),by=c("name","bin1","bin2")]
-  cts = mat[,.(name,bin1,bin2,phi,signal)][cts,,on=c("name","bin1","bin2")]
-  cts[,c("z","var"):=list(count/(exp(phi)*mu)-1,(1/(exp(phi)*mu)+1/csg@dispersion))]
-  mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
+  if (is.null(mat)) mat=cts[,.(phi=0,signal=1,eCprime=0),by=c("name","bin1","bin2")]
+  cts = mat[,.(name,bin1,bin2,phi,signal,eCprime)][cts,,on=c("name","bin1","bin2")]
+  cts[,c("z","var"):=list(count/(exp(phi+eCprime)*mu)-1,(1/(exp(phi+eCprime)*mu)+1/csg@dispersion))]
+  mat = cts[,.(phihat=weighted.mean(z+phi+eCprime, weight/var),
                phihat.sd=sqrt(1/sum(weight/var)),ncounts=sum(weight)),by=c("name","bin1","bin2","phi","signal")]
-  mat[,value:=phihat/phihat.sd]
+  mat[,valuehat:=phihat/phihat.sd]
   setkey(mat,name,bin1,bin2)
   return(mat)
+}
+
+#' cross-validate eCsd
+#' @keywords internal
+optimize_eCsd = function(mat, res.ref, res.cv, cvgroups, g, lambda1=0, lambda2=0, eCsd.init=0, enforce.positivity=T) {
+  obj = function(x){csnorm:::flsa_cross_validate(mat[name==g], res.ref, res.cv,
+                                                 cvgroups, lambda1=lambda1, lambda2=lambda2,
+                                                 eCsd=x)[,mse]}
+  mineC=mat[name==g,min(value)]
+  maxeC=mineC+lambda1
+  if (enforce.positivity==T) {
+    maxeC=min(mat[name==g,(max(value)+min(value))/2], maxeC)
+  }
+  #ggplot(data.table(x=seq(mineC,maxeC,l=100))[,.(x,y=sapply(x,obj))])+geom_line(aes(x,y))
+  if (lambda1>0) {
+    eC=optimize(obj, c(mineC,maxeC), tol=tol)$minimum
+  } else {
+    eC=mineC
+  }
+  data.table(name=g, lambda2=lambda2, eCsd=eC+eCsd.init, lambda1=lambda1)
+}
+
+#' cross-validate lambda1
+#' @keywords internal
+optimize_lambda1 = function(mat, res.ref, res.cv, cvgroups, g, lambda2=0, eCsd=0, enforce.positivity=T) {
+  obj = function(x){csnorm:::flsa_cross_validate(mat[name==g], res.ref, res.cv,
+                                                 cvgroups, lambda1=x, lambda2=lambda2,
+                                                 eCsd=eCsd)[,mse]}
+  if (enforce.positivity==T) { #we force all signal values to be positive
+    minlambda=mat[name==g,abs(min(value))] #in this case minlambda <= maxlambda always
+    maxlambda=mat[name==g,abs(max(value))]
+    stopifnot(minlambda<=maxlambda)
+  } else { #we don't
+    minlambda=0
+    maxlambda=mat[name==g,max(abs(value))]
+  }
+  #ggplot(data.table(x=seq(minlambda,maxlambda,l=100))[,.(x,y=sapply(x,obj))])+geom_line(aes(x,y))
+  if (maxlambda>0) {
+    lambda1=optimize(obj, c(minlambda,maxlambda), tol=tol)$minimum
+    if (abs(lambda1)<tol) lambda1=0
+  } else {
+    lambda1=0
+  }
+  data.table(name=g, lambda2=lambda2, eCsd=eCsd, lambda1=lambda1)
+}
+
+#' cross-validate lambda2
+#' @keywords internal
+optimize_lambda2 = function(mat, res.ref, res.cv, cvgroups, g, lambda1=0, eCsd=0) {
+  obj = function(x){csnorm:::flsa_cross_validate(mat[name==g], res.ref, res.cv,
+                                                 cvgroups, lambda1=lambda1, lambda2=x, eCsd=eCsd)[,mse]}
+  minlambda=0
+  maxlambda=max(res.ref[[g]]$BeginLambda)
+  #ggplot(data.table(x=seq(minlambda,maxlambda,l=100))[,.(x,y=sapply(x,obj))])+geom_line(aes(x,y))
+  op=optimize(obj, c(minlambda,maxlambda), tol=tol)
+  l2vals=sort(res.ref[[g]]$BeginLambda)
+  i=findInterval(op$minimum, l2vals)
+  if (i==length(l2vals)) {
+    lambda2=l2vals[i]
+  } else if (i==0) {
+    lambda2=0
+  } else if (obj(l2vals[i]) <= obj(l2vals[i+1])) {
+    lambda2=l2vals[i]
+  } else {
+    lambda2=l2vals[i+1]
+  }
+  data.table(name=g, lambda2=lambda2, eCsd=eCsd, lambda1=lambda1)
 }
 
 #' compute input to fused lasso
@@ -167,16 +243,17 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
 
 #' run fused lasso on each dataset contained in mat, fusing 'value'
 #' 
-#' finds optimal lambda2 through k-fold cv. Uses lambda1=0
+#' finds optimal lambda1, lambda2 and eC through k-fold cv.
 #' @keywords internal
-csnorm_fused_lasso = function(mat, cv.fold=10, tol=1e-3, verbose=T) {
+csnorm_fused_lasso = function(mat, cv.fold=10, tol=1e-3, niter=10, verbose=T, enforce.positivity=T, ncores=ncores) {
   if (verbose==T) cat("   estimation runs\n")
   groupnames=mat[,as.character(unique(name))]
   cmat = csnorm:::flsa_compute_connectivity(mat[,nlevels(bin1)])
+  registerDoParallel(cores=ncores)
   res.ref = foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
     submat=mat[name==g]
     stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
-    flsa(submat[,value], connListObj=cmat, verbose=F)
+    flsa(submat[,valuehat], connListObj=cmat, verbose=F)
   }
   #fail if any has failed (flsa bugs)
   if (any(sapply(res.ref, is.null))) stop("one flsa run failed, aborting")
@@ -188,9 +265,9 @@ csnorm_fused_lasso = function(mat, cv.fold=10, tol=1e-3, verbose=T) {
   res.cv = foreach (cv=cvgroups, .final=function(x){setNames(x,cvgroups)}) %:%
     foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
       submat=copy(mat[name==g])
-      submat[cv.group==cv,value:=0]
+      submat[cv.group==cv,valuehat:=0]
       stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
-      flsa(submat[,value], connListObj=cmat, verbose=F)
+      flsa(submat[,valuehat], connListObj=cmat, verbose=F)
     }
   #remove failed cv attempts (flsa bugs)
   cvgroups = foreach(cv=cvgroups, .combine=c) %do% {
@@ -199,30 +276,41 @@ csnorm_fused_lasso = function(mat, cv.fold=10, tol=1e-3, verbose=T) {
     else
       cv
   }
-  #determine optimal lambda2 value
-  if (verbose==T) cat("  determine lambda2\n")
-  obj = function(x,g){csnorm:::flsa_cross_validate(mat[name==g], res.cv, cvgroups, lambda1=0, lambda2=x)[,mse]}
-  l2vals = foreach(g=groupnames, .combine=rbind) %dopar% {
-    minlambda=0
-    maxlambda=max(res.ref[[g]]$BeginLambda)
-    op=optimize(obj, c(minlambda,maxlambda), g, tol=tol)
-    l2vals=sort(res.ref[[g]]$BeginLambda)
-    i=findInterval(op$minimum, l2vals)
-    if (i==length(l2vals)) {
-      lambda2=l2vals[i]
-    } else if (i==0) {
-      lambda2=0
-    } else if (obj(l2vals[i],g) <= obj(l2vals[i+1],g)) {
-        lambda2=l2vals[i]
-    } else {
-      lambda2=l2vals[i+1]
+  #determine optimal parameters
+  if (verbose==T) cat("  determine optimal parameters\n")
+  params = foreach(g=groupnames, .combine=rbind) %dopar% {
+    matg=mat[name==g]
+    #lambda2
+    lambda1=0
+    eCsd=0
+    matg[,value:=NULL]
+    for (i in 1:niter) {
+      matg[,value.old:=value]
+      lambda2 = csnorm:::optimize_lambda2(matg, res.ref, res.cv, cvgroups, g,
+                                          lambda1=lambda1, eCsd=eCsd)[,lambda2]
+      matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
+      #eCsd
+      eCsd = csnorm:::optimize_eCsd(matg, res.ref, res.cv, cvgroups, g,
+                                          lambda1=lambda1, lambda2=lambda2, eCsd.init=eCsd,
+                                          enforce.positivity=enforce.positivity)[,eCsd]
+      matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
+      #lambda1
+      lambda1 = csnorm:::optimize_lambda1(matg, res.ref, res.cv, cvgroups, g,
+                                         lambda2=lambda2, eCsd=eCsd,
+                                         enforce.positivity=enforce.positivity)[,lambda1]
+      matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
+      cat("   iteration ",i," : lambda1=",lambda1," lambda2=",lambda2," eCsd'=",eCsd,"\n")
+      #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()
+      if (matg[,all(abs(value-value.old)<tol)]) break
     }
-    data.table(name=g, lambda2=lambda2)
+    data.table(name=g,lambda1=lambda1,lambda2=lambda2,eCsd=eCsd)
   }
-  #
-  if (verbose==T) cat("   report optimum\n")
-  for (g in groupnames)
-    mat[name==g,value:=flsaGetSolution(res.ref[[g]], lambda1=0, lambda2=l2vals[name==g,lambda2])[1,]]
+  mat = foreach (g=groupnames, .combine=rbind) %do% {
+    p=params[name==g]
+    mat[name==g,c("lambda1","lambda2","eCsd"):=list(p$lambda1, p$lambda2, p$eCsd)]
+    mat[name==g,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=p$lambda1, lambda2=p$lambda2,
+                                               eCsd=p$eCsd)]
+  }
   return(mat)
 }
 
@@ -260,14 +348,14 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     #
     #perform fused lasso on signal to noise
     if (verbose==T) cat("  Fused lasso\n")
-    mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, tol=tol)
-    #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~name)+scale_fill_gradient2(na.value = "white")
+    mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, tol=tol, enforce.positivity=T, ncores=ncores)
+    #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=-value))+facet_wrap(~name)+scale_fill_gradient2(na.value = "white")
     #
     #convert back value to the actual signal
-    mat[,c("cv.group","phi"):=list(NULL,value*phihat.sd)]
+    mat[,c("cv.group","phi","eCprime"):=list(NULL,value*phihat.sd,eCsd*phihat.sd)]
     mat[,signal.old:=signal]
     mat[,signal:=exp(phi)]
-    mat=mat[,.(name,bin1,bin2,phi,signal,signal.old,ncounts,value)]
+    mat=mat[,.(name,bin1,bin2,phi,eCprime,signal,signal.old,ncounts,value)]
     if(mat[,all(abs(signal-signal.old)<tol)]) break
   }
   mat[,ncounts:=NULL]
@@ -309,7 +397,7 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
     #
     #perform fused lasso on signal to noise
     if (verbose==T) cat("  Fused lasso\n")
-    mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, tol=tol)
+    mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, tol=tol, ncores=ncores)
     #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~name)+scale_fill_gradient2(na.value = "white")
     #
     #convert back value to the actual signal
