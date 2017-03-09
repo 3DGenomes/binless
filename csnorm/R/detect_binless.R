@@ -231,7 +231,7 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
 #' 
 #' finds optimal lambda1, lambda2 and eC through k-fold cv.
 #' @keywords internal
-csnorm_fused_lasso = function(mat, cv.fold=10, tol=1e-3, niter=10, verbose=T, enforce.positivity=T, ncores=ncores) {
+csnorm_fused_lasso = function(mat, tol=1e-3, niter=10, verbose=T, enforce.positivity=T, ncores=ncores) {
   if (verbose==T) cat("   compute fused lasso solution path\n")
   groupnames=mat[,as.character(unique(name))]
   cmat = csnorm:::flsa_compute_connectivity(mat[,nlevels(bin1)])
@@ -245,12 +245,16 @@ csnorm_fused_lasso = function(mat, cv.fold=10, tol=1e-3, niter=10, verbose=T, en
   if (any(sapply(res.ref, is.null))) stop("one flsa run failed, aborting")
   #
   #determine optimal parameters
-  if (verbose==T) cat("  determine optimal parameters\n")
+  if (verbose==T) cat("   determine optimal parameters\n")
   params = foreach(g=groupnames, .combine=rbind) %dopar% {
     matg=mat[name==g]
     #lambda2
-    lambda1=0
-    eCsd=0
+    lambda1=matg[,mad(valuehat)/2]
+    if (enforce.positivity==T) {
+      eCsd=matg[,min(valuehat)+lambda1]
+    } else {
+      eCsd=matg[,median(valuehat)]
+    }
     matg[,value:=0]
     for (i in 1:niter) {
       matg[,value.old:=value]
@@ -264,9 +268,10 @@ csnorm_fused_lasso = function(mat, cv.fold=10, tol=1e-3, niter=10, verbose=T, en
       matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
       #lambda1
       lambda1 = csnorm:::optimize_lambda1(matg, res.ref, g,
-                                         lambda2=lambda2, eCsd=eCsd,
-                                         enforce.positivity=enforce.positivity)[,lambda1]
+                                          lambda2=lambda2, eCsd=eCsd,
+                                          enforce.positivity=enforce.positivity)[,lambda1]
       matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
+      #
       cat("   iteration ",i," : lambda1=",lambda1," lambda2=",lambda2," eCsd'=",eCsd,"\n")
       #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()
       if (matg[,all(abs(value-value.old)<tol)]) break
@@ -275,10 +280,12 @@ csnorm_fused_lasso = function(mat, cv.fold=10, tol=1e-3, niter=10, verbose=T, en
   }
   mat = foreach (g=groupnames, .combine=rbind) %do% {
     p=params[name==g]
-    mat[name==g,c("lambda1","lambda2","eCsd"):=list(p$lambda1, p$lambda2, p$eCsd)]
-    mat[name==g,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=p$lambda1, lambda2=p$lambda2,
-                                               eCsd=p$eCsd)]
+    matg=mat[name==g]
+    matg[,c("lambda1","lambda2","eCsd"):=list(p$lambda1, p$lambda2, p$eCsd)]
+    matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=p$lambda1, lambda2=p$lambda2,eCsd=p$eCsd)]
+    matg
   }
+  #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()+facet_wrap(~name)
   return(mat)
 }
 
@@ -289,16 +296,13 @@ csnorm_fused_lasso = function(mat, cv.fold=10, tol=1e-3, niter=10, verbose=T, en
 #' @param resolution 
 #' @param group 
 #' @param ncores 
-#' @param niter number of IRLS iterations
-#' @param cv.fold perform x-fold cross-validation
-#' @param cv.gridsize compute possible values of log lambda on a grid
+#' @param niter number of IRLS iterations, and Cp iterations within
 #'   
 #' @return 
 #' @export
 #' 
 #' @examples
-detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol=1e-3,
-                                       cv.fold=10, verbose=T){
+detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol=1e-3, verbose=T){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
@@ -316,14 +320,15 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     #
     #perform fused lasso on signal to noise
     if (verbose==T) cat("  Fused lasso\n")
-    mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, tol=tol, enforce.positivity=T, ncores=ncores)
-    #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=-value))+facet_wrap(~name)+scale_fill_gradient2(na.value = "white")
+    mat = csnorm:::csnorm_fused_lasso(mat, tol=tol, niter=niter, enforce.positivity=T, ncores=ncores)
+    #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+facet_wrap(~name)+scale_fill_gradient(na.value = "black")
     #
     #convert back value to the actual signal
-    mat[,c("cv.group","phi","eCprime"):=list(NULL,value*phihat.sd,eCsd*phihat.sd)]
+    mat[,c("phi","eCprime"):=list(value*phihat.sd,eCsd*phihat.sd)]
     mat[,signal.old:=signal]
     mat[,signal:=exp(phi)]
-    mat=mat[,.(name,bin1,bin2,phi,eCprime,signal,signal.old,ncounts,value)]
+    mat=mat[,.(name,bin1,bin2,phi,eCprime,signal,signal.old,ncounts,value,valuehat)]
+    #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=log10(signal)))+facet_wrap(~name)+scale_fill_gradient(na.value = "black")+geom_raster(aes(bin2,bin1,fill=log10(signal.old)))
     if(mat[,all(abs(signal-signal.old)<tol)]) break
   }
   mat[,ncounts:=NULL]
@@ -410,8 +415,8 @@ plot_binless_matrix = function(mat, minima=F) {
       geom_polygon(aes(begin2,begin1,group=patchno),colour="blue",fill=NA,data=b)+
       geom_polygon(aes(begin2,begin1,group=patchno),colour="red",fill=NA,data=a)
   } else {
-    p=ggplot(mat)+geom_raster(aes(begin1,begin2,fill=-(pmax(-2,pmin(2,value)))))+
-      geom_raster(aes(begin2,begin1,fill=-(pmax(-2,pmin(2,value)))))+
+    p=ggplot(mat)+geom_raster(aes(begin1,begin2,fill=-value))+
+      geom_raster(aes(begin2,begin1,fill=-value))+
       guides(fill=F)+scale_fill_gradient2()+facet_wrap(~name)+
       geom_polygon(aes(begin2,begin1,group=patchno),colour="black",fill=NA,data=a)
   }
