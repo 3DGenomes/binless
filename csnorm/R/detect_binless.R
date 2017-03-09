@@ -141,6 +141,30 @@ csnorm_compute_raw_signal = function(csg, mat) {
   return(mat)
 }
 
+#' compute input to fused lasso
+#' @keywords internal
+csnorm_compute_raw_differential = function(csg, mat, ref) {
+  ctsref = foreach(n=csg@cts[name!=ref,unique(name)],.combine=rbind) %do%
+    csg@cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
+  cts=csg@cts[name!=ref]
+  #
+  if (is.null(mat)) mat=cts[,.(phi.ref=0,delta=0,diffsig=1,ncounts=sum(weight)),by=c("name","bin1","bin2")]
+  ctsref=mat[ctsref]
+  ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@dispersion))]
+  mat=mat[ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
+                    sigmasq.ref=1/sum(weight/var)),keyby=c("name","bin1","bin2")]]
+  #
+  cts=mat[cts]
+  cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
+                          (1/(exp(phi.ref+delta)*mu)+1/csg@dispersion))]
+  mat=mat[cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
+                 sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
+  mat[,c("deltahat","deltahat.sd"):=list(phihat-phihat.ref,sqrt(sigmasq+sigmasq.ref))]
+  mat[,value:=deltahat/deltahat.sd]
+  setkey(mat,name,bin1,bin2)
+  return(mat)
+}
+
 #' cross-validate eCsd
 #' @keywords internal
 optimize_eCsd = function(mat, res.ref, g, lambda1=0, lambda2=0, eCsd.init=0, enforce.positivity=T) {
@@ -201,30 +225,6 @@ optimize_lambda2 = function(mat, res.ref, g, lambda1=0, eCsd=0) {
     lambda2=l2vals[i+1]
   }
   data.table(name=g, lambda2=lambda2, eCsd=eCsd, lambda1=lambda1)
-}
-
-#' compute input to fused lasso
-#' @keywords internal
-csnorm_compute_raw_differential = function(csg, mat, ref) {
-  ctsref = foreach(n=csg@cts[name!=ref,unique(name)],.combine=rbind) %do%
-    csg@cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
-  cts=csg@cts[name!=ref]
-  #
-  if (is.null(mat)) mat=cts[,.(phi.ref=0,delta=0,diffsig=1,ncounts=sum(weight)),by=c("name","bin1","bin2")]
-  ctsref=mat[ctsref]
-  ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@dispersion))]
-  mat=mat[ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
-                    sigmasq.ref=1/sum(weight/var)),keyby=c("name","bin1","bin2")]]
-  #
-  cts=mat[cts]
-  cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
-                          (1/(exp(phi.ref+delta)*mu)+1/csg@dispersion))]
-  mat=mat[cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
-                 sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
-  mat[,c("deltahat","deltahat.sd"):=list(phihat-phihat.ref,sqrt(sigmasq+sigmasq.ref))]
-  mat[,value:=deltahat/deltahat.sd]
-  setkey(mat,name,bin1,bin2)
-  return(mat)
 }
 
 #' run fused lasso on each dataset contained in mat, fusing 'value'
