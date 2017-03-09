@@ -33,28 +33,19 @@ flsa_get_value = function(flsa.op, lambda1, lambda2, eCsd) {
   return(value)
 }
 
-#' compute cv error for a given value of of lambda1 and lambda2
+#' compute Mallow's Cp for a given value of of lambda1, lambda2 and eCsd
 #' @keywords internal
-flsa_cross_validate = function(mat, res.ref, res.cv, cvgroups, lambda1, lambda2, eCsd) {
+flsa_Cp = function(mat, res.ref, lambda1, lambda2, eCsd) {
   #compute coefficients on each model
-  submat.all = mat[name==g,.(name,bin1,bin2,ncounts,
-                      value.ref=csnorm:::flsa_get_value(res.ref[[as.character(name[1])]],
-                                               lambda1=lambda1, lambda2=lambda2, eCsd=eCsd))]
-  #compute cv coefs for each group, given lambda
-  submat.cv = foreach(cv=cvgroups, .combine=rbind) %do% {
-    ret = mat[name==g,.(name,cv.group,bin1,bin2)]
-    ret[,value:=csnorm:::flsa_get_value(res.cv[[cv]][[as.character(name[1])]],
-                                lambda1=lambda1, lambda2=lambda2, eCsd=eCsd),by=name]
-    ret[cv.group==cv]
-  }
-  #ggplot(submat.cv)+geom_raster(aes(ibin1,ibin2,fill=value))+facet_grid(name~cv.group)
-  #ggplot(submat.all)+geom_raster(aes(ibin1,ibin2,fill=value.ref))+facet_grid(~name)#+scale_fill_gradient2()
-  ret=merge(submat.cv, submat.all, all.x=T, by=c("name","bin1","bin2"), sort=F)
-  ggplot(ret)+geom_raster(aes(bin1,bin2,fill=value))+geom_raster(aes(bin2,bin1,fill=value.ref))
-  ret[,mse:=ncounts*(value-value.ref)^2]
-  ret=ret[,.(mse=mean(mse),ncounts=.N),by=c("name","cv.group")]
-  ret=ret[,.(mse=weighted.mean(mse,ncounts),mse.sd=sd(mse)),by=name]
-  ret[,.(name,lambda1=lambda1,lambda2=lambda2,eCsd=eCsd,mse,mse.sd)]
+  submat = mat[,.(name,bin1,bin2,ncounts,valuehat,
+                  value=csnorm:::flsa_get_value(res.ref[[as.character(name[1])]],
+                                                lambda1=lambda1, lambda2=lambda2, eCsd=eCsd))]
+  #get the number of patches and degrees of freedom
+  submat = csnorm:::detect_binless_patches(submat)
+  dof = submat[value!=0,uniqueN(patchno)]
+  #compute mallow's Cp
+  Cp = submat[,sum(((valuehat-(value+eCsd))^2 - 1))]+2*dof
+  return(Cp)
 }
 
 #' connectivity on a triangle
@@ -152,10 +143,8 @@ csnorm_compute_raw_signal = function(csg, mat) {
 
 #' cross-validate eCsd
 #' @keywords internal
-optimize_eCsd = function(mat, res.ref, res.cv, cvgroups, g, lambda1=0, lambda2=0, eCsd.init=0, enforce.positivity=T) {
-  obj = function(x){csnorm:::flsa_cross_validate(mat[name==g], res.ref, res.cv,
-                                                 cvgroups, lambda1=lambda1, lambda2=lambda2,
-                                                 eCsd=x)[,mse]}
+optimize_eCsd = function(mat, res.ref, g, lambda1=0, lambda2=0, eCsd.init=0, enforce.positivity=T) {
+  obj = function(x){csnorm:::flsa_Cp(mat[name==g], res.ref, lambda1=lambda1, lambda2=lambda2, eCsd=x)}
   mineC=mat[name==g,min(value)]
   maxeC=mineC+lambda1
   if (enforce.positivity==T) {
@@ -172,10 +161,8 @@ optimize_eCsd = function(mat, res.ref, res.cv, cvgroups, g, lambda1=0, lambda2=0
 
 #' cross-validate lambda1
 #' @keywords internal
-optimize_lambda1 = function(mat, res.ref, res.cv, cvgroups, g, lambda2=0, eCsd=0, enforce.positivity=T) {
-  obj = function(x){csnorm:::flsa_cross_validate(mat[name==g], res.ref, res.cv,
-                                                 cvgroups, lambda1=x, lambda2=lambda2,
-                                                 eCsd=eCsd)[,mse]}
+optimize_lambda1 = function(mat, res.ref, g, lambda2=0, eCsd=0, enforce.positivity=T) {
+  obj = function(x){csnorm:::flsa_Cp(mat[name==g], res.ref, lambda1=x, lambda2=lambda2, eCsd=eCsd)}
   if (enforce.positivity==T) { #we force all signal values to be positive
     minlambda=mat[name==g,abs(min(value))] #in this case minlambda <= maxlambda always
     maxlambda=mat[name==g,abs(max(value))]
@@ -196,9 +183,8 @@ optimize_lambda1 = function(mat, res.ref, res.cv, cvgroups, g, lambda2=0, eCsd=0
 
 #' cross-validate lambda2
 #' @keywords internal
-optimize_lambda2 = function(mat, res.ref, res.cv, cvgroups, g, lambda1=0, eCsd=0) {
-  obj = function(x){csnorm:::flsa_cross_validate(mat[name==g], res.ref, res.cv,
-                                                 cvgroups, lambda1=lambda1, lambda2=x, eCsd=eCsd)[,mse]}
+optimize_lambda2 = function(mat, res.ref, g, lambda1=0, eCsd=0) {
+  obj = function(x){csnorm:::flsa_Cp(mat[name==g], res.ref, lambda1=lambda1, lambda2=x, eCsd=eCsd)}
   minlambda=0
   maxlambda=max(res.ref[[g]]$BeginLambda)
   #ggplot(data.table(x=seq(minlambda,maxlambda,l=100))[,.(x,y=sapply(x,obj))])+geom_line(aes(x,y))
@@ -246,7 +232,7 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
 #' finds optimal lambda1, lambda2 and eC through k-fold cv.
 #' @keywords internal
 csnorm_fused_lasso = function(mat, cv.fold=10, tol=1e-3, niter=10, verbose=T, enforce.positivity=T, ncores=ncores) {
-  if (verbose==T) cat("   estimation runs\n")
+  if (verbose==T) cat("   compute fused lasso solution path\n")
   groupnames=mat[,as.character(unique(name))]
   cmat = csnorm:::flsa_compute_connectivity(mat[,nlevels(bin1)])
   registerDoParallel(cores=ncores)
@@ -257,25 +243,7 @@ csnorm_fused_lasso = function(mat, cv.fold=10, tol=1e-3, niter=10, verbose=T, en
   }
   #fail if any has failed (flsa bugs)
   if (any(sapply(res.ref, is.null))) stop("one flsa run failed, aborting")
-  #cross-validate lambda2 (lambda1=0 gives good results)
-  mat[,cv.group:=as.character(((unclass(bin2)+unclass(bin1)*max(unclass(bin1)))%%cv.fold)+1)]
-  cvgroups=as.character(1:cv.fold)
-  #first, run lasso regressions
-  if (verbose==T) cat("   cross-validation runs\n")
-  res.cv = foreach (cv=cvgroups, .final=function(x){setNames(x,cvgroups)}) %:%
-    foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
-      submat=copy(mat[name==g])
-      submat[cv.group==cv,valuehat:=0]
-      stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
-      flsa(submat[,valuehat], connListObj=cmat, verbose=F)
-    }
-  #remove failed cv attempts (flsa bugs)
-  cvgroups = foreach(cv=cvgroups, .combine=c) %do% {
-    if (any(sapply(res.cv[[cv]], is.null)))
-      cat("removing CV group ",cv," due to failure of flsa!\n")
-    else
-      cv
-  }
+  #
   #determine optimal parameters
   if (verbose==T) cat("  determine optimal parameters\n")
   params = foreach(g=groupnames, .combine=rbind) %dopar% {
@@ -283,19 +251,19 @@ csnorm_fused_lasso = function(mat, cv.fold=10, tol=1e-3, niter=10, verbose=T, en
     #lambda2
     lambda1=0
     eCsd=0
-    matg[,value:=NULL]
+    matg[,value:=0]
     for (i in 1:niter) {
       matg[,value.old:=value]
-      lambda2 = csnorm:::optimize_lambda2(matg, res.ref, res.cv, cvgroups, g,
+      lambda2 = csnorm:::optimize_lambda2(matg, res.ref, g,
                                           lambda1=lambda1, eCsd=eCsd)[,lambda2]
       matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
       #eCsd
-      eCsd = csnorm:::optimize_eCsd(matg, res.ref, res.cv, cvgroups, g,
+      eCsd = csnorm:::optimize_eCsd(matg, res.ref, g,
                                           lambda1=lambda1, lambda2=lambda2, eCsd.init=eCsd,
                                           enforce.positivity=enforce.positivity)[,eCsd]
       matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
       #lambda1
-      lambda1 = csnorm:::optimize_lambda1(matg, res.ref, res.cv, cvgroups, g,
+      lambda1 = csnorm:::optimize_lambda1(matg, res.ref, g,
                                          lambda2=lambda2, eCsd=eCsd,
                                          enforce.positivity=enforce.positivity)[,lambda1]
       matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
