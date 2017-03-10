@@ -165,24 +165,6 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
   return(mat)
 }
 
-#' cross-validate eCsd
-#' @keywords internal
-optimize_eCsd = function(mat, res.ref, g, lambda1=0, lambda2=0, eCsd.init=0, enforce.positivity=T) {
-  obj = function(x){csnorm:::flsa_Cp(mat[name==g], res.ref, lambda1=lambda1, lambda2=lambda2, eCsd=x)}
-  mineC=mat[name==g,min(value)]
-  maxeC=mineC+lambda1
-  if (enforce.positivity==T) {
-    maxeC=min(mat[name==g,(max(value)+min(value))/2], maxeC)
-  }
-  #ggplot(data.table(x=seq(mineC,maxeC,l=100))[,.(x,y=sapply(x,obj))])+geom_line(aes(x,y))
-  if (lambda1>0) {
-    eC=optimize(obj, c(mineC,maxeC), tol=tol)$minimum
-  } else {
-    eC=mineC
-  }
-  data.table(name=g, lambda2=lambda2, eCsd=eC+eCsd.init, lambda1=lambda1)
-}
-
 #' cross-validate lambda1
 #' @keywords internal
 optimize_lambda1 = function(mat, res.ref, g, lambda2=0, eCsd=0, enforce.positivity=T) {
@@ -249,11 +231,11 @@ csnorm_fused_lasso = function(mat, tol=1e-3, niter=10, verbose=T, enforce.positi
   params = foreach(g=groupnames, .combine=rbind) %dopar% {
     matg=mat[name==g]
     #lambda2
-    lambda1=matg[,mad(valuehat)/2]
+    lambda1=matg[,mad(valuehat)]
     if (enforce.positivity==T) {
-      eCsd=matg[,min(valuehat)+lambda1]
+      eCsd=matg[,min(valuehat)]
     } else {
-      eCsd=matg[,median(valuehat)]
+      eCsd=0
     }
     matg[,value:=0]
     for (i in 1:niter) {
@@ -261,16 +243,16 @@ csnorm_fused_lasso = function(mat, tol=1e-3, niter=10, verbose=T, enforce.positi
       lambda2 = csnorm:::optimize_lambda2(matg, res.ref, g,
                                           lambda1=lambda1, eCsd=eCsd)[,lambda2]
       matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
-      #eCsd
-      eCsd = csnorm:::optimize_eCsd(matg, res.ref, g,
-                                          lambda1=lambda1, lambda2=lambda2, eCsd.init=eCsd,
-                                          enforce.positivity=enforce.positivity)[,eCsd]
-      matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
       #lambda1
       lambda1 = csnorm:::optimize_lambda1(matg, res.ref, g,
                                           lambda2=lambda2, eCsd=eCsd,
                                           enforce.positivity=enforce.positivity)[,lambda1]
       matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
+      #eCsd
+      if (enforce.positivity==T) {
+        eCsd = matg[,min(value+eCsd)]
+        matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
+      }
       #
       cat("   iteration ",i," : lambda1=",lambda1," lambda2=",lambda2," eCsd'=",eCsd,"\n")
       #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()
