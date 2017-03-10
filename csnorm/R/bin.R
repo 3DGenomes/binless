@@ -235,6 +235,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   setkey(groups,name)
   cts = groups[cts]
   cts[,name:=groupname]
+  cts[,groupname:=NULL]
   setkeyv(cts,c("name","bin1","bin2"))
   #
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
