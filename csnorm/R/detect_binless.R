@@ -33,9 +33,9 @@ flsa_get_value = function(flsa.op, lambda1, lambda2, eCsd) {
   return(value)
 }
 
-#' compute Mallow's Cp for a given value of of lambda1, lambda2 and eCsd
+#' compute BIC for a given value of of lambda1, lambda2 and eCsd
 #' @keywords internal
-flsa_Cp = function(mat, res.ref, lambda1, lambda2, eCsd) {
+flsa_BIC = function(mat, res.ref, lambda1, lambda2, eCsd) {
   #compute coefficients on each model
   submat = mat[,.(name,bin1,bin2,ncounts,valuehat,
                   value=csnorm:::flsa_get_value(res.ref[[as.character(name[1])]],
@@ -43,9 +43,11 @@ flsa_Cp = function(mat, res.ref, lambda1, lambda2, eCsd) {
   #get the number of patches and degrees of freedom
   submat = csnorm:::detect_binless_patches(submat)
   dof = submat[value!=0,uniqueN(patchno)]
+  #compute BIC
+  BIC = submat[,sum(((valuehat-(value+eCsd))^2))+log(.N)*dof]
   #compute mallow's Cp
-  Cp = submat[,sum(((valuehat-(value+eCsd))^2 - 1))]+2*dof
-  return(Cp)
+  #Cp = submat[,sum(((valuehat-(value+eCsd))^2 - 1))]+2*dof
+  return(BIC)
 }
 
 #' connectivity on a triangle
@@ -168,7 +170,7 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
 #' cross-validate lambda1
 #' @keywords internal
 optimize_lambda1 = function(mat, res.ref, g, lambda2=0, eCsd=0, enforce.positivity=T) {
-  obj = function(x){csnorm:::flsa_Cp(mat[name==g], res.ref, lambda1=x, lambda2=lambda2, eCsd=eCsd)}
+  obj = function(x){csnorm:::flsa_BIC(mat[name==g], res.ref, lambda1=x, lambda2=lambda2, eCsd=eCsd)}
   if (enforce.positivity==T) { #we force all signal values to be positive
     minlambda=mat[name==g,abs(min(value))] #in this case minlambda <= maxlambda always
     maxlambda=mat[name==g,abs(max(value))]
@@ -190,7 +192,7 @@ optimize_lambda1 = function(mat, res.ref, g, lambda2=0, eCsd=0, enforce.positivi
 #' cross-validate lambda2
 #' @keywords internal
 optimize_lambda2 = function(mat, res.ref, g, lambda1=0, eCsd=0) {
-  obj = function(x){csnorm:::flsa_Cp(mat[name==g], res.ref, lambda1=lambda1, lambda2=x, eCsd=eCsd)}
+  obj = function(x){csnorm:::flsa_BIC(mat[name==g], res.ref, lambda1=lambda1, lambda2=x, eCsd=eCsd)}
   minlambda=0
   maxlambda=max(res.ref[[g]]$BeginLambda)
   #ggplot(data.table(x=seq(minlambda,maxlambda,l=100))[,.(x,y=sapply(x,obj))])+geom_line(aes(x,y))
@@ -278,7 +280,7 @@ csnorm_fused_lasso = function(mat, tol=1e-3, niter=10, verbose=T, enforce.positi
 #' @param resolution 
 #' @param group 
 #' @param ncores 
-#' @param niter number of IRLS iterations, and Cp iterations within
+#' @param niter number of IRLS iterations, and BIC iterations within
 #'   
 #' @return 
 #' @export
