@@ -160,7 +160,7 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
   mat=mat[cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
                  sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
   mat[,c("deltahat","deltahat.sd"):=list(phihat-phihat.ref,sqrt(sigmasq+sigmasq.ref))]
-  mat[,value:=deltahat/deltahat.sd]
+  mat[,valuehat:=deltahat/deltahat.sd]
   setkey(mat,name,bin1,bin2)
   return(mat)
 }
@@ -335,8 +335,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
 #' @export
 #' 
 #' @examples
-detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=1e-3, ncores=1,
-                                      cv.fold=10, verbose=T){
+detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=1e-3, ncores=1, verbose=T){
   if (verbose==T) cat("Binless difference detection with resolution=",resolution,
                       " group=",group," and ref=",ref,"\n")
   ### get CSgroup object
@@ -348,15 +347,15 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
   for (step in 1:niter) {
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
-    mat = csnorm_compute_raw_differential(csg, mat, ref)
+    mat = csnorm:::csnorm_compute_raw_differential(csg, mat, ref)
     #
     #perform fused lasso on signal to noise
     if (verbose==T) cat("  Fused lasso\n")
-    mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, tol=tol, ncores=ncores)
-    #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~name)+scale_fill_gradient2(na.value = "white")
+    mat = csnorm:::csnorm_fused_lasso(mat, tol=tol, niter=niter, enforce.positivity=F, ncores=ncores)
+    #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+facet_wrap(~name)+scale_fill_gradient(na.value = "black")
     #
     #convert back value to the actual signal
-    mat[,c("cv.group","delta"):=list(NULL,value*deltahat.sd)]
+    mat[,delta:=value*deltahat.sd]
     mat[,diffsig.old:=diffsig]
     mat[,diffsig:=exp(delta)]
     mat[,phi.ref:=(phihat.ref/sigmasq.ref + (phihat-delta)/sigmasq)/(1/sigmasq.ref+1/sigmasq)]
