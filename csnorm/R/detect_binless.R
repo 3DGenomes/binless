@@ -37,7 +37,7 @@ flsa_get_value = function(flsa.op, lambda1, lambda2, eCsd) {
 #' @keywords internal
 flsa_BIC = function(mat, res.ref, lambda1, lambda2, eCsd) {
   #compute coefficients on each model
-  submat = mat[,.(name,bin1,bin2,ncounts,valuehat,
+  submat = mat[,.(name,bin1,bin2,valuehat,
                   value=csnorm:::flsa_get_value(res.ref[[as.character(name[1])]],
                                                 lambda1=lambda1, lambda2=lambda2, eCsd=eCsd))]
   #get the number of patches and degrees of freedom
@@ -137,7 +137,7 @@ csnorm_compute_raw_signal = function(csg, mat) {
   cts = mat[,.(name,bin1,bin2,phi,signal,eCprime)][cts,,on=c("name","bin1","bin2")]
   cts[,c("z","var"):=list(count/(exp(phi+eCprime)*mu)-1,(1/(exp(phi+eCprime)*mu)+1/csg@dispersion))]
   mat = cts[,.(phihat=weighted.mean(z+phi+eCprime, weight/var),
-               phihat.sd=sqrt(1/sum(weight/var)),ncounts=sum(weight)),by=c("name","bin1","bin2","phi","signal")]
+               phihat.var=1/sum(weight/var)),by=c("name","bin1","bin2","phi","signal")]
   mat[,valuehat:=phihat/phihat.sd]
   setkey(mat,name,bin1,bin2)
   return(mat)
@@ -150,7 +150,7 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
     csg@cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
   cts=csg@cts[name!=ref]
   #
-  if (is.null(mat)) mat=cts[,.(phi.ref=0,delta=0,diffsig=1,ncounts=sum(weight)),by=c("name","bin1","bin2")]
+  if (is.null(mat)) mat=cts[,.(phi.ref=0,delta=0,diffsig=1),by=c("name","bin1","bin2")]
   ctsref=mat[ctsref]
   ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@dispersion))]
   mat=mat[ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
@@ -161,7 +161,7 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
                           (1/(exp(phi.ref+delta)*mu)+1/csg@dispersion))]
   mat=mat[cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
                  sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
-  mat[,c("deltahat","deltahat.sd"):=list(phihat-phihat.ref,sqrt(sigmasq+sigmasq.ref))]
+  mat[,c("deltahat","deltahat.var"):=list(phihat-phihat.ref,sigmasq+sigmasq.ref)]
   mat[,valuehat:=deltahat/deltahat.sd]
   setkey(mat,name,bin1,bin2)
   return(mat)
@@ -311,11 +311,10 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     mat[,c("phi","eCprime"):=list(value*phihat.sd,eCsd*phihat.sd)]
     mat[,signal.old:=signal]
     mat[,signal:=exp(phi)]
-    mat=mat[,.(name,bin1,bin2,phi,eCprime,signal,signal.old,ncounts,value,valuehat)]
+    mat=mat[,.(name,bin1,bin2,phi,eCprime,signal,signal.old,value,valuehat)]
     #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=log10(signal)))+facet_wrap(~name)+scale_fill_gradient(na.value = "black")+geom_raster(aes(bin2,bin1,fill=log10(signal.old)))
     if(mat[,all(abs(signal-signal.old)<tol)]) break
   }
-  mat[,ncounts:=NULL]
   if (verbose==T) cat(" Detect patches\n")
   mat = csnorm:::detect_binless_patches(mat)
   #
@@ -361,10 +360,9 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
     mat[,diffsig.old:=diffsig]
     mat[,diffsig:=exp(delta)]
     mat[,phi.ref:=(phihat.ref/sigmasq.ref + (phihat-delta)/sigmasq)/(1/sigmasq.ref+1/sigmasq)]
-    mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig,diffsig.old,ncounts,value)]
+    mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig,diffsig.old,value)]
     if(mat[,all(abs(diffsig-diffsig.old)<tol)]) break
   }
-  mat[,ncounts:=NULL]
   if (verbose==T) cat(" Detect patches\n")
   mat = csnorm:::detect_binless_patches(mat)
   csi=new("CSinter", mat=mat, type="bdifferences", threshold=-1, ref=ref)
