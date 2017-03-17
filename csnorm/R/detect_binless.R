@@ -1,7 +1,7 @@
 #' @include csnorm.R
 NULL
 
-#' compute trail information for the gfl package, for a triangle trid with nrow rows
+#' internal use
 #' @keywords internal
 gfl_triangle_grid_chain = function(nrow) {
   #rows of consecutive numbers
@@ -32,7 +32,7 @@ gfl_triangle_grid_chain = function(nrow) {
   return(chains)
 }
 
-#' compute trail information for the gfl package, for a triangle trid with nrow rows
+#' internal use
 #' @keywords internal
 gfl_chains_to_trails = function(chains) {
   trails=c()
@@ -57,12 +57,12 @@ gfl_compute_trails = function(nrow) {
 #' compute sparse fused lasso coefficients for a given value of lambda1, lambda2 and eCprime
 #' @keywords internal
 gfl_get_value = function(valuehat, weight, trails, lambda1, lambda2, eCprime,
-                         alpha=0.2, inflate=2, tol=1e-3, maxsteps=100000) {
+                         alpha=0.2, inflate=2, tol.beta=1e-6, maxsteps=100000) {
   #assume lambda1=0 and compute the fused lasso solution, centered around eCprime
   z=rep(0,tail(trails$breakpoints,n=1))
   u=rep(0,tail(trails$breakpoints,n=1))
-  value = weighted_graphfl(valuehat, weight, trails$ntrails, trails$trails,
-                         trails$breakpoints, alpha, inflate, maxsteps, tol, z, u) - eCprime
+  value = csnorm:::weighted_graphfl(valuehat, weight, trails$ntrails, trails$trails,
+                         trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.beta, z, u) - eCprime
   #now soft-threshold manually around eCprime
   value=sign(value)*pmax(abs(value)-lambda1, 0)
   return(value)
@@ -70,14 +70,14 @@ gfl_get_value = function(valuehat, weight, trails, lambda1, lambda2, eCprime,
 
 #' compute BIC for a given value of of lambda1, lambda2 and eCprime
 #' @keywords internal
-gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime) {
+gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
   #compute coefficients on each model
   submat = matg[,.(name,bin1,bin2,valuehat,weight,
                    value=csnorm:::gfl_get_value(valuehat, weight, trails,
                                                 lambda1=lambda1, lambda2=lambda2, eCprime=eCprime))]
   #get the number of patches and degrees of freedom
-  submat = csnorm:::detect_binless_patches(submat)
-  dof = submat[value!=0,uniqueN(patchno)] #sparse fused lasso
+  submat = csnorm:::detect_binless_patches(submat, tol.value=tol.value)
+  dof = submat[abs(value)>tol.value,uniqueN(patchno)] #sparse fused lasso
   #compute BIC
   BIC = submat[,sum(weight*((valuehat-(value+eCprime))^2))+log(.N)*dof]
   #compute mallow's Cp
@@ -104,11 +104,11 @@ compute_2d_connectivity_graph = function(nbins, start=1) {
 
 #' give a patch ID to each patch in a binless matrix, and report local extrema
 #' @keywords internal
-detect_binless_patches = function(mat) {
+detect_binless_patches = function(mat, tol.value=1e-3) {
   if (mat[,uniqueN(name)]>1)
     return(foreach (n=mat[,unique(name)],.combine=rbind) %do% csnorm:::detect_binless_patches(mat[name==n]))
   #build bin graph
-  g = compute_2d_connectivity_graph(mat[,as.integer(max(bin1))])
+  g = csnorm:::compute_2d_connectivity_graph(mat[,as.integer(max(bin1))])
   stopifnot(length(V(g))==mat[,.N])
   V(g)$value = mat[,value]
   V(g)$weight = 1
@@ -117,7 +117,7 @@ detect_binless_patches = function(mat) {
   #
   #remove edges that connect different values
   values_by_edge = t(matrix(get.vertex.attribute(g,"value",index=get.edges(g,E(g))), ncol=2))
-  to_rm = E(g)[abs(values_by_edge[1,]-values_by_edge[2,])>1e-8]
+  to_rm = E(g)[abs(values_by_edge[1,]-values_by_edge[2,])>tol.value]
   g2 = delete_edges(g, to_rm)
   #plot(g2, vertex.color=factor(V(g2)$value), layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
   #
@@ -207,14 +207,15 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
 optimize_lambda1 = function(matg, trails, tol=1e-3, lambda2=0, eCprime=0, enforce.positivity=T) {
   obj = function(x){csnorm:::gfl_BIC(matg, trails, lambda1=x, lambda2=lambda2, eCprime=eCprime)}
   if (enforce.positivity==T) { #we force all signal values to be positive
-    minlambda=matg[,abs(min(value))] #in this case minlambda <= maxlambda always
+    minlambda=matg[,abs(min(pmin(value,0)))] #in this case minlambda <= maxlambda always
     maxlambda=matg[,abs(max(value))]
     stopifnot(minlambda<=maxlambda)
   } else { #we don't
     minlambda=0
     maxlambda=matg[,max(abs(value))]
   }
-  #ggplot(data.table(x=seq(minlambda,maxlambda,l=100))[,.(x,y=sapply(x,obj))])+geom_line(aes(x,y))
+  #dt = foreach (lam=seq(minlambda,maxlambda,l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
+  #ggplot(dt)+geom_line(aes(x,y))
   if (maxlambda>0) {
     lambda1=optimize(obj, c(minlambda,maxlambda), tol=tol)$minimum
     if (abs(lambda1)<tol) lambda1=0
@@ -230,7 +231,14 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0) {
   obj = function(x){csnorm:::gfl_BIC(matg, trails, lambda1=lambda1, lambda2=x, eCprime=eCprime)}
   minlambda=0
   maxlambda=matg[,max(valuehat)-min(valuehat)]
-  #ggplot(data.table(x=seq(minlambda,maxlambda,l=100))[,.(x,y=sapply(x,obj))])+geom_line(aes(x,y))
+  repeat {
+    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, maxlambda, eCprime)]
+    #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value)))
+    if (matg[,max(value)-min(value)] <= tol) break
+    maxlambda = maxlambda*10
+  }
+  #dt = foreach (lam=seq(minlambda,maxlambda,l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
+  #ggplot(dt)+geom_line(aes(x,y))
   op=optimize(obj, c(minlambda,maxlambda), tol=tol)
   return(op$minimum)
 }
@@ -251,7 +259,18 @@ csnorm_fused_lasso = function(mat, trails, tol=1e-3, niter=10, verbose=T, enforc
       eCprime=0
     }
     matg[,value:=0]
+    #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+scale_fill_gradient2())
     for (i in 1:niter) {
+      #lambda2=10
+      #beta=csnorm:::weighted_graphfl(matg[,valuehat], matg[,weight], trails$ntrails, trails$trails, trails$breakpoints,
+      #                               lambda2, 0.2, 2, 100000, 1e-3, rep(0,tail(trails$breakpoints,n=1)), rep(0,tail(trails$breakpoints,n=1)))
+      #write.table(matg[,valuehat],file="tmp/gfl-master/example/mat_y.csv", quote=F, row.names=F, col.names=F)
+      #write.table(matg[,weight],file="tmp/gfl-master/example/mat_weight.csv", quote=F, row.names=F, col.names=F)
+      #matg[,value:=beta]
+      #matg[,value.py:=fread("tmp/gfl-master/example/beta.csv")$V1]
+      #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+geom_raster(aes(bin2,bin1,fill=value.py))
+      #ggplot(matg)+geom_point(aes(value,value.py))
+      #
       matg[,value.old:=value]
       lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol, lambda1=lambda1, eCprime=eCprime)
       matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
@@ -265,12 +284,18 @@ csnorm_fused_lasso = function(mat, trails, tol=1e-3, niter=10, verbose=T, enforc
         matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
       }
       #
-      cat("   iteration ",i," : lambda1=",lambda1," lambda2=",lambda2," eCsd'=",eCsd,"\n")
-      #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()
+      cat("   iteration ",i," : lambda1=",lambda1," lambda2=",lambda2," eC'=",eCprime,"\n")
+      #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
       if (matg[,all(abs(value-value.old)<tol)]) break
     }
     data.table(name=g,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime)
   }
+  #
+  if (verbose==T)
+    for (i in 1:params[,.N])
+      cat("   ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],
+          " eC'=",params[i,eCprime],"\n")
+  #
   mat = foreach (g=groupnames, .combine=rbind) %do% {
     p=params[name==g]
     matg=mat[name==g]
@@ -316,6 +341,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1,
     if (is.null(trails)) {
       if (verbose==T) cat("  Build triangle grid trails\n")
       trails = csnorm:::gfl_compute_trails(mat[,nlevels(bin1)])
+      stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
     }
     #perform fused lasso on signal to noise
     if (verbose==T) cat("  Fused lasso\n")
@@ -329,6 +355,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1,
     mat[,signal:=exp(phi)]
     mat=mat[,.(name,bin1,bin2,phi,eCprime,signal,signal.old,value,valuehat,weight)]
     #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=log10(signal)))+facet_wrap(~name)+scale_fill_gradient(na.value = "black")+geom_raster(aes(bin2,bin1,fill=log10(signal.old)))
+    #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=log10(weight)))+facet_wrap(~name)+scale_fill_gradient(na.value = "black")+geom_raster(aes(bin2,bin1,fill=log10(signal.old)))
     if(mat[,all(abs(signal-signal.old)<tol)]) break
   }
   if (verbose==T) cat(" Detect patches\n")
