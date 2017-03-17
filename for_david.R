@@ -82,7 +82,7 @@ cs=cs_r
 #bin at 20kb
 resolution=5000
 ncores=8
-cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ice=100, ncores=ncores)
+cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
 mat=get_matrices(cs, resolution=resolution, group="all")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(signal)))+
@@ -94,8 +94,8 @@ save(cs,file=paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_",sub,"_csno
 load(file=paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
 
 #detect significant interactions
-cs=detect_interactions(cs, resolution=resolution, group="all", threshold=0.95, ncores=ncores, binless=T)
-mat=get_interactions(cs, type="interactions", resolution=resolution, group="all", threshold=0.95, ref="expected")
+cs=detect_binless_interactions(cs, resolution=resolution, group="all")
+ mat=get_interactions(cs, type="interactions", resolution=resolution, group="all", threshold=0.95, ref="expected")
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=-log(signal)))+
   geom_raster(aes(begin2,begin1,fill=-log(signal)))+

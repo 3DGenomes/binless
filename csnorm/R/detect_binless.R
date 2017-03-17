@@ -178,6 +178,13 @@ csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
     stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
     flsa(submat[,value], connListObj=cmat, verbose=F)
   }
+  
+  # M = submat[,.N]
+  # gfl = Module("gfl")
+  # W1 = cumsum(rep(0.01,M))
+  # y = submat[,value]
+  # z = weighted_graphfl(y, W1, W1, W1, W1, 10, 0.2, 2, 10000, 1e-5, W1, W1, W1)
+  
   #fail if any has failed (flsa bugs)
   if (any(sapply(res.ref, is.null))) stop("one flsa run failed, aborting")
   #cross-validate lambda2 (lambda1=0 gives good results)

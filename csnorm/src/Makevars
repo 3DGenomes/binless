@@ -1,2 +1,34 @@
 STANHEADERS_SRC = `"$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" --vanilla -e "cat(system.file('include', 'src', package = 'StanHeaders'))"`
-PKG_CPPFLAGS = -I"$(STANHEADERS_SRC)" -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS
+PKG_CPPFLAGS = -Igfl/src -Igfl/include -I"$(STANHEADERS_SRC)" -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS
+#PKG_CXXFLAGS = 
+
+SOURCES = $(wildcard gfl/src/*.cpp)
+SOURCES_C = $(wildcard gfl/src/*.c)
+PKG_LIBS = $(SOURCES_C:.c=.o) -lgsl -lgslcblas
+
+#OBJECTS = Modules.o $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)
+OBJECTS = Modules.o $(SOURCES:.cpp=.o)
+
+SUBDIRS = gfl
+all: $(SHLIB)
+
+#$(SHLIB): $(OBJECTS) sublibs
+$(SHLIB): sublibs
+
+sublibs:
+	#mkdir -p ../lib
+	@for d in $(SUBDIRS); do \
+		(cd $${d} && CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" $(MAKE)) || exit 1; \
+	done
+	#cp $(SUBDIRS)/lib/*.so ../lib/
+
+clean: 
+	subclean
+	@-rm -f *.o $(SHLIB)
+	#@-rm -f lib/*.so $(SHLIB)
+
+subclean:
+	@-rm -f *.o
+	@for d in $(SUBDIRS); do \
+		(cd $${d} && $(MAKE) clean) || exit 1; \
+	done
