@@ -5,14 +5,14 @@ using namespace Rcpp;
 #include "utils.c"
 
 NumericVector weighted_graphfl(Rcpp::NumericVector y_i, Rcpp::NumericVector w_i, int ntrails, Rcpp::NumericVector trails_i, Rcpp::NumericVector breakpoints_i, double lam, 
-                                  double alpha, double inflate, int maxsteps, double converge, Rcpp::NumericVector beta_i, Rcpp::NumericVector z_i, Rcpp::NumericVector u_i)
+                                  double alpha, double inflate, int maxsteps, double converge, Rcpp::NumericVector z_i, Rcpp::NumericVector u_i)
 {
   size_t N = y_i.size();
   std::vector<double> y_r = Rcpp::as<std::vector<double> >(y_i);
   std::vector<double> w_r = Rcpp::as<std::vector<double> >(w_i);
   std::vector<int> trails_r = Rcpp::as<std::vector<int> >(trails_i);
   std::vector<int> breakpoints_r = Rcpp::as<std::vector<int> >(breakpoints_i);
-  std::vector<double> beta_r = Rcpp::as<std::vector<double> >(beta_i);
+  std::vector<double> beta_r;
   std::vector<double> z_r = Rcpp::as<std::vector<double> >(z_i);
   std::vector<double> u_r = Rcpp::as<std::vector<double> >(u_i);
   
