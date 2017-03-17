@@ -6,8 +6,8 @@ IDIR=../include/
 
 all:
 	#mkdir -p lib
-	mkdir -p obj
-	cd obj; ${CC} ${CFLAGS}  -c -fPIC ../src/*.c -I${IDIR}
+	#mkdir -p obj
+	cd src; ${CC} ${CFLAGS}  -c -fPIC *.c -I${IDIR}
 	#${CC} -shared -o lib/libgraphfl.so ${OBJ} -lgsl -lgslcblas
 	
 docs:
