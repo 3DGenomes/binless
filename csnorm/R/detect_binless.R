@@ -45,77 +45,12 @@ gfl_chains_to_trails = function(chains) {
   return(list(ntrails=length(breakpoints),trails=trails,breakpoints=breakpoints))
 }
 
-#' compute trail information for the gfl package, for a triangle trid with nrow rows
-#' @keywords internal
-gfl_compute_trails = function(nrow) {
-  chain = gfl_triangle_grid_chain(nrow)
-  trails = gfl_chains_to_trails(chain)
-  stopifnot(uniqueN(trails$trails)==nrow*(nrow+1)/2)
-  return(trails)
-}
-
-#' compute sparse fused lasso coefficients for a given value of lambda1, lambda2 and eCprime
-#' @keywords internal
-gfl_get_value = function(valuehat, weight, trails, lambda1, lambda2, eCprime,
-                         alpha=0.2, inflate=2, tol.beta=1e-6, maxsteps=100000) {
-  #assume lambda1=0 and compute the fused lasso solution, centered around eCprime
-  z=rep(0,tail(trails$breakpoints,n=1))
-  u=rep(0,tail(trails$breakpoints,n=1))
-  value = csnorm:::weighted_graphfl(valuehat, weight, trails$ntrails, trails$trails,
-                         trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.beta, z, u) - eCprime
-  #now soft-threshold manually around eCprime
-  value=sign(value)*pmax(abs(value)-lambda1, 0)
-  return(value)
-}
-
-#' compute BIC for a given value of of lambda1, lambda2 and eCprime
-#' @keywords internal
-gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
-  #compute coefficients on each model
-  submat = matg[,.(name,bin1,bin2,valuehat,weight,
-                   value=csnorm:::gfl_get_value(valuehat, weight, trails,
-                                                lambda1=lambda1, lambda2=lambda2, eCprime=eCprime))]
-  #get the number of patches and degrees of freedom
-  submat = csnorm:::detect_binless_patches(submat, tol.value=tol.value)
-  dof = submat[abs(value)>tol.value,uniqueN(patchno)] #sparse fused lasso
-  #compute BIC
-  BIC = submat[,sum(weight*((valuehat-(value+eCprime))^2))+log(.N)*dof]
-  #compute mallow's Cp
-  #Cp = submat[,sum(weight*((valuehat-(value+eCprime))^2 - 1))]+2*dof
-  return(BIC)
-}
-
-#' connectivity on a triangle
-#' @keywords internal
-compute_2d_connectivity_graph = function(nbins, start=1) {
-  stopifnot(start>=1,nbins>=2)
-  if (nbins==2) {
-    ret=graph(c(start,start+1,start+1,start+2), directed=F)
-  } else {
-    upper.row = c(c(start,start+1),
-                  c(sapply((start+1):(start+nbins-2),function(x){c(x,x+1,x,x+nbins-1)},simplify=T)),
-                  c(start+nbins-1,start+2*(nbins-1)))
-    lower.tri = compute_2d_connectivity_graph(nbins-1,start=start+nbins)
-    ret = add.edges(lower.tri,upper.row)
-  }
-  #plot(ret)
-  return(ret)
-}
-
 #' give a patch ID to each patch in a binless matrix, and report local extrema
 #' @keywords internal
-detect_binless_patches = function(mat, tol.value=1e-3) {
-  if (mat[,uniqueN(name)]>1)
-    return(foreach (n=mat[,unique(name)],.combine=rbind) %do% csnorm:::detect_binless_patches(mat[name==n]))
-  #build bin graph
-  g = csnorm:::compute_2d_connectivity_graph(mat[,as.integer(max(bin1))])
-  stopifnot(length(V(g))==mat[,.N])
-  V(g)$value = mat[,value]
-  V(g)$weight = 1
-  #plot(g, vertex.color=factor(V(g)$value), vertex.label=V(g)$count,
-  #     layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
-  #
+build_patch_graph = function(mat, trails, tol.value=1e-3) {
+  g=trails$graph
   #remove edges that connect different values
+  V(g)$value = mat[,value]
   values_by_edge = t(matrix(get.vertex.attribute(g,"value",index=get.edges(g,E(g))), ncol=2))
   to_rm = E(g)[abs(values_by_edge[1,]-values_by_edge[2,])>tol.value]
   g2 = delete_edges(g, to_rm)
@@ -130,7 +65,20 @@ detect_binless_patches = function(mat, tol.value=1e-3) {
   #patches=foreach (id=1:cl$no) %do% V(g)[cl$membership==id]
   #plot(g, vertex.color=factor(V(g)$value), vertex.label=V(g)$patch, edge.arrow.size=0.3,
   #     mark.groups=patches, layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
+  return(list(g.patches=g2,components=cl))
+}
+
+#' give a patch ID to each patch in a binless matrix, and report local extrema
+#' @keywords internal
+detect_binless_patches = function(mat, trails, tol.value=1e-3) {
+  if (mat[,uniqueN(name)]>1)
+    return(foreach (n=mat[,unique(name)],.combine=rbind) %do%
+             csnorm:::detect_binless_patches(mat[name==n], trails, tol.value=tol.value))
   #
+  stuff = build_patch_graph(mat, trails, tol.value=tol.value)
+  g=trails$graph
+  V(g)$value = mat[,value]
+  cl=stuff$components
   #create fused graph
   g3 = contract(g, cl$membership, vertex.attr.comb = list(value="min", weight="sum")) %>% simplify()
   #plot(g3, vertex.color=factor(V(g3)$value), vertex.label=V(g3)$weight, vertex.size=10*log(1+V(g3)$weight), layout=layout_as_tree)
@@ -162,6 +110,69 @@ detect_binless_patches = function(mat, tol.value=1e-3) {
   mat[,is.maximum:=V(g5)$indegree==0]
   mat[,patchno:=factor(cl$membership)]
   return(mat)
+}
+
+#' connectivity on a triangle
+#' @keywords internal
+compute_2d_connectivity_graph = function(nbins, start=1) {
+  stopifnot(start>=1,nbins>=2)
+  if (nbins==2) {
+    ret=graph(c(start,start+1,start+1,start+2), directed=F)
+  } else {
+    upper.row = c(c(start,start+1),
+                  c(sapply((start+1):(start+nbins-2),function(x){c(x,x+1,x,x+nbins-1)},simplify=T)),
+                  c(start+nbins-1,start+2*(nbins-1)))
+    lower.tri = compute_2d_connectivity_graph(nbins-1,start=start+nbins)
+    ret = add.edges(lower.tri,upper.row)
+  }
+  #plot(ret)
+  return(ret)
+}
+
+#' compute trail information for the gfl package, for a triangle trid with nrow rows
+#' @keywords internal
+gfl_compute_trails = function(nrow) {
+  chain = csnorm:::gfl_triangle_grid_chain(nrow)
+  trails = csnorm:::gfl_chains_to_trails(chain)
+  stopifnot(uniqueN(trails$trails)==nrow*(nrow+1)/2)
+  #store bin graph
+  trails$graph = csnorm:::compute_2d_connectivity_graph(nrow)
+  #plot(trails$graph, vertex.color=factor(V(g)$value), vertex.label=V(g)$count,
+  #     layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
+  return(trails)
+}
+
+#' compute sparse fused lasso coefficients for a given value of lambda1, lambda2 and eCprime
+#' @keywords internal
+gfl_get_value = function(valuehat, weight, trails, lambda1, lambda2, eCprime,
+                         alpha=0.2, inflate=2, tol.beta=1e-6, maxsteps=100000) {
+  #assume lambda1=0 and compute the fused lasso solution, centered around eCprime
+  z=rep(0,tail(trails$breakpoints,n=1))
+  u=rep(0,tail(trails$breakpoints,n=1))
+  value = csnorm:::weighted_graphfl(valuehat, weight, trails$ntrails, trails$trails,
+                         trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.beta, z, u) - eCprime
+  #now soft-threshold manually around eCprime
+  value=sign(value)*pmax(abs(value)-lambda1, 0)
+  return(value)
+}
+
+#' compute BIC for a given value of of lambda1, lambda2 and eCprime
+#' @keywords internal
+gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
+  #compute coefficients on each model
+  submat = matg[,.(name,bin1,bin2,valuehat,weight,
+                   value=csnorm:::gfl_get_value(valuehat, weight, trails,
+                                                lambda1=lambda1, lambda2=lambda2, eCprime=eCprime))]
+  #get the number of patches and degrees of freedom
+  cl = csnorm:::build_patch_graph(submat, trails, tol.value=tol.value)$components
+  submat[,patchno:=cl$membership]
+  dof = submat[abs(value)>tol.value,uniqueN(patchno)] #sparse fused lasso
+  stopifnot(dof<=cl$no)
+  #compute BIC
+  BIC = submat[,sum(weight*((valuehat-(value+eCprime))^2))+log(.N)*dof]
+  #compute mallow's Cp
+  #Cp = submat[,sum(weight*((valuehat-(value+eCprime))^2 - 1))]+2*dof
+  return(BIC)
 }
 
 #' compute input to fused lasso
@@ -351,6 +362,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1,
       if (verbose==T) cat("  Build triangle grid trails\n")
       trails = csnorm:::gfl_compute_trails(mat[,nlevels(bin1)])
       stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
+      stopifnot(all(length(V(trails$graph))==mat[,.N,by=name]$N))
     }
     #perform fused lasso on signal
     if (verbose==T) cat("  Fused lasso\n")
@@ -364,7 +376,8 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1,
         cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],
             " eC'=",params[i,eCprime],"\n")
     #compute matrix at new params
-    mat = foreach (g=groupnames, .combine=rbind) %dopar% get_lasso_coefs(mat[name==g],params[name==g], trails)
+    mat = foreach (g=groupnames, .combine=rbind) %dopar%
+      csnorm:::get_lasso_coefs(mat[name==g],params[name==g], trails)
     #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()+facet_wrap(~name)
     #
     #convert back value to the actual signal
@@ -375,7 +388,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1,
     if(mat[,all(abs(signal-signal.old)<tol)]) break
   }
   if (verbose==T) cat(" Detect patches\n")
-  mat = csnorm:::detect_binless_patches(mat)
+  mat = csnorm:::detect_binless_patches(mat, trails, tol.value=tol)
   #
   ### store interaction
   csi=new("CSinter", mat=mat, type="binteractions", threshold=-1, ref="expected")
@@ -430,7 +443,8 @@ detect_binless_differences = function(cs, resolution, group, ref, niter.outer=10
         cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],
             " eC'=",params[i,eCprime],"\n")
     #compute matrix at new params
-    mat = foreach (g=groupnames, .combine=rbind) %dopar% get_lasso_coefs(mat[name==g],params[name==g], trails)
+    mat = foreach (g=groupnames, .combine=rbind) %dopar%
+      csnorm:::get_lasso_coefs(mat[name==g],params[name==g], trails)
     #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()+facet_wrap(~name)
     #
     #convert back value to the actual signal
@@ -442,7 +456,7 @@ detect_binless_differences = function(cs, resolution, group, ref, niter.outer=10
     if(mat[,all(abs(diffsig-diffsig.old)<tol)]) break
   }
   if (verbose==T) cat(" Detect patches\n")
-  mat = csnorm:::detect_binless_patches(mat)
+  mat = csnorm:::detect_binless_patches(mat, trails, tol.value=tol)
   csi=new("CSinter", mat=mat, type="bdifferences", threshold=-1, ref=ref)
   #store back
   csg@interactions=append(csg@interactions,list(csi))
