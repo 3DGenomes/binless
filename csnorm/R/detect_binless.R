@@ -231,11 +231,19 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0) {
   obj = function(x){csnorm:::gfl_BIC(matg, trails, lambda1=lambda1, lambda2=x, eCprime=eCprime)}
   minlambda=0
   maxlambda=matg[,max(valuehat)-min(valuehat)]
+  #first shrink maximum lambda, in case initial guess is too big
+  repeat {
+    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, maxlambda, eCprime)]
+    #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value)))
+    if (matg[,max(value)-min(value)] > tol) break
+    maxlambda = maxlambda/2
+  }
+  #now expand it until we fuse everyone
   repeat {
     matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, maxlambda, eCprime)]
     #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value)))
     if (matg[,max(value)-min(value)] <= tol) break
-    maxlambda = maxlambda*10
+    maxlambda = maxlambda*2
   }
   #dt = foreach (lam=seq(minlambda,maxlambda,l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
   #ggplot(dt)+geom_line(aes(x,y))
@@ -252,11 +260,12 @@ csnorm_fused_lasso = function(mat, trails, tol=1e-3, niter=10, verbose=T, enforc
   params = foreach(g=groupnames, .combine=rbind) %dopar% {
     matg=mat[name==g]
     #lambda2
-    lambda1=matg[,mad(valuehat)]
     if (enforce.positivity==T) {
       eCprime=matg[,min(valuehat)]
+      lambda1=matg[,mad(valuehat)]
     } else {
       eCprime=0
+      lambda1=0
     }
     matg[,value:=0]
     #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+scale_fill_gradient2())
