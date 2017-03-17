@@ -22,30 +22,32 @@ flsa_compute_connectivity = function(nbins, start=0) {
   return(ret)
 }
 
+
 #' compute cv error for a given value of of lambda1 and lambda2
 #' @keywords internal
-flsa_cross_validate = function(mat, res.cv, cvgroups, lambda1, lambda2) {
+flsa_get_value = function(flsa.op, lambda1, lambda2, eCsd) {
+  #assume lambda1=0
+  value=flsaGetSolution(flsa.op, lambda1=0, lambda2=lambda2)[1,]-eCsd
+  #now soft-threshold manually around eCsd
+  value=sign(value)*pmax(abs(value)-lambda1, 0)
+  return(value)
+}
+
+#' compute BIC for a given value of of lambda1, lambda2 and eCsd
+#' @keywords internal
+flsa_BIC = function(mat, res.ref, lambda1, lambda2, eCsd) {
   #compute coefficients on each model
-  submat.all = mat[,.(name,bin1,bin2,ncounts, value.ref=value)]
-  #compute cv coefs for each group, given lambda
-  submat.cv = foreach(cv=cvgroups, .combine=rbind) %do% {
-    ret = mat[,.(name,cv.group,bin1,bin2)]
-    if (lambda1>0) {
-      ret[,value:=flsaGetSolution(res.cv[[cv]][[as.character(name[1])]],
-                                        lambda1=lambda1, lambda2=lambda2)[1,1,],by=name]
-    } else {
-      ret[,value:=flsaGetSolution(res.cv[[cv]][[as.character(name[1])]],
-                                        lambda1=lambda1, lambda2=lambda2)[1,],by=name]
-    }
-    ret[cv.group==cv]
-  }
-  #ggplot(submat.cv)+geom_raster(aes(ibin1,ibin2,fill=value))+facet_grid(groupname~cv.group)
-  #ggplot(submat.all)+geom_raster(aes(ibin1,ibin2,fill=value.ref))+facet_grid(~name)#+scale_fill_gradient2()
-  ret=merge(submat.cv, submat.all, all.x=T, by=c("name","bin1","bin2"), sort=F)
-  ret[,mse:=ncounts*(value-value.ref)^2]
-  ret=ret[,.(mse=mean(mse),ncounts=.N),by=c("name","cv.group")]
-  ret=ret[,.(mse=weighted.mean(mse,ncounts),mse.sd=sd(mse)),by=name]
-  ret[,.(name,lambda1=lambda1,lambda2=lambda2,mse,mse.sd)]
+  submat = mat[,.(name,bin1,bin2,ncounts,valuehat,
+                  value=csnorm:::flsa_get_value(res.ref[[as.character(name[1])]],
+                                                lambda1=lambda1, lambda2=lambda2, eCsd=eCsd))]
+  #get the number of patches and degrees of freedom
+  submat = csnorm:::detect_binless_patches(submat)
+  dof = submat[value!=0,uniqueN(patchno)]
+  #compute BIC
+  BIC = submat[,sum(((valuehat-(value+eCsd))^2))+log(.N)*dof]
+  #compute mallow's Cp
+  #Cp = submat[,sum(((valuehat-(value+eCsd))^2 - 1))]+2*dof
+  return(BIC)
 }
 
 #' connectivity on a triangle
@@ -131,12 +133,12 @@ detect_binless_patches = function(mat) {
 #' @keywords internal
 csnorm_compute_raw_signal = function(csg, mat) {
   cts = csg@cts
-  if (is.null(mat)) mat=cts[,.(phi=0,signal=1),by=c("name","bin1","bin2")]
-  cts = mat[,.(name,bin1,bin2,phi,signal)][cts,,on=c("name","bin1","bin2")]
-  cts[,c("z","var"):=list(count/(exp(phi)*mu)-1,(1/(exp(phi)*mu)+1/csg@dispersion))]
-  mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
+  if (is.null(mat)) mat=cts[,.(phi=0,signal=1,eCprime=0),by=c("name","bin1","bin2")]
+  cts = mat[,.(name,bin1,bin2,phi,signal,eCprime)][cts,,on=c("name","bin1","bin2")]
+  cts[,c("z","var"):=list(count/(exp(phi+eCprime)*mu)-1,(1/(exp(phi+eCprime)*mu)+1/csg@dispersion))]
+  mat = cts[,.(phihat=weighted.mean(z+phi+eCprime, weight/var),
                phihat.sd=sqrt(1/sum(weight/var)),ncounts=sum(weight)),by=c("name","bin1","bin2","phi","signal")]
-  mat[,value:=phihat/phihat.sd]
+  mat[,valuehat:=phihat/phihat.sd]
   setkey(mat,name,bin1,bin2)
   return(mat)
 }
@@ -160,23 +162,68 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
   mat=mat[cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
                  sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
   mat[,c("deltahat","deltahat.sd"):=list(phihat-phihat.ref,sqrt(sigmasq+sigmasq.ref))]
-  mat[,value:=deltahat/deltahat.sd]
+  mat[,valuehat:=deltahat/deltahat.sd]
   setkey(mat,name,bin1,bin2)
   return(mat)
 }
 
+#' cross-validate lambda1
+#' @keywords internal
+optimize_lambda1 = function(mat, res.ref, g, lambda2=0, eCsd=0, enforce.positivity=T) {
+  obj = function(x){csnorm:::flsa_BIC(mat[name==g], res.ref, lambda1=x, lambda2=lambda2, eCsd=eCsd)}
+  if (enforce.positivity==T) { #we force all signal values to be positive
+    minlambda=mat[name==g,abs(min(value))] #in this case minlambda <= maxlambda always
+    maxlambda=mat[name==g,abs(max(value))]
+    stopifnot(minlambda<=maxlambda)
+  } else { #we don't
+    minlambda=0
+    maxlambda=mat[name==g,max(abs(value))]
+  }
+  #ggplot(data.table(x=seq(minlambda,maxlambda,l=100))[,.(x,y=sapply(x,obj))])+geom_line(aes(x,y))
+  if (maxlambda>0) {
+    lambda1=optimize(obj, c(minlambda,maxlambda), tol=tol)$minimum
+    if (abs(lambda1)<tol) lambda1=0
+  } else {
+    lambda1=0
+  }
+  data.table(name=g, lambda2=lambda2, eCsd=eCsd, lambda1=lambda1)
+}
+
+#' cross-validate lambda2
+#' @keywords internal
+optimize_lambda2 = function(mat, res.ref, g, lambda1=0, eCsd=0) {
+  obj = function(x){csnorm:::flsa_BIC(mat[name==g], res.ref, lambda1=lambda1, lambda2=x, eCsd=eCsd)}
+  minlambda=0
+  maxlambda=max(res.ref[[g]]$BeginLambda)
+  #ggplot(data.table(x=seq(minlambda,maxlambda,l=100))[,.(x,y=sapply(x,obj))])+geom_line(aes(x,y))
+  op=optimize(obj, c(minlambda,maxlambda), tol=tol)
+  l2vals=sort(res.ref[[g]]$BeginLambda)
+  i=findInterval(op$minimum, l2vals)
+  if (i==length(l2vals)) {
+    lambda2=l2vals[i]
+  } else if (i==0) {
+    lambda2=0
+  } else if (obj(l2vals[i]) <= obj(l2vals[i+1])) {
+    lambda2=l2vals[i]
+  } else {
+    lambda2=l2vals[i+1]
+  }
+  data.table(name=g, lambda2=lambda2, eCsd=eCsd, lambda1=lambda1)
+}
+
 #' run fused lasso on each dataset contained in mat, fusing 'value'
 #' 
-#' finds optimal lambda2 through k-fold cv. Uses lambda1=0
+#' finds optimal lambda1, lambda2 and eC through k-fold cv.
 #' @keywords internal
-csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
-  if (verbose==T) cat("   estimation runs\n")
+csnorm_fused_lasso = function(mat, tol=1e-3, niter=10, verbose=T, enforce.positivity=T, ncores=ncores) {
+  if (verbose==T) cat("   compute fused lasso solution path\n")
   groupnames=mat[,as.character(unique(name))]
   cmat = csnorm:::flsa_compute_connectivity(mat[,nlevels(bin1)])
+  registerDoParallel(cores=ncores)
   res.ref = foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
     submat=mat[name==g]
     stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
-    flsa(submat[,value], connListObj=cmat, verbose=F)
+    flsa(submat[,valuehat], connListObj=cmat, verbose=F)
   }
   
   # M = submat[,.N]
@@ -187,59 +234,49 @@ csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
   
   #fail if any has failed (flsa bugs)
   if (any(sapply(res.ref, is.null))) stop("one flsa run failed, aborting")
-  #cross-validate lambda2 (lambda1=0 gives good results)
-  mat[,cv.group:=as.character(((unclass(bin2)+unclass(bin1)*max(unclass(bin1)))%%cv.fold)+1)]
-  cvgroups=as.character(1:cv.fold)
-  #first, run lasso regressions
-  if (verbose==T) cat("   cross-validation runs\n")
-  res.cv = foreach (cv=cvgroups, .final=function(x){setNames(x,cvgroups)}) %:%
-    foreach (g=groupnames, .final=function(x){setNames(x,groupnames)}) %dopar% {
-      submat=copy(mat[name==g])
-      submat[cv.group==cv,value:=0]
-      stopifnot(length(cmat)==submat[,.N]) #ibin indices have something wrong
-      flsa(submat[,value], connListObj=cmat, verbose=F)
-    }
-  #remove failed cv attempts (flsa bugs)
-  cvgroups = foreach(cv=cvgroups, .combine=c) %do% {
-    if (any(sapply(res.cv[[cv]], is.null)))
-      cat("removing CV group ",cv," due to failure of flsa!\n")
-    else
-      cv
-  }
-  #then, try a few lambda values to define the interesting region
-  if (verbose==T) cat("  coarse scan\n")
-  cv = foreach (g=groupnames, .combine=rbind) %do% {
-    minlambda=min(res.ref[[g]]$EndLambda[res.ref[[g]]$EndLambda>0])
-    maxlambda=max(res.ref[[g]]$BeginLambda)
-    l2vals=c(0,10^seq(log10(minlambda),log10(maxlambda),length.out=cv.gridsize))
-    foreach (lambda2=l2vals, .combine=rbind) %dopar%
-      csnorm:::flsa_cross_validate(mat[name==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
-  }
-  #ggplot(cv)+geom_line(aes(lambda2,mse))+geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
-  #  facet_wrap(~name,scales="free")+scale_x_log10()
-  #lower bound is lambda one step below minimum mse
-  bounds=merge(cv,cv[,.SD[mse==min(mse),.(lambda2.max=lambda2)],by=name],by="name")
-  lmin=bounds[lambda2<lambda2.max,.(l2min=max(lambda2)),by=name]
-  #upper bound is lambda one step above mse
-  lmax=bounds[,.SD[lambda2>lambda2.max,.(l2max=min(lambda2))],by=name]
-  bounds=merge(lmin,lmax,by="name", all=T)
-  bounds[,l2max:=pmin(l2max, sapply(as.character(name),FUN=function(g){max(res.ref[[g]]$BeginLambda)}), na.rm=T)]
   #
-  #now, try all lambda values between these bounds
-  if (verbose==T) cat("   fine scan\n")
-  cv = foreach (g=groupnames, .combine=rbind) %do% {
-    l2vals=sort(unique(res.ref[[g]]$BeginLambda))
-    l2vals=bounds[name==g,l2vals[l2vals>=l2min & l2vals<=l2max]]
-    foreach (lambda2=l2vals, .combine=rbind) %dopar%
-      csnorm:::flsa_cross_validate(mat[name==g], res.cv, cvgroups, lambda1=0, lambda2=lambda2)
+  #determine optimal parameters
+  if (verbose==T) cat("   determine optimal parameters\n")
+  params = foreach(g=groupnames, .combine=rbind) %dopar% {
+    matg=mat[name==g]
+    #lambda2
+    lambda1=matg[,mad(valuehat)]
+    if (enforce.positivity==T) {
+      eCsd=matg[,min(valuehat)]
+    } else {
+      eCsd=0
+    }
+    matg[,value:=0]
+    for (i in 1:niter) {
+      matg[,value.old:=value]
+      lambda2 = csnorm:::optimize_lambda2(matg, res.ref, g,
+                                          lambda1=lambda1, eCsd=eCsd)[,lambda2]
+      matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
+      #lambda1
+      lambda1 = csnorm:::optimize_lambda1(matg, res.ref, g,
+                                          lambda2=lambda2, eCsd=eCsd,
+                                          enforce.positivity=enforce.positivity)[,lambda1]
+      matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
+      #eCsd
+      if (enforce.positivity==T) {
+        eCsd = matg[,min(value+eCsd)]
+        matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=lambda1, lambda2=lambda2, eCsd=eCsd)]
+      }
+      #
+      cat("   iteration ",i," : lambda1=",lambda1," lambda2=",lambda2," eCsd'=",eCsd,"\n")
+      #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()
+      if (matg[,all(abs(value-value.old)<tol)]) break
+    }
+    data.table(name=g,lambda1=lambda1,lambda2=lambda2,eCsd=eCsd)
   }
-  #ggplot(cv)+geom_line(aes(lambda2,mse))+#geom_errorbar(aes(lambda2,ymin=mse-mse.sd,ymax=mse+mse.sd))+
-  #  facet_wrap(~name,scales="free")
-  #determine optimal lambda value and compute coefficients
-  if (verbose==T) cat("   report optimum\n")
-  l2vals=cv[,.SD[mse==min(mse),.(lambda2)],by=name]
-  for (g in groupnames)
-    mat[name==g,value:=flsaGetSolution(res.ref[[g]], lambda1=0, lambda2=l2vals[name==g,lambda2])[1,]]
+  mat = foreach (g=groupnames, .combine=rbind) %do% {
+    p=params[name==g]
+    matg=mat[name==g]
+    matg[,c("lambda1","lambda2","eCsd"):=list(p$lambda1, p$lambda2, p$eCsd)]
+    matg[,value:=csnorm:::flsa_get_value(res.ref[[g]], lambda1=p$lambda1, lambda2=p$lambda2,eCsd=p$eCsd)]
+    matg
+  }
+  #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()+facet_wrap(~name)
   return(mat)
 }
 
@@ -250,16 +287,13 @@ csnorm_fused_lasso = function(mat, cv.fold=10, cv.gridsize=30, verbose=T) {
 #' @param resolution 
 #' @param group 
 #' @param ncores 
-#' @param niter number of IRLS iterations
-#' @param cv.fold perform x-fold cross-validation
-#' @param cv.gridsize compute possible values of log lambda on a grid
+#' @param niter number of IRLS iterations, and BIC iterations within
 #'   
 #' @return 
 #' @export
 #' 
 #' @examples
-detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol=1e-3,
-                                       cv.fold=10, cv.gridsize=30, verbose=T){
+detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol=1e-3, verbose=T){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
@@ -273,18 +307,19 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
   for (step in 1:niter) {
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
-    mat = csnorm_compute_raw_signal(csg, mat)
+    mat = csnorm:::csnorm_compute_raw_signal(csg, mat)
     #
     #perform fused lasso on signal to noise
     if (verbose==T) cat("  Fused lasso\n")
-    mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, cv.gridsize=cv.gridsize)
-    #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~name)+scale_fill_gradient2(na.value = "white")
+    mat = csnorm:::csnorm_fused_lasso(mat, tol=tol, niter=niter, enforce.positivity=T, ncores=ncores)
+    #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+facet_wrap(~name)+scale_fill_gradient(na.value = "black")
     #
     #convert back value to the actual signal
-    mat[,c("cv.group","phi"):=list(NULL,value*phihat.sd)]
+    mat[,c("phi","eCprime"):=list(value*phihat.sd,eCsd*phihat.sd)]
     mat[,signal.old:=signal]
     mat[,signal:=exp(phi)]
-    mat=mat[,.(name,bin1,bin2,phi,signal,signal.old,ncounts,value)]
+    mat=mat[,.(name,bin1,bin2,phi,eCprime,signal,signal.old,ncounts,value,valuehat)]
+    #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=log10(signal)))+facet_wrap(~name)+scale_fill_gradient(na.value = "black")+geom_raster(aes(bin2,bin1,fill=log10(signal.old)))
     if(mat[,all(abs(signal-signal.old)<tol)]) break
   }
   mat[,ncounts:=NULL]
@@ -309,8 +344,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
 #' @export
 #' 
 #' @examples
-detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=1e-3, ncores=1,
-                                      cv.fold=10, cv.gridsize=30, verbose=T){
+detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=1e-3, ncores=1, verbose=T){
   if (verbose==T) cat("Binless difference detection with resolution=",resolution,
                       " group=",group," and ref=",ref,"\n")
   ### get CSgroup object
@@ -322,15 +356,15 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
   for (step in 1:niter) {
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
-    mat = csnorm_compute_raw_differential(csg, mat, ref)
+    mat = csnorm:::csnorm_compute_raw_differential(csg, mat, ref)
     #
     #perform fused lasso on signal to noise
     if (verbose==T) cat("  Fused lasso\n")
-    mat = csnorm:::csnorm_fused_lasso(mat, cv.fold=cv.fold, cv.gridsize=cv.gridsize)
-    #ggplot(mat)+geom_raster(aes(ibin1,ibin2,fill=-value))+facet_wrap(~name)+scale_fill_gradient2(na.value = "white")
+    mat = csnorm:::csnorm_fused_lasso(mat, tol=tol, niter=niter, enforce.positivity=F, ncores=ncores)
+    #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+facet_wrap(~name)+scale_fill_gradient(na.value = "black")
     #
     #convert back value to the actual signal
-    mat[,c("cv.group","delta"):=list(NULL,value*deltahat.sd)]
+    mat[,delta:=value*deltahat.sd]
     mat[,diffsig.old:=diffsig]
     mat[,diffsig:=exp(delta)]
     mat[,phi.ref:=(phihat.ref/sigmasq.ref + (phihat-delta)/sigmasq)/(1/sigmasq.ref+1/sigmasq)]
@@ -371,8 +405,8 @@ plot_binless_matrix = function(mat, minima=F) {
       geom_polygon(aes(begin2,begin1,group=patchno),colour="blue",fill=NA,data=b)+
       geom_polygon(aes(begin2,begin1,group=patchno),colour="red",fill=NA,data=a)
   } else {
-    p=ggplot(mat)+geom_raster(aes(begin1,begin2,fill=-(pmax(-2,pmin(2,value)))))+
-      geom_raster(aes(begin2,begin1,fill=-(pmax(-2,pmin(2,value)))))+
+    p=ggplot(mat)+geom_raster(aes(begin1,begin2,fill=-value))+
+      geom_raster(aes(begin2,begin1,fill=-value))+
       guides(fill=F)+scale_fill_gradient2()+facet_wrap(~name)+
       geom_polygon(aes(begin2,begin1,group=patchno),colour="black",fill=NA,data=a)
   }
