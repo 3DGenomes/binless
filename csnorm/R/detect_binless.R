@@ -235,22 +235,45 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
   return(mat)
 }
 
+#' cross-validate eCprime (no positivity constraint)
+#' perfer grid search over optimize, because function is very rugged
+#' @keywords internal
+optimize_eCprime = function(matg, trails, tol=1e-3, lambda1=0, lambda2=1, niter=2, grid.size=10) {
+  if (lambda1<tol) return(0)
+  obj = function(x){csnorm:::gfl_BIC(matg, trails, lambda1=lambda1, lambda2=lambda2, eCprime=x)}
+  mineC=matg[,min(value)]
+  maxeC=matg[,max(value)]
+  if (maxeC==mineC) return(mineC)
+  for (i in 1:niter) {
+    dt = foreach (lam=seq(mineC,maxeC,l=grid.size),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
+    #ggplot(dt)+geom_line(aes(x,y))
+    eCopt=dt[y==min(y),x]
+    eCleft=dt[x<eCopt,tail(x,n=1)]
+    if (length(eCleft)==0) eCleft=mineC
+    eCright=dt[x>eCopt,head(x,n=1)]
+    if (length(eCright)==0) eCright=maxeC
+    mineC=eCleft
+    maxeC=eCright
+  }
+  return(eCopt)
+}
+
 #' cross-validate lambda1
 #' @keywords internal
 optimize_lambda1 = function(matg, trails, tol=1e-3, lambda2=0, eCprime=0, enforce.positivity=T) {
-  obj = function(x){csnorm:::gfl_BIC(matg, trails, lambda1=x, lambda2=lambda2, eCprime=eCprime)}
+  obj = function(x){csnorm:::gfl_BIC(matg, trails, lambda1=10^(x), lambda2=lambda2, eCprime=eCprime)}
   if (enforce.positivity==T) { #we force all signal values to be positive
-    minlambda=matg[,abs(min(pmin(value,0)))] #in this case minlambda <= maxlambda always
+    minlambda=matg[,abs(min(pmin(value,-tol/2)))] #in this case minlambda <= maxlambda always
     maxlambda=matg[,abs(max(value))]
     stopifnot(minlambda<=maxlambda)
   } else { #we don't
-    minlambda=0
+    minlambda=tol/2
     maxlambda=matg[,max(abs(value))]
   }
-  #dt = foreach (lam=seq(minlambda,maxlambda,l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
+  #dt = foreach (lam=seq(log10(minlambda),log10(maxlambda),l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
   #ggplot(dt)+geom_line(aes(x,y))
   if (maxlambda>0) {
-    lambda1=optimize(obj, c(minlambda,maxlambda), tol=tol)$minimum
+    lambda1=10^(optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=tol)$minimum)
     if (abs(lambda1)<tol) lambda1=0
   } else {
     lambda1=0
@@ -284,6 +307,7 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0, lambda
   op=optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=tol)
   lambda2=10^op$minimum
   if (lambda2==minlambda | lambda2==maxlambda) cat("   Warning: lambda2 hit boundary.")
+  if (lambda2<tol) lambda2=0
   return(lambda2)
 }
 
@@ -295,51 +319,51 @@ csnorm_fused_lasso = function(matg, params, trails, tol=1e-3, niter=10,
                               verbose=T, enforce.positivity=T, ncores=ncores) {
   groupname=matg[,as.character(name[1])]
   if (is.null(params)) {
-    #lambda2
     if (enforce.positivity==T) {
       eCprime=matg[,min(valuehat)]
-      lambda1=matg[,mad(valuehat)]
     } else {
       eCprime=0
-      lambda1=0
     }
+    lambda1=0
   } else {
     lambda1=params[name==groupname,lambda1]
     eCprime=params[name==groupname,eCprime]
   }
-    matg[,value:=0]
-    lambda2=1
-    #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+scale_fill_gradient2())
-    for (i in 1:niter) {
-      #lambda2=10
-      #beta=csnorm:::weighted_graphfl(matg[,valuehat], matg[,weight], trails$ntrails, trails$trails, trails$breakpoints,
-      #                               lambda2, 0.2, 2, 100000, 1e-3, rep(0,tail(trails$breakpoints,n=1)), rep(0,tail(trails$breakpoints,n=1)))
-      #write.table(matg[,valuehat],file="tmp/gfl-master/example/mat_y.csv", quote=F, row.names=F, col.names=F)
-      #write.table(matg[,weight],file="tmp/gfl-master/example/mat_weight.csv", quote=F, row.names=F, col.names=F)
-      #matg[,value:=beta]
-      #matg[,value.py:=fread("tmp/gfl-master/example/beta.csv")$V1]
-      #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+geom_raster(aes(bin2,bin1,fill=value.py))
-      #ggplot(matg)+geom_point(aes(value,value.py))
-      #
-      matg[,value.old:=value]
-      lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol, lambda1=lambda1, eCprime=eCprime,
-                                          lambda2.last=lambda2)
-      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
-      #lambda1
-      lambda1 = csnorm:::optimize_lambda1(matg, trails, tol=tol, lambda2=lambda2, eCprime=eCprime,
-                                          enforce.positivity=enforce.positivity)
-      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
-      #eCprime
-      if (enforce.positivity==T) {
-        eCprime = matg[,min(value+eCprime)]
-        matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
-      }
-      #
-      cat("   iteration ",i," : lambda1=",lambda1," lambda2=",lambda2," eC'=",eCprime,"\n")
-      #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
-      if (matg[,all(abs(value-value.old)<tol)]) break
+  matg[,value:=0]
+  lambda2=1
+  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+scale_fill_gradient2())
+  for (i in 1:niter) {
+    #lambda2=10
+    #beta=csnorm:::weighted_graphfl(matg[,valuehat], matg[,weight], trails$ntrails, trails$trails, trails$breakpoints,
+    #                               lambda2, 0.2, 2, 100000, 1e-3, rep(0,tail(trails$breakpoints,n=1)), rep(0,tail(trails$breakpoints,n=1)))
+    #write.table(matg[,valuehat],file="tmp/gfl-master/example/mat_y.csv", quote=F, row.names=F, col.names=F)
+    #write.table(matg[,weight],file="tmp/gfl-master/example/mat_weight.csv", quote=F, row.names=F, col.names=F)
+    #matg[,value:=beta]
+    #matg[,value.py:=fread("tmp/gfl-master/example/beta.csv")$V1]
+    #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+geom_raster(aes(bin2,bin1,fill=value.py))
+    #ggplot(matg)+geom_point(aes(value,value.py))
+    #
+    matg[,value.old:=value]
+    lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol, lambda1=lambda1, eCprime=eCprime,
+                                        lambda2.last=lambda2)
+    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
+    #lambda1
+    lambda1 = csnorm:::optimize_lambda1(matg, trails, tol=tol, lambda2=lambda2, eCprime=eCprime,
+                                        enforce.positivity=enforce.positivity)
+    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
+    #eCprime
+    if (enforce.positivity==T) {
+      eCprime = matg[,min(value+eCprime)]
+    } else {
+      eCprime = csnorm:::optimize_eCprime(matg, trails, tol=tol, lambda1=lambda1, lambda2=lambda2)
     }
-    return(data.table(name=groupname,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime))
+    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
+    #
+    cat("   iteration ",i," : lambda1=",lambda1," lambda2=",lambda2," eC'=",eCprime,"\n")
+    #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
+    if (matg[,all(abs(value-value.old)<tol)]) break
+  }
+  return(data.table(name=groupname,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime))
 }
 
 #' produce fused lasso solution at the given set of parameters
@@ -472,10 +496,10 @@ detect_binless_differences = function(cs, resolution, group, ref, niter.outer=10
     #compute matrix at new params
     mat = foreach (g=groupnames, .combine=rbind) %dopar%
       csnorm:::get_lasso_coefs(mat[name==g],params[name==g], trails)
-    #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()+facet_wrap(~name)
-    #ggsave(p,filename = paste0("diff_step_",step,"_value.png"), width=10, height=8)
-    #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))+scale_fill_gradient2()+facet_wrap(~name)
-    #ggsave(p,filename = paste0("diff_step_",step,"_weight.png"), width=10, height=8)
+    p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()+facet_wrap(~name)
+    ggsave(p,filename = paste0("diff_step_",step,"_value.png"), width=10, height=8)
+    p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))+scale_fill_gradient2()+facet_wrap(~name)
+    ggsave(p,filename = paste0("diff_step_",step,"_weight.png"), width=10, height=8)
     #
     #convert back value to the actual signal
     mat[,delta:=value]
