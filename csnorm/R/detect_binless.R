@@ -189,11 +189,13 @@ csnorm_compute_raw_signal = function(csg, mat) {
   if (is.null(mat)) {
     mat=cts[,CJ(name=name,bin1=ordered(levels(bin1)),bin2=ordered(levels(bin2)),sorted=T,unique=T)][bin2>=bin1]
     mat[,c("phi","signal","eCprime"):=list(0,1,0)]
+  } else {
+    mat=mat[,.(name,bin1,bin2,phi,signal,eCprime)]
   }
-  cts = mat[,.(name,bin1,bin2,phi,signal,eCprime)][cts,,on=c("name","bin1","bin2")]
+  cts = mat[cts,,on=c("name","bin1","bin2")]
   cts[,c("z","var"):=list(count/(exp(phi+eCprime)*mu)-1,(1/(exp(phi+eCprime)*mu)+1/csg@dispersion))]
   mat = cts[,.(phihat=weighted.mean(z+phi+eCprime, weight/var),
-               phihat.var=1/sum(weight/var)),by=c("name","bin1","bin2")][mat]
+               phihat.var=1/sum(weight/var)),keyby=c("name","bin1","bin2")][mat]
   mat[is.na(phihat),c("phihat","phihat.var"):=list(1,Inf)] #bins with no detectable counts
   mat[,c("valuehat","weight"):=list(phihat,1/phihat.var)]
   setkey(mat,name,bin1,bin2)
@@ -210,6 +212,8 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
   if (is.null(mat)) {
     mat=cts[,CJ(name=name,bin1=ordered(levels(bin1)),bin2=ordered(levels(bin2)),sorted=T,unique=T)][bin2>=bin1]
     mat[,c("phi.ref","delta","diffsig"):=list(0,0,1)]
+  } else {
+    mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig)]
   }
   ctsref=mat[ctsref]
   ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@dispersion))]
@@ -221,7 +225,7 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
   cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
                           (1/(exp(phi.ref+delta)*mu)+1/csg@dispersion))]
   mat=cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
-             sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
+             sigmasq=1/sum(weight/var)),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
   mat[is.na(phihat),c("phihat","sigmasq"):=list(1,Inf)] #bins with no detectable counts
   stopifnot(mat[,.N]==mat.ref[,.N])
   mat=merge(mat,mat.ref)
