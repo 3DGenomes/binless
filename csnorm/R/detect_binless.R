@@ -225,7 +225,7 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
   cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
                           (1/(exp(phi.ref+delta)*mu)+1/csg@dispersion))]
   mat=cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
-             sigmasq=1/sum(weight/var)),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
+             sigmasq=1/sum(weight/var)),keyby=c("name","bin1","bin2")][mat]
   mat[is.na(phihat),c("phihat","sigmasq"):=list(1,Inf)] #bins with no detectable counts
   stopifnot(mat[,.N]==mat.ref[,.N])
   mat=merge(mat,mat.ref)
