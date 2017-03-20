@@ -261,8 +261,8 @@ optimize_lambda1 = function(matg, trails, tol=1e-3, lambda2=0, eCprime=0, enforc
 #' cross-validate lambda2
 #' @keywords internal
 optimize_lambda2 = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0, lambda2.last=1) {
-  obj = function(x){csnorm:::gfl_BIC(matg, trails, lambda1=lambda1, lambda2=x, eCprime=eCprime)}
-  minlambda=0
+  obj = function(x){csnorm:::gfl_BIC(matg, trails, lambda1=lambda1, lambda2=10^(x), eCprime=eCprime)}
+  minlambda=tol/2
   maxlambda=10*lambda2.last
   #save(matg,trails,tol,lambda1,eCprime,file="debug_lambda2.RData")
   #cat("*** maxlambda ",maxlambda," (range=",matg[,max(value)-min(value)],")\n")
@@ -275,15 +275,16 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0, lambda
       break
     }
     maxlambda = maxlambda/2
-    dof = csnorm:::get_gfl_degrees_of_freedom(matg, trails)
+    #dof = csnorm:::get_gfl_degrees_of_freedom(matg, trails)
     #cat("shrink maxlambda ",maxlambda," (range=",matg[,max(value)-min(value)],", dof=",dof,")\n")
   }
   #cat("optimize lambda2 between ",minlambda," and ",maxlambda,"\n")
-  #dt = foreach (lam=seq(minlambda,maxlambda,l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
+  #dt = foreach (lam=seq(log10(minlambda),log10(maxlambda),l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
   #ggplot(dt)+geom_line(aes(x,y))
-  op=optimize(obj, c(minlambda,maxlambda), tol=tol)
-  if (op$minimum==minlambda | op$minimum==maxlambda) cat("   Warning: lambda2 hit boundary.")
-  return(op$minimum)
+  op=optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=tol)
+  lambda2=10^op$minimum
+  if (lambda2==minlambda | lambda2==maxlambda) cat("   Warning: lambda2 hit boundary.")
+  return(lambda2)
 }
 
 #' run fused lasso on one dataset contained in matg, fusing 'value'
