@@ -176,7 +176,7 @@ gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
   #get the number of patches and degrees of freedom
   dof = csnorm:::get_gfl_degrees_of_freedom(submat, trails, tol.value)
   #compute BIC
-  BIC = submat[,sum(weight*((valuehat-(value+eCprime))^2))+log(.N)*dof]
+  BIC = submat[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
   #compute mallow's Cp
   #Cp = submat[,sum(weight*((valuehat-(value+eCprime))^2 - 1))]+2*dof
   return(BIC)
@@ -195,8 +195,9 @@ csnorm_compute_raw_signal = function(csg, mat) {
   cts = mat[cts,,on=c("name","bin1","bin2")]
   cts[,c("z","var"):=list(count/(exp(phi+eCprime)*mu)-1,(1/(exp(phi+eCprime)*mu)+1/csg@dispersion))]
   mat = cts[,.(phihat=weighted.mean(z+phi+eCprime, weight/var),
-               phihat.var=1/sum(weight/var)),keyby=c("name","bin1","bin2")][mat]
-  mat[is.na(phihat),c("phihat","phihat.var"):=list(1,Inf)] #bins with no detectable counts
+               phihat.var=1/sum(weight/var),
+               ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat]
+  mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
   mat[,c("valuehat","weight"):=list(phihat,1/phihat.var)]
   setkey(mat,name,bin1,bin2)
   return(mat)
@@ -218,19 +219,21 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
   ctsref=mat[ctsref]
   ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@dispersion))]
   mat.ref=ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
-                    sigmasq.ref=1/sum(weight/var)),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
-  mat.ref[is.na(phihat.ref),c("phihat.ref","sigmasq.ref"):=list(1,Inf)] #bins with no detectable counts
+                    sigmasq.ref=1/sum(weight/var),
+                    ncounts.ref=sum(weight)),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
+  mat.ref[is.na(phihat.ref),c("phihat.ref","sigmasq.ref","ncounts.ref"):=list(1,Inf,0)] #bins with no detectable counts
   #
   cts=mat[cts]
   cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
                           (1/(exp(phi.ref+delta)*mu)+1/csg@dispersion))]
   mat=cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
-             sigmasq=1/sum(weight/var)),keyby=c("name","bin1","bin2")][mat]
-  mat[is.na(phihat),c("phihat","sigmasq"):=list(1,Inf)] #bins with no detectable counts
+             sigmasq=1/sum(weight/var),
+             ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat]
+  mat[is.na(phihat),c("phihat","sigmasq","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
   stopifnot(mat[,.N]==mat.ref[,.N])
   mat=merge(mat,mat.ref)
-  mat[,c("deltahat","deltahat.var"):=list(phihat-phihat.ref,sigmasq+sigmasq.ref)]
-  mat[,c("valuehat","weight"):=list(deltahat,1/deltahat.var)]
+  mat[,c("deltahat","deltahat.var","ncounts"):=list(phihat-phihat.ref,sigmasq+sigmasq.ref,ncounts+ncounts.ref)]
+  mat[,c("valuehat","weight","ncounts.ref"):=list(deltahat,1/deltahat.var,NULL)]
   setkey(mat,name,bin1,bin2)
   return(mat)
 }
@@ -429,7 +432,10 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1,
     #compute matrix at new params
     mat = foreach (g=groupnames, .combine=rbind) %dopar%
       csnorm:::get_lasso_coefs(mat[name==g],params[name==g], trails)
-    #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()+facet_wrap(~name)
+    p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()+facet_wrap(~name)
+    ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
+    p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))+scale_fill_gradient2()+facet_wrap(~name)
+    ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
     #
     #convert back value to the actual signal
     mat[,phi:=value]
