@@ -207,17 +207,24 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
     csg@cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
   cts=csg@cts[name!=ref]
   #
-  if (is.null(mat)) mat=cts[,.(phi.ref=0,delta=0,diffsig=1),by=c("name","bin1","bin2")]
+  if (is.null(mat)) {
+    mat=cts[,CJ(name=name,bin1=ordered(levels(bin1)),bin2=ordered(levels(bin2)),sorted=T,unique=T)][bin2>=bin1]
+    mat[,c("phi.ref","delta","diffsig"):=list(0,0,1)]
+  }
   ctsref=mat[ctsref]
   ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@dispersion))]
-  mat=mat[ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
-                    sigmasq.ref=1/sum(weight/var)),keyby=c("name","bin1","bin2")]]
+  mat.ref=ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
+                    sigmasq.ref=1/sum(weight/var)),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
+  mat.ref[is.na(phihat.ref),c("phihat.ref","sigmasq.ref"):=list(1,Inf)] #bins with no detectable counts
   #
   cts=mat[cts]
   cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
                           (1/(exp(phi.ref+delta)*mu)+1/csg@dispersion))]
-  mat=mat[cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
-                 sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
+  mat=cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
+             sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
+  mat[is.na(phihat),c("phihat","sigmasq"):=list(1,Inf)] #bins with no detectable counts
+  stopifnot(mat[,.N]==mat.ref[,.N])
+  mat=merge(mat,mat.ref)
   mat[,c("deltahat","deltahat.var"):=list(phihat-phihat.ref,sigmasq+sigmasq.ref)]
   mat[,c("valuehat","weight"):=list(deltahat,1/deltahat.var)]
   setkey(mat,name,bin1,bin2)
