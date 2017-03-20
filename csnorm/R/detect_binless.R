@@ -186,11 +186,15 @@ gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
 #' @keywords internal
 csnorm_compute_raw_signal = function(csg, mat) {
   cts = csg@cts
-  if (is.null(mat)) mat=cts[,.(phi=0,signal=1,eCprime=0),by=c("name","bin1","bin2")]
+  if (is.null(mat)) {
+    mat=cts[,CJ(name=name,bin1=ordered(levels(bin1)),bin2=ordered(levels(bin2)),sorted=T,unique=T)][bin2>=bin1]
+    mat[,c("phi","signal","eCprime"):=list(0,1,0)]
+  }
   cts = mat[,.(name,bin1,bin2,phi,signal,eCprime)][cts,,on=c("name","bin1","bin2")]
   cts[,c("z","var"):=list(count/(exp(phi+eCprime)*mu)-1,(1/(exp(phi+eCprime)*mu)+1/csg@dispersion))]
   mat = cts[,.(phihat=weighted.mean(z+phi+eCprime, weight/var),
-               phihat.var=1/sum(weight/var)),by=c("name","bin1","bin2","phi","signal")]
+               phihat.var=1/sum(weight/var)),by=c("name","bin1","bin2")][mat]
+  mat[is.na(phihat),c("phihat","phihat.var"):=list(1,Inf)] #bins with no detectable counts
   mat[,c("valuehat","weight"):=list(phihat,1/phihat.var)]
   setkey(mat,name,bin1,bin2)
   return(mat)
@@ -253,7 +257,6 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0, lambda
   #cat("*** maxlambda ",maxlambda," (range=",matg[,max(value)-min(value)],")\n")
   #shrink maximum lambda, in case initial guess is too big
   repeat {
-    cat("shrink maxlambda ",maxlambda,"\n")
     matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, maxlambda, eCprime)]
     #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value)))
     if (matg[,max(value)-min(value)] > tol) {
@@ -268,6 +271,7 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0, lambda
   #dt = foreach (lam=seq(minlambda,maxlambda,l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
   #ggplot(dt)+geom_line(aes(x,y))
   op=optimize(obj, c(minlambda,maxlambda), tol=tol)
+  if (op$minimum==minlambda | op$minimum==maxlambda) cat("   Warning: lambda2 hit boundary.")
   return(op$minimum)
 }
 
