@@ -151,7 +151,7 @@ gfl_get_value = function(valuehat, weight, trails, lambda1, lambda2, eCprime,
   u=rep(0,tail(trails$breakpoints,n=1))
   value = csnorm:::weighted_graphfl(valuehat, weight, trails$ntrails, trails$trails,
                          trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.beta, z, u) - eCprime
-  #now soft-threshold manually around eCprime
+  #now soft-threshold the shifted value around eCprime
   value=sign(value)*pmax(abs(value)-lambda1, 0)
   return(value)
 }
@@ -169,12 +169,17 @@ get_gfl_degrees_of_freedom = function(mat, trails, tol.value=1e-3) {
 #' compute BIC for a given value of of lambda1, lambda2 and eCprime
 #' @keywords internal
 gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
-  #compute coefficients on each model
-  submat = matg[,.(name,bin1,bin2,valuehat,weight,
-                   value=csnorm:::gfl_get_value(valuehat, weight, trails,
-                                                lambda1=lambda1, lambda2=lambda2, eCprime=eCprime))]
-  #get the number of patches and degrees of freedom
-  dof = csnorm:::get_gfl_degrees_of_freedom(submat, trails, tol.value)
+  #get value with lambda1 set to zero to avoid round-off errors in degrees of freedom
+  submat = matg[,.(name,bin1,bin2,valuehat,weight,ncounts)]
+  submat[,value:=csnorm:::gfl_get_value(valuehat, weight, trails,
+                                        lambda1=0, lambda2=lambda2, eCprime=eCprime)]
+  #get the number of patches and deduce degrees of freedom
+  cl = csnorm:::build_patch_graph(submat, trails, tol.value=tol.value)$components
+  submat[,patchno:=cl$membership]
+  dof = submat[abs(value)+tol.value>lambda1,uniqueN(patchno)] #sparse fused lasso
+  stopifnot(dof<=cl$no)
+  #now soft-threshold the value around eCprime
+  submat[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
   #compute BIC
   BIC = submat[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
   #compute mallow's Cp
@@ -306,7 +311,7 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0, lambda
   }
   #cat("optimize lambda2 between ",minlambda," and ",maxlambda,"\n")
   #dt = foreach (lam=seq(log10(minlambda),log10(maxlambda),l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
-  #ggplot(dt)+geom_line(aes(x,y))
+  #ggplot(dt)+geom_line(aes(10^(x),y))+scale_x_log10()
   op=optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=tol)
   lambda2=10^op$minimum
   if (lambda2==minlambda | lambda2==maxlambda) cat("   Warning: lambda2 hit boundary.")
@@ -349,15 +354,20 @@ csnorm_fused_lasso = function(matg, params, trails, tol=1e-3, niter=10,
     matg[,value.old:=value]
     lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol, lambda1=lambda1, eCprime=eCprime,
                                         lambda2.last=lambda2)
-    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
-    #lambda1
-    lambda1 = csnorm:::optimize_lambda1(matg, trails, tol=tol, lambda2=lambda2, eCprime=eCprime,
-                                        enforce.positivity=enforce.positivity)
-    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
-    #eCprime
     if (enforce.positivity==T) {
-      eCprime = matg[,min(value+eCprime)]
+      #set eCprime to lower bound when lambda1=0
+      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, eCprime)]
+      eCprime = matg[,min(value)]
+      #get best lambda1
+      lambda1 = csnorm:::optimize_lambda1(matg, trails, tol=tol, lambda2=lambda2, eCprime=eCprime,
+                                          enforce.positivity=enforce.positivity)
     } else {
+      #find lambda1
+      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
+      lambda1 = csnorm:::optimize_lambda1(matg, trails, tol=tol, lambda2=lambda2, eCprime=eCprime,
+                                          enforce.positivity=enforce.positivity)
+      #find eCprime
+      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
       eCprime = csnorm:::optimize_eCprime(matg, trails, tol=tol, lambda1=lambda1, lambda2=lambda2)
     }
     matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
