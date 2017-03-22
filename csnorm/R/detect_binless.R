@@ -187,38 +187,50 @@ gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
   return(BIC)
 }
 
-#' cross-validate eCprime (no positivity constraint)
-#' perfer grid search over optimize, because function is very rugged
+#' cross-validate lambda1 and eCprime
+#' 
 #' @keywords internal
-optimize_eCprime = function(matg, trails, tol=1e-3, lambda1=0, lambda2=1, niter=2, grid.size=10) {
-  if (lambda1<tol) return(0)
-  obj = function(x){csnorm:::gfl_BIC(matg, trails, lambda1=lambda1, lambda2=lambda2, eCprime=x)}
-  mineC=matg[,min(value)]
-  maxeC=matg[,max(value)]
-  if (maxeC==mineC) return(mineC)
-  for (i in 1:niter) {
-    dt = foreach (lam=seq(mineC,maxeC,l=grid.size),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
-    #ggplot(dt)+geom_line(aes(x,y))
-    eCopt=dt[y==min(y),x]
-    eCleft=dt[x<eCopt,tail(x,n=1)]
-    if (length(eCleft)==0) eCleft=mineC
-    eCright=dt[x>eCopt,head(x,n=1)]
-    if (length(eCright)==0) eCright=maxeC
-    mineC=eCleft
-    maxeC=eCright
+optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, eC.num=100) {
+  #compute values for lambda1=0 and eCprime=0
+  matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
+  matg[,eCprime:=NULL]
+  matg[,value.ori:=value]
+  #get the number of patches to compute degrees of freedom
+  cl = csnorm:::build_patch_graph(matg, trails, tol.value=tol.value)$components
+  matg[,patchno:=cl$membership]
+  patches = matg[,.(value=value[1]),by=patchno][,.N,keyby=value]
+  stopifnot(patches[,sum(N)]==cl$no)
+  #
+  dt = foreach (lambda1=c(0,patches[,abs(value)],patches[,max(abs(value))]+tol),.combine=rbind) %:% 
+    foreach (eCprime=seq(patches[,min(value)]-tol,patches[,max(value)]+tol,l=eC.num), .combine=rbind) %dopar% {
+    matg[,value:=value.ori-eCprime]
+    dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
+    stopifnot(dof<=cl$no)
+    #now soft-threshold the value around eCprime
+    matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
+    #compute BIC
+    BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
+    data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
   }
-  return(eCopt)
+  #ggplot(dt)+geom_point(aes(eCprime,lambda1,fill=dof))
+  #ggplot(dt[BIC<7000])+geom_line(aes(eCprime,BIC))+facet_wrap(~ lambda1)
+  #ggplot(dt[BIC<7000])+geom_line(aes(lambda1,BIC,colour=BIC))+facet_wrap(~ eCprime)
+  #ggplot(dt[lambda1<0.1])+geom_line(aes(lambda1,dof))
+  #ggplot(dt)+geom_line(aes(lambda1,BIC))
+  #ggplot(dt[lambda1<0.2])+geom_point(aes(lambda1,BIC))
+  lambda1=dt[BIC==min(BIC),lambda1]
+  eCprime=dt[BIC==min(BIC),eCprime]
+  return(list(lambda1=lambda1,eCprime=eCprime))
 }
 
-#' cross-validate lambda1
-#' 
-#' assuming eCprime is at minimum
-#' assuming value is up-to-date and computed at lambda1=0 and eCprime=0
+#' cross-validate lambda1 and set eCprime at minimum
 #' 
 #' @keywords internal
-optimize_lambda1_only = function(matg, trails, tol=1e-3, lambda2=0, eCprime=0) {
+optimize_lambda1_only = function(matg, trails, tol=1e-3, lambda2=0) {
+  #set eCprime to lower bound when lambda1=0
+  matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
+  eCprime = matg[,min(value)-tol]
   matg[,eCprime:=NULL]
-  stopifnot(all(matg[,value]>=eCprime))
   matg[,value.ori:=value]
   #get the number of patches to compute degrees of freedom
   cl = csnorm:::build_patch_graph(matg, trails, tol.value=tol.value)$components
@@ -241,7 +253,7 @@ optimize_lambda1_only = function(matg, trails, tol=1e-3, lambda2=0, eCprime=0) {
   #ggplot(dt)+geom_line(aes(lambda1,BIC))
   #ggplot(dt[lambda1<0.2])+geom_point(aes(lambda1,BIC))
   lambda1=dt[BIC==min(BIC),lambda1]
-  return(lambda1)
+  return(list(lambda1=lambda1,eCprime=eCprime))
 }
 
 #' cross-validate lambda2
@@ -310,24 +322,18 @@ csnorm_fused_lasso = function(matg, params, trails, tol=1e-3, niter=10,
     lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol, lambda1=lambda1, eCprime=eCprime,
                                         lambda2.last=lambda2)
     if (enforce.positivity==T) {
-      #set eCprime to lower bound when lambda1=0
-      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
-      eCprime = matg[,min(value)-tol]
-      #get best lambda1
-      lambda1 = csnorm:::optimize_lambda1_only(matg, trails, tol=tol, lambda2=lambda2, eCprime=eCprime)
+      #get best lambda1 and set eCprime to lower bound
+      vals = csnorm:::optimize_lambda1_only(matg, trails, tol=tol, lambda2=lambda2)
     } else {
-      #find lambda1
-      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
-      lambda1 = csnorm:::optimize_lambda1(matg, trails, tol=tol, lambda2=lambda2, eCprime=eCprime,
-                                          enforce.positivity=enforce.positivity)
-      #find eCprime
-      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
-      eCprime = csnorm:::optimize_eCprime(matg, trails, tol=tol, lambda1=lambda1, lambda2=lambda2)
+      #find best lambda1 and eCprime
+      vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2)
     }
+    lambda1=vals$lambda1
+    eCprime=vals$eCprime
     matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
     #
     cat("   iteration ",i," : lambda1=",lambda1," lambda2=",lambda2," eC'=",eCprime,"\n")
-    print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
+    #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
     if (matg[,all(abs(value-value.old)<tol)]) break
   }
   return(data.table(name=groupname,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime))
