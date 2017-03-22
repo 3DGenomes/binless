@@ -240,14 +240,21 @@ optimize_lambda1_only = function(matg, trails, tol=1e-3, lambda2=0, eCprime=0) {
   #ggplot(dt[lambda1<0.1])+geom_line(aes(lambda1,dof))
   #ggplot(dt)+geom_line(aes(lambda1,BIC))
   #ggplot(dt[lambda1<0.2])+geom_point(aes(lambda1,BIC))
-  lambda1=dt[BIC==min(BIC),lambda1]
-  return(lambda1)
+  #lambda1=dt[BIC==min(BIC),lambda1]
+  return(dt[BIC==min(BIC)])
 }
 
 #' cross-validate lambda2
 #' @keywords internal
-optimize_lambda2 = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0, lambda2.last=1) {
-  obj = function(x){csnorm:::gfl_BIC(matg, trails, lambda1=lambda1, lambda2=10^(x), eCprime=eCprime)}
+optimize_params_signal = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0, lambda2.last=1) {
+  obj = function(x){
+    #determine eCprime given lambda2
+    lambda2=10^(x)
+    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
+    eCprime = matg[,min(value)-tol]
+    #get BIC for best lambda1
+    csnorm:::optimize_lambda1_only(matg, trails, tol=tol, lambda2, eCprime)[,BIC]
+  }
   minlambda=tol/2
   maxlambda=10*lambda2.last
   #save(matg,trails,tol,lambda1,eCprime,file="debug_lambda2.RData")
@@ -271,8 +278,34 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0, lambda
   lambda2=10^op$minimum
   if (lambda2==minlambda | lambda2==maxlambda) cat("   Warning: lambda2 hit boundary.")
   if (lambda2<tol) lambda2=0
-  return(lambda2)
+  #obtain value at optimum
+  matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
+  eCprime = matg[,min(value)-tol]
+  #get lambda1
+  lambda1=csnorm:::optimize_lambda1_only(matg, trails, tol=tol, lambda2, eCprime)[,lambda1]
+  return(data.table(name=matg[,name[1]],lambda1=lambda1,lambda2=lambda2,eCprime=eCprime))
 }
+
+#' run fused lasso on one dataset contained in matg, fusing 'value'
+#' 
+#' finds optimal lambda1, lambda2 and eC using BIC
+#' @keywords internal
+csnorm_fused_lasso_signal = function(matg, params, trails, tol=1e-3, verbose=T, ncores=ncores) {
+  groupname=matg[,as.character(name[1])]
+  if (!is.null(params)) {
+    lambda2=params[name==groupname,lambda2]
+  } else {
+    lambda2=1
+  }
+  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+scale_fill_gradient2())
+  params = csnorm:::optimize_params_signal(matg, trails, tol=tol, lambda2.last=lambda2)
+  #matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, params[,lambda1], params[,lambda2], params[,eCprime])]
+  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
+  return(params)
+}
+
+
+
 
 #' run fused lasso on one dataset contained in matg, fusing 'value'
 #' 
@@ -327,7 +360,7 @@ csnorm_fused_lasso = function(matg, params, trails, tol=1e-3, niter=10,
     matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
     #
     cat("   iteration ",i," : lambda1=",lambda1," lambda2=",lambda2," eC'=",eCprime,"\n")
-    print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
+    #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
     if (matg[,all(abs(value-value.old)<tol)]) break
   }
   return(data.table(name=groupname,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime))
@@ -442,14 +475,14 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1,
     if (verbose==T) cat("  Fused lasso\n")
     groupnames=mat[,as.character(unique(name))]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso(mat[name==g], params, trails, tol=tol,
-                                  niter=niter.inner, enforce.positivity=T, ncores=ncores)
+      csnorm:::csnorm_fused_lasso_signal(mat[name==g], params, trails, tol=tol, ncores=ncores)
     #display param info
     if (verbose==T)
       for (i in 1:params[,.N])
         cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],
             " eC'=",params[i,eCprime],"\n")
     #compute matrix at new params
+    save(mat,params,file=paste0("mat_step_",step,".RData"))
     mat = foreach (g=groupnames, .combine=rbind) %dopar%
       csnorm:::get_lasso_coefs(mat[name==g],params[name==g], trails)
     p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()+facet_wrap(~name)
