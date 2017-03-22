@@ -187,62 +187,6 @@ gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
   return(BIC)
 }
 
-#' compute input to fused lasso
-#' @keywords internal
-csnorm_compute_raw_signal = function(csg, mat) {
-  cts = csg@cts
-  if (is.null(mat)) {
-    mat=cts[,CJ(name=name,bin1=ordered(levels(bin1)),bin2=ordered(levels(bin2)),sorted=T,unique=T)][bin2>=bin1]
-    mat[,c("phi","signal","eCprime"):=list(0,1,0)]
-  } else {
-    mat=mat[,.(name,bin1,bin2,phi,signal,eCprime)]
-  }
-  cts = mat[cts,,on=c("name","bin1","bin2")]
-  cts[,c("z","var"):=list(count/(exp(phi+eCprime)*mu)-1,(1/(exp(phi+eCprime)*mu)+1/csg@dispersion))]
-  mat = cts[,.(phihat=weighted.mean(z+phi+eCprime, weight/var),
-               phihat.var=1/sum(weight/var),
-               ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat]
-  mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
-  mat[,c("valuehat","weight"):=list(phihat,1/phihat.var)]
-  setkey(mat,name,bin1,bin2)
-  return(mat)
-}
-
-#' compute input to fused lasso
-#' @keywords internal
-csnorm_compute_raw_differential = function(csg, mat, ref) {
-  ctsref = foreach(n=csg@cts[name!=ref,unique(name)],.combine=rbind) %do%
-    csg@cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
-  cts=csg@cts[name!=ref]
-  #
-  if (is.null(mat)) {
-    mat=cts[,CJ(name=name,bin1=ordered(levels(bin1)),bin2=ordered(levels(bin2)),sorted=T,unique=T)][bin2>=bin1]
-    mat[,c("phi.ref","delta","diffsig"):=list(0,0,1)]
-  } else {
-    mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig)]
-  }
-  ctsref=mat[ctsref]
-  ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@dispersion))]
-  mat.ref=ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
-                    sigmasq.ref=1/sum(weight/var),
-                    ncounts.ref=sum(weight)),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
-  mat.ref[is.na(phihat.ref),c("phihat.ref","sigmasq.ref","ncounts.ref"):=list(1,Inf,0)] #bins with no detectable counts
-  #
-  cts=mat[cts]
-  cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
-                          (1/(exp(phi.ref+delta)*mu)+1/csg@dispersion))]
-  mat=cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
-             sigmasq=1/sum(weight/var),
-             ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat]
-  mat[is.na(phihat),c("phihat","sigmasq","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
-  stopifnot(mat[,.N]==mat.ref[,.N])
-  mat=merge(mat,mat.ref)
-  mat[,c("deltahat","deltahat.var","ncounts"):=list(phihat-phihat.ref,sigmasq+sigmasq.ref,ncounts+ncounts.ref)]
-  mat[,c("valuehat","weight","ncounts.ref"):=list(deltahat,1/deltahat.var,NULL)]
-  setkey(mat,name,bin1,bin2)
-  return(mat)
-}
-
 #' cross-validate eCprime (no positivity constraint)
 #' perfer grid search over optimize, because function is very rugged
 #' @keywords internal
@@ -396,6 +340,62 @@ get_lasso_coefs = function(matg, p, trails) {
   matg[,c("lambda1","lambda2","eCprime"):=list(p$lambda1, p$lambda2, p$eCprime)]
   matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, p$lambda1, p$lambda2, p$eCprime)]
   matg
+}
+
+#' compute input to fused lasso
+#' @keywords internal
+csnorm_compute_raw_signal = function(csg, mat) {
+  cts = csg@cts
+  if (is.null(mat)) {
+    mat=cts[,CJ(name=name,bin1=ordered(levels(bin1)),bin2=ordered(levels(bin2)),sorted=T,unique=T)][bin2>=bin1]
+    mat[,c("phi","signal","eCprime"):=list(0,1,0)]
+  } else {
+    mat=mat[,.(name,bin1,bin2,phi,signal,eCprime)]
+  }
+  cts = mat[cts,,on=c("name","bin1","bin2")]
+  cts[,c("z","var"):=list(count/(exp(phi+eCprime)*mu)-1,(1/(exp(phi+eCprime)*mu)+1/csg@dispersion))]
+  mat = cts[,.(phihat=weighted.mean(z+phi+eCprime, weight/var),
+               phihat.var=1/sum(weight/var),
+               ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat]
+  mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
+  mat[,c("valuehat","weight"):=list(phihat,1/phihat.var)]
+  setkey(mat,name,bin1,bin2)
+  return(mat)
+}
+
+#' compute input to fused lasso
+#' @keywords internal
+csnorm_compute_raw_differential = function(csg, mat, ref) {
+  ctsref = foreach(n=csg@cts[name!=ref,unique(name)],.combine=rbind) %do%
+    csg@cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
+  cts=csg@cts[name!=ref]
+  #
+  if (is.null(mat)) {
+    mat=cts[,CJ(name=name,bin1=ordered(levels(bin1)),bin2=ordered(levels(bin2)),sorted=T,unique=T)][bin2>=bin1]
+    mat[,c("phi.ref","delta","diffsig"):=list(0,0,1)]
+  } else {
+    mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig)]
+  }
+  ctsref=mat[ctsref]
+  ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@dispersion))]
+  mat.ref=ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
+                    sigmasq.ref=1/sum(weight/var),
+                    ncounts.ref=sum(weight)),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
+  mat.ref[is.na(phihat.ref),c("phihat.ref","sigmasq.ref","ncounts.ref"):=list(1,Inf,0)] #bins with no detectable counts
+  #
+  cts=mat[cts]
+  cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
+                          (1/(exp(phi.ref+delta)*mu)+1/csg@dispersion))]
+  mat=cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
+             sigmasq=1/sum(weight/var),
+             ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat]
+  mat[is.na(phihat),c("phihat","sigmasq","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
+  stopifnot(mat[,.N]==mat.ref[,.N])
+  mat=merge(mat,mat.ref)
+  mat[,c("deltahat","deltahat.var","ncounts"):=list(phihat-phihat.ref,sigmasq+sigmasq.ref,ncounts+ncounts.ref)]
+  mat[,c("valuehat","weight","ncounts.ref"):=list(deltahat,1/deltahat.var,NULL)]
+  setkey(mat,name,bin1,bin2)
+  return(mat)
 }
 
 
