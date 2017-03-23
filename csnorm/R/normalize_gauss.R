@@ -138,17 +138,10 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
  return(csd)
 }
 
-#' Single-cpu simplified fitting for iota and rho
+#' Optimize decay parameters
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", type=c("outer","perf"), max_perf_iteration=1000, convergence_epsilon=1e-5) {
-  type=match.arg(type)
-  if (init.mean=="mean") {
-    csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
-  } else {
-    csd = csnorm:::csnorm_gauss_decay_muhat_data(cs)
-  }
-  #run optimization
+csnorm_gauss_decay_optimize = function(cs, csd, type, max_perf_iteration=1000, convergence_epsilon=1e-5) {
   Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
   Totalcbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
   #cbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
@@ -296,6 +289,21 @@ csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", type=c("outer","p
   dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=all_log_mean_counts,log_decay=all_log_decay)]
   setkey(dmat,name,dbin)
   op$par$decay=dmat 
+  return(op)
+}
+
+#' Single-cpu simplified fitting for iota and rho
+#' @keywords internal
+#' 
+csnorm_gauss_decay = function(cs, init.mean="mean", type=c("outer","perf"), max_perf_iteration=1000, convergence_epsilon=1e-5) {
+  type=match.arg(type)
+  if (init.mean=="mean") {
+    csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
+  } else {
+    csd = csnorm:::csnorm_gauss_decay_muhat_data(cs)
+  }
+  #run optimization
+  op = csnorm:::csnorm_gauss_decay_optimize(cs, csd, type, max_perf_iteration=max_perf_iteration, convergence_epsilon=convergence_epsilon)
   #update par slot
   cs@par=modifyList(cs@par, op$par)
   return(cs)
