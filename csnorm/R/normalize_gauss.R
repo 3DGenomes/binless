@@ -802,6 +802,8 @@ plot_diagnostics = function(cs) {
 #' and iota/rho.
 #' 
 #' @param cs CSnorm object as returned by \code{\link{merge_cs_norm_datasets}}
+#' @param init boolean (default is FALSE). Whether to continue an existing
+#'  normalization or to start anew (default).
 #' @param bf_per_kb positive numeric. Number of cubic spline basis functions per
 #'   kilobase, for genomic bias estimates. Small values make the optimization 
 #'   easy, but makes the genomic biases stiffer.
@@ -834,37 +836,27 @@ plot_diagnostics = function(cs) {
 #' 
 #' @examples
 #' 
-run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
+run_gauss = function(cs, restart=F, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
                      ngibbs = 3, iter=10000, fit.decay=T, fit.genomic=T, fit.disp=T,
                      verbose=T, ncounts=100000, init_alpha=1e-7, init.dispersion=10,
                      tol.obj=1e-1, type="outer", ncores=1) {
-  type=match.arg(type,c("outer","perf"))
-  if (verbose==T) cat("Normalization with fast approximation and ",type,"iteration\n")
-  #clean object if dirty
-  cs@par=list() #in case we have a weird object
-  cs@groups=list()
-  setkey(cs@biases, id, name)
-  setkey(cs@counts, id1, id2, name)
   #basic checks
+  type=match.arg(type,c("outer","perf"))
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
-  #add settings
-  cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","qmax")],
-                  list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf,
-                       iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj))
-  #get number of zeros along cut sites and decay
-  stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
-  cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
-  if (cs@zeros[,.N]==0) {
-    if(verbose==T) cat("Counting zeros\n")
-    cs@zeros = csnorm:::get_nzeros_normalization(cs, ncores=ncores)
-  }
   #
-  if(verbose==T) cat("Subsampling counts for dispersion\n")
-  subcounts = csnorm:::subsample_counts(cs, ncounts)
-  subcounts.weight = merge(cs@zeros[,.(nc=sum(nposs)/8),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
-  #initial guess
-  if (is.null(init)) {
+  if (verbose==T) cat("Normalization with fast approximation and",type,"iteration\n")
+  setkey(cs@biases, id, name)
+  setkey(cs@counts, id1, id2, name)
+  if (restart==F) {
+    #fresh start
+    cs@par=list() #in case we have a weird object
+    cs@groups=list()
+    #add settings
+    cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","qmax")],
+                    list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf,
+                         iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj))
+    #initial guess
     if (verbose==T) cat("No initial guess provided\n")
     cs@diagnostics=list()
     laststep=0
@@ -876,12 +868,21 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
       cs=csnorm:::fill_parameters_perf(cs, dispersion=init.dispersion, fit.decay=fit.decay,
                                        fit.genomic=fit.genomic, fit.disp=fit.disp)
     }
+    #get number of zeros along cut sites and decay
+    if(verbose==T) cat("Counting zeros\n")
+    stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
+    cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
+    cs@zeros = csnorm:::get_nzeros_normalization(cs, ncores=ncores)
+    
   } else {
     if (verbose==T) cat("Using provided initial guess\n")
-    if (is.data.table(cs@diagnostics$params)) laststep = cs@diagnostics$params[,max(step)] else laststep = 0
+    laststep = cs@diagnostics$params[,max(step)]
     init.mean="mean"
-    cs@par=init
   }
+  #
+  if(verbose==T) cat("Subsampling counts for dispersion\n")
+  subcounts = csnorm:::subsample_counts(cs, ncounts)
+  subcounts.weight = merge(cs@zeros[,.(nc=sum(nposs)/8),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
   #gibbs sampling
   for (i in (laststep + 1:ngibbs)) {
     #fit diagonal decay given iota and rho
@@ -917,8 +918,6 @@ run_gauss = function(cs, init=NULL, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     if (has_converged(cs)) break
   }
   if (verbose==T) cat("Done\n")
-  if ("init" %in% names(init)) init$init=NULL
-  cs@par$init=init
   return(cs)
 }
 
