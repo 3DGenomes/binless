@@ -141,7 +141,7 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7, type=c("outer","perf"), max_perf_iteration=1000, convergence_epsilon=1e-5) {
+csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", type=c("outer","perf"), max_perf_iteration=1000, convergence_epsilon=1e-5) {
   type=match.arg(type)
   if (init.mean=="mean") {
     csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
@@ -365,7 +365,7 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", init_alpha=1e-7, type=c("perf","outer"), max_perf_iteration=1000, convergence_epsilon=1e-5) {
+csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","outer"), max_perf_iteration=1000, convergence_epsilon=1e-5) {
   type=match.arg(type)
   if (init.mean=="mean") {
     a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
@@ -888,8 +888,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     #fit diagonal decay given iota and rho
     if (fit.decay==T) {
       if (verbose==T) cat("Gibbs",i,": Decay ")
-      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean,
-                                                                               init_alpha=init_alpha, type=type)))
+      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean, type=type)))
       if(length(output) == 0) { output = 'ok' }
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", out=output, runtime=a[1]+a[4], type=type)
       if (verbose==T) cat("log-likelihood = ",cs@par$value, "\n")
@@ -898,8 +897,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     if (fit.genomic==T) {
       if (verbose==T) cat("Gibbs",i,": Genomic ")
       decay_eC = cs@par$eC
-      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean,
-                                                                                 init_alpha=init_alpha, type=type)))
+      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean, type=type)))
       if(length(output) == 0) { output = 'ok' }
       cs@par$eC = as.array(colMeans(rbind(decay_eC,cs@par$eC)))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", out=output, runtime=a[1]+a[4], type=type)
