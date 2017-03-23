@@ -103,37 +103,34 @@ csnorm_predict_binned_counts_irls = function(cs, resolution, zeros) {
   dbins=cs@settings$dbins
   cpos[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   cpos=merge(cpos,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
-  cpos[,log_mu.base:=eC + log_decay]
-  cpos[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_iota1+log_rho2,
-                                                           log_mu.base+log_rho1 +log_rho2,
-                                                           log_mu.base+log_rho1 +log_iota2,
-                                                           log_mu.base+log_iota1+log_iota2)]
-  cpos[,log_mu.base:=NULL]
+  cpos[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_iota1+log_rho2,
+                                                           log_rho1 +log_rho2,
+                                                           log_rho1 +log_iota2,
+                                                           log_iota1+log_iota2)]
   #rewrite for each bin
-  cpos=rbind(cpos[contact.close>0,.(name, bin1, bin2, cat="close",
-                                    count=contact.close, mu=exp(lmu.close), decay=exp(log_decay), weight=1)],
-             cpos[contact.far>0,.(name, bin1, bin2, cat="far",
-                                  count=contact.far, mu=exp(lmu.far), decay=exp(log_decay), weight=1)],
-             cpos[contact.up>0,.(name, bin1, bin2, cat="up",
-                                 count=contact.up, mu=exp(lmu.up), decay=exp(log_decay), weight=1)],
-             cpos[contact.down>0,.(name, bin1, bin2, cat="down",
-                                   count=contact.down, mu=exp(lmu.down), decay=exp(log_decay), weight=1)])
+  cpos=rbind(cpos[contact.close>0,.(name, bin1, bin2, dbin, cat="close",
+                                    count=contact.close, lmu.base=lmu.close, log_decay, eC, weight=1)],
+             cpos[contact.far>0,.(name, bin1, bin2, dbin, cat="far",
+                                  count=contact.far, lmu.base=lmu.far, log_decay, eC, weight=1)],
+             cpos[contact.up>0,.(name, bin1, bin2, dbin, cat="up",
+                                 count=contact.up, lmu.base=lmu.up, log_decay, eC, weight=1)],
+             cpos[contact.down>0,.(name, bin1, bin2, dbin, cat="down",
+                                   count=contact.down, lmu.base=lmu.down, log_decay, eC, weight=1)])
   ### predict approximate means for zero counts
   #approximate decay
   czero = merge(zeros,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
   czero = merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
-  czero[,log_mu.base:=eC + log_decay]
   #approximate bias
   bsub = bsub[,.(log_iota=mean(log_iota),log_rho=mean(log_rho)),by=c("name","bin")]
   czero = merge(bsub[,.(name,bin1=bin,log_iota,log_rho)],czero,by=c("name","bin1"),all.x=F,all.y=T)
   czero = merge(bsub[,.(name,bin2=bin,log_iota,log_rho)],czero,by=c("name","bin2"),all.x=F,all.y=T, suffixes=c("2","1"))
-  czero[,log_mu:=ifelse(cat=="far", log_mu.base+log_iota1+log_rho2,
-                        ifelse(cat=="down", log_mu.base+log_rho1 +log_rho2,
-                               ifelse(cat=="close", log_mu.base+log_rho1 +log_iota2,
-                                      log_mu.base+log_iota1+log_iota2)))]
-  czero[,log_mu.base:=NULL]
-  czero = czero[nzero>0,.(name,bin1,bin2,cat,count=0,mu=exp(log_mu),decay=exp(log_decay),weight=nzero)]
+  czero[,lmu.base:=ifelse(cat=="far", log_iota1+log_rho2,
+                        ifelse(cat=="down", log_rho1 +log_rho2,
+                               ifelse(cat=="close", log_rho1 +log_iota2,
+                                      log_iota1+log_iota2)))]
+  czero = czero[nzero>0,.(name,bin1,bin2,dbin,cat,count=0,lmu.base,log_decay,eC,weight=nzero)]
   cts=rbind(cpos,czero)
+  cts[,c("mu","decay"):=list(exp(lmu.base+eC+log_decay),exp(log_decay))]
   return(cts)
 }
 

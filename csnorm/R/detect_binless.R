@@ -423,9 +423,10 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
 #' @export
 #' 
 #' @examples
-detect_binless_interactions = function(cs, resolution, group, ncores=1,
+detect_binless_interactions = function(cs, resolution, group, fit.decay=F, ncores=1,
                                        niter=10, tol=1e-3, verbose=T){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
+  if (group!="all" & fit.decay!=F) stop("Cannot yet fit decay with grouped data!")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
