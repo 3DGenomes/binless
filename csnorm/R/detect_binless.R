@@ -424,7 +424,7 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
 #' 
 #' @examples
 detect_binless_interactions = function(cs, resolution, group, ncores=1,
-                                       niter.outer=10, tol=1e-3, verbose=T){
+                                       niter=10, tol=1e-3, verbose=T){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
@@ -438,7 +438,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1,
   trails=NULL
   params=NULL
   registerDoParallel(cores=ncores)
-  for (step in 1:niter.outer) {
+  for (step in 1:niter) {
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
     mat = csnorm:::csnorm_compute_raw_signal(csg, mat)
@@ -460,13 +460,13 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1,
         cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],
             " eC'=",params[i,eCprime],"\n")
     #compute matrix at new params
-    save(mat,params,file=paste0("mat_step_",step,".RData"))
+    #save(mat,params,file=paste0("mat_step_",step,".RData"))
     mat = foreach (g=groupnames, .combine=rbind) %dopar%
       csnorm:::get_lasso_coefs(mat[name==g],params[name==g], trails)
-    p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()+facet_wrap(~name)
-    ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
-    p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))+scale_fill_gradient2()+facet_wrap(~name)
-    ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
+    #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()+facet_wrap(~name)
+    #ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
+    #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))+scale_fill_gradient2()+facet_wrap(~name)
+    #ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
     #
     #convert back value to the actual signal
     mat[,phi:=value]
@@ -496,7 +496,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1,
 #' @export
 #' 
 #' @examples
-detect_binless_differences = function(cs, resolution, group, ref, niter.outer=10, tol=1e-3, ncores=1, verbose=T){
+detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=1e-3, ncores=1, verbose=T){
   if (verbose==T) cat("Binless difference detection with resolution=",resolution,
                       " group=",group," and ref=",ref,"\n")
   ### get CSgroup object
@@ -508,7 +508,7 @@ detect_binless_differences = function(cs, resolution, group, ref, niter.outer=10
   trails=NULL
   params=NULL
   registerDoParallel(cores=ncores)
-  for (step in 1:niter.outer) {
+  for (step in 1:niter) {
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
     mat = csnorm:::csnorm_compute_raw_differential(csg, mat, ref)
@@ -529,13 +529,13 @@ detect_binless_differences = function(cs, resolution, group, ref, niter.outer=10
         cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],
             " eC'=",params[i,eCprime],"\n")
     #compute matrix at new params
-    save(mat,params,file=paste0("dmat_step_",step,".RData"))
+    #save(mat,params,file=paste0("dmat_step_",step,".RData"))
     mat = foreach (g=groupnames, .combine=rbind) %dopar%
       csnorm:::get_lasso_coefs(mat[name==g],params[name==g], trails)
-    p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()+facet_wrap(~name)
-    ggsave(p,filename = paste0("diff_step_",step,"_value.png"), width=10, height=8)
-    p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))+scale_fill_gradient2()+facet_wrap(~name)
-    ggsave(p,filename = paste0("diff_step_",step,"_weight.png"), width=10, height=8)
+    #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()+facet_wrap(~name)
+    #ggsave(p,filename = paste0("diff_step_",step,"_value.png"), width=10, height=8)
+    #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))+scale_fill_gradient2()+facet_wrap(~name)
+    #ggsave(p,filename = paste0("diff_step_",step,"_weight.png"), width=10, height=8)
     #
     #convert back value to the actual signal
     mat[,delta:=value]
