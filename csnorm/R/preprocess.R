@@ -628,7 +628,7 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
   counts=counts[distance>=settings$dmin]
   cat("return CSnorm object\n")
   new("CSnorm", experiments=experiments,
-      design=design,
+      design=design, zeros=data.table(),
       settings=settings,
       biases=biases, counts=counts)
 }
