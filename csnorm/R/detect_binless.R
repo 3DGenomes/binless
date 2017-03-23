@@ -358,13 +358,15 @@ get_lasso_coefs = function(matg, p, trails) {
 csnorm_compute_raw_signal = function(csg, mat) {
   cts = csg@cts
   if (is.null(mat)) {
-    mat=cts[,CJ(name=name,bin1=ordered(levels(bin1)),bin2=ordered(levels(bin2)),sorted=T,unique=T)][bin2>=bin1]
-    mat[,c("phi","signal","eCprime"):=list(0,1,0)]
+    mat=cts[,CJ(name=name,bin1=ordered(levels(bin1)),bin2=ordered(levels(bin2)),
+                sorted=T,unique=T)][bin2>=bin1]
+    cts[,phi:=0]
   } else {
-    mat=mat[,.(name,bin1,bin2,phi,signal,eCprime)]
+    mat=mat[,.(name,bin1,bin2)]
   }
   cts = mat[cts,,on=c("name","bin1","bin2")]
-  cts[,c("z","var"):=list(count/(exp(phi+eCprime)*mu)-1,(1/(exp(phi+eCprime)*mu)+1/csg@par$alpha))]
+  cts[,c("z","var"):=list(count/(exp(phi+eC+lmu.base+log_decay))-1,
+                          (1/(exp(phi+eC+lmu.base+log_decay)*mu)+1/csg@par$alpha))]
   mat = cts[,.(phihat=weighted.mean(z+phi+eCprime, weight/var),
                phihat.var=1/sum(weight/var),
                ncounts=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat]
