@@ -9,7 +9,7 @@ fill_parameters_perf = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.ge
   Decays=cs@design[,uniqueN(decay)]
   init=list(alpha=dispersion)
   if (fit.decay==F) {
-    Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
+    Kdiag=cs@settings$Kdiag
     beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
     init=c(init,list(beta_diag=beta_diag, lambda_diag=array(lambda,dim=Decays)))
   }
@@ -33,7 +33,7 @@ fill_parameters_outer = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.g
   init=list(alpha=dispersion,
             lambda_iota=array(lambda,dim=nBiases), lambda_rho=array(lambda,dim=nBiases), lambda_diag=array(lambda,dim=Decays))
   if (fit.decay==F) {
-    Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
+    Kdiag=cs@settings$Kdiag
     beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
     init=c(init,list(beta_diag=beta_diag))
   }
@@ -142,7 +142,7 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
 #' @keywords internal
 #' 
 csnorm_gauss_decay_optimize = function(cs, csd, type, max_perf_iteration=1000, convergence_epsilon=1e-5) {
-  Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
+  Kdiag=cs@settings$Kdiag
   Totalcbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
   #cbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
   TotalDsets = cs@design[,.N]
@@ -385,7 +385,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
   XB = as.array(cs@design[,genomic])
   
   #run optimization
-  Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
+  Krow=cs@settings$Krow
   Totalbbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
   TotalDsets = cs@design[,.N]
   
@@ -665,8 +665,8 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   cs@par$eC=cs@par$eC+op$par$eC_sup
   #
   #estimate lambdas if outer iteration
-  Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
-  Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))* cs@settings$bf_per_decade)
+  Krow=cs@settings$Krow
+  Kdiag=cs@settings$Kdiag
   if (type=="outer") {
     lambdas = copy(cs@design)
     lambdas[,lambda_iota:=sqrt((Krow-2)/(Krow^2*diag(tcrossprod(cs@par$beta_iota_diff))+1e6))] #sigma=1e-3 for genomic
@@ -864,6 +864,8 @@ run_gauss = function(cs, restart=F, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","qmax")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf,
                          iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj))
+    cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
+    cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
     #initial guess
     if (verbose==T) cat("No initial guess provided\n")
     cs@diagnostics=list()
