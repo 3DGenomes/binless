@@ -181,7 +181,7 @@ gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
   #now soft-threshold the value around eCprime
   submat[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
   #compute BIC
-  BIC = submat[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
+  BIC = submat[,sum(weight*((valuehat-(value+eCprime))^2))+log(.N)*dof]
   #compute mallow's Cp
   #Cp = submat[,sum(weight*((valuehat-(value+eCprime))^2 - 1))]+2*dof
   return(BIC)
@@ -209,7 +209,7 @@ optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, eC.num=10
     #now soft-threshold the value around eCprime
     matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
     #compute BIC
-    BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
+    BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(.N)*dof]
     data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
   }
   #ggplot(dt)+geom_point(aes(eCprime,lambda1,fill=dof))
@@ -245,7 +245,7 @@ optimize_lambda1_only = function(matg, trails, tol=1e-3, lambda2=0) {
       #now soft-threshold the value around eCprime
       matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
       #compute BIC
-      BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
+      BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(.N)*dof]
       data.table(lambda1=lambda1,BIC=BIC,dof=dof)
     }
   #ggplot(dt)+geom_line(aes(lambda1,dof))
@@ -367,7 +367,7 @@ csnorm_compute_raw_signal = function(csg, mat) {
   cts[,c("z","var"):=list(count/(exp(phi+eCprime)*mu)-1,(1/(exp(phi+eCprime)*mu)+1/csg@dispersion))]
   mat = cts[,.(phihat=weighted.mean(z+phi+eCprime, weight/var),
                phihat.var=1/sum(weight/var),
-               ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat]
+               ncounts=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat]
   mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
   mat[,c("valuehat","weight"):=list(phihat,1/phihat.var)]
   setkey(mat,name,bin1,bin2)
@@ -391,7 +391,7 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
   ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@dispersion))]
   mat.ref=ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
                     sigmasq.ref=1/sum(weight/var),
-                    ncounts.ref=sum(weight)),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
+                    ncounts.ref=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
   mat.ref[is.na(phihat.ref),c("phihat.ref","sigmasq.ref","ncounts.ref"):=list(1,Inf,0)] #bins with no detectable counts
   #
   cts=mat[cts]
@@ -399,7 +399,7 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
                           (1/(exp(phi.ref+delta)*mu)+1/csg@dispersion))]
   mat=cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
              sigmasq=1/sum(weight/var),
-             ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat]
+             ncounts=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat]
   mat[is.na(phihat),c("phihat","sigmasq","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
   stopifnot(mat[,.N]==mat.ref[,.N])
   mat=merge(mat,mat.ref)
