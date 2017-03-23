@@ -141,7 +141,7 @@ setMethod("show",signature="CSinter",definition=function(object) {
 #' @slot resolution in bases.
 #' @slot group 
 #' @slot cts data.table. The counts and predicted means used in all calculations.
-#' @slot dispersion
+#' @slot par
 #' @slot names 
 #'
 #' @return
@@ -155,7 +155,7 @@ setClass("CSgroup",
                       resolution="numeric",
                       group="character",
                       cts="data.table",
-                      dispersion="numeric",
+                      par="list",
                       names="character"))
 
 setMethod("show",signature="CSgroup",definition=function(object) {

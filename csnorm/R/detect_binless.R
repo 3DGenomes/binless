@@ -364,7 +364,7 @@ csnorm_compute_raw_signal = function(csg, mat) {
     mat=mat[,.(name,bin1,bin2,phi,signal,eCprime)]
   }
   cts = mat[cts,,on=c("name","bin1","bin2")]
-  cts[,c("z","var"):=list(count/(exp(phi+eCprime)*mu)-1,(1/(exp(phi+eCprime)*mu)+1/csg@dispersion))]
+  cts[,c("z","var"):=list(count/(exp(phi+eCprime)*mu)-1,(1/(exp(phi+eCprime)*mu)+1/csg@par$alpha))]
   mat = cts[,.(phihat=weighted.mean(z+phi+eCprime, weight/var),
                phihat.var=1/sum(weight/var),
                ncounts=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat]
@@ -388,7 +388,7 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
     mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig)]
   }
   ctsref=mat[ctsref]
-  ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@dispersion))]
+  ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@par$alpha))]
   mat.ref=ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
                     sigmasq.ref=1/sum(weight/var),
                     ncounts.ref=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
@@ -396,7 +396,7 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
   #
   cts=mat[cts]
   cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
-                          (1/(exp(phi.ref+delta)*mu)+1/csg@dispersion))]
+                          (1/(exp(phi.ref+delta)*mu)+1/csg@par$alpha))]
   mat=cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
              sigmasq=1/sum(weight/var),
              ncounts=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat]
