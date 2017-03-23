@@ -141,12 +141,11 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
 #' Optimize decay parameters
 #' @keywords internal
 #' 
-csnorm_gauss_decay_optimize = function(cs, csd, type, max_perf_iteration=1000, convergence_epsilon=1e-5) {
-  Kdiag=cs@settings$Kdiag
+csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag, type, max_perf_iteration=1000, convergence_epsilon=1e-5) {
   Totalcbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
   #cbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
-  TotalDsets = cs@design[,.N]
-  XD=as.array(cs@design[,decay])
+  TotalDsets = design[,.N]
+  XD=as.array(design[,decay])
   
   all_beta_diag = matrix(0,nrow=TotalDsets,ncol=Kdiag)
   all_beta_diag_diff = matrix(0,nrow=TotalDsets,ncol=Kdiag-2)
@@ -178,8 +177,8 @@ csnorm_gauss_decay_optimize = function(cs, csd, type, max_perf_iteration=1000, c
     stan_W = W
     diags = list(rep(1,Kdiag), rep(-2,Kdiag))
     D = bandSparse(Kdiag-2, Kdiag, k=0:2, diagonals=c(diags, diags[1]))
-    if (type=="outer" || (!is.null(cs@par$lambda_diag))) {
-      lambda_diag = cs@par$lambda_diag[uXD]
+    if (type=="outer" || (!is.null(original_lambda_diag))) {
+      lambda_diag = original_lambda_diag[uXD]
     } else {
       lambda_diag = 1
     }
@@ -303,7 +302,8 @@ csnorm_gauss_decay = function(cs, init.mean="mean", type=c("outer","perf"), max_
     csd = csnorm:::csnorm_gauss_decay_muhat_data(cs)
   }
   #run optimization
-  op = csnorm:::csnorm_gauss_decay_optimize(cs, csd, type, max_perf_iteration=max_perf_iteration, convergence_epsilon=convergence_epsilon)
+  op = csnorm:::csnorm_gauss_decay_optimize(csd, cs@design, cs@settings$Kdiag, cs@par$lambda_diag,
+                                            type, max_perf_iteration=max_perf_iteration, convergence_epsilon=convergence_epsilon)
   #update par slot
   cs@par=modifyList(cs@par, op$par)
   return(cs)
