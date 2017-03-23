@@ -28,7 +28,7 @@ detect_binned_interactions = function(cs, resolution, group, threshold=0.95, nco
   if (get_cs_interaction_idx(csg, type="interactions", threshold=threshold,
                              ref="expected", raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
-  cts = csg@cts
+  cts = copy(csg@cts)
   #
   ### interaction detection
   if (verbose==T) cat("   Interaction detection\n")

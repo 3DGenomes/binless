@@ -236,7 +236,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   setkeyv(cts,c("name","bin1","bin2"))
   #
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
-  mat=csnorm_predict_binned_matrices_irls(cts, cs@par$alpha, ncores=ncores, niter=niter, tol=tol, verbose=verbose)
+  mat = csnorm_predict_binned_matrices_irls(copy(cts), cs@par$alpha, ncores=ncores, niter=niter, tol=tol, verbose=verbose)
   setkey(mat,name,bin1,bin2)
   #
   if (verbose==T) cat("*** write begin/end positions\n")
