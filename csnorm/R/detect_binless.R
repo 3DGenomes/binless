@@ -476,7 +476,6 @@ detect_binless_interactions = function(cs, resolution, group, fit.decay=F, ncore
     #convert back value to the actual signal
     mat[,phi.old:=phi]
     mat[,phi:=value]
-    mat=mat[,.(name,bin1,bin2,phi,phi.old,value,valuehat,weight)]
     cts=csg@cts
     if ("phi" %in% names(cts)) cts[,phi:=NULL]
     csg@cts=merge(cts, mat[,.(name,bin1,bin2,phi)], by=c("name","bin1","bin2"), all.x=T)
