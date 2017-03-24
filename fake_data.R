@@ -8,11 +8,12 @@ setwd("/home/yannick/simulations/cs_norm")
 
 csd=generate_fake_dataset(signal=F,eC=-4.4,replicate="1",condition="WT")
 save(csd,file="data/fake_replicate1_csdata.RData")
-csd=generate_fake_dataset(signal=F,eC=-5,replicate="2",condition="WT")
+biases.ref=csd@biases
+csd=generate_fake_dataset(signal=F,biases.ref=biases.ref,eC=-5,replicate="2",condition="WT")
 save(csd,file="data/fake_replicate2_csdata.RData")
-csd=generate_fake_dataset(signal=T,eC=-4.3,replicate="1",condition="KO")
+csd=generate_fake_dataset(signal=T,biases.ref=biases.ref,eC=-4.3,replicate="1",condition="KO")
 save(csd,file="data/fake_signal_replicate1_csdata.RData")
-csd=generate_fake_dataset(signal=T,eC=-6.1,replicate="2",condition="KO")
+csd=generate_fake_dataset(signal=T,biases.ref=biases.ref,eC=-6.1,replicate="2",condition="KO")
 save(csd,file="data/fake_signal_replicate2_csdata.RData")
 
 csd@counts[,bin1:=round(pos1/10000)]
@@ -26,9 +27,11 @@ csd1=csd
 load("data/fake_replicate2_csdata.RData")
 csd2=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
-cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 10,
+cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 20,
                iter=100000, init_alpha=1e-7, ncounts = 1000000, type="perf", ncores=30)
 save(cs,file="data/fake_csnorm_optimized.RData")
+
+plot_diagnostics(cs)
 
 ggplot(cs@par$decay)+geom_point(aes(distance,kappahat),alpha=0.1)+
   geom_line(aes(distance,kappa))+facet_wrap(~ name)+scale_x_log10()+

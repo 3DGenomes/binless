@@ -363,14 +363,20 @@ dset_statistics = function(biases,counts){
 #' @export
 #'
 #' @examples
-generate_fake_dataset = function(num_rsites=3000, genome_size=1000000, eC=-4.4, eRJ=3, eDE=1, alpha=2,
+generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1000000, eC=-4.4, eRJ=3, eDE=1, alpha=2,
                                  condition="WT", replicate="1", enzyme="NA",
                                  name = paste("Fake", condition, enzyme, replicate), dmin=1000, signal=F) {
-  #place rsites
-  biases=data.table(id=seq(num_rsites),
-                    pos=cumsum(1+rmultinom(n=1, size=genome_size-num_rsites,
-                                                prob=rep(1,num_rsites+1)))[1:num_rsites])
-  setkey(biases,id)
+  if (is.null(biases.ref)) {
+    #place rsites
+    biases=data.table(id=seq(num_rsites),
+                      pos=cumsum(1+rmultinom(n=1, size=genome_size-num_rsites,
+                                                  prob=rep(1,num_rsites+1)))[1:num_rsites])
+    setkey(biases,id)
+  } else {
+    biases=biases.ref[,.(id,pos=(pos-min(pos)+1))]
+    num_rsites=biases[,.N]
+    genome_size=biases[,max(pos)+1]
+  }
   #build biases
   biases[,true_log_iota:=sin(pos/1000)+(pos-genome_size/2)/genome_size]
   biases[,true_log_iota:=true_log_iota-mean(true_log_iota)]
