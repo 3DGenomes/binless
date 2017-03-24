@@ -6,14 +6,19 @@ library(foreach)
 
 setwd("/home/yannick/simulations/cs_norm")
 
-csd=generate_fake_dataset()
+csd=generate_fake_dataset(signal=F,eC=-4.4,replicate="1",condition="WT")
 save(csd,file="data/fake_replicate1_csdata.RData")
-csd=generate_fake_dataset(eC=-5,replicate="2")
+csd=generate_fake_dataset(signal=F,eC=-5,replicate="2",condition="WT")
 save(csd,file="data/fake_replicate2_csdata.RData")
-csd=generate_fake_dataset(signal=T,eC=-4.3,condition="KO")
+csd=generate_fake_dataset(signal=T,eC=-4.3,replicate="1",condition="KO")
 save(csd,file="data/fake_signal_replicate1_csdata.RData")
-csd=generate_fake_dataset(signal=T,eC=-6.1,condition="KO",replicate="2")
+csd=generate_fake_dataset(signal=T,eC=-6.1,replicate="2",condition="KO")
 save(csd,file="data/fake_signal_replicate2_csdata.RData")
+
+csd@counts[,bin1:=round(pos1/10000)]
+csd@counts[,bin2:=round(pos2/10000)]
+binned=csd@counts[,.(count=sum(contact.far+contact.close+contact.up+contact.down)),by=c("bin1","bin2")]
+ggplot(binned)+geom_raster(aes(bin1,bin2,fill=log(count)))
 
 
 load("data/fake_replicate1_csdata.RData")
@@ -29,4 +34,11 @@ ggplot(cs@par$decay)+geom_point(aes(distance,kappahat),alpha=0.1)+
   geom_line(aes(distance,kappa))+facet_wrap(~ name)+scale_x_log10()+
   geom_line(aes(distance,base_count),colour="red",data=cs@counts[sample(.N,min(.N,100000))])
 
+ggplot(cs@par$biases[cat=="dangling L"])+geom_point(aes(pos,etahat),alpha=0.1)+
+  geom_line(aes(pos,eta))+facet_wrap(~ name)+xlim(0,100000)+
+  geom_line(aes(pos,true_log_mean_DL),colour="red",data=cs@biases)
+
+ggplot(cs@par$biases[cat=="dangling R"])+geom_point(aes(pos,etahat),alpha=0.1)+
+  geom_line(aes(pos,eta))+facet_wrap(~ name)+xlim(0,100000)+
+  geom_line(aes(pos,true_log_mean_DR),colour="red",data=cs@biases)
 

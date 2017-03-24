@@ -372,10 +372,10 @@ generate_fake_dataset = function(num_rsites=3000, genome_size=1000000, eC=-4.4, 
                                                 prob=rep(1,num_rsites+1)))[1:num_rsites])
   setkey(biases,id)
   #build biases
-  biases[,true_log_iota:=sin(pos/100)+(pos-genome_size/2)/genome_size]
+  biases[,true_log_iota:=sin(pos/1000)+(pos-genome_size/2)/genome_size]
   biases[,true_log_iota:=true_log_iota-mean(true_log_iota)]
   #ggplot(biases,aes(pos,true_log_iota))+geom_point()+geom_line()
-  biases[,true_log_rho:=-(pos-genome_size/2)/genome_size+sin(pos/130)]
+  biases[,true_log_rho:=-(pos-genome_size/2)/genome_size+sin(pos/1300)]
   biases[,true_log_rho:=true_log_rho-mean(true_log_rho)]
   #ggplot(biases,aes(pos,true_log_rho))+geom_point()+geom_line()
   biases[,true_log_mean_RJ:=eRJ+(true_log_iota+true_log_rho)/2]
