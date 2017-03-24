@@ -45,6 +45,39 @@ ggplot(cs@par$biases[cat=="dangling R"])+geom_point(aes(pos,etahat),alpha=0.1)+
   geom_line(aes(pos,eta))+facet_wrap(~ name)+xlim(0,100000)+
   geom_line(aes(pos,true_log_mean_DR),colour="red",data=cs@biases)
 
-counts[distance>=1096.47819614&distance<1122.0184543]
+resolution=10000
+ncores=30
+cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
+cs=detect_binned_interactions(cs, resolution=resolution, group="all", threshold=0.95, ncores=ncores)
+save(cs,file="data/fake_csnorm_optimized.RData")
+mat=get_interactions(cs, type="interactions", resolution=resolution, group="all", threshold=0.95, ref="expected")
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=normalized))+facet_wrap(~name)+
+  scale_fill_gradient(high="red", low="white", na.value = "white")
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=signal))+facet_wrap(~name)+
+  scale_fill_gradient(high="black", low="white", na.value = "white")+
+  geom_point(aes(bin1,bin2,colour=direction),data=mat[is.significant==T])
+mat[,.N,by=is.significant]
+
+
+cs=detect_binned_differences(cs, resolution=resolution, group="all", threshold=0.95,
+                             ncores=ncores, ref=as.character(cs@experiments[1,name]))
+save(cs,file="data/fake_csnorm_optimized.RData")
+mat=get_interactions(cs, type="differences", resolution=resolution, group="all", threshold=0.95,
+                     ref=as.character(cs@experiments[1,name]))
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=difference))+facet_wrap(~name)+
+  scale_fill_gradient(high="black", low="white", na.value = "white")+
+  geom_point(aes(bin1,bin2,colour=direction),data=mat[is.significant==T])
+
+
+cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=30, niter=20, fit.decay=T)
+save(cs,file="data/fake_csnorm_optimized.RData")
+
+
+
+
+
+cs=detect_binless_differences(cs, resolution=resolution, group="all", ncores=ncores,
+                              ref=as.character(cs@experiments[1,name]), niter=2)
+save(cs, file=fname)
 
 
