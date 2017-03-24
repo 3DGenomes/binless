@@ -363,16 +363,19 @@ dset_statistics = function(biases,counts){
 #' @export
 #'
 #' @examples
-generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4, eDE=.8, alpha=10) {
+generate_fake_dataset = function(num_rsites=3000, genome_size=1000000, eC=-4.4, eRJ=3, eDE=1, alpha=2,
+                                 condition="WT", replicate="1", enzyme="NA",
+                                 name = paste("Fake", condition, enzyme, replicate), dmin=1000, signal=F) {
   #place rsites
   biases=data.table(id=seq(num_rsites),
-                    pos=cumsum(rmultinom(n=1, size=genome_size, prob=rep(1,num_rsites+1)))[1:num_rsites])
+                    pos=cumsum(1+rmultinom(n=1, size=genome_size-num_rsites,
+                                                prob=rep(1,num_rsites+1)))[1:num_rsites])
   setkey(biases,id)
   #build biases
-  biases[,true_log_iota:=sin(pos/1000)+(pos-genome_size/2)/genome_size]
+  biases[,true_log_iota:=sin(pos/100)+(pos-genome_size/2)/genome_size]
   biases[,true_log_iota:=true_log_iota-mean(true_log_iota)]
   #ggplot(biases,aes(pos,true_log_iota))+geom_point()+geom_line()
-  biases[,true_log_rho:=-(pos-genome_size/2)/genome_size+sin(pos/2100)]
+  biases[,true_log_rho:=-(pos-genome_size/2)/genome_size+sin(pos/130)]
   biases[,true_log_rho:=true_log_rho-mean(true_log_rho)]
   #ggplot(biases,aes(pos,true_log_rho))+geom_point()+geom_line()
   biases[,true_log_mean_RJ:=eRJ+(true_log_iota+true_log_rho)/2]
@@ -383,34 +386,55 @@ generate_fake_dataset = function(num_rsites=10, genome_size=10000, eC=.1, eRJ=.4
   biases[,dangling.R:=rnbinom(.N, mu=exp(true_log_mean_DR), size=alpha)]
   biases[,rejoined:=rnbinom(.N, mu=exp(true_log_mean_RJ), size=alpha)]
   #report rsites in counts
-  counts=CJ(biases[,paste(id,pos,true_log_iota,true_log_rho)],biases[,paste(id,pos,true_log_iota,true_log_rho)])
-  counts[,c("id1","pos1","true_log_iota1","true_log_rho1"):=tstrsplit(V1, " ")]
-  counts[,c("id2","pos2","true_log_iota2","true_log_rho2"):=tstrsplit(V2, " ")]
-  counts[,c("id1","id2","pos1","pos2","V1","V2"):=list(as.integer(id1),as.integer(id2),as.integer(pos1),as.integer(pos2),NULL,NULL)]
-  counts[,c("true_log_iota1","true_log_iota2","true_log_rho1","true_log_rho2"):=list(
-    as.numeric(true_log_iota1), as.numeric(true_log_iota2), as.numeric(true_log_rho1), as.numeric(true_log_rho2))]
-  counts=counts[pos1<pos2]
+  counts=CJ(id1=biases[,id],id2=biases[,id])[id2>id1]
+  counts=merge(counts, biases[,.(id1=id,pos,true_log_iota,true_log_rho)], by="id1")
+  counts=merge(counts, biases[,.(id2=id,pos,true_log_iota,true_log_rho)], by="id2", suffixes=c("1","2"))
   setkey(counts, id1, id2)
   #build decay
   counts[,distance:=pos2-pos1]
-  counts[,true_log_decay:=5*dnorm(log(distance), mean=log(min(distance)), sd=log(max(distance))/10)-0.2*log(distance)]
+  counts[,true_log_decay:=100*dnorm(log(distance), mean=0, sd=log(max(distance))/3)]
   counts[,true_log_decay:=true_log_decay-mean(true_log_decay)]
-  #ggplot(counts)+geom_point(aes(distance,exp(true_log_decay)))+scale_x_log10()+scale_y_log10()
+  #ggplot(counts[sample(.N,min(100000,.N))])+geom_line(aes(distance,true_log_decay))+scale_x_log10()
   counts[,base_count:=eC+true_log_decay]
-  counts[,true_log_mean_cclose:=base_count+true_log_rho1+true_log_iota2]
-  counts[,true_log_mean_cfar:=base_count+true_log_iota1+true_log_rho2]
-  counts[,true_log_mean_cup:=base_count+true_log_iota1+true_log_iota2]
-  counts[,true_log_mean_cdown:=base_count+true_log_rho1+true_log_rho2]
+  #add signal
+  if (signal==T) {
+    #loop
+    loop_center=c(genome_size*0.2, genome_size*0.8)
+    loop_sd=c(genome_size/50,genome_size/20)
+    counts[,true_phi:=2*exp(-(pos1-loop_center[1])^2/loop_sd[1]^2)*exp(-(pos2-loop_center[2])^2/loop_sd[2]^2)]
+    #tad
+    tad_begin=genome_size*0.6
+    tad_end=genome_size*0.8
+    counts[,true_phi:=true_phi+ifelse(pos1>=tad_begin&pos1<=tad_end&pos2>=tad_begin&pos2<=tad_end,1,0)]
+  } else {
+    counts[,true_phi:=0]
+  }
+  counts[,true_log_mean_cclose:=base_count+true_phi+true_log_rho1+true_log_iota2]
+  counts[,true_log_mean_cfar:=base_count+true_phi+true_log_iota1+true_log_rho2]
+  counts[,true_log_mean_cup:=base_count+true_phi+true_log_iota1+true_log_iota2]
+  counts[,true_log_mean_cdown:=base_count+true_phi+true_log_rho1+true_log_rho2]
   #draw counts
   counts[,contact.close:=rnbinom(.N, mu=exp(true_log_mean_cclose), size=alpha)]
   counts[,contact.far:=rnbinom(.N, mu=exp(true_log_mean_cfar), size=alpha)]
   counts[,contact.up:=rnbinom(.N, mu=exp(true_log_mean_cup), size=alpha)]
   counts[,contact.down:=rnbinom(.N, mu=exp(true_log_mean_cdown), size=alpha)]
-  #ggplot(dset$counts)+geom_point(aes(distance,contact.close/exp(true_log_mean_cclose-true_log_decay)), alpha=0.1)+
-  #  geom_line(aes(distance,exp(true_log_decay)))+scale_x_log10()+scale_y_log10()
+  #
+  #counts[,bin1:=round(pos1/10000)]
+  #counts[,bin2:=round(pos2/10000)]
+  #binned=counts[,.(count=sum(contact.far+contact.close+contact.up+contact.down)),by=c("bin1","bin2")]
+  #ggplot(binned)+geom_raster(aes(bin1,bin2,fill=log(count)))
   #statistics
-  dset_statistics(biases,counts)
-  return(list(biases=biases, counts=counts))
+  #csnorm:::dset_statistics(biases,counts)
+  counts=counts[contact.close+contact.far+contact.up+contact.down>0]
+  #csd object
+  dmax=biases[,max(pos)-min(pos)]+0.01
+  csd = new("CSdata", info=list(name=name, condition=condition, replicate=replicate,
+                                enzyme=enzyme, experiment="Hi-C",
+                                dangling.L="NA", dangling.R="NA", maxlen="NA",
+                                filename="NA"),
+            settings=list(circularize=-1, dmin=dmin, dmax=dmax, qmin=0, qmax=1),
+            data=data.table(), biases=biases, counts=counts)
+  return(csd)
 }
 
 #' Diagnostic plots to determine dangling.L, dangling.R and maxlen arguments
