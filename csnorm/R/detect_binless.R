@@ -363,13 +363,7 @@ prepare_binless_decay = function(csg, mat) {
 #' @keywords internal
 csnorm_compute_raw_signal = function(csg, mat) {
   cts = copy(csg@cts)
-  if (is.null(mat)) {
-    mat=cts[,CJ(name=name,bin1=ordered(levels(bin1)),bin2=ordered(levels(bin2)),
-                sorted=T,unique=T)][bin2>=bin1]
-    mat[,phi:=0]
-  } else {
-    mat=mat[,.(name,bin1,bin2,phi)]
-  }
+  mat=mat[,.(name,bin1,bin2,phi)]
   cts = mat[cts,,on=c("name","bin1","bin2")]
   cts[,c("z","var"):=list(count/exp(phi+eC+lmu.base+log_decay)-1,
                           (1/exp(phi+eC+lmu.base+log_decay)+1/csg@par$alpha))]
@@ -443,7 +437,11 @@ detect_binless_interactions = function(cs, resolution, group, fit.decay=F, ncore
     stop("Refusing to overwrite this already detected interaction")
   #
   ### build matrix
-  mat=NULL
+  #create an empty matrix containing all cells, even those with no cut-site intersection
+  bins=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
+  bins=unique(cut(c(bins,head(bins,n=-1)+resolution/2), bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12))
+  mat=CJ(name=csg@cts[,unique(name)],bin1=bins,bin2=bins,sorted=F,unique=F)[bin2>=bin1]
+  mat[,phi:=0]
   trails=NULL
   params=NULL
   registerDoParallel(cores=ncores)
