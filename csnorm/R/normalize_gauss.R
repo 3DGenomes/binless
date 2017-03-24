@@ -134,7 +134,7 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
   dbins=cs@settings$dbins
   csd = cts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
                kappahat=weighted.mean(z+kappaij, weight/var),
-               std=1/sqrt(sum(weight/var)), weight=sum(weight)/2), keyby=c("name", "dbin")] #each count appears twice
+               std=1/sqrt(sum(weight/(2*var))), weight=sum(weight)/2), keyby=c("name", "dbin")] #each count appears twice
  return(csd)
 }
 
@@ -378,7 +378,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
   if (init.mean=="mean") {
     a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
   } else {
-    a = csnorm_gauss_genomic_muhat_data(cs)
+    a = csnorm:::csnorm_gauss_genomic_muhat_data(cs)
   }
   bts=a$bts
   cts=a$cts

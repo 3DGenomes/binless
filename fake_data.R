@@ -45,3 +45,6 @@ ggplot(cs@par$biases[cat=="dangling R"])+geom_point(aes(pos,etahat),alpha=0.1)+
   geom_line(aes(pos,eta))+facet_wrap(~ name)+xlim(0,100000)+
   geom_line(aes(pos,true_log_mean_DR),colour="red",data=cs@biases)
 
+counts[distance>=1096.47819614&distance<1122.0184543]
+
+
