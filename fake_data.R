@@ -24,12 +24,12 @@ ggplot(binned)+geom_raster(aes(bin1,bin2,fill=log(count)))
 
 load("data/fake_replicate1_csdata.RData")
 csd1=csd
-load("data/fake_replicate2_csdata.RData")
+load("data/fake_signal_replicate1_csdata.RData")
 csd2=csd
-cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
+cs=merge_cs_norm_datasets(list(csd1), different.decays="none")
 cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 20,
                iter=100000, init_alpha=1e-7, ncounts = 1000000, type="perf", ncores=30)
-save(cs,file="data/fake_csnorm_optimized.RData")
+save(cs,file="data/fake_replicate1_csnorm_optimized.RData")
 
 plot_diagnostics(cs)
 
@@ -38,7 +38,7 @@ ggplot(cs@par$decay)+geom_point(aes(distance,kappahat),alpha=0.1)+
   geom_line(aes(distance,base_count),colour="red",data=cs@counts[sample(.N,min(.N,100000))])
 
 ggplot(cs@par$biases[cat=="dangling L"])+geom_point(aes(pos,etahat),alpha=0.1)+
-  geom_line(aes(pos,eta))+facet_wrap(~ name)+xlim(0,100000)+
+  geom_line(aes(pos,eta))+facet_wrap(~ name)+xlim(550000,650000)+
   geom_line(aes(pos,true_log_mean_DL),colour="red",data=cs@biases)
 
 ggplot(cs@par$biases[cat=="dangling R"])+geom_point(aes(pos,etahat),alpha=0.1)+
@@ -48,11 +48,16 @@ ggplot(cs@par$biases[cat=="dangling R"])+geom_point(aes(pos,etahat),alpha=0.1)+
 resolution=10000
 ncores=30
 cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
+mat=get_matrices(cs, resolution=resolution, group="all")
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=observed))+facet_wrap(~name)+
+  scale_fill_gradient(high="red", low="white", na.value = "white")
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=expected))+facet_wrap(~name)+
+  scale_fill_gradient(high="red", low="white", na.value = "white")
+
+
 cs=detect_binned_interactions(cs, resolution=resolution, group="all", threshold=0.95, ncores=ncores)
 save(cs,file="data/fake_csnorm_optimized.RData")
 mat=get_interactions(cs, type="interactions", resolution=resolution, group="all", threshold=0.95, ref="expected")
-ggplot(mat)+geom_raster(aes(bin1,bin2,fill=normalized))+facet_wrap(~name)+
-  scale_fill_gradient(high="red", low="white", na.value = "white")
 ggplot(mat)+geom_raster(aes(bin1,bin2,fill=signal))+facet_wrap(~name)+
   scale_fill_gradient(high="black", low="white", na.value = "white")+
   geom_point(aes(bin1,bin2,colour=direction),data=mat[is.significant==T])
@@ -70,6 +75,9 @@ ggplot(mat)+geom_raster(aes(bin1,bin2,fill=difference))+facet_wrap(~name)+
 
 
 cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=30, niter=20, fit.decay=T)
+
+
+
 save(cs,file="data/fake_csnorm_optimized.RData")
 
 
