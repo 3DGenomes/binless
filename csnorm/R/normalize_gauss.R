@@ -662,7 +662,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   op=optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, data=data, iter=cs@settings$iter,
                          verbose=verbose, init=init, init_alpha=init_alpha)
   cs@par=modifyList(cs@par, op$par[c("eRJ","eDE","alpha")])
-  cs@par$eC=cs@par$eC+op$par$eC_sup
+  #cs@par$eC=cs@par$eC+op$par$eC_sup
   #
   #estimate lambdas if outer iteration
   Krow=cs@settings$Krow
