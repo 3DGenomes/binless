@@ -592,7 +592,7 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
 #' @export
 #'
 #' @examples
-plot_binless_matrix = function(mat, minima=F) {
+plot_binless_matrix = function(mat, minima=F, scale=T) {
   resolution=mat[bin1==bin1[1]&name==name[1],begin2[2]-begin2[1]]
   a=mat[is.maximum==T]
   a=a[,.SD[,.(begin1=c(begin1,begin1,end1,end1)-resolution/2, begin2=c(begin2,end2,begin2,end2)-resolution/2,
@@ -603,14 +603,15 @@ plot_binless_matrix = function(mat, minima=F) {
                 patchno, value)][chull(begin1,begin2)], by=c("patchno","name")]
     p=ggplot(mat)+geom_raster(aes(begin1,begin2,fill=-(value)))+
       geom_raster(aes(begin2,begin1,fill=-(value)))+
-      guides(fill=F)+scale_fill_gradient2()+facet_wrap(~name)+
+      scale_fill_gradient2()+facet_wrap(~name)+
       geom_polygon(aes(begin2,begin1,group=patchno),colour="blue",fill=NA,data=b)+
       geom_polygon(aes(begin2,begin1,group=patchno),colour="red",fill=NA,data=a)
   } else {
     p=ggplot(mat)+geom_raster(aes(begin1,begin2,fill=-value))+
       geom_raster(aes(begin2,begin1,fill=-value))+
-      guides(fill=F)+scale_fill_gradient2()+facet_wrap(~name)+
+      scale_fill_gradient2()+facet_wrap(~name)+
       geom_polygon(aes(begin2,begin1,group=patchno),colour="black",fill=NA,data=a)
   }
+  if (scale!=T) p=p+guides(fill=F)
   print(p)
 }

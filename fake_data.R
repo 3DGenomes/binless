@@ -11,6 +11,12 @@ save(csd,file="data/fake_replicate1_csdata.RData")
 biases.ref=csd@biases
 csd=generate_fake_dataset(signal=F,biases.ref=biases.ref,eC=-5,replicate="2",condition="WT")
 save(csd,file="data/fake_replicate2_csdata.RData")
+csd=generate_fake_dataset(signal=F,eC=-4,biases.ref=biases.ref,replicate="3",condition="WT")
+save(csd,file="data/fake_replicate3_csdata.RData")
+csd=generate_fake_dataset(signal=F,eC=-3.8,biases.ref=biases.ref,replicate="4",condition="WT")
+save(csd,file="data/fake_replicate4_csdata.RData")
+csd=generate_fake_dataset(signal=F,eC=-4.1,biases.ref=biases.ref,replicate="5",condition="WT")
+save(csd,file="data/fake_replicate5_csdata.RData")
 csd=generate_fake_dataset(signal=T,biases.ref=biases.ref,eC=-4.3,replicate="1",condition="KO")
 save(csd,file="data/fake_signal_replicate1_csdata.RData")
 csd=generate_fake_dataset(signal=T,biases.ref=biases.ref,eC=-6.1,replicate="2",condition="KO")
@@ -24,12 +30,18 @@ ggplot(binned)+geom_raster(aes(bin1,bin2,fill=log(count)))
 
 load("data/fake_replicate1_csdata.RData")
 csd1=csd
-load("data/fake_signal_replicate1_csdata.RData")
+load("data/fake_replicate2_csdata.RData")
 csd2=csd
-cs=merge_cs_norm_datasets(list(csd1), different.decays="none")
+load("data/fake_replicate3_csdata.RData")
+csd3=csd
+load("data/fake_replicate4_csdata.RData")
+csd4=csd
+load("data/fake_replicate5_csdata.RData")
+csd5=csd
+cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
 cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 20,
                iter=100000, init_alpha=1e-7, ncounts = 1000000, type="perf", ncores=30)
-save(cs,file="data/fake_replicate1_csnorm_optimized.RData")
+save(cs,file="data/fake_csnorm_optimized.RData")
 
 plot_diagnostics(cs)
 
@@ -75,7 +87,8 @@ ggplot(mat)+geom_raster(aes(bin1,bin2,fill=difference))+facet_wrap(~name)+
 
 
 cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=30, niter=20, fit.decay=T)
-
+mat=get_interactions(cs, type="binteractions", resolution=resolution, group="all", threshold=-1, ref="expected")
+plot_binless_matrix(mat)
 
 
 save(cs,file="data/fake_csnorm_optimized.RData")
