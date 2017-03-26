@@ -196,7 +196,7 @@ setClass("CSnorm",
                       biases="data.table",
                       counts="data.table",
                       par="list",
-                      zeros="data.table",
+                      zeros="list",
                       diagnostics="list",
                       pred="list",
                       groups="list"))

@@ -57,7 +57,7 @@ csnorm_gauss_decay_muhat_data = function(cs, pseudocount=1e-2) {
                variable.name = "category", value.name = "count")[count>0,.(name,distance,category,count)]
   mcounts[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #add zero counts
-  zdecay = cs@zeros[,.(nzero=sum(nzero)/2),keyby=c("name","dbin")] #each contact is counted twice
+  zdecay = cs@zeros$bg[,.(nzero=sum(nzero)/2),keyby=c("name","dbin")] #each contact is counted twice
   mcounts = rbind(mcounts[,.(name,dbin,category,count,weight=1)],
                   zdecay[,.(name,dbin,category=NA,count=0,weight=nzero)])
   #compute z-scores and sum counts
@@ -112,7 +112,7 @@ csnorm_gauss_common_muhat_mean = function(cs) {
   cpos[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   cpos[,c("pos","distance"):=list(NULL,NULL)]
   ### zero counts
-  czero = merge(init$decay[,.(name,dbin,log_decay)], cs@zeros, by=c("name","dbin"))
+  czero = merge(init$decay[,.(name,dbin,log_decay)], cs@zeros$bg, by=c("name","dbin"))
   stopifnot(czero[is.na(log_decay),.N]==0)
   czero = merge(bsub,czero,by="id",all.x=F,all.y=T)
   czero[,log_bias:=ifelse(cat=="contact L",log_iota,log_rho)]
@@ -321,7 +321,7 @@ csnorm_gauss_genomic_muhat_data = function(cs, pseudocount=1e-2) {
   setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
   #counts
-  zbias = cs@zeros[,.(nzero=sum(nzero)),keyby=c("id","name","cat")][cs@biases[,.(name,id,pos)]]
+  zbias = cs@zeros$bg[,.(nzero=sum(nzero)),keyby=c("id","name","cat")][cs@biases[,.(name,id,pos)]]
   cts=rbind(cs@counts[contact.close>0,.(name,id=id1,pos=pos1, cat="contact R", count=contact.close, weight=1)],
             cs@counts[contact.far>0,  .(name,id=id1,pos=pos1, cat="contact L", count=contact.far, weight=1)],
             cs@counts[contact.down>0, .(name,id=id1,pos=pos1, cat="contact R", count=contact.down, weight=1)],
@@ -684,6 +684,12 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   return(cs)
 }
 
+#' fit signal using sparse fused lasso
+#' @keywords internal
+#' 
+csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores) {
+  stop("not implemented")
+}
 
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
@@ -783,6 +789,24 @@ subsample_counts = function(cs, ncounts, dset=NA) {
   }
 }
 
+
+#' Prepare for concurrent signal estimation 
+#' @keywords internal
+prepare_signal = function(cs, base.res) {
+  ### build matrix
+  #create an empty matrix containing all cells, even those with no cut-site intersection
+  signal.bins=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+base.res],base.res)
+  signal.bins=unique(cut(c(signal.bins,head(signal.bins,n=-1)+base.res/2), signal.bins,
+                         ordered_result=T, right=F, include.lowest=T,dig.lab=12))
+  signal.mat=CJ(name=csg@cts[,unique(name)],bin1=signal.bins,bin2=signal.bins,sorted=F,unique=F)[bin2>=bin1]
+  signal.mat[,phi:=0]
+  ### build optimization trails
+  trails = csnorm:::gfl_compute_trails(signal.mat[,nlevels(bin1)])
+  stopifnot(all(signal.mat[,.N,by=name]$N==signal.mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
+  stopifnot(all(length(V(trails$graph))==signal.mat[,.N,by=name]$N))
+  return(list(signal.mat=signal.mat,trails=trails))
+}
+
 #' Diagnostics plots to monitor convergence of normalization (gaussian
 #' approximation)
 #' 
@@ -844,10 +868,10 @@ plot_diagnostics = function(cs) {
 #' 
 #' @examples
 #' 
-run_gauss = function(cs, restart=F, bf_per_kb=1, bf_per_decade=20, bins_per_bf=10,
-                     ngibbs = 3, iter=10000, fit.decay=T, fit.genomic=T, fit.disp=T,
-                     verbose=T, ncounts=100000, init_alpha=1e-7, init.dispersion=10,
-                     tol.obj=1e-1, type="outer", ncores=1) {
+run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
+                     ngibbs = 20, iter=10000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
+                     verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
+                     tol.obj=1e-1, type="perf", ncores=1) {
   #basic checks
   type=match.arg(type,c("outer","perf"))
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
@@ -862,7 +886,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     cs@groups=list()
     #add settings
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","qmax")],
-                    list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf,
+                    list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
                          iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
@@ -882,17 +906,22 @@ run_gauss = function(cs, restart=F, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
     if(verbose==T) cat("Counting zeros\n")
     stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
     cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
-    cs@zeros = csnorm:::get_nzeros_normalization(cs, ncores=ncores)
-    
+    cs@zeros = list(bg=csnorm:::get_nzeros_normalization(cs, ncores=ncores), sig=data.table())
+    #prepare signal matrix and trails
+    if (fit.signal==T) {
+      if(verbose==T) cat("Preparing for signal estimation\n")
+      cs@par=modifyList(cs@par, csnorm:::prepare_signal(cs, base.res))
+      cs@zeros=modifyList(cs@zeros, list(sig=csnorm:::get_nzeros_binning(cs, base.res, ncores = ncores)))
+    }
   } else {
-    if (verbose==T) cat("Using provided initial guess\n")
+    if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
     init.mean="mean"
   }
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
   subcounts = csnorm:::subsample_counts(cs, ncounts)
-  subcounts.weight = merge(cs@zeros[,.(nc=sum(nposs)/8),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
+  subcounts.weight = merge(cs@zeros$bg[,.(nc=sum(nposs)/8),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
   #gibbs sampling
   for (i in (laststep + 1:ngibbs)) {
     #fit diagonal decay given iota and rho
@@ -914,8 +943,15 @@ run_gauss = function(cs, restart=F, bf_per_kb=1, bf_per_decade=20, bins_per_bf=1
       if (verbose==T) cat("log-likelihood = ",cs@par$value, "\n")
     }
     init.mean="mean"
+    #fit signal using sparse fused lasso
+    if (fit.signal==T) {
+      if (verbose==T) cat("Gibbs",i,": Signal ")
+      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_signal(cs)))
+      if(length(output) == 0) { output = 'ok' }
+      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", out=output, runtime=a[1]+a[4], type="perf")
+    }
+    #fit dispersion
     if (fit.disp==T) {
-      #fit exposures and dispersion
       if (verbose==T) cat("Gibbs",i,": Remaining parameters ")
       a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight,
                                                                                     init_alpha=init_alpha, type=type, ncores = ncores)))
