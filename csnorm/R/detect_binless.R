@@ -466,7 +466,7 @@ detect_binless_interactions = function(cs, resolution, group, fit.decay=F, ncore
         cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],
             " eC'=",params[i,eCprime],"\n")
     #compute matrix at new params
-    save(mat,params,file=paste0("mat_step_",step,".RData"))
+    #save(mat,params,file=paste0("mat_step_",step,".RData"))
     mat = foreach (g=groupnames, .combine=rbind) %dopar%
       csnorm:::get_lasso_coefs(mat[name==g],params[name==g], trails)
     #convert back value to the actual signal
@@ -476,8 +476,8 @@ detect_binless_interactions = function(cs, resolution, group, fit.decay=F, ncore
     if ("phi" %in% names(cts)) cts[,phi:=NULL]
     csg@cts=merge(cts, mat[,.(name,bin1,bin2,phi)], by=c("name","bin1","bin2"), all.x=T)
     #
-    p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()+facet_wrap(~name)
-    ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
+    #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()+facet_wrap(~name)
+    #ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
     #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))+scale_fill_gradient2()+facet_wrap(~name)
     #ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
     #
