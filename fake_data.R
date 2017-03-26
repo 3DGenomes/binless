@@ -21,27 +21,34 @@ csd=generate_fake_dataset(signal=T,biases.ref=biases.ref,eC=-4.3,replicate="1",c
 save(csd,file="data/fake_signal_replicate1_csdata.RData")
 csd=generate_fake_dataset(signal=T,biases.ref=biases.ref,eC=-6.1,replicate="2",condition="KO")
 save(csd,file="data/fake_signal_replicate2_csdata.RData")
+csd=generate_fake_dataset(signal=T,biases.ref=biases.ref,eC=-3.7,replicate="3",condition="KO")
+save(csd,file="data/fake_signal_replicate3_csdata.RData")
+csd=generate_fake_dataset(signal=T,biases.ref=biases.ref,eC=-4.2,replicate="4",condition="KO")
+save(csd,file="data/fake_signal_replicate4_csdata.RData")
+csd=generate_fake_dataset(signal=T,biases.ref=biases.ref,eC=-5.2,replicate="5",condition="KO")
+save(csd,file="data/fake_signal_replicate5_csdata.RData")
 
 csd@counts[,bin1:=round(pos1/10000)]
 csd@counts[,bin2:=round(pos2/10000)]
 binned=csd@counts[,.(count=sum(contact.far+contact.close+contact.up+contact.down)),by=c("bin1","bin2")]
 ggplot(binned)+geom_raster(aes(bin1,bin2,fill=log(count)))
 
+load("data/fake_csnorm_optimized.RData")
 
-load("data/fake_replicate1_csdata.RData")
+load("data/fake_signal_replicate1_csdata.RData")
 csd1=csd
-load("data/fake_replicate2_csdata.RData")
+load("data/fake_signal_replicate2_csdata.RData")
 csd2=csd
-load("data/fake_replicate3_csdata.RData")
+load("data/fake_signal_replicate3_csdata.RData")
 csd3=csd
-load("data/fake_replicate4_csdata.RData")
+load("data/fake_signal_replicate4_csdata.RData")
 csd4=csd
-load("data/fake_replicate5_csdata.RData")
+load("data/fake_signal_replicate5_csdata.RData")
 csd5=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
 cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 20,
                iter=100000, init_alpha=1e-7, ncounts = 1000000, type="perf", ncores=30)
-save(cs,file="data/fake_csnorm_optimized.RData")
+save(cs,file="data/fake_signal_csnorm_optimized.RData")
 
 plot_diagnostics(cs)
 
@@ -75,6 +82,14 @@ ggplot(mat)+geom_raster(aes(bin1,bin2,fill=signal))+facet_wrap(~name)+
   geom_point(aes(bin1,bin2,colour=direction),data=mat[is.significant==T])
 mat[,.N,by=is.significant]
 
+cs=group_datasets(cs, resolution=resolution, group="condition", ncores=ncores)
+cs=detect_binned_interactions(cs, resolution=resolution, group="condition", threshold=0.95, ncores=ncores)
+mat=get_interactions(cs, type="interactions", resolution=resolution, group="condition", threshold=0.95, ref="expected")
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=signal))+facet_wrap(~name)+
+  scale_fill_gradient(high="black", low="white", na.value = "white")+
+  geom_point(aes(bin1,bin2,colour=direction),data=mat[is.significant==T])
+mat[,.N,by=is.significant]
+
 
 cs=detect_binned_differences(cs, resolution=resolution, group="all", threshold=0.95,
                              ncores=ncores, ref=as.character(cs@experiments[1,name]))
@@ -91,7 +106,7 @@ mat=get_interactions(cs, type="binteractions", resolution=resolution, group="all
 plot_binless_matrix(mat)
 
 
-save(cs,file="data/fake_csnorm_optimized.RData")
+save(cs,file="data/fake_signal_csnorm_optimized.RData")
 
 
 
