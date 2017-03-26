@@ -442,20 +442,18 @@ detect_binless_interactions = function(cs, resolution, group, fit.decay=F, ncore
   bins=unique(cut(c(bins,head(bins,n=-1)+resolution/2), bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12))
   mat=CJ(name=csg@cts[,unique(name)],bin1=bins,bin2=bins,sorted=F,unique=F)[bin2>=bin1]
   mat[,phi:=0]
-  trails=NULL
+  ### build optimization trails
+  if (verbose==T) cat("  Build triangle grid trails\n")
+  trails = csnorm:::gfl_compute_trails(mat[,nlevels(bin1)])
+  stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
+  stopifnot(all(length(V(trails$graph))==mat[,.N,by=name]$N))
+  ### main loop
   params=NULL
   registerDoParallel(cores=ncores)
   for (step in 1:niter) {
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
     mat = csnorm:::csnorm_compute_raw_signal(csg, mat)
-    #
-    if (is.null(trails)) {
-      if (verbose==T) cat("  Build triangle grid trails\n")
-      trails = csnorm:::gfl_compute_trails(mat[,nlevels(bin1)])
-      stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
-      stopifnot(all(length(V(trails$graph))==mat[,.N,by=name]$N))
-    }
     #
     #perform fused lasso on signal
     if (verbose==T) cat("  Fused lasso\n")
