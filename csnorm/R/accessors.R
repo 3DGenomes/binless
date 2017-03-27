@@ -163,7 +163,8 @@ update_diagnostics = function(cs, step, leg, out, runtime, type) {
 #' @examples
 get_all_values = function(cs, param, trans) {
   #get value in tmp as vector of lists, remove NULL lists
-  values=cs@diagnostics$params[,.(step=step+((.I-1)%%3)/3,leg,tmp=get(param))][!sapply(tmp,is.null)]
+  legs=c("decay","bias","signal","disp")
+  values=cs@diagnostics$params[,.(step=step+((.I-1)%%4)/4,leg=ordered(leg,legs),tmp=get(param))][!sapply(tmp,is.null)]
   #melt it
   melted=as.data.table(values[,melt(tmp)])
   if ("Var1" %in% names(melted)) {
