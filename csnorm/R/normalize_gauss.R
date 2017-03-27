@@ -123,7 +123,6 @@ csnorm_gauss_common_muhat_mean = function(cs) {
   ### add signal
   if (cs@zeros$sig[,.N]>0) {
     cts[,bin:=cut(pos, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
-    cts=merge(cts,cs@zeros$sig)
     signal=merge(cs@zeros$sig, cs@par$signal, by=c("name","bin1","bin2"), all.x=T)
     stopifnot(all(complete.cases(signal)))
     signal=rbind(signal[,.(name,bin=bin1,dbin,ncross,phi)],signal[bin2>bin1,.(name,bin=bin2,dbin,ncross,phi)])
@@ -702,8 +701,29 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores) {
-  return(cs)#stop("not implemented")
+csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
+  cts = csnorm:::csnorm_predict_binned_counts_irls(cs, cs@settings$base.res, cs@zeros$sig)
+  mat = csnorm:::csnorm_compute_raw_signal(cts, cs@par$alpha, cs@par$signal)
+  #
+  #perform fused lasso on signal
+  groupnames=mat[,as.character(unique(name))]
+  registerDoParallel(cores=ncores)
+  params = foreach(g=groupnames, .combine=rbind) %dopar%
+    csnorm:::csnorm_fused_lasso_signal(mat[name==g], cs@settings$trails, tol=tol, ncores=ncores, verbose=verbose)
+  #compute matrix at new params
+  #save(mat,params,file=paste0("mat_step_",step,".RData"))
+  mat = foreach (g=groupnames, .combine=rbind) %dopar%
+    csnorm:::get_lasso_coefs(mat[name==g],params[name==g], cs@settings$trails)
+  #store new signal in cs and update eC
+  mat[,phi:=value]
+  cs@par$signal=mat[,.(name,bin1,bin2,phi)]
+  params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
+  cs@par$eC=as.array(params[,eC+eCprime])
+  cs@par$eCprime=as.array(params[,eCprime])
+  cs@par$lambda1=as.array(params[,lambda1])
+  cs@par$lambda2=as.array(params[,lambda2])
+  cs@par$value = params[,sum(BIC)]
+  return(cs)
 }
 
 #' Single-cpu simplified fitting for exposures and dispersion
@@ -842,8 +862,8 @@ plot_diagnostics = function(cs) {
   plot=ggplot(cs@diagnostics$params[,.(step,leg,value,out.last)])+
     geom_line(aes(step,value))+geom_point(aes(step,value,colour=out.last))+facet_wrap(~leg, scales = "free")+
     theme(legend.position="bottom")
-  vars=foreach(var=c("eC","eRJ","eDE","alpha","lambda_iota","lambda_rho","lambda_diag"),
-               trans=(c("exp","exp","exp",NA,"log","log","log")),.combine=rbind) %do% get_all_values(cs,var,trans)
+  vars=foreach(var=c("eC","eRJ","eDE","alpha","lambda_iota","lambda_rho","lambda_diag", "lambda1", "lambda2", "eCprime"),
+               trans=(c("exp","exp","exp",NA,"log","log","log","log","log",NA)),.combine=rbind) %do% get_all_values(cs,var,trans)
   plot2=ggplot(vars)+geom_line(aes(step,value))+
     geom_point(aes(step,value,colour=leg))+facet_wrap(~variable, scales = "free_y")
   return(list(plot=plot,plot2=plot2))
@@ -967,9 +987,10 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     #fit signal using sparse fused lasso
     if (fit.signal==T) {
       if (verbose==T) cat("Gibbs",i,": Signal ")
-      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_signal(cs)))
+      a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, ncores=ncores)))
       if(length(output) == 0) { output = 'ok' }
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", out=output, runtime=a[1]+a[4], type="perf")
+      if (verbose==T) cat("BIC = ",cs@par$value, "\n")
     }
     #fit dispersion
     if (fit.disp==T) {

@@ -303,8 +303,9 @@ csnorm_fused_lasso_signal = function(matg, trails, tol=1e-3, verbose=T, ncores=n
   lambda1=vals$lambda1
   eCprime=vals$eCprime
   matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
+  BIC=csnorm:::gfl_BIC(matg, trails, lambda1=lambda1, lambda2=lambda2, eCprime=eCprime)
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
-  return(data.table(name=groupname,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime))
+  return(data.table(name=groupname,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime,BIC=BIC))
 }
 
 #' run fused lasso on one dataset contained in matg, fusing 'value'
@@ -361,15 +362,14 @@ prepare_binless_decay = function(csg, mat) {
 
 #' compute input to fused lasso
 #' @keywords internal
-csnorm_compute_raw_signal = function(csg, mat) {
-  cts = copy(csg@cts)
+csnorm_compute_raw_signal = function(cts, dispersion, mat) {
   mat=mat[,.(name,bin1,bin2,phi)]
-  cts = mat[cts,,on=c("name","bin1","bin2")]
-  cts[,c("z","var"):=list(count/exp(phi+eC+lmu.base+log_decay)-1,
-                          (1/exp(phi+eC+lmu.base+log_decay)+1/csg@par$alpha))]
-  mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
-               phihat.var=1/sum(weight/var),
-               ncounts=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat]
+  cts.cp = mat[cts,,on=c("name","bin1","bin2")]
+  cts.cp[,c("z","var"):=list(count/exp(phi+eC+lmu.base+log_decay)-1,
+                             (1/exp(phi+eC+lmu.base+log_decay)+1/dispersion))]
+  mat = cts.cp[,.(phihat=weighted.mean(z+phi, weight/var),
+                  phihat.var=1/sum(weight/var),
+                  ncounts=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat]
   mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
   mat[,c("valuehat","weight"):=list(phihat,1/phihat.var)]
   setkey(mat,name,bin1,bin2)
@@ -453,7 +453,7 @@ detect_binless_interactions = function(cs, resolution, group, fit.decay=F, ncore
   for (step in 1:niter) {
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
-    mat = csnorm:::csnorm_compute_raw_signal(csg, mat)
+    mat = csnorm:::csnorm_compute_raw_signal(csg@cts, csg@par$alpha, mat)
     #
     #perform fused lasso on signal
     if (verbose==T) cat("  Fused lasso\n")
