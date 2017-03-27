@@ -47,7 +47,7 @@ fill_parameters_outer = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.g
   cs
 }
 
-#' Compute decay etahat and weights using data as initial guess
+#' Compute decay etahat and weights using data as initial guess. Signal is assumed to be zero.
 #' @keywords internal
 #' 
 csnorm_gauss_decay_muhat_data = function(cs, pseudocount=1e-2) {
@@ -93,35 +93,50 @@ csnorm_gauss_common_muhat_mean = function(cs) {
   cpos[,log_mu.base:=NULL]
   #collect all counts on left/right side, per distance
   cpos=rbind(cpos[contact.close>0,.(name, id=id1, pos=pos1, distance, cat="contact R",
-                                    count=contact.close, mu=exp(lmu.close), weight=1, eC, log_decay, log_bias=log_rho1)],
+                                    count=contact.close, lmu=lmu.close, weight=1, eC, log_decay, log_bias=log_rho1)],
              cpos[contact.far>0,  .(name, id=id1, pos=pos1, distance, cat="contact L",
-                                    count=contact.far,   mu=exp(lmu.far),   weight=1, eC, log_decay, log_bias=log_iota1)],
+                                    count=contact.far,   lmu=lmu.far,   weight=1, eC, log_decay, log_bias=log_iota1)],
              cpos[contact.down>0, .(name, id=id1, pos=pos1, distance, cat="contact R",
-                                    count=contact.down,  mu=exp(lmu.down),  weight=1, eC, log_decay, log_bias=log_rho1)],
+                                    count=contact.down,  lmu=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho1)],
              cpos[contact.up>0,   .(name, id=id1, pos=pos1, distance, cat="contact L",
-                                    count=contact.up,    mu=exp(lmu.up),    weight=1, eC, log_decay, log_bias=log_iota1)],
+                                    count=contact.up,    lmu=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota1)],
              cpos[contact.far>0,  .(name, id=id2, pos=pos2, distance, cat="contact R",
-                                    count=contact.far,   mu=exp(lmu.far),   weight=1, eC, log_decay, log_bias=log_rho2)],
+                                    count=contact.far,   lmu=lmu.far,   weight=1, eC, log_decay, log_bias=log_rho2)],
              cpos[contact.close>0,.(name, id=id2, pos=pos2, distance, cat="contact L",
-                                    count=contact.close, mu=exp(lmu.close), weight=1, eC, log_decay, log_bias=log_iota2)],
+                                    count=contact.close, lmu=lmu.close, weight=1, eC, log_decay, log_bias=log_iota2)],
              cpos[contact.down>0, .(name, id=id2, pos=pos2, distance, cat="contact R",
-                                    count=contact.down,  mu=exp(lmu.down),  weight=1, eC, log_decay, log_bias=log_rho2)],
+                                    count=contact.down,  lmu=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho2)],
              cpos[contact.up>0,   .(name, id=id2, pos=pos2, distance, cat="contact L",
-                                    count=contact.up,    mu=exp(lmu.up),    weight=1, eC, log_decay, log_bias=log_iota2)])
+                                    count=contact.up,    lmu=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota2)])
   dbins=cs@settings$dbins
   cpos[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-  cpos[,c("pos","distance"):=list(NULL,NULL)]
+  cpos[,distance:=NULL]
   ### zero counts
   czero = merge(init$decay[,.(name,dbin,log_decay)], cs@zeros$bg, by=c("name","dbin"))
   stopifnot(czero[is.na(log_decay),.N]==0)
   czero = merge(bsub,czero,by="id",all.x=F,all.y=T)
   czero[,log_bias:=ifelse(cat=="contact L",log_iota,log_rho)]
   czero = merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
-  czero[,log_mu:=eC + log_decay + log_bias] #we don't average over j
-  czero = czero[nzero>0,.(name,id,dbin,cat,count=0,mu=exp(log_mu),weight=nzero,log_bias,log_decay,eC)]
+  czero[,lmu:=eC + log_decay + log_bias] #we don't average over j
+  czero = czero[nzero>0,.(name,id,pos,dbin,cat,count=0,lmu,weight=nzero,log_bias,log_decay,eC)]
   cts=rbind(cpos,czero)
+  ### add signal
+  if (cs@zeros$sig[,.N]>0) {
+    cts[,bin:=cut(pos, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
+    cts=merge(cts,cs@zeros$sig)
+    signal=merge(cs@zeros$sig, cs@par$signal, by=c("name","bin1","bin2"), all.x=T)
+    stopifnot(all(complete.cases(signal)))
+    signal=rbind(signal[,.(name,bin=bin1,dbin,ncross,phi)],signal[bin2>bin1,.(name,bin=bin2,dbin,ncross,phi)])
+    signal=signal[,.(phi=weighted.mean(phi,ncross)),keyby=c("name","bin","dbin")]
+    cts=signal[cts,,on=key(signal)]
+    cts[,mu:=exp(lmu+phi)]
+  } else {
+    cts[,mu:=exp(lmu)]
+  }
+  ### finalize
   cts[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
   #ggplot(cts[name=="T47D es 60 MboI 1"&cat=="contact R"])+geom_line(aes(dbin,log_decay,colour=count>0,group=count>0))
+  cts[,c("count","mu","pos","lmu"):=NULL] #not needed downstream
   return(cts)
 }
 
@@ -688,7 +703,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' @keywords internal
 #' 
 csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores) {
-  stop("not implemented")
+  return(cs)#stop("not implemented")
 }
 
 #' Single-cpu simplified fitting for exposures and dispersion
@@ -696,7 +711,7 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores) {
 #' 
 has_converged = function(cs) {
   params=cs@diagnostics$params
-  if (params[,.N]<=3) return(FALSE)
+  if (params[,.N]<=4) return(FALSE)
   tol=cs@settings$tol.obj
   laststep=params[,step[.N]]
   delta=abs(params[step==laststep,value]-params[step==laststep-1,value])
@@ -744,6 +759,9 @@ get_nzeros_normalization = function(cs, ncores=1) {
   zeros[is.na(nnz),nnz:=0]
   setkey(zeros,id,name,dbin,cat)
   zeros[,nzero:=nposs-nnz]
+  #add positions
+  zeros=cs@biases[,.(name,id,pos)][zeros]
+  setkeyv(zeros,c("id","name","dbin","cat"))
   #Nkz=csnorm:::get_nzeros_per_decay(cs,ncores)
   #all(zeros[,.(ncross=sum(nposs)/8,nnz=sum(nnz)/2,nzero=sum(nzero)/2),keyby=c("name","dbin")]==Nkz)
   #zbias=csnorm:::get_nzeros_per_cutsite(cs,ncores)
@@ -796,15 +814,18 @@ prepare_signal = function(cs, base.res) {
   ### build matrix
   #create an empty matrix containing all cells, even those with no cut-site intersection
   signal.bins=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+base.res],base.res)
+  cs@settings$sbins=signal.bins
   signal.bins=unique(cut(c(signal.bins,head(signal.bins,n=-1)+base.res/2), signal.bins,
                          ordered_result=T, right=F, include.lowest=T,dig.lab=12))
-  signal.mat=CJ(name=csg@cts[,unique(name)],bin1=signal.bins,bin2=signal.bins,sorted=F,unique=F)[bin2>=bin1]
+  signal.mat=CJ(name=cs@experiments[,name],bin1=signal.bins,bin2=signal.bins,sorted=F,unique=F)[bin2>=bin1]
   signal.mat[,phi:=0]
   ### build optimization trails
   trails = csnorm:::gfl_compute_trails(signal.mat[,nlevels(bin1)])
   stopifnot(all(signal.mat[,.N,by=name]$N==signal.mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
   stopifnot(all(length(V(trails$graph))==signal.mat[,.N,by=name]$N))
-  return(list(signal.mat=signal.mat,trails=trails))
+  cs@par$signal=signal.mat
+  cs@settings$trails=trails
+  return(cs)
 }
 
 #' Diagnostics plots to monitor convergence of normalization (gaussian
@@ -910,8 +931,8 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     #prepare signal matrix and trails
     if (fit.signal==T) {
       if(verbose==T) cat("Preparing for signal estimation\n")
-      cs@par=modifyList(cs@par, csnorm:::prepare_signal(cs, base.res))
-      cs@zeros=modifyList(cs@zeros, list(sig=csnorm:::get_nzeros_binning(cs, base.res, ncores = ncores)))
+      cs = csnorm:::prepare_signal(cs, base.res)
+      cs@zeros=modifyList(list(sig=csnorm:::get_nzeros_binning(cs, base.res, ncores = ncores)), cs@zeros)
     }
   } else {
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")

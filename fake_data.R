@@ -45,9 +45,10 @@ load("data/fake_signal_replicate4_csdata.RData")
 csd4=csd
 load("data/fake_signal_replicate5_csdata.RData")
 csd5=csd
-cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
-cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 20,
-               iter=100000, init_alpha=1e-7, ncounts = 1000000, type="perf", ncores=30)
+#cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
+cs=merge_cs_norm_datasets(list(csd1), different.decays="none")
+cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 2,
+               iter=100000, init_alpha=1e-7, ncounts = 1000000, type="perf", ncores=30, fit.signal=T)
 save(cs,file="data/fake_signal_csnorm_optimized.RData")
 
 plot_diagnostics(cs)
