@@ -149,7 +149,7 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
   csd = cts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
                kappahat=weighted.mean(z+kappaij, weight/var),
                std=1/sqrt(sum(weight/(2*var))), weight=sum(weight)/2), keyby=c("name", "dbin")] #each count appears twice
- return(csd)
+  return(csd)
 }
 
 #' Optimize decay parameters
@@ -488,7 +488,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
         SD = SD + SDd
       }
     } 
-      
+    
     SD = bbegin[2]-bbegin[1]
     etas = c(eta_hat_RJ[1:SD],eta_hat_DL[1:SD],eta_hat_DR[1:SD],eta_hat_L[1:SD],eta_hat_R[1:SD])
     sds = c((1/(sd_RJ[1:SD])),(1/(sd_DL[1:SD])),(1/(sd_DR[1:SD])),(1/(sd_L[1:SD])),(1/(sd_R[1:SD])))
@@ -862,7 +862,8 @@ plot_diagnostics = function(cs) {
     geom_line(aes(step,value))+geom_point(aes(step,value,colour=out.last))+facet_wrap(~leg, scales = "free")+
     theme(legend.position="bottom")
   vars=foreach(var=c("eC","eRJ","eDE","alpha","lambda_iota","lambda_rho","lambda_diag", "lambda1", "lambda2", "eCprime"),
-               trans=(c("exp","exp","exp",NA,"log","log","log","log","log",NA)),.combine=rbind) %do% get_all_values(cs,var,trans)
+               trans=(c("exp","exp","exp",NA,"log","log","log","log","log",NA)),.combine=rbind) %do%
+    try(get_all_values(cs,var,trans), FALSE)
   plot2=ggplot(vars)+geom_line(aes(step,value))+
     geom_point(aes(step,value,colour=leg))+facet_wrap(~variable, scales = "free_y")
   return(list(plot=plot,plot2=plot2))
