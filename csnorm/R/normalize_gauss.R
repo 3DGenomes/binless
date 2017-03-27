@@ -731,7 +731,6 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
 #' 
 has_converged = function(cs) {
   params=cs@diagnostics$params
-  if (params[,.N]<=4) return(FALSE)
   tol=cs@settings$tol.obj
   laststep=params[,step[.N]]
   delta=abs(params[step==laststep,value]-params[step==laststep-1,value])
@@ -948,16 +947,17 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
     cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
     cs@zeros = list(bg=csnorm:::get_nzeros_normalization(cs, ncores=ncores), sig=data.table())
-    #prepare signal matrix and trails
-    if (fit.signal==T) {
-      if(verbose==T) cat("Preparing for signal estimation\n")
-      cs = csnorm:::prepare_signal(cs, base.res)
-      cs@zeros=modifyList(list(sig=csnorm:::get_nzeros_binning(cs, base.res, ncores = ncores)), cs@zeros)
-    }
   } else {
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
     init.mean="mean"
+  }
+  #
+  #prepare signal matrix and trails
+  if (fit.signal==T & cs@zeros$sig[,.N]==0) { #either restart==F or restart==T but was run with fit.signal==F
+    if(verbose==T) cat("Preparing for signal estimation\n")
+    cs = csnorm:::prepare_signal(cs, base.res)
+    cs@zeros=modifyList(list(sig=csnorm:::get_nzeros_binning(cs, base.res, ncores = ncores)), cs@zeros)
   }
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
@@ -1001,7 +1001,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
       if (verbose==T) cat("log-likelihood = ",cs@par$value,"\n")
     }
     if (verbose==T) cat("Gibbs",i,": dispersion = ",cs@par$alpha, " lambda_iota = ",cs@par$lambda_iota, "\n")
-    if (has_converged(cs)) break
+    if (i-laststep>1) if (has_converged(cs)) break
   }
   if (verbose==T) cat("Done\n")
   return(cs)
