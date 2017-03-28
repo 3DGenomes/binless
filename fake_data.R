@@ -47,11 +47,15 @@ load("data/fake_signal_replicate5_csdata.RData")
 csd5=csd
 #cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
 cs=merge_cs_norm_datasets(list(csd1), different.decays="none")
-cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 2,
-               iter=100000, init_alpha=1e-7, ncounts = 1000000, type="perf", ncores=30, fit.signal=T)
-save(cs,file="data/fake_signal_csnorm_optimized.RData")
+cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 6, base.res=20000,
+               iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=F)
+#save(cs,file="data/fake_signal_shrink10pc_new_csnorm_optimized.RData")
+cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, base.res=20000,
+               iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=T)
+#save(cs,file="data/fake_replicate1_signal_shrink10pc_new2_csnorm_optimized.RData")
 
-plot_diagnostics(cs)
+plot_diagnostics(cs)$plot
+plot_diagnostics(cs)$plot2
 
 ggplot(cs@par$decay)+geom_point(aes(distance,kappahat),alpha=0.1)+
   geom_line(aes(distance,kappa))+facet_wrap(~ name)+scale_x_log10()+
@@ -62,8 +66,19 @@ ggplot(cs@par$biases[cat=="dangling L"])+geom_point(aes(pos,etahat),alpha=0.1)+
   geom_line(aes(pos,true_log_mean_DL),colour="red",data=cs@biases)
 
 ggplot(cs@par$biases[cat=="dangling R"])+geom_point(aes(pos,etahat),alpha=0.1)+
-  geom_line(aes(pos,eta))+facet_wrap(~ name)+xlim(0,100000)+
+  geom_line(aes(pos,eta))+facet_wrap(~ name)+xlim(550000,650000)+
   geom_line(aes(pos,true_log_mean_DR),colour="red",data=cs@biases)
+
+signals=foreach(i=1:16,.combine=rbind) %do% {
+  if ("signal" %in% cs@diagnostics$params[step==i,leg]) {
+    sig=copy(cs@diagnostics$params[step==i&leg=="signal",signal][[1]])
+    sig[,step:=i]
+    sig
+  }
+}
+ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+facet_wrap(~ step)+scale_fill_gradient2()
+
+
 
 resolution=10000
 ncores=30
@@ -73,6 +88,14 @@ ggplot(mat)+geom_raster(aes(bin1,bin2,fill=observed))+facet_wrap(~name)+
   scale_fill_gradient(high="red", low="white", na.value = "white")
 ggplot(mat)+geom_raster(aes(bin1,bin2,fill=expected))+facet_wrap(~name)+
   scale_fill_gradient(high="red", low="white", na.value = "white")
+
+signals=foreach(i=1:20,.combine=rbind) %do% {
+  a=copy(cs@diagnostics$params[step==i&leg=="signal",signal][[1]])
+  a[,step:=i]
+  a
+}
+ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+facet_wrap(~ step)+scale_fill_gradient2()
+
 
 
 cs=detect_binned_interactions(cs, resolution=resolution, group="all", threshold=0.95, ncores=ncores)
