@@ -387,7 +387,8 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","outer"), max_perf_iteration=1000, convergence_epsilon=1e-5) {
+csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","outer"),
+                                max_perf_iteration=1000, convergence_epsilon=1e-5, shrinkage=0.1) {
   type=match.arg(type)
   if (init.mean=="mean") {
     a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
@@ -509,7 +510,8 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
     maxiter = 0
     D = bdiag(lambda_iota*D1,lambda_rho*D1)
     DtD = crossprod(D)
-    cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD)
+    shrinkfac=Krow^2*lambda_iota*lambda_rho*shrinkage
+    cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD, Imult=shrinkfac)
     while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
       tmp_WtXAm1 = t(solve(cholA,tmp_Xt_W)) #2xK
       
