@@ -977,10 +977,8 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     #fit iota and rho given diagonal decay
     if (fit.genomic==T) {
       if (verbose==T) cat("Gibbs",i,": Genomic ")
-      decay_eC = cs@par$eC
       a=system.time(output <- capture.output(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean, type=type)))
       if(length(output) == 0) { output = 'ok' }
-      cs@par$eC = as.array(colMeans(rbind(decay_eC,cs@par$eC)))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", out=output, runtime=a[1]+a[4], type=type)
       if (verbose==T) cat("log-likelihood = ",cs@par$value, "\n")
     }
