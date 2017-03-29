@@ -235,7 +235,8 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
       
       At = tmp_X_S_m2_X + Kdiag^2*lambda_diag^2*DtD
-      
+      #salt=Kdiag^2*lambda_diag^2*0.1*bdiag(Diagonal(Dsets)*0,Diagonal(Kdiag))
+      #At.PD = At + salt
       At.PD = nearPD(At)$mat  
       fit = solve.QP(At.PD, tmp_X_S_m2_k, -Ct, meq = Dsets)
       betat = fit$solution
@@ -862,8 +863,7 @@ plot_diagnostics = function(cs) {
     geom_line(aes(step,value))+geom_point(aes(step,value,colour=out.last))+facet_wrap(~leg, scales = "free")+
     theme(legend.position="bottom")
   vars=foreach(var=c("eC","eRJ","eDE","alpha","lambda_iota","lambda_rho","lambda_diag", "lambda1", "lambda2", "eCprime"),
-               trans=(c("exp","exp","exp",NA,"log","log","log","log","log",NA)),.combine=rbind) %do%
-    try(get_all_values(cs,var,trans), FALSE)
+               trans=(c("exp","exp","exp",NA,"log","log","log","log","log",NA)),.combine=rbind) %do% get_all_values(cs,var,trans)
   plot2=ggplot(vars)+geom_line(aes(step,value))+
     geom_point(aes(step,value,colour=leg))+facet_wrap(~variable, scales = "free_y")
   return(list(plot=plot,plot2=plot2))
