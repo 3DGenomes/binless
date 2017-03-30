@@ -185,6 +185,8 @@ get_all_values = function(cs, param, trans) {
   if (!is.na(trans)) {
     if (trans=="log") {
       melted[,c("variable","value"):=list(paste("log",variable),log(value))]
+    } else if (trans=="log10") {
+      melted[,c("variable","value"):=list(paste("log10",variable),log10(value))]
     } else if (trans=="exp") {
       melted[,c("variable","value"):=list(paste("exp",variable),exp(value))]
     } else {

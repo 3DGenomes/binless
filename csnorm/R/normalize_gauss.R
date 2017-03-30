@@ -705,6 +705,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   cts = csnorm:::csnorm_predict_binned_counts_irls(cs, cs@settings$base.res, cs@zeros$sig)
   mat = csnorm:::csnorm_compute_raw_signal(cts, cs@par$alpha, cs@par$signal)
+  #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phihat))+facet_wrap(~name)
   #
   #perform fused lasso on signal
   groupnames=mat[,as.character(unique(name))]
@@ -713,10 +714,15 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
     csnorm:::csnorm_fused_lasso_signal(mat[name==g], cs@settings$trails, tol=tol, ncores=ncores, verbose=verbose)
   #compute matrix at new params
   #save(mat,params,file=paste0("mat_step_",step,".RData"))
-  mat = foreach (g=groupnames, .combine=rbind) %dopar%
-    csnorm:::get_lasso_coefs(mat[name==g],params[name==g], cs@settings$trails)
+  mat = foreach (g=groupnames, .combine=rbind) %dopar% {
+    p=params[name==g]
+    matg=mat[name==g]
+    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, cs@settings$trails, p$lambda1, p$lambda2, p$eCprime)]
+    matg
+  }
   #store new signal in cs and update eC
   mat[,phi:=value]
+  #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=value))+facet_wrap(~name)
   cs@par$signal=mat[,.(name,bin1,bin2,phi)]
   params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
   cs@par$eC=as.array(params[,eC+eCprime])
@@ -863,7 +869,7 @@ plot_diagnostics = function(cs) {
     geom_line(aes(step,value))+geom_point(aes(step,value,colour=out.last))+facet_wrap(~leg, scales = "free")+
     theme(legend.position="bottom")
   vars=foreach(var=c("eC","eRJ","eDE","alpha","lambda_iota","lambda_rho","lambda_diag", "lambda1", "lambda2", "eCprime"),
-               trans=(c("exp","exp","exp",NA,"log","log","log","log","log",NA)),.combine=rbind) %do% get_all_values(cs,var,trans)
+               trans=(c(NA,NA,NA,NA,"log10","log10","log10","log10","log10",NA)),.combine=rbind) %do% get_all_values(cs,var,trans)
   plot2=ggplot(vars)+geom_line(aes(step,value))+
     geom_point(aes(step,value,colour=leg))+facet_wrap(~variable, scales = "free_y")
   return(list(plot=plot,plot2=plot2))

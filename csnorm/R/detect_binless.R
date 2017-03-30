@@ -181,7 +181,7 @@ gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
   #now soft-threshold the value around eCprime
   submat[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
   #compute BIC
-  BIC = submat[,sum(weight*((valuehat-(value+eCprime))^2))+log(.N)*dof]
+  BIC = submat[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
   #compute mallow's Cp
   #Cp = submat[,sum(weight*((valuehat-(value+eCprime))^2 - 1))]+2*dof
   return(BIC)
@@ -209,7 +209,7 @@ optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, eC.num=10
     #now soft-threshold the value around eCprime
     matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
     #compute BIC
-    BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(.N)*dof]
+    BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
     data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
   }
   #ggplot(dt)+geom_point(aes(eCprime,lambda1,fill=dof))
@@ -218,9 +218,7 @@ optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, eC.num=10
   #ggplot(dt[lambda1<0.1])+geom_line(aes(lambda1,dof))
   #ggplot(dt)+geom_line(aes(lambda1,BIC))
   #ggplot(dt[lambda1<0.2])+geom_point(aes(lambda1,BIC))
-  lambda1=dt[BIC==min(BIC),lambda1]
-  eCprime=dt[BIC==min(BIC),eCprime]
-  return(list(lambda1=lambda1,eCprime=eCprime))
+  return(dt[BIC==min(BIC)][lambda1==min(lambda1)][1,list(lambda1=lambda1,eCprime=eCprime,BIC=BIC)])
 }
 
 #' cross-validate lambda1 and set eCprime at minimum
@@ -244,16 +242,15 @@ optimize_lambda1_only = function(matg, trails, tol=1e-3, lambda2=0) {
       #now soft-threshold the value around eCprime
       matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
       #compute BIC
-      BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(.N)*dof]
+      BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
       data.table(lambda1=lambda1,BIC=BIC,dof=dof)
     }
   #ggplot(dt)+geom_line(aes(lambda1,dof))
   #ggplot(dt[lambda1<0.1])+geom_line(aes(lambda1,dof))
   #ggplot(dt)+geom_line(aes(lambda1,BIC))
   #ggplot(dt[lambda1<0.2])+geom_point(aes(lambda1,BIC))
-  lambda1=dt[BIC==min(BIC),lambda1][1]
   matg[,c("value","value.ori","patchno"):=NULL]
-  return(list(lambda1=lambda1,eCprime=eCprime))
+  return(dt[BIC==min(BIC)][lambda1==min(lambda1)][1,list(lambda1=lambda1,eCprime=eCprime,BIC=BIC)])
 }
 
 #' cross-validate lambda2
@@ -299,11 +296,12 @@ csnorm_fused_lasso_signal = function(matg, trails, tol=1e-3, verbose=T, ncores=n
   lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol, lambda1=lambda1, eCprime=eCprime,
                                       lambda2.last=lambda2)
   #get best lambda1 and set eCprime to lower bound
+  #vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2)
   vals = csnorm:::optimize_lambda1_only(matg, trails, tol=tol, lambda2=lambda2)
   lambda1=vals$lambda1
   eCprime=vals$eCprime
+  BIC=vals$BIC
   matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
-  BIC=csnorm:::gfl_BIC(matg, trails, lambda1=lambda1, lambda2=lambda2, eCprime=eCprime)
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   return(data.table(name=groupname,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime,BIC=BIC))
 }
@@ -330,18 +328,10 @@ csnorm_fused_lasso_differential = function(matg, params, trails, tol=1e-3, verbo
   vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2)
   lambda1=vals$lambda1
   eCprime=vals$eCprime
+  BIC=vals$BIC
   matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
-  return(data.table(name=groupname,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime))
-}
-
-#' produce fused lasso solution at the given set of parameters
-#' 
-#' @keywords internal
-get_lasso_coefs = function(matg, p, trails) {
-  matg[,c("lambda1","lambda2","eCprime"):=list(p$lambda1, p$lambda2, p$eCprime)]
-  matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, p$lambda1, p$lambda2, p$eCprime)]
-  matg
+  return(data.table(name=groupname,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime,BIC=BIC))
 }
 
 #' produce fused lasso solution at the given set of parameters
@@ -467,8 +457,12 @@ detect_binless_interactions = function(cs, resolution, group, fit.decay=F, ncore
             " eC'=",params[i,eCprime],"\n")
     #compute matrix at new params
     #save(mat,params,file=paste0("mat_step_",step,".RData"))
-    mat = foreach (g=groupnames, .combine=rbind) %dopar%
-      csnorm:::get_lasso_coefs(mat[name==g],params[name==g], trails)
+    mat = foreach (g=groupnames, .combine=rbind) %dopar% {
+      p=params[name==g]
+      matg=mat[name==g]
+      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, p$lambda1, p$lambda2, p$eCprime)]
+      matg
+    }
     #convert back value to the actual signal
     mat[,phi.old:=phi]
     mat[,phi:=value]
@@ -557,8 +551,12 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
             " eC'=",params[i,eCprime],"\n")
     #compute matrix at new params
     #save(mat,params,file=paste0("dmat_step_",step,".RData"))
-    mat = foreach (g=groupnames, .combine=rbind) %dopar%
-      csnorm:::get_lasso_coefs(mat[name==g],params[name==g], trails)
+    mat = foreach (g=groupnames, .combine=rbind) %dopar% {
+      p=params[name==g]
+      matg=mat[name==g]
+      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, p$lambda1, p$lambda2, p$eCprime)]
+      matg
+    }
     #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()+facet_wrap(~name)
     #ggsave(p,filename = paste0("diff_step_",step,"_value.png"), width=10, height=8)
     #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))+scale_fill_gradient2()+facet_wrap(~name)
