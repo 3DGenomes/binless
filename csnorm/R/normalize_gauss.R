@@ -651,6 +651,14 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   counts=csnorm:::csnorm_predict_all_parallel(cs,counts,ncores = ncores)
   setkeyv(counts,key(cs@counts))
   stopifnot(cs@biases[,.N]==length(cs@par$log_iota))
+  #add signal contribution if available
+  if (cs@zeros$sig[,.N]>0) {
+    counts[,bin1:=cut(pos1, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
+    counts[,bin2:=cut(pos2, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
+    counts=cs@par$signal[counts,,on=key(cs@par$signal)]
+    counts[,c("log_mean_cclose","log_mean_cfar","log_mean_cup","log_mean_cdown"):=
+             list(log_mean_cclose+phi,log_mean_cfar+phi,log_mean_cup+phi,log_mean_cdown+phi)]
+  }
   #
   #fit dispersion and exposures
   bbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
@@ -723,6 +731,7 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   #store new signal in cs and update eC
   mat[,phi:=value]
   #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phihat))+facet_wrap(~name)+scale_fill
+  setkey(mat,name,bin1,bin2)
   cs@par$signal=mat[,.(name,bin1,bin2,phi)]
   params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
   cs@par$eC=as.array(params[,eC+eCprime])

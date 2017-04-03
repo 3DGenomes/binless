@@ -55,11 +55,11 @@ cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ng
 cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 5, base.res=20000,
                iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=F)
 #save(cs,file="data/fake_signal_shrink10pc_new_csnorm_optimized.RData")
-cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 5, base.res=20000,
+cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 3, base.res=20000,
                iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=T)
 #save(cs,file="data/fake_replicate1_signal_shrink10pc_new2_csnorm_optimized.RData")
 
-save(cs,file="data/fake_signal_optimal_phi_csnorm_optimized.RData")
+save(cs,file="data/fake_csnorm_optimized.RData")
 
 
 plot_diagnostics(cs)$plot
