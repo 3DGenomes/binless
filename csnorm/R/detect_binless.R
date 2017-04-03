@@ -190,7 +190,7 @@ gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
 #' cross-validate lambda1 and eCprime
 #' 
 #' @keywords internal
-optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0) {
+optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=F) {
   #compute values for lambda1=0 and eCprime=0
   matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
   matg[,value.ori:=value]
@@ -204,7 +204,9 @@ optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0) {
   valrange=maxval-minval
   #
   obj = function(lambda1) {
-    dt = foreach (eCprime=c(patches[,value-lambda1],patches[,value+lambda1]), .combine=rbind) %dopar% {
+    eCvals = c(patches[,value-lambda1],patches[,value+lambda1])
+    if (positive==T) eCvals=eCvals[eCvals<=lambda1+minval]
+    dt = foreach (eCprime=eCvals, .combine=rbind) %dopar% {
     matg[,value:=value.ori-eCprime]
     dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
     stopifnot(dof<=cl$no)
@@ -286,7 +288,7 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0, lambda
 
 #' run fused lasso on one dataset contained in matg, fusing 'value'
 #' 
-#' finds optimal lambda1, lambda2 and eC using BIC
+#' finds optimal lambda1, lambda2 and eC using BIC. Signal is constrained to be positive.
 #' @keywords internal
 csnorm_fused_lasso_signal = function(matg, trails, tol=1e-3, verbose=T, ncores=ncores) {
   groupname=matg[,as.character(name[1])]
@@ -297,7 +299,7 @@ csnorm_fused_lasso_signal = function(matg, trails, tol=1e-3, verbose=T, ncores=n
   lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol, lambda1=lambda1, eCprime=eCprime,
                                       lambda2.last=lambda2)
   #get best lambda1 and set eCprime to lower bound
-  vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2)
+  vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2, positive=T)
   #vals = csnorm:::optimize_lambda1_only(matg, trails, tol=tol, lambda2=lambda2)
   lambda1=vals$lambda1
   eCprime=vals$eCprime
