@@ -722,7 +722,7 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   }
   #store new signal in cs and update eC
   mat[,phi:=value]
-  #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=value))+facet_wrap(~name)
+  #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phihat))+facet_wrap(~name)+scale_fill
   cs@par$signal=mat[,.(name,bin1,bin2,phi)]
   params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
   cs@par$eC=as.array(params[,eC+eCprime])

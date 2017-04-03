@@ -190,19 +190,21 @@ gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
 #' cross-validate lambda1 and eCprime
 #' 
 #' @keywords internal
-optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, eC.num=100) {
+optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0) {
   #compute values for lambda1=0 and eCprime=0
   matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
-  matg[,eCprime:=NULL]
   matg[,value.ori:=value]
   #get the number of patches to compute degrees of freedom
   cl = csnorm:::build_patch_graph(matg, trails, tol.value=tol)$components
   matg[,patchno:=cl$membership]
   patches = matg[,.(value=value[1]),by=patchno][,.N,keyby=value]
   stopifnot(patches[,sum(N)]==cl$no)
+  minval=patches[,min(value)]
+  maxval=patches[,max(value)]
+  valrange=maxval-minval
   #
-  dt = foreach (lambda1=c(0,patches[,abs(value)],patches[,max(abs(value))]+tol),.combine=rbind) %:% 
-    foreach (eCprime=seq(patches[,min(value)]-tol,patches[,max(value)]+tol,l=eC.num), .combine=rbind) %dopar% {
+  obj = function(lambda1) {
+    dt = foreach (eCprime=c(patches[,value-lambda1],patches[,value+lambda1]), .combine=rbind) %dopar% {
     matg[,value:=value.ori-eCprime]
     dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
     stopifnot(dof<=cl$no)
@@ -211,14 +213,13 @@ optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, eC.num=10
     #compute BIC
     BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
     data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
+    }
+    dt[BIC==min(BIC)][lambda1==min(lambda1)][1]
   }
-  #ggplot(dt)+geom_point(aes(eCprime,lambda1,fill=dof))
-  #ggplot(dt[BIC<7000])+geom_line(aes(eCprime,BIC))+facet_wrap(~ lambda1)
-  #ggplot(dt[BIC<7000])+geom_line(aes(lambda1,BIC,colour=BIC))+facet_wrap(~ eCprime)
-  #ggplot(dt[lambda1<0.1])+geom_line(aes(lambda1,dof))
-  #ggplot(dt)+geom_line(aes(lambda1,BIC))
-  #ggplot(dt[lambda1<0.2])+geom_point(aes(lambda1,BIC))
-  return(dt[BIC==min(BIC)][lambda1==min(lambda1)][1,list(lambda1=lambda1,eCprime=eCprime,BIC=BIC)])
+  #dt=foreach(lambda1=seq(tol/2,valrange,length.out=50), .combine=rbind) %do% obj(lambda1)
+  #ggplot(dt)+geom_point(aes(lambda1,BIC))
+  op=optimize(function(x){obj(10^(x))[,BIC]}, c(log10(tol/2),log10(valrange)), tol=tol)
+  return(as.list(obj(10^(op$minimum))))
 }
 
 #' cross-validate lambda1 and set eCprime at minimum
@@ -296,8 +297,8 @@ csnorm_fused_lasso_signal = function(matg, trails, tol=1e-3, verbose=T, ncores=n
   lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol, lambda1=lambda1, eCprime=eCprime,
                                       lambda2.last=lambda2)
   #get best lambda1 and set eCprime to lower bound
-  #vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2)
-  vals = csnorm:::optimize_lambda1_only(matg, trails, tol=tol, lambda2=lambda2)
+  vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2)
+  #vals = csnorm:::optimize_lambda1_only(matg, trails, tol=tol, lambda2=lambda2)
   lambda1=vals$lambda1
   eCprime=vals$eCprime
   BIC=vals$BIC
