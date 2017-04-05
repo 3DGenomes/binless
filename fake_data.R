@@ -35,35 +35,60 @@ ggplot(binned)+geom_raster(aes(bin1,bin2,fill=log(count)))
 
 load("data/fake_csnorm_optimized.RData")
 
-load("data/fake_replicate1_csdata.RData")
+load("data/fake_signal_replicate1_csdata.RData")
 csd1=csd
-load("data/fake_replicate2_csdata.RData")
+load("data/fake_signal_replicate2_csdata.RData")
 csd2=csd
-load("data/fake_replicate3_csdata.RData")
+load("data/fake_signal_replicate3_csdata.RData")
 csd3=csd
-load("data/fake_replicate4_csdata.RData")
+load("data/fake_signal_replicate4_csdata.RData")
 csd4=csd
-load("data/fake_replicate5_csdata.RData")
+load("data/fake_signal_replicate5_csdata.RData")
 csd5=csd
-cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
-#cs=merge_cs_norm_datasets(list(csd1), different.decays="none")
-cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 5, base.res=20000,
-               iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=F)
-cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 1, base.res=20000,
+#cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
+cs=merge_cs_norm_datasets(list(csd1), different.decays="none")
+cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 1, base.res=20000,
                iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=T)
 #cs@par$signal[,phi:=2*phi]
 cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 5, base.res=20000,
+               iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=T, fit.disp=F, fit.genomic=F, fit.decay=F)
+cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 5, base.res=20000,
                iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=F)
 #save(cs,file="data/fake_signal_shrink10pc_new_csnorm_optimized.RData")
-cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 3, base.res=20000,
+cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, base.res=20000,
                iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=T)
 #save(cs,file="data/fake_replicate1_signal_shrink10pc_new2_csnorm_optimized.RData")
 
 save(cs,file="data/fake_csnorm_optimized.RData")
 
-
 plot_diagnostics(cs)$plot
 plot_diagnostics(cs)$plot2
+
+
+#set true signal
+true_sig=cs@counts[,.(name,pos1,pos2,true_phi)]
+true_sig[,bin1:=cut(pos1,cs@settings$sbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+true_sig[,bin2:=cut(pos2,cs@settings$sbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+true_sig=true_sig[,.(phi=mean(true_phi)),keyby=c("name","bin1","bin2")]
+ggplot(true_sig[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()
+cs@par$signal=true_sig[cs@par$signal[,.(name,bin1,bin2)]]
+
+#set true biases
+cs@par$log_iota=cs@biases[,true_log_iota]
+cs@par$log_rho=cs@biases[,true_log_rho]
+#cs@par$eC=as.array(c(-4.3,-6.3,-3.7,-3.1,-4.2))
+#cs@par$eRJ=as.array(rep(3,5))
+#cs@par$eDE=as.array(rep(1,5))
+cs@par$eC=as.array(c(-4.3))
+cs@par$eRJ=as.array(rep(3,1))
+cs@par$eDE=as.array(rep(1,1))
+cs@par$alpha=2
+cts=cs@counts[,.(name,dbin=cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12),
+                 true_log_decay)][,.(true_log_decay=mean(true_log_decay)),keyby=c("name","dbin")]
+cs@par$decay=cts[cs@par$decay][,.(name,dbin,distance,kappahat,std,ncounts,kappa,log_decay=true_log_decay)]
+
+
+
 
 ggplot(cs@par$decay)+geom_pointrange(aes(distance,kappahat,ymin=kappahat-std,ymax=kappahat+std),alpha=0.1)+
   geom_line(aes(distance,kappa))+facet_wrap(~ name)+scale_x_log10()+
@@ -80,12 +105,6 @@ ggplot(cs@par$biases[cat=="dangling R"])+geom_point(aes(pos,etahat),alpha=0.1)+
   geom_line(aes(pos,eta))+facet_wrap(~ name)+xlim(550000,650000)+
   geom_line(aes(pos,true_log_mean_DR),colour="red",data=cs@biases)
 
-true_sig=cs@counts[,.(name,pos1,pos2,true_phi)]
-true_sig[,bin1:=cut(pos1,cs@settings$sbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-true_sig[,bin2:=cut(pos2,cs@settings$sbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-true_sig=true_sig[,.(phi=mean(true_phi)),keyby=c("name","bin1","bin2")]
-ggplot(true_sig[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()
-cs@par$signal=true_sig[cs@par$signal[,.(name,bin1,bin2)]]
 
 #signals
 signals=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
@@ -96,6 +115,7 @@ signals=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
   }
 }
 ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+facet_wrap(~ step)+scale_fill_gradient2()
+ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi==0))+facet_wrap(~ step)#+scale_fill_gradient2()
 
 #decays
 decays=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
@@ -201,6 +221,8 @@ mat=get_matrices(cs, resolution=resolution, group="all")
 ggplot(mat)+geom_raster(aes(bin1,bin2,fill=observed))+facet_wrap(~name)+
   scale_fill_gradient(high="red", low="white", na.value = "white")
 ggplot(mat)+geom_raster(aes(bin1,bin2,fill=expected))+facet_wrap(~name)+
+  scale_fill_gradient(high="red", low="white", na.value = "white")
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=expected))+geom_raster(aes(bin2,bin1,fill=observed))+facet_wrap(~name)+
   scale_fill_gradient(high="red", low="white", na.value = "white")
 
 
