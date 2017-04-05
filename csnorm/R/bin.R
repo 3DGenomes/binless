@@ -47,7 +47,7 @@ get_nzeros_binning = function(cs, resolution, ncores=1) {
   cts=melt(cs@counts[,.(name,pos1,pos2,distance,contact.close,contact.down,contact.far,contact.up)],
            id.vars=c("name","pos1","pos2","distance"))[value>0]
   #retrieve bin borders
-  biases=cs@biases
+  biases=cs@biases[,.(name,id,pos)]
   bins=seq(biases[,min(pos)-1],biases[,max(pos)+1+resolution],resolution)
   biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
   cts[,c("bin1","bin2","dbin"):=
