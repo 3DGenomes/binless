@@ -47,7 +47,7 @@ load("data/fake_signal_replicate5_csdata.RData")
 csd5=csd
 #cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
 cs=merge_cs_norm_datasets(list(csd1), different.decays="none")
-cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 1, base.res=20000,
+cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, base.res=20000,
                iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=T)
 #cs@par$signal[,phi:=2*phi]
 cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 5, base.res=20000,
@@ -55,7 +55,7 @@ cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ng
 cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 5, base.res=20000,
                iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=F)
 #save(cs,file="data/fake_signal_shrink10pc_new_csnorm_optimized.RData")
-cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, base.res=20000,
+cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 2, base.res=20000,
                iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=T)
 #save(cs,file="data/fake_replicate1_signal_shrink10pc_new2_csnorm_optimized.RData")
 
@@ -116,6 +116,10 @@ signals=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
 }
 ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+facet_wrap(~ step)+scale_fill_gradient2()
 ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi==0))+facet_wrap(~ step)#+scale_fill_gradient2()
+
+#last signal
+ggplot(signals[step==step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_wrap(~ name)+scale_fill_gradient2()
+
 
 #decays
 decays=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
@@ -253,7 +257,7 @@ ggplot(mat)+geom_raster(aes(bin1,bin2,fill=difference))+facet_wrap(~name)+
   geom_point(aes(bin1,bin2,colour=direction),data=mat[is.significant==T])
 
 
-cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=30, niter=5, fit.decay=T)
+cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=30, niter=1, fit.decay=F)
 mat=get_interactions(cs, type="binteractions", resolution=resolution, group="all", threshold=-1, ref="expected")
 plot_binless_matrix(mat)
 

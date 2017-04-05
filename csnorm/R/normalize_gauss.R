@@ -440,7 +440,16 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
     t = min(cutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
     Bsp = spline.des(cutsites, knots = t, outer.ok = T, sparse=T)$design
     X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
-    W=Matrix(cbind(c(rep(0,3*SD),rep(1,SD),rep(0,SD)), c(rep(0,4*SD),rep(1,SD))), sparse = T)
+    if (cs@zeros$sig[,.N]>0) {
+      sbinned=cs@biases[bbegin[1]:(bbegin[2]-1), cut(pos, cs@settings$sbins, ordered_result=T,
+                                                     right=F, include.lowest=T,dig.lab=12)]
+      centering=Matrix(model.matrix(~ 0+sbinned))
+      stopifnot(dim(centering)==c(SD,length(cs@settings$sbins)-1))
+    } else {
+      centering=rep(1,SD)
+    }
+    W=cbind(rbind(Matrix(0,nrow=3*SD,ncol=ncol(centering)),centering,Matrix(0,nrow=SD,ncol=ncol(centering))),
+            rbind(Matrix(0,nrow=4*SD,ncol=ncol(centering)),centering))
     diags = list(rep(1,Krow), rep(-2,Krow))
     D1 = bandSparse(Krow-2, Krow, k=0:2, diagonals=c(diags, diags[1]))
     if (type=="outer" || (!is.null(cs@par$lambda_iota) && !is.null(cs@par$lambda_rho))) {
@@ -473,7 +482,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
         SDd = bbegin[2*d]-bbegin[(2*d-1)]
         X = rbind(X,nX)
         Bsp = bdiag(Bsp,nBsp)
-        W = rbind(W,cbind(rep(0,5*SDd),rep(0,5*SDd)))
+        W = rbind(W,Matrix(0,nrow=5*SDd,ncol=2*ncol(centering)))
         nU_e = cbind(c(rep.int(1,SDd),rep.int(0,4*SDd)),c(rep.int(0,SDd),rep.int(1,2*SDd),rep.int(0,2*SDd)),c(rep.int(0,3*SDd),rep.int(1,2*SDd)))
         U_e = bdiag(U_e,nU_e) 
         eta_hat_RJ=c(eta_hat_RJ,bts[cat=="rejoined",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
@@ -730,7 +739,8 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   }
   #store new signal in cs and update eC
   mat[,phi:=value]
-  #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phihat))+facet_wrap(~name)+scale_fill
+  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phihat))
+  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
   setkey(mat,name,bin1,bin2)
   cs@par$signal=mat[,.(name,bin1,bin2,phi)]
   params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
