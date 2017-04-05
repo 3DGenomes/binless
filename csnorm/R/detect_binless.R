@@ -217,7 +217,7 @@ optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=
     matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
     #compute BIC
     #BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof-2*.N*log(lambda1)]
-    BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof-9*log(lambda1)+5*lambda1]
+    BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]#-9*log(lambda1)+5*lambda1]
     data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
     }
     dt[BIC==min(BIC)][lambda1==max(lambda1)][eCprime==min(eCprime)]
