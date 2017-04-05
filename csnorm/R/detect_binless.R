@@ -190,14 +190,17 @@ gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
 #' cross-validate lambda1 and eCprime
 #' 
 #' @keywords internal
-optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=F) {
+optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=F, lambda1.min=0.05) {
   #compute values for lambda1=0 and eCprime=0
   matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
   matg[,value.ori:=value]
+  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
+  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=factor(round(value,3))))+guides(fill=F))
+  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value<0.30)))
   #get the number of patches to compute degrees of freedom
   cl = csnorm:::build_patch_graph(matg, trails, tol.value=tol)$components
   matg[,patchno:=cl$membership]
-  patches = matg[,.(value=value[1]),by=patchno][,.N,keyby=value]
+  patches = matg[,.(value=value[1],size=.N),by=patchno][,.(N=.N,size=size[1]),keyby=value]
   stopifnot(patches[,sum(N)]==cl$no)
   minval=patches[,min(value)]
   maxval=patches[,max(value)]
@@ -213,14 +216,21 @@ optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=
     #now soft-threshold the value around eCprime
     matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
     #compute BIC
-    BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
+    #BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof-2*.N*log(lambda1)]
+    BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof-9*log(lambda1)+5*lambda1]
     data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
     }
-    dt[BIC==min(BIC)][lambda1==min(lambda1)][1]
+    dt[BIC==min(BIC)][lambda1==max(lambda1)][eCprime==min(eCprime)]
   }
   #dt=foreach(lambda1=seq(tol/2,valrange,length.out=50), .combine=rbind) %do% obj(lambda1)
-  #ggplot(dt)+geom_point(aes(lambda1,BIC))
-  op=optimize(function(x){obj(10^(x))[,BIC]}, c(log10(tol/2),log10(valrange)), tol=tol)
+  #ggplot(dt)+geom_point(aes(lambda1,BIC))+geom_line(aes(lambda1,BIC))
+  #dt[,g:=dof*matg[,log(sum(ncounts))]]
+  #dt[,h:=-2*matg[,.N]*log(lambda1)]
+  #dt[,h:=-9*log(lambda1)+5*lambda1]
+  #dt[,f:=BIC-g-h]
+  #ggplot(dt)+geom_line(aes(lambda1,f,colour="f"))+geom_line(aes(lambda1,g,colour="g"))+geom_line(aes(lambda1,h,colour="h"))
+  #ggplot(data.table(x=seq(0,valrange,l=1000))[,.(x,y=dgamma(x,rate=10,shape=5,log=T))])+geom_line(aes(x,y))
+  op=optimize(function(x){obj(10^(x))[,BIC]}, c(log10(max(lambda1.min,tol/2)),log10(valrange)), tol=tol)
   return(as.list(obj(10^(op$minimum))))
 }
 
@@ -258,17 +268,18 @@ optimize_lambda1_only = function(matg, trails, tol=1e-3, lambda2=0) {
 
 #' cross-validate lambda2
 #' @keywords internal
-optimize_lambda2 = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0, lambda2.last=1) {
-  obj = function(x){csnorm:::gfl_BIC(matg, trails, lambda1=lambda1, lambda2=10^(x), eCprime=eCprime)}
+optimize_lambda2 = function(matg, trails, tol=1e-3, lambda2.max=1000) {
+  obj = function(x){csnorm:::gfl_BIC(matg, trails, lambda1=0, lambda2=10^(x), eCprime=0)}
   minlambda=tol/2
-  maxlambda=10*lambda2.last
+  maxlambda=lambda2.max
   #save(matg,trails,tol,lambda1,eCprime,file="debug_lambda2.RData")
   #cat("*** maxlambda ",maxlambda," (range=",matg[,max(value)-min(value)],")\n")
   #shrink maximum lambda, in case initial guess is too big
   repeat {
-    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, maxlambda, eCprime)]
+    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, maxlambda, 0)]
     #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value)))
     if (matg[,max(value)-min(value)] > tol) {
+      if (maxlambda==lambda2.max) cat("   Warning: maxlambda hit boundary.\n")
       maxlambda = maxlambda*2
       break
     }
@@ -278,11 +289,14 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0, lambda
   }
   #cat("optimize lambda2 between ",minlambda," and ",maxlambda,"\n")
   #dt = foreach (lam=seq(log10(minlambda),log10(maxlambda),l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
-  #ggplot(dt)+geom_line(aes(10^(x),y))+scale_x_log10()
+  #ggplot(dt)+geom_point(aes(10^(x),y))
   op=optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=tol)
   lambda2=10^op$minimum
-  if (lambda2==minlambda | lambda2==maxlambda) cat("   Warning: lambda2 hit boundary.")
-  if (lambda2<tol) lambda2=0
+  if (lambda2==minlambda | lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
+  if (lambda2<tol) {
+    cat("   Warning: lambda2 hit lower boundary.")
+    lambda2=0
+  }
   return(lambda2)
 }
 
@@ -292,19 +306,16 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda1=0, eCprime=0, lambda
 #' @keywords internal
 csnorm_fused_lasso_signal = function(matg, trails, tol=1e-3, verbose=T, ncores=ncores) {
   groupname=matg[,as.character(name[1])]
-  eCprime=matg[,min(valuehat)]
-  lambda1=0
-  lambda2=1
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+scale_fill_gradient2())
-  lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol, lambda1=lambda1, eCprime=eCprime,
-                                      lambda2.last=lambda2)
+  lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol)
   #get best lambda1 and set eCprime to lower bound
   vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2, positive=T)
-  #vals = csnorm:::optimize_lambda1_only(matg, trails, tol=tol, lambda2=lambda2)
   lambda1=vals$lambda1
   eCprime=vals$eCprime
   BIC=vals$BIC
-  matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
+  #matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
+  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=abs(value-eCprime)<=lambda1)))
+  #matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   return(data.table(name=groupname,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime,BIC=BIC))
 }
