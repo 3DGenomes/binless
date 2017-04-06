@@ -43,7 +43,6 @@
 #' @import methods
 #' @import Matrix
 #' @import quadprog
-#' @import gsl
 #' @importFrom Hmisc cut2
 #' @importFrom dplyr ntile
 #'
