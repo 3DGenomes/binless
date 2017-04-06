@@ -401,10 +401,8 @@ csnorm_compute_raw_differential = function(csg, mat, ref) {
 #' @export
 #' 
 #' @examples
-detect_binless_interactions = function(cs, resolution, group, fit.decay=F, ncores=1, niter=10, tol=1e-3,
-                                       verbose=T, max_perf_iteration=1000, convergence_epsilon=1e-5){
+detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol=1e-3, verbose=T){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
-  if (group!="all" & fit.decay!=F) stop("Cannot yet fit decay with grouped data!")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
@@ -412,17 +410,11 @@ detect_binless_interactions = function(cs, resolution, group, fit.decay=F, ncore
   if (get_cs_interaction_idx(csg, type="binteractions", threshold=-1, ref="expected", raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
   #
-  ### build matrix
-  #create an empty matrix containing all cells, even those with no cut-site intersection
-  bins=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
-  bins=unique(cut(c(bins,head(bins,n=-1)+resolution/2), bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12))
-  mat=CJ(name=csg@cts[,unique(name)],bin1=bins,bin2=bins,sorted=F,unique=F)[bin2>=bin1]
-  mat[,phi:=0]
-  ### build optimization trails
-  if (verbose==T) cat("  Build triangle grid trails\n")
-  trails = csnorm:::gfl_compute_trails(mat[,nlevels(bin1)])
-  stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
-  stopifnot(all(length(V(trails$graph))==mat[,.N,by=name]$N))
+  ### prepare signal estimation
+  if (verbose==T) cat("  Prepare for signal estimation\n")
+  stuff = csnorm:::prepare_signal(cs, cs@biases, csg@names, resolution)
+  mat=stuff$signal
+  trails=stuff$trails
   ### main loop
   params=NULL
   registerDoParallel(cores=ncores)
@@ -452,9 +444,6 @@ detect_binless_interactions = function(cs, resolution, group, fit.decay=F, ncore
     #convert back value to the actual signal
     mat[,phi.old:=phi]
     mat[,phi:=value]
-    cts=csg@cts
-    if ("phi" %in% names(cts)) cts[,phi:=NULL]
-    csg@cts=merge(cts, mat[,.(name,bin1,bin2,phi)], by=c("name","bin1","bin2"), all.x=T)
     #
     #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()+facet_wrap(~name)
     #ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
@@ -463,23 +452,6 @@ detect_binless_interactions = function(cs, resolution, group, fit.decay=F, ncore
     #
     #check convergence
     if(mat[,all(abs(phi-phi.old)<tol)]) break
-    #
-    if (fit.decay!=F) {
-      if (verbose==T) cat("  Fit decay\n")
-      #compute diagonal decay
-      csd = csnorm:::prepare_binless_decay(csg, mat)
-      op = csnorm:::csnorm_gauss_decay_optimize(csd, csg@par$design, csg@par$Kdiag, csg@par$lambda_diag,
-                                                'perf', max_perf_iteration=max_perf_iteration,
-                                                convergence_epsilon=convergence_epsilon)
-      p=ggplot(op$par$decay)+geom_point(aes(distance,kappahat))+geom_line(aes(distance,kappa))+
-        scale_x_log10()+facet_wrap(~name)
-      ggsave(p,filename = paste0("sig_step_",step,"_decay.png"), width=10, height=8)
-      #report new parameters
-      cts=csg@cts
-      cts[,c("eC","log_decay"):=NULL]
-      cts = merge(cbind(csg@par$design[,.(name)],eC=op$par$eC), cts, by="name", all.x=F,all.y=T)
-      csg@cts = merge(op$par$decay[,.(name,dbin,log_decay)], cts, by=c("name","dbin"))
-    }
   }
   #
   if (verbose==T) cat(" Detect patches\n")
