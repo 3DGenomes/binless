@@ -201,6 +201,9 @@ optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=
   cl = csnorm:::build_patch_graph(matg, trails, tol.value=tol)$components
   matg[,patchno:=cl$membership]
   patches = matg[,.(value=value[1],size=.N),by=patchno][,.(N=.N,size=size[1]),keyby=value]
+  if (patches[,.N]==1) #matrix is just one big bin
+    return(data.table(eCprime=patches[,value],lambda1=lambda1.min,
+                      BIC=matg[,sum(weight*((valuehat-(value+patches[,value]))^2))],dof=0))
   stopifnot(patches[,sum(N)]==cl$no)
   minval=patches[,min(value)]
   maxval=patches[,max(value)]
@@ -354,33 +357,30 @@ csnorm_compute_raw_signal = function(cts, dispersion, mat) {
 
 #' compute input to fused lasso
 #' @keywords internal
-csnorm_compute_raw_differential = function(csg, mat, ref) {
-  ctsref = foreach(n=csg@cts[name!=ref,unique(name)],.combine=rbind) %do%
-    csg@cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
-  cts=csg@cts[name!=ref]
+csnorm_compute_raw_differential = function(cts, dispersion, mat, ref) {
+  ctsref = foreach(n=cts[name!=ref,unique(name)],.combine=rbind) %do%
+    cts[name==ref,.(name=n,bin1,bin2,count,lmu.base,log_decay,eC,weight)]
+  ctsoth=cts[name!=ref,.(name,bin1,bin2,count,lmu.base,log_decay,eC,weight)]
+  mat=mat[,.(name,bin1,bin2,phi.ref,delta)]
   #
-  if (is.null(mat)) {
-    mat=cts[,CJ(name=name,bin1=ordered(levels(bin1)),bin2=ordered(levels(bin2)),sorted=T,unique=T)][bin2>=bin1]
-    mat[,c("phi.ref","delta","diffsig"):=list(0,0,1)]
-  } else {
-    mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig)]
-  }
-  ctsref=mat[ctsref]
-  ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@par$alpha))]
+  ctsref=mat[ctsref,,on=c("name","bin1","bin2")]
+  ctsref[,c("z","var"):=list(count/exp(phi.ref+eC+lmu.base+log_decay)-1,
+                             (1/exp(phi.ref+eC+lmu.base+log_decay)+1/dispersion))]
   mat.ref=ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
                     sigmasq.ref=1/sum(weight/var),
                     ncounts.ref=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
   mat.ref[is.na(phihat.ref),c("phihat.ref","sigmasq.ref","ncounts.ref"):=list(1,Inf,0)] #bins with no detectable counts
   #
-  cts=mat[cts]
-  cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
-                          (1/(exp(phi.ref+delta)*mu)+1/csg@par$alpha))]
-  mat=cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
-             sigmasq=1/sum(weight/var),
-             ncounts=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat]
-  mat[is.na(phihat),c("phihat","sigmasq","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
-  stopifnot(mat[,.N]==mat.ref[,.N])
-  mat=merge(mat,mat.ref)
+  ctsoth = mat[ctsoth,,on=c("name","bin1","bin2")]
+  ctsoth[,c("z","var"):=list(count/exp(phi.ref+delta+eC+lmu.base+log_decay)-1,
+                             (1/exp(phi.ref+delta+eC+lmu.base+log_decay)+1/dispersion))]
+  mat.oth=ctsoth[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
+                 sigmasq=1/sum(weight/var),
+                 ncounts=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2,delta)]]
+  mat.oth[is.na(phihat),c("phihat","sigmasq","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
+  #
+  stopifnot(mat.oth[,.N]==mat.ref[,.N])
+  mat=merge(mat.oth,mat.ref)
   mat[,c("deltahat","deltahat.var","ncounts"):=list(phihat-phihat.ref,sigmasq+sigmasq.ref,ncounts+ncounts.ref)]
   mat[,c("valuehat","weight","ncounts.ref"):=list(deltahat,1/deltahat.var,NULL)]
   setkey(mat,name,bin1,bin2)
@@ -483,24 +483,15 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
   if (get_cs_interaction_idx(csg, type="bdifferences", threshold=-1, ref=ref, raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
   if (verbose==T) cat("  Prepare for signal estimation\n")
-  stuff = csnorm:::prepare_signal(cs, cs@biases, csg@names, resolution)
-  mat=stuff$signal
+  stuff = csnorm:::prepare_signal(cs, cs@biases, csg@names[csg@names != ref], resolution)
+  mat=stuff$signal[,.(name,bin1,bin2,phi.ref=0,delta=0)]
   trails=stuff$trails
   ### main loop
-  params=NULL
-  mat=NULL
-  trails=NULL
-  params=NULL
   registerDoParallel(cores=ncores)
   for (step in 1:niter) {
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
-    mat = csnorm:::csnorm_compute_raw_differential(csg, mat, ref)
-    #
-    if (is.null(trails)) {
-      if (verbose==T) cat("  Build triangle grid trails\n")
-      trails = csnorm:::gfl_compute_trails(mat[,nlevels(bin1)])
-    }
+    mat = csnorm:::csnorm_compute_raw_differential(csg@cts, csg@par$alpha, mat, ref)
     #
     #perform fused lasso on signal
     if (verbose==T) cat("  Fused lasso\n")
@@ -526,12 +517,10 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
     #ggsave(p,filename = paste0("diff_step_",step,"_weight.png"), width=10, height=8)
     #
     #convert back value to the actual signal
+    mat[,delta.old:=delta]
     mat[,delta:=value]
-    mat[,diffsig.old:=diffsig]
-    mat[,diffsig:=exp(delta)]
     mat[,phi.ref:=(phihat.ref/sigmasq.ref + (phihat-delta)/sigmasq)/(1/sigmasq.ref+1/sigmasq)]
-    mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig,diffsig.old,value,weight)]
-    if(mat[,all(abs(diffsig-diffsig.old)<tol)]) break
+    if(mat[,all(abs(delta-delta.old)<tol)]) break
   }
   if (verbose==T) cat(" Detect patches\n")
   mat = csnorm:::detect_binless_patches(mat, trails, tol.value=tol)
