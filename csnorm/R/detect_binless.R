@@ -302,48 +302,20 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda2.max=1000) {
 
 #' run fused lasso on one dataset contained in matg, fusing 'value'
 #' 
-#' finds optimal lambda1, lambda2 and eC using BIC. Signal is constrained to be positive.
+#' finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso_signal = function(matg, trails, tol=1e-3, verbose=T, ncores=ncores) {
+csnorm_fused_lasso = function(matg, trails, positive=T, tol=1e-3, verbose=T, ncores=ncores) {
   groupname=matg[,as.character(name[1])]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+scale_fill_gradient2())
   lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol)
   #get best lambda1 and set eCprime to lower bound
-  vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2, positive=T)
+  vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2, positive=positive)
   lambda1=vals$lambda1
   eCprime=vals$eCprime
   BIC=vals$BIC
   #matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=abs(value-eCprime)<=lambda1)))
   #matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
-  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
-  return(data.table(name=groupname,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime,BIC=BIC))
-}
-
-#' run fused lasso on one dataset contained in matg, fusing 'value'
-#' 
-#' finds optimal lambda1, lambda2 and eC using BIC
-#' @keywords internal
-csnorm_fused_lasso_differential = function(matg, params, trails, tol=1e-3, verbose=T, ncores=ncores) {
-  groupname=matg[,as.character(name[1])]
-  if (is.null(params)) {
-    eCprime=0
-    lambda1=0
-  } else {
-    lambda1=params[name==groupname,lambda1]
-    eCprime=params[name==groupname,eCprime]
-  }
-  matg[,value:=0]
-  lambda2=1
-  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+scale_fill_gradient2())
-  lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol, lambda1=lambda1, eCprime=eCprime,
-                                      lambda2.last=lambda2)
-  #find best lambda1 and eCprime
-  vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2)
-  lambda1=vals$lambda1
-  eCprime=vals$eCprime
-  BIC=vals$BIC
-  matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   return(data.table(name=groupname,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime,BIC=BIC))
 }
@@ -463,7 +435,7 @@ detect_binless_interactions = function(cs, resolution, group, fit.decay=F, ncore
     if (verbose==T) cat("  Fused lasso\n")
     groupnames=mat[,as.character(unique(name))]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso_signal(mat[name==g], trails, tol=tol, ncores=ncores, verbose=verbose)
+      csnorm:::csnorm_fused_lasso(mat[name==g], trails, positive=T, tol=tol, ncores=ncores, verbose=verbose)
     #display param info
     if (verbose==T)
       for (i in 1:params[,.N])
@@ -557,7 +529,7 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
     if (verbose==T) cat("  Fused lasso\n")
     groupnames=mat[,as.character(unique(name))]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso_differential(mat[name==g], params, trails, tol=tol, ncores=ncores, verbose=verbose)
+      csnorm:::csnorm_fused_lasso(mat[name==g], trails, positive=F, tol=tol, ncores=ncores, verbose=verbose)
     #display param info
     if (verbose==T)
       for (i in 1:params[,.N])
