@@ -855,22 +855,19 @@ subsample_counts = function(cs, ncounts, dset=NA) {
 
 #' Prepare for concurrent signal estimation 
 #' @keywords internal
-prepare_signal = function(cs, base.res) {
+prepare_signal = function(cs, biases, names, base.res) {
   ### build matrix
   #create an empty matrix containing all cells, even those with no cut-site intersection
-  signal.bins=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+base.res],base.res)
-  cs@settings$sbins=signal.bins
-  signal.bins=unique(cut(c(signal.bins,head(signal.bins,n=-1)+base.res/2), signal.bins,
+  sbins=seq(biases[,min(pos)-1],biases[,max(pos)+1+base.res],base.res)
+  signal.bins=unique(cut(c(sbins,head(sbins,n=-1)+base.res/2), sbins,
                          ordered_result=T, right=F, include.lowest=T,dig.lab=12))
-  signal.mat=CJ(name=cs@experiments[,name],bin1=signal.bins,bin2=signal.bins,sorted=F,unique=F)[bin2>=bin1]
+  signal.mat=CJ(name=names,bin1=signal.bins,bin2=signal.bins,sorted=F,unique=F)[bin2>=bin1]
   signal.mat[,phi:=0]
   ### build optimization trails
   trails = csnorm:::gfl_compute_trails(signal.mat[,nlevels(bin1)])
   stopifnot(all(signal.mat[,.N,by=name]$N==signal.mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
   stopifnot(all(length(V(trails$graph))==signal.mat[,.N,by=name]$N))
-  cs@par$signal=signal.mat
-  cs@settings$trails=trails
-  return(cs)
+  return(list(signal=signal.mat,trails=trails,sbins=sbins))
 }
 
 #' Diagnostics plots to monitor convergence of normalization (gaussian
@@ -982,7 +979,10 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
   #prepare signal matrix and trails
   if (fit.signal==T & cs@zeros$sig[,.N]==0) { #either restart==F or restart==T but was run with fit.signal==F
     if(verbose==T) cat("Preparing for signal estimation\n")
-    cs = csnorm:::prepare_signal(cs, base.res)
+    stuff = csnorm:::prepare_signal(cs, cs@biases, cs@experiments[,name], base.res)
+    cs@par$signal=stuff$signal
+    cs@settings$sbins=stuff$sbins
+    cs@settings$trails=stuff$trails
     cs@zeros=modifyList(list(sig=csnorm:::get_nzeros_binning(cs, base.res, ncores = ncores)), cs@zeros)
   }
   #
