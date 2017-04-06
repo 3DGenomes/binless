@@ -216,7 +216,13 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
                       "kb with group=",group,"\n")
   #
   if (verbose==T) cat("   Get zeros per bin\n")
-  zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores = ncores)
+  if (resolution < cs@settings$base.res)
+    cat("Warning: resolution is smaller than base.res, results might be inconsistent\n")
+  if (resolution == cs@settings$base.res) {
+    zeros = cs@zeros$sig
+  } else {
+    zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores = ncores)
+  }
   #
   if (verbose==T) cat("   Predict means\n")
   cts = csnorm:::csnorm_predict_binned_counts_irls(cs, resolution, zeros)
