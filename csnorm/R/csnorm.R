@@ -37,13 +37,13 @@
 #' @import foreach
 #' @import matrixStats
 #' @import ggplot2
-#' @import flsa
 #' @import igraph
 #' @import MASS
 #' @import abind
 #' @import methods
 #' @import Matrix
 #' @import quadprog
+#' @import gsl
 #' @importFrom Hmisc cut2
 #' @importFrom dplyr ntile
 #'
