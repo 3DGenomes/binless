@@ -416,7 +416,6 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
   mat=stuff$signal
   trails=stuff$trails
   ### main loop
-  params=NULL
   registerDoParallel(cores=ncores)
   for (step in 1:niter) {
     if (verbose==T) cat(" Main loop, step ",step,"\n")
@@ -483,6 +482,12 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
   csg=cs@groups[[idx1]]
   if (get_cs_interaction_idx(csg, type="bdifferences", threshold=-1, ref=ref, raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
+  if (verbose==T) cat("  Prepare for signal estimation\n")
+  stuff = csnorm:::prepare_signal(cs, cs@biases, csg@names, resolution)
+  mat=stuff$signal
+  trails=stuff$trails
+  ### main loop
+  params=NULL
   mat=NULL
   trails=NULL
   params=NULL
