@@ -34,6 +34,9 @@ iterative_normalization = function(mat, niterations=100, namecol="name", verbose
     binned[,c(namecol):=n]
     setkeyv(binned,c(namecol,"bin1","bin2"))
   }
+  if ("begin1" %in% names(mat)) 
+    binned=merge(binned,mat[,.(name,bin1,begin1,end1,bin2,begin2,end2)],
+                 by=c("name","bin1","bin2"),all.x=T)
   setkey(binned,name,bin1,bin2)
   binned
 }
