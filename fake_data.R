@@ -46,16 +46,16 @@ csd4=csd
 load("data/fake_signal_replicate5_csdata.RData")
 csd5=csd
 #cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
-cs=merge_cs_norm_datasets(list(csd1), different.decays="none")
-cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, base.res=20000,
-               iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=T)
+cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
+cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 8, base.res=20000,
+               iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=4, fit.signal=T)
 #cs@par$signal[,phi:=2*phi]
 cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 5, base.res=20000,
                iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=T, fit.disp=F, fit.genomic=F, fit.decay=F)
 cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 5, base.res=20000,
                iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=F)
 #save(cs,file="data/fake_signal_shrink10pc_new_csnorm_optimized.RData")
-cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 2, base.res=20000,
+cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 4, base.res=20000,
                iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=T)
 #save(cs,file="data/fake_replicate1_signal_shrink10pc_new2_csnorm_optimized.RData")
 
@@ -219,16 +219,26 @@ ggplot(melt(data.table(x=seq(1,100),a=eigen(a)$vectors[,val], b=eigen(b,symmetri
 
 
 resolution=20000
-ncores=30
+ncores=4
 cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
 mat=get_matrices(cs, resolution=resolution, group="all")
-ggplot(mat)+geom_raster(aes(bin1,bin2,fill=observed))+facet_wrap(~name)+
+#observed
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=observed))+
+  geom_raster(aes(begin2,begin1,fill=observed))+facet_wrap(~name)+
   scale_fill_gradient(high="red", low="white", na.value = "white")
-ggplot(mat)+geom_raster(aes(bin1,bin2,fill=expected))+facet_wrap(~name)+
+#ggsave(filename="fake_observed_20k.png",width=15,height=7)
+#expected
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=expected))+facet_wrap(~name)+
   scale_fill_gradient(high="red", low="white", na.value = "white")
-ggplot(mat)+geom_raster(aes(bin1,bin2,fill=expected))+geom_raster(aes(bin2,bin1,fill=observed))+facet_wrap(~name)+
+#observed vs expected
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=expected))+geom_raster(aes(begin2,begin1,fill=observed))+facet_wrap(~name)+
   scale_fill_gradient(high="red", low="white", na.value = "white")
-
+#expected vs ice
+iced=iterative_normalization(mat)
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=expected))+
+  geom_raster(aes(begin2,begin1,fill=ice.100),data=iced)+facet_wrap(~name)+
+  scale_fill_gradient(high="red", low="white", na.value = "white")
+ggsave(filename="fake_expected_with_ice_20k.png",width=15,height=7)
 
 cs=detect_binned_interactions(cs, resolution=resolution, group="all", threshold=0.95, ncores=ncores)
 save(cs,file="data/fake_csnorm_optimized.RData")
@@ -257,8 +267,12 @@ ggplot(mat)+geom_raster(aes(bin1,bin2,fill=difference))+facet_wrap(~name)+
   geom_point(aes(bin1,bin2,colour=direction),data=mat[is.significant==T])
 
 
-cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=30, niter=1, fit.decay=F)
+cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=4, niter=5)
 mat=get_interactions(cs, type="binteractions", resolution=resolution, group="all", threshold=-1, ref="expected")
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=phi))+
+  geom_raster(aes(begin2,begin1,fill=phi))+
+  facet_wrap(~name)+scale_fill_gradient(high=muted("red"), low="white", na.value = "white")
+#ggsave(filename="fake_binless_signal_20k.png",width=15,height=7)
 plot_binless_matrix(mat)
 
 
@@ -269,7 +283,13 @@ save(cs,file="data/fake_signal_csnorm_optimized.RData")
 
 
 cs=detect_binless_differences(cs, resolution=resolution, group="all", ncores=ncores,
-                              ref=as.character(cs@experiments[1,name]), niter=2)
+                              ref=as.character(cs@experiments[1,name]), niter=5)
+mat=get_interactions(cs, type="bdifferences", resolution=resolution, group="all", threshold=-1,
+                     ref=as.character(cs@experiments[1,name]))
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=delta))+
+  geom_raster(aes(begin2,begin1,fill=delta))+
+  facet_wrap(~name)+scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"),na.value="white")
+ggsave(filename="fake_binless_difference_20k.png",width=8,height=7)
 save(cs, file=fname)
 
 
