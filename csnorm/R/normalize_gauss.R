@@ -517,23 +517,35 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
     
     epsilon = 1
     maxiter = 0
-    D = bdiag(lambda_iota*D1,lambda_rho*D1)
-    DtD = crossprod(D)
-    cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD)
     while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
-      tmp_WtXAm1 = t(solve(cholA,tmp_Xt_W)) #2xK
-      
-      Gamma_v = solve(tmp_WtXAm1 %*% tmp_Xt_W, tmp_WtXAm1) #2xK
-      #all(abs((Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)%*%(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v)-(Diagonal(2*Krow)-tmp_Xt_W%*%Gamma_v))<1e-5)
-      
+      D = bdiag(lambda_iota*D1,lambda_rho*D1)
+      DtD = crossprod(D)
+      #do LLt cholesky so we can use crossprod for Gamma_v
+      if (maxiter==0) {
+        cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD, LDL=F, super=NA) 
+        stopifnot(!isLDL(cholA))
+      } else {
+        cholA = update(cholA,tmp_X_S_m2_X + Krow^2*DtD)
+      }
+      tmp_Am1XtW = solve(cholA,tmp_Xt_W) #2xK
+      #
       tmp_Xt_Sm2_etas = crossprod(X,S_m2%*%etas) #Kx1
-      beta_y = solve(cholA, tmp_Xt_Sm2_etas)
-      beta_y = beta_y - solve(cholA, tmp_Xt_W) %*% (Gamma_v %*% tmp_Xt_Sm2_etas)
-      
+      beta_y_tilde = solve(cholA, tmp_Xt_Sm2_etas)
+      beta_y = beta_y_tilde -
+        tmp_Am1XtW %*% solve(crossprod(tmp_Xt_W,tmp_Am1XtW),
+                             crossprod(tmp_Xt_W,beta_y_tilde)) #2xK
+      #
       tmp_Xt_Sm2_U = crossprod(X,S_m2%*%U_e)
-      beta_U = solve(cholA, tmp_Xt_Sm2_U)
-      beta_U = beta_U - solve(cholA, tmp_Xt_W) %*% (Gamma_v %*% tmp_Xt_Sm2_U)
-      
+      beta_U_tilde = solve(cholA, tmp_Xt_Sm2_U)
+      beta_U = beta_U_tilde -
+        tmp_Am1XtW %*% solve(crossprod(tmp_Xt_W,tmp_Am1XtW),
+                             crossprod(tmp_Xt_W,beta_U_tilde))
+      #
+      #tmp_Lm1XtW = solve(cholA,tmp_Xt_W, system="L")
+      #tmp_WtXAm1 = t(solve(cholA,tmp_Lm1XtW, system="Lt"))
+      #cholWtXAm1XtW = Cholesky(crossprod(tmp_Lm1XtW), super=NA)
+      #Gamma_v = solve(cholWtXAm1XtW, tmp_WtXAm1)
+      #    
       e=solve(t(U_e)%*%S_m2%*%(U_e-X%*%beta_U),t(U_e)%*%S_m2%*%(etas-X%*%beta_y))
       
       beta = beta_y - beta_U%*%e
@@ -551,10 +563,6 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
       lambda_iota = nlambda_iota
       lambda_rho = nlambda_rho
       maxiter = maxiter+1
-      
-      D = bdiag(lambda_iota*D1,lambda_rho*D1)
-      DtD = crossprod(D)
-      cholA = update(cholA,tmp_X_S_m2_X + Krow^2*DtD)
     }
     
     eRJ = array(0,dim=c(Dsets))
