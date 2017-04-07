@@ -528,18 +528,21 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
         cholA = update(cholA,tmp_X_S_m2_X + Krow^2*DtD)
       }
       tmp_Am1XtW = solve(cholA,tmp_Xt_W) #2xK
+      if (maxiter==0) {
+        cholWtXAm1XtW = Cholesky(symmpart(crossprod(tmp_Xt_W,tmp_Am1XtW)), super=NA)
+      } else {
+        cholWtXAm1XtW = update(cholWtXAm1XtW, symmpart(crossprod(tmp_Xt_W,tmp_Am1XtW)))
+      }
       #
       tmp_Xt_Sm2_etas = crossprod(X,S_m2%*%etas) #Kx1
       beta_y_tilde = solve(cholA, tmp_Xt_Sm2_etas)
       beta_y = beta_y_tilde -
-        tmp_Am1XtW %*% solve(crossprod(tmp_Xt_W,tmp_Am1XtW),
-                             crossprod(tmp_Xt_W,beta_y_tilde)) #2xK
+        tmp_Am1XtW %*% solve(cholWtXAm1XtW, crossprod(tmp_Xt_W,beta_y_tilde)) #2xK
       #
       tmp_Xt_Sm2_U = crossprod(X,S_m2%*%U_e)
       beta_U_tilde = solve(cholA, tmp_Xt_Sm2_U)
       beta_U = beta_U_tilde -
-        tmp_Am1XtW %*% solve(crossprod(tmp_Xt_W,tmp_Am1XtW),
-                             crossprod(tmp_Xt_W,beta_U_tilde))
+               tmp_Am1XtW %*% solve(cholWtXAm1XtW, crossprod(tmp_Xt_W,beta_U_tilde))
       #
       #tmp_Lm1XtW = solve(cholA,tmp_Xt_W, system="L")
       #tmp_WtXAm1 = t(solve(cholA,tmp_Lm1XtW, system="Lt"))
