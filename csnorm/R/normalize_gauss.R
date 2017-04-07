@@ -740,44 +740,39 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, niter=10, tol=1e-3) {
+csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_predict_binned_counts_irls(cs, cs@settings$base.res, cs@zeros$sig)
-  for (i in 1:niter) {
-    mat = csnorm:::csnorm_compute_raw_signal(cts, cs@par$alpha, cs@par$signal)
-    #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phihat))+facet_wrap(~name)
-    #
-    #perform fused lasso on signal
-    groupnames=mat[,as.character(unique(name))]
-    registerDoParallel(cores=ncores)
-    params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, positive=T, tol=tol, ncores=ncores, verbose=verbose)
-    #compute matrix at new params
-    #save(mat,params,file=paste0("mat_step_",step,".RData"))
-    mat = foreach (g=groupnames, .combine=rbind) %dopar% {
-      p=params[name==g]
-      matg=mat[name==g]
-      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, cs@settings$trails, p$lambda1, p$lambda2, p$eCprime)]
-      matg
-    }
-    #store new signal in cs and update eC
-    mat[,phi.old:=phi]
-    mat[,phi:=value]
-    #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phihat))
-    #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
-    setkey(mat,name,bin1,bin2)
-    cs@par$signal=mat[,.(name,bin1,bin2,phi)]
-    params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
-    cs@par$eC=as.array(params[,eC+eCprime])
-    cs@par$eCprime=as.array(params[,eCprime])
-    cs@par$lambda1=as.array(params[,lambda1])
-    cs@par$lambda2=as.array(params[,lambda2])
-    cs@par$value = params[,sum(BIC)]
-    cts[,eC:=NULL]
-    cts=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), cts, by="name",all=T)
-    if (verbose==T) cat("   step",i," lambda1",cs@par$lambda1[1],"lambda2",cs@par$lambda2[1],"\n")
-    if (mat[,all(abs(phi.old-phi)<tol)]) break
+  mat = csnorm:::csnorm_compute_raw_signal(cts, cs@par$alpha, cs@par$signal)
+  if (verbose==T) cat("  predict\n")
+  #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phihat))+facet_wrap(~name)
+  #
+  #perform fused lasso on signal
+  groupnames=mat[,as.character(unique(name))]
+  registerDoParallel(cores=ncores)
+  params = foreach(g=groupnames, .combine=rbind) %dopar%
+    csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, positive=T, tol=tol, ncores=ncores, verbose=verbose)
+  #compute matrix at new params
+  #save(mat,params,file=paste0("mat_step_",step,".RData"))
+  mat = foreach (g=groupnames, .combine=rbind) %dopar% {
+    p=params[name==g]
+    matg=mat[name==g]
+    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, cs@settings$trails, p$lambda1, p$lambda2, p$eCprime)]
+    matg
   }
+  #store new signal in cs and update eC
+  mat[,phi:=value]
+  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phihat))
+  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
+  setkey(mat,name,bin1,bin2)
+  cs@par$signal=mat[,.(name,bin1,bin2,phi)]
+  params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
+  cs@par$eC=as.array(params[,eC+eCprime])
+  cs@par$eCprime=as.array(params[,eCprime])
+  cs@par$lambda1=as.array(params[,lambda1])
+  cs@par$lambda2=as.array(params[,lambda2])
+  cs@par$value = params[,sum(BIC)]
+  if (verbose==T) cat("  fit: lambda1",cs@par$lambda1[1],"lambda2",cs@par$lambda2[1],"\n")
   return(cs)
 }
 
