@@ -555,44 +555,44 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
       D = bdiag(lambda_iota*D1,lambda_rho*D1)
       DtD = crossprod(D)
       cholA = update(cholA,tmp_X_S_m2_X + Krow^2*DtD)
-      
-      eRJ = array(0,dim=c(Dsets))
-      eDE = array(0,dim=c(Dsets))
-      eC = array(0,dim=c(Dsets))
-      for (d in 1:Dsets) {
-        eRJ[d] = e[(3*(d-1)+1)]
-        eDE[d] = e[(3*(d-1)+2)]
-        eC[d] = e[(3*(d-1)+3)]
-      }
-      
-      log_mean = U_e %*% e + X%*%beta
-      SD = bbegin[2]-bbegin[1]
-      log_iota = Bsp[1:SD,1:Krow]%*%beta_iota
-      log_rho = Bsp[1:SD,1:Krow]%*%beta_rho
-      
-      log_mean_RJ = log_mean[1:SD]
-      log_mean_DL = log_mean[(SD+1):(2*SD)]
-      log_mean_DR = log_mean[(2*SD+1):(3*SD)]
-      log_mean_cleft  = log_mean[(3*SD+1):(4*SD)]
-      log_mean_cright = log_mean[(4*SD+1):(5*SD)]
-      SD = 5*SD
-      if (Dsets > 1) {
-        for (d in 2:Dsets) {
-          SDd = bbegin[2*d]-bbegin[(2*d-1)]
-          
-          nlog_iota = Bsp[(SD/5+1):(SD/5+SDd),((d-1)*Krow+1):(d*Krow)]%*%beta_iota
-          nlog_rho = Bsp[(SD/5+1):(SD/5+SDd),((d-1)*Krow+1):(d*Krow)]%*%beta_rho
-          
-          log_iota = c(as.array(log_iota),as.array(nlog_iota))
-          log_rho = c(as.array(log_rho),as.array(nlog_rho))
-          
-          log_mean_RJ = c(log_mean_RJ,log_mean[(SD+1):(SD+SDd)])
-          log_mean_DL = c(log_mean_DL,log_mean[(SD+(SDd+1)):(SD+(2*SDd))])
-          log_mean_DR = c(log_mean_DR,log_mean[(SD+(2*SDd+1)):(SD+(3*SDd))])
-          log_mean_cleft  = c(log_mean_cleft,log_mean[(SD+(3*SDd+1)):(SD+(4*SDd))])
-          log_mean_cright = c(log_mean_cright,log_mean[(SD+(4*SDd+1)):(SD+(5*SDd))])
-          SD = SD + 5*SDd
-        }
+    }
+    
+    eRJ = array(0,dim=c(Dsets))
+    eDE = array(0,dim=c(Dsets))
+    eC = array(0,dim=c(Dsets))
+    for (d in 1:Dsets) {
+      eRJ[d] = e[(3*(d-1)+1)]
+      eDE[d] = e[(3*(d-1)+2)]
+      eC[d] = e[(3*(d-1)+3)]
+    }
+    
+    log_mean = U_e %*% e + X%*%beta
+    SD = bbegin[2]-bbegin[1]
+    log_iota = Bsp[1:SD,1:Krow]%*%beta_iota
+    log_rho = Bsp[1:SD,1:Krow]%*%beta_rho
+    
+    log_mean_RJ = log_mean[1:SD]
+    log_mean_DL = log_mean[(SD+1):(2*SD)]
+    log_mean_DR = log_mean[(2*SD+1):(3*SD)]
+    log_mean_cleft  = log_mean[(3*SD+1):(4*SD)]
+    log_mean_cright = log_mean[(4*SD+1):(5*SD)]
+    SD = 5*SD
+    if (Dsets > 1) {
+      for (d in 2:Dsets) {
+        SDd = bbegin[2*d]-bbegin[(2*d-1)]
+        
+        nlog_iota = Bsp[(SD/5+1):(SD/5+SDd),((d-1)*Krow+1):(d*Krow)]%*%beta_iota
+        nlog_rho = Bsp[(SD/5+1):(SD/5+SDd),((d-1)*Krow+1):(d*Krow)]%*%beta_rho
+        
+        log_iota = c(as.array(log_iota),as.array(nlog_iota))
+        log_rho = c(as.array(log_rho),as.array(nlog_rho))
+        
+        log_mean_RJ = c(log_mean_RJ,log_mean[(SD+1):(SD+SDd)])
+        log_mean_DL = c(log_mean_DL,log_mean[(SD+(SDd+1)):(SD+(2*SDd))])
+        log_mean_DR = c(log_mean_DR,log_mean[(SD+(2*SDd+1)):(SD+(3*SDd))])
+        log_mean_cleft  = c(log_mean_cleft,log_mean[(SD+(3*SDd+1)):(SD+(4*SDd))])
+        log_mean_cright = c(log_mean_cright,log_mean[(SD+(4*SDd+1)):(SD+(5*SDd))])
+        SD = SD + 5*SDd
       }
     }
     
