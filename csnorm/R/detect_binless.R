@@ -312,7 +312,7 @@ csnorm_fused_lasso = function(matg, trails, positive=T, tol=1e-3, verbose=T, nco
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+scale_fill_gradient2())
   lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol)
   #get best lambda1 and set eCprime to lower bound
-  profvis({vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2, positive=positive)})
+  vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2, positive=positive)
   lambda1=vals$lambda1
   eCprime=vals$eCprime
   BIC=vals$BIC
