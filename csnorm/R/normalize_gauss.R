@@ -513,34 +513,30 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
       D = bdiag(lambda_iota*D1,lambda_rho*D1)
       DtD = crossprod(D)
-      #do LLt cholesky so we can use crossprod for Gamma_v
       if (maxiter==0) {
         cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD, LDL=F, super=NA) 
-        stopifnot(!isLDL(cholA))
+        stopifnot(!isLDL(cholA)) #do LLt cholesky so we can use crossprod for Gamma_v
       } else {
         cholA = update(cholA,tmp_X_S_m2_X + Krow^2*DtD)
       }
-      tmp_Am1XtW = solve(cholA,tmp_Xt_W) #2xK
+      tmp_Lm1XtW = solve(cholA,solve(cholA,tmp_Xt_W,system="P"),system="L") 
       if (maxiter==0) {
-        cholWtXAm1XtW = Cholesky(symmpart(crossprod(tmp_Xt_W,tmp_Am1XtW)), super=NA)
+        cholWtXAm1XtW = Cholesky(crossprod(tmp_Lm1XtW), super=NA)
       } else {
-        cholWtXAm1XtW = update(cholWtXAm1XtW, symmpart(crossprod(tmp_Xt_W,tmp_Am1XtW)))
+        cholWtXAm1XtW = update(cholWtXAm1XtW, t(tmp_Lm1XtW)) #update providing M in A=MMt
       }
       #
       tmp_Xt_Sm2_etas = crossprod(X,S_m2%*%etas) #Kx1
-      beta_y_tilde = solve(cholA, tmp_Xt_Sm2_etas)
-      beta_y = beta_y_tilde -
-        tmp_Am1XtW %*% solve(cholWtXAm1XtW, crossprod(tmp_Xt_W,beta_y_tilde)) #2xK
+      beta1 = solve(cholA, tmp_Xt_Sm2_etas)
+      beta2 = tmp_Lm1XtW %*% solve(cholWtXAm1XtW, crossprod(tmp_Xt_W,beta1))
+      beta2 = solve(cholA,solve(cholA,beta2,system="DLt"),system="Pt") 
+      beta_y = beta1-beta2
       #
       tmp_Xt_Sm2_U = crossprod(X,S_m2%*%U_e)
-      beta_U_tilde = solve(cholA, tmp_Xt_Sm2_U)
-      beta_U = beta_U_tilde -
-        tmp_Am1XtW %*% solve(cholWtXAm1XtW, crossprod(tmp_Xt_W,beta_U_tilde))
-      #
-      #tmp_Lm1XtW = solve(cholA,tmp_Xt_W, system="L")
-      #tmp_WtXAm1 = t(solve(cholA,tmp_Lm1XtW, system="Lt"))
-      #cholWtXAm1XtW = Cholesky(crossprod(tmp_Lm1XtW), super=NA)
-      #Gamma_v = solve(cholWtXAm1XtW, tmp_WtXAm1)
+      beta1 = solve(cholA, tmp_Xt_Sm2_U)
+      beta2 = tmp_Lm1XtW %*% solve(cholWtXAm1XtW, crossprod(tmp_Xt_W,beta1))
+      beta2 = solve(cholA,solve(cholA,beta2,system="DLt"),system="Pt") 
+      beta_U = beta1-beta2
       #    
       e=solve(t(U_e)%*%S_m2%*%(U_e-X%*%beta_U),t(U_e)%*%S_m2%*%(etas-X%*%beta_y))
       
