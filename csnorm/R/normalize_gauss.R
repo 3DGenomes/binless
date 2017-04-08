@@ -386,27 +386,15 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
   return(list(bts=bts,cts=cts))
 }
 
-#' Single-cpu simplified fitting for iota and rho
-#' @param if a single value, use data for estimate of mu and that value as a
-#'   dispersion, otherwise it's a list with parameters to compute the mean from
-#' @keywords internal
-#'   
-csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","outer"), max_perf_iteration=1000, convergence_epsilon=1e-5) {
-  if (verbose==T) cat(" Genomic\n")
-  type=match.arg(type)
-  if (init.mean=="mean") {
-    a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
-  } else {
-    a = csnorm:::csnorm_gauss_genomic_muhat_data(cs)
-  }
-  bts=a$bts
-  cts=a$cts
-  XB = as.array(cs@design[,genomic])
+
+csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
+                                         lambda_iota, lambda_rho, type, verbose=T,
+                                         max_perf_iteration=1000, convergence_epsilon=1e-5) {
+  XB = as.array(design[,genomic])
   
   #run optimization
-  Krow=cs@settings$Krow
-  Totalbbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
-  TotalDsets = cs@design[,.N]
+  Totalbbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
+  TotalDsets = design[,.N]
   
   all_beta_iota = c()
   all_beta_rho = c()
@@ -440,26 +428,26 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
     SD = bbegin[2]-bbegin[1]
     #sparse spline design
     splinedegree=3 #Cubic spline
-    cutsites = cs@biases[,pos][bbegin[1]:(bbegin[2]-1)]
+    cutsites = biases[,pos][bbegin[1]:(bbegin[2]-1)]
     dx = 1.01*(max(cutsites)-min(cutsites))/(Krow-splinedegree)
     t = min(cutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
     Bsp = spline.des(cutsites, knots = t, outer.ok = T, sparse=T)$design
     X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
-    if (cs@zeros$sig[,.N]>0) {
-      sbinned=cs@biases[bbegin[1]:(bbegin[2]-1), cut(pos, cs@settings$sbins, ordered_result=T,
-                                                     right=F, include.lowest=T,dig.lab=12)]
-      centering=Matrix(model.matrix(~ 0+sbinned))
-      stopifnot(dim(centering)==c(SD,length(cs@settings$sbins)-1))
-    } else {
+    if (is.null(sbins)) {
       centering=rep(1,SD)
+    } else {
+      sbinned=biases[bbegin[1]:(bbegin[2]-1), cut(pos, sbins, ordered_result=T,
+                                                  right=F, include.lowest=T,dig.lab=12)]
+      centering=Matrix(model.matrix(~ 0+sbinned))
+      stopifnot(dim(centering)==c(SD,length(sbins)-1))
     }
     W=cbind(rbind(Matrix(0,nrow=3*SD,ncol=ncol(centering)),centering,Matrix(0,nrow=SD,ncol=ncol(centering))),
             rbind(Matrix(0,nrow=4*SD,ncol=ncol(centering)),centering))
     diags = list(rep(1,Krow), rep(-2,Krow))
     D1 = bandSparse(Krow-2, Krow, k=0:2, diagonals=c(diags, diags[1]))
-    if (type=="outer" || (!is.null(cs@par$lambda_iota) && !is.null(cs@par$lambda_rho))) {
-      lambda_iota = cs@par$lambda_iota[uXB]
-      lambda_rho = cs@par$lambda_rho[uXB]
+    if (type=="outer" || (!is.null(lambda_iota) && !is.null(lambda_rho))) {
+      lambda_iota = lambda_iota[uXB]
+      lambda_rho = lambda_rho[uXB]
     } else {
       lambda_iota = 1 
       lambda_rho = 1 
@@ -478,7 +466,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
     
     if (Dsets > 1) {
       for (d in 2:Dsets) {
-        ncutsites = cs@biases[,pos][bbegin[(2*d-1)]:(bbegin[2*d]-1)]
+        ncutsites = biases[,pos][bbegin[(2*d-1)]:(bbegin[2*d]-1)]
         dx = 1.01*(max(ncutsites)-min(ncutsites))/(Krow-splinedegree)
         t = min(ncutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
         nBsp = spline.des(ncutsites, knots = t, outer.ok = T, sparse=T)$design
@@ -547,7 +535,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
       tmp_Xt_Sm2_U = crossprod(X,S_m2%*%U_e)
       beta_U_tilde = solve(cholA, tmp_Xt_Sm2_U)
       beta_U = beta_U_tilde -
-               tmp_Am1XtW %*% solve(cholWtXAm1XtW, crossprod(tmp_Xt_W,beta_U_tilde))
+        tmp_Am1XtW %*% solve(cholWtXAm1XtW, crossprod(tmp_Xt_W,beta_U_tilde))
       #
       #tmp_Lm1XtW = solve(cholA,tmp_Xt_W, system="L")
       #tmp_WtXAm1 = t(solve(cholA,tmp_Lm1XtW, system="Lt"))
@@ -663,8 +651,34 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
   bout=rbind(bout,cout)
   setkey(bout, id, name, cat)
   op$par$biases=bout
+  return(op)
+}
+
+#' Single-cpu simplified fitting for iota and rho
+#' @param if a single value, use data for estimate of mu and that value as a
+#'   dispersion, otherwise it's a list with parameters to compute the mean from
+#' @keywords internal
+#'   
+csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","outer"), max_perf_iteration=1000, convergence_epsilon=1e-5) {
+  if (verbose==T) cat(" Genomic\n")
+  type=match.arg(type)
+  if (init.mean=="mean") {
+    a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
+  } else {
+    a = csnorm:::csnorm_gauss_genomic_muhat_data(cs)
+  }
+  if (cs@zeros$sig[,.N]>0) {
+    sbins=cs@settings$sbins
+  } else {
+    sbins=NULL
+  }
+  #run optimization
+  op = csnorm:::csnorm_gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, sbins,
+                                              cs@par$lambda_iota, cs@par$lambda_rho, type, verbose=verbose,
+                                              max_perf_iteration=max_perf_iteration,
+                                              convergence_epsilon=convergence_epsilon)
+  #update par slot
   cs@par=modifyList(cs@par, op$par)
-  gc()
   return(cs)
 }
 

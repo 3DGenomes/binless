@@ -47,8 +47,8 @@ load("data/fake_signal_replicate5_csdata.RData")
 csd5=csd
 #cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
 cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
-cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 8, base.res=20000,
-               iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=4, fit.signal=T)
+cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 4, base.res=10000,
+               iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=10, fit.signal=T)
 #cs@par$signal[,phi:=2*phi]
 cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 5, base.res=20000,
                iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=T, fit.disp=F, fit.genomic=F, fit.decay=F)
