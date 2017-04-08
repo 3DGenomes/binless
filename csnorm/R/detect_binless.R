@@ -348,7 +348,7 @@ csnorm_compute_raw_signal = function(cts, dispersion, mat) {
                              (1/exp(phi+eC+lmu.base+log_decay)+1/dispersion))]
   mat = cts.cp[,.(phihat=weighted.mean(z+phi, weight/var),
                   phihat.var=1/sum(weight/var),
-                  ncounts=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat]
+                  ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat]
   mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
   mat[,c("valuehat","weight"):=list(phihat,1/phihat.var)]
   setkey(mat,name,bin1,bin2)
@@ -368,7 +368,7 @@ csnorm_compute_raw_differential = function(cts, dispersion, mat, ref) {
                              (1/exp(phi.ref+eC+lmu.base+log_decay)+1/dispersion))]
   mat.ref=ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
                     sigmasq.ref=1/sum(weight/var),
-                    ncounts.ref=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
+                    ncounts.ref=sum(weight)),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2)]]
   mat.ref[is.na(phihat.ref),c("phihat.ref","sigmasq.ref","ncounts.ref"):=list(1,Inf,0)] #bins with no detectable counts
   #
   ctsoth = mat[ctsoth,,on=c("name","bin1","bin2")]
@@ -376,7 +376,7 @@ csnorm_compute_raw_differential = function(cts, dispersion, mat, ref) {
                              (1/exp(phi.ref+delta+eC+lmu.base+log_decay)+1/dispersion))]
   mat.oth=ctsoth[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
                  sigmasq=1/sum(weight/var),
-                 ncounts=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2,delta)]]
+                 ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat[,.(name,bin1,bin2,delta)]]
   mat.oth[is.na(phihat),c("phihat","sigmasq","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
   #
   stopifnot(mat.oth[,.N]==mat.ref[,.N])
