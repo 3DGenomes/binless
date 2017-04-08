@@ -521,9 +521,9 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       }
       tmp_Lm1XtW = solve(cholA,solve(cholA,tmp_Xt_W,system="P"),system="L") 
       if (maxiter==0) {
-        cholWtXAm1XtW = Cholesky(crossprod(tmp_Lm1XtW), super=NA)
+        cholWtXAm1XtW = Cholesky(crossprod(tmp_Lm1XtW), super=NA, Imult=1e-20)
       } else {
-        cholWtXAm1XtW = update(cholWtXAm1XtW, t(tmp_Lm1XtW)) #update providing M in A=MMt
+        cholWtXAm1XtW = update(cholWtXAm1XtW, t(tmp_Lm1XtW), mult=1e-20) #update providing M in A=MMt
       }
       #
       tmp_Xt_Sm2_etas = crossprod(X,S_m2%*%etas) #Kx1
