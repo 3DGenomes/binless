@@ -85,17 +85,21 @@ get_matrices = function(cs, resolution, group) {
 get_interactions = function(cs, type, resolution, group, ref, threshold) {
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
-  mat=csg@mat
   idx2=get_cs_interaction_idx(csg, type, threshold, ref)
-  int=csg@interactions[[idx2]]@mat
-  ret=merge(mat,int,by=c("name","bin1","bin2"))
-  if (type=="interactions" | type=="binteractions") {
-    return(ret)
-  } else {
-    ret=merge(ret, mat[name==ref,.(bin1,bin2,ref.observed=observed,ref.expected=expected,
-                                   ref.normalized=normalized,ref.signal=signal)], by=c("bin1","bin2"))
-    return(ret)
-  }
+  mat=csg@interactions[[idx2]]@mat
+  bin1.begin=mat[,bin1]
+  bin1.end=mat[,bin1]
+  bin2.begin=mat[,bin2]
+  bin2.end=mat[,bin2]
+  levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[][,)]")[[2]]
+  levels(bin1.end) <- tstrsplit(as.character(levels(bin1.end)), "[][,)]")[[3]]
+  levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[][,)]")[[2]]
+  levels(bin2.end) <- tstrsplit(as.character(levels(bin2.end)), "[][,)]")[[3]]
+  mat[,begin1:=as.integer(as.character(bin1.begin))]
+  mat[,end1:=as.integer(as.character(bin1.end))]
+  mat[,begin2:=as.integer(as.character(bin2.begin))]
+  mat[,end2:=as.integer(as.character(bin2.end))]
+  return(mat)
 }
 
 #' Predict model parameters on a subset of the input data
