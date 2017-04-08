@@ -212,7 +212,7 @@ optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=
   obj = function(lambda1) {
     eCvals = c(patches[,value-lambda1],patches[,value+lambda1])
     if (positive==T) eCvals=eCvals[eCvals<=lambda1+minval]
-    dt = foreach (eCprime=eCvals, .combine=rbind) %dopar% {
+    dt = foreach (eCprime=eCvals, .combine=rbind) %do% {
     matg[,value:=value.ori-eCprime]
     dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
     stopifnot(dof<=cl$no)
@@ -312,7 +312,7 @@ csnorm_fused_lasso = function(matg, trails, positive=T, tol=1e-3, verbose=T, nco
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+scale_fill_gradient2())
   lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol)
   #get best lambda1 and set eCprime to lower bound
-  vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2, positive=positive)
+  profvis({vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2, positive=positive)})
   lambda1=vals$lambda1
   eCprime=vals$eCprime
   BIC=vals$BIC
