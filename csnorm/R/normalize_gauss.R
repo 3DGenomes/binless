@@ -434,7 +434,7 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     Bsp = spline.des(cutsites, knots = t, outer.ok = T, sparse=T)$design
     X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
     if (is.null(sbins)) {
-      centering=rep(1,SD)
+      centering=Matrix(rep(1,SD),ncol=1)
     } else {
       sbinned=biases[bbegin[1]:(bbegin[2]-1), cut(pos, sbins, ordered_result=T,
                                                   right=F, include.lowest=T,dig.lab=12)]
