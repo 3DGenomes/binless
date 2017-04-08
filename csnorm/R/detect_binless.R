@@ -308,7 +308,7 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda2.max=1000) {
 #' finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
 csnorm_fused_lasso = function(matg, trails, positive=T, tol=1e-3, verbose=T, ncores=ncores) {
-  groupname=matg[,as.character(name[1])]
+  groupname=matg[,name[1]]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+scale_fill_gradient2())
   lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol)
   #get best lambda1 and set eCprime to lower bound
@@ -424,7 +424,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     #
     #perform fused lasso on signal
     if (verbose==T) cat("  Fused lasso\n")
-    groupnames=mat[,as.character(unique(name))]
+    groupnames=mat[,unique(name)]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
       csnorm:::csnorm_fused_lasso(mat[name==g], trails, positive=T, tol=tol, ncores=ncores, verbose=verbose)
     #display param info
@@ -495,7 +495,7 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
     #
     #perform fused lasso on signal
     if (verbose==T) cat("  Fused lasso\n")
-    groupnames=mat[,as.character(unique(name))]
+    groupnames=mat[,unique(name)]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
       csnorm:::csnorm_fused_lasso(mat[name==g], trails, positive=F, tol=tol, ncores=ncores, verbose=verbose)
     #display param info
