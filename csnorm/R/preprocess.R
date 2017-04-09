@@ -555,14 +555,7 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "H
 #'
 remove_suspicious_cut_sites = function(csd) {
   #sum all counts on each cut site
-  bts=melt(csd@biases,id.vars=c("id","pos"))
-  cts=rbind(csd@counts[,.(id=id1, pos=pos1, contact.R=contact.close, contact.L=contact.far)],
-            csd@counts[,.(id=id1, pos=pos1, contact.R=contact.down,  contact.L=contact.up)],
-            csd@counts[,.(id=id2, pos=pos2, contact.R=contact.far,   contact.L=contact.close)],
-            csd@counts[,.(id=id2, pos=pos2, contact.R=contact.down,  contact.L=contact.up)])
-  cts=rbind(bts,melt(cts[,.(contact.R=sum(contact.R),contact.L=sum(contact.L)),
-                         by=c("id","pos")],id.vars=c("id","pos")))
-  cts=cts[,.(value=sum(value)),by="id"]
+  cts=melt(csd@biases,id.vars=c("id","pos"))[,.(value=sum(value)),by="id"]
   #get limits and filter out cut sites
   limits=cts[,quantile(value,c(csd@settings$qmin,csd@settings$qmax))]
   bad_ids=cts[value>limits[2]|value<limits[1],id]
