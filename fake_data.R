@@ -118,7 +118,8 @@ ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+facet_wrap(~
 ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi==0))+facet_wrap(~ step)#+scale_fill_gradient2()
 
 #last signal
-ggplot(signals[step==step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_wrap(~ name)+scale_fill_gradient2()
+ggplot(signals[step==step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+
+  facet_wrap(~name)+scale_fill_gradient(high=muted("red"), low="white", na.value = "white")
 
 
 #decays
@@ -128,7 +129,7 @@ decays=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
   sig
 }
 ggplot(decays[name==name[1]])+geom_pointrange(aes(distance,kappahat,ymin=kappahat-std,ymax=kappahat+std),alpha=0.01)+
-  geom_line(aes(distance,kappa))+facet_wrap(~ step)+scale_x_log10()+
+  geom_line(aes(distance,kappa))+facet_wrap(~ step)+scale_x_log10()#+
   geom_line(aes(distance,base_count),colour="red",data=cs@counts[name==name[1]][sample(.N,min(.N,10000))])
 
 #biases
@@ -218,7 +219,7 @@ ggplot(melt(data.table(x=seq(1,100),a=eigen(a)$vectors[,val], b=eigen(b,symmetri
 
 
 
-resolution=1000
+resolution=5000
 ncores=30
 cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
 mat=get_matrices(cs, resolution=resolution, group="all")
@@ -239,13 +240,29 @@ ggplot(mat)+geom_raster(aes(begin1,begin2,fill=expected))+
   geom_raster(aes(begin2,begin1,fill=ice.100),data=iced)+facet_wrap(~name)+
   scale_fill_gradient(high="red", low="white", na.value = "white")
 ggsave(filename="fake_expected_with_ice_20k.png",width=15,height=7)
+#signal
+ggplot(mat)+geom_raster(aes(begin2,begin1,fill=signal))+geom_raster(aes(begin1,begin2,fill=signal))+facet_wrap(~name)+
+  scale_fill_gradient(high="black", low="white", na.value = "white")
+ggplot(mat[begin2<73900000&begin1>73850000])+geom_raster(aes(bin2,bin1,fill=signal))+geom_raster(aes(bin1,bin2,fill=signal))+facet_wrap(~name)+
+  scale_fill_gradient(high="black", low="white", na.value = "white")
+
+ggplot(cs@par$biases[pos<73895000&pos>73880000&name=="GM MboI 1"])+geom_line(aes(pos,eta))+
+  geom_pointrange(aes(pos,etahat,ymin=etahat+std,ymax=etahat-std),alpha=0.1)+facet_wrap(cat~name,scales="free")
+ggplot(rbind(mat[,.(begin1,begin2,signal)],mat[,.(begin2,begin1,signal)])[
+  ,sum(signal),by=begin1][begin1<73900000&begin1>73850000])+geom_point(aes(begin1,V1))
+
+plot_raw(csd1@data, b1=73880000, e1=73895000)
+plot_raw(csd2@data, b1=73880000, e1=73895000)
+
+
+
 
 cs=detect_binned_interactions(cs, resolution=resolution, group="all", threshold=0.95, ncores=ncores)
 save(cs,file="data/fake_csnorm_optimized.RData")
 mat=get_interactions(cs, type="interactions", resolution=resolution, group="all", threshold=0.95, ref="expected")
-ggplot(mat)+geom_raster(aes(bin2,bin1,fill=signal))+geom_raster(aes(bin1,bin2,fill=signal))+facet_wrap(~name)+
+ggplot(mat)+geom_raster(aes(begin2,begin1,fill=signal.signif))+geom_raster(aes(begin1,begin2,fill=signal.signif))+facet_wrap(~name)+
   scale_fill_gradient(high="black", low="white", na.value = "white")+
-  geom_point(aes(bin1,bin2,colour=direction),data=mat[is.significant==T])
+  geom_point(aes(begin1,begin2,colour=direction),data=mat[is.significant==T])
 mat[,.N,by=is.significant]
 
 cs=group_datasets(cs, resolution=resolution, group="condition", ncores=ncores)
@@ -267,10 +284,10 @@ ggplot(mat)+geom_raster(aes(bin1,bin2,fill=difference))+facet_wrap(~name)+
   geom_point(aes(bin1,bin2,colour=direction),data=mat[is.significant==T])
 
 
-cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=30, niter=5)
+cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=30, niter=10)
 mat=get_interactions(cs, type="binteractions", resolution=resolution, group="all", threshold=-1, ref="expected")
-ggplot(mat)+geom_raster(aes(begin1,begin2,fill=phi))+
-  geom_raster(aes(begin2,begin1,fill=phi))+
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=pmin(phi,2.5)))+
+  geom_raster(aes(begin2,begin1,fill=pmin(phi,2.5)))+
   facet_wrap(~name)+scale_fill_gradient(high=muted("red"), low="white", na.value = "white")
 #ggsave(filename="fake_binless_signal_20k.png",width=15,height=7)
 plot_binless_matrix(mat)
@@ -291,5 +308,32 @@ ggplot(mat)+geom_raster(aes(begin1,begin2,fill=delta))+
   facet_wrap(~name)+scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"),na.value="white")
 ggsave(filename="fake_binless_difference_20k.png",width=8,height=7)
 save(cs, file=fname)
+
+
+
+
+plot_raw(csd@data, b1=73825158, e1=73830158, b2=74080158, e2=74085158)
+cs@biases[name==name[1]&pos>=73825158&pos<73830158]
+cs@biases[name==name[1]&pos>=74080158&pos<74085158]
+pos1=cs@biases[name==name[1]&pos>=73825158&pos<73830158,pos]
+pos2=cs@biases[name==name[1]&pos>=74080158&pos<74085158,pos]
+a=CJ(pos1=pos1,pos2=pos2)[pos1<pos2,.(pos1,pos2,distance=pos2-pos1)]
+a[,dbin:=cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+
+cs@biases[name==name[1]&pos>=73827178+251188.643151&pos<73827178+257039.578277]
+
+#dmin
+74085158-73825158
+#dmax
+74080158-73830158
+#dbin sz
+257039.578277-251188.643151
+
+
+dbs=cs@zeros$bg[name==name[1]&pos>=73825158&pos<73830158][,sort(unique(dbin))][209:211]
+cs@zeros$bg[name==name[1]&pos>=73825158&pos<73830158&dbin%in%dbs]
+
+cs@zeros$sig[name==name[1]&bin1=="[73825158,73830158)"&bin2=="[74080158,74085158)"]
+
 
 
