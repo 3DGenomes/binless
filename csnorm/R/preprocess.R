@@ -518,7 +518,7 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000, s
 read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "HindIII", experiment = "Hi-C",
                             name = paste(condition, enzyme, replicate), skip = 0L, nrows = -1L,
                             circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1), maxlen = 600,
-                            read.len=40, dmin=2000, qmin=0.01, qmax=0.99, save.data=T) {
+                            read.len=40, dmin=2000, qmin=0.02, qmax=0.99, save.data=T) {
   match.arg(experiment)
   cat("*** READ\n")
   data=read_tsv(infile, skip=skip, nrows=nrows)
