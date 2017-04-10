@@ -1032,7 +1032,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
   subcounts.weight = merge(cs@zeros$bg[,.(nc=sum(nposs)/8),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
   #gibbs sampling
   for (i in (laststep + 1:ngibbs)) {
-    if (verbose==T) cat("Iteration",i,"\n")
+    if (verbose==T) cat("\n### Iteration",i,"\n")
     #fit diagonal decay given iota and rho
     if (fit.decay==T) {
       a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean, type=type))
