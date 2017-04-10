@@ -18,6 +18,8 @@ gfl_triangle_grid_chain = function(nrow) {
       current=c(current,i)
     }
   }
+  #diagonal
+  chains=c(chains,list(c(sapply(chains,function(x){x[1]}),ntotal)))
   #columns with Ui+1 = Ui + (N-i) with U1 from 2 to nrow
   for (U1 in 2:nrow) {
     Ui=U1
@@ -309,7 +311,7 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda2.max=1000) {
 #' @keywords internal
 csnorm_fused_lasso = function(matg, trails, positive=T, tol=1e-3, verbose=T, ncores=ncores) {
   groupname=matg[,name[1]]
-  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+scale_fill_gradient2())
+  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=valuehat))+scale_fill_gradient2())
   lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol)
   #get best lambda1 and set eCprime to lower bound
   vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2, positive=positive)
