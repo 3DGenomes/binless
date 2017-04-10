@@ -156,7 +156,7 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
 #' @keywords internal
 #' 
 csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag, type,
-                                       verbose=T, max_perf_iteration=1000, convergence_epsilon=1e-5) {
+                                       verbose=T, max_perf_iteration=1000, convergence_epsilon=1e-9) {
   Totalcbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
   #cbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
   TotalDsets = design[,.N]
@@ -310,7 +310,7 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", type=c("outer","perf"), max_perf_iteration=1000, convergence_epsilon=1e-5) {
+csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", type=c("outer","perf"), max_perf_iteration=1000, convergence_epsilon=1e-9) {
   if (verbose==T) cat(" Decay\n")
   type=match.arg(type)
   if (init.mean=="mean") {
@@ -756,6 +756,12 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   mat = csnorm:::csnorm_compute_raw_signal(cts, cs@par$alpha, cs@par$signal)
   if (verbose==T) cat("  predict\n")
   #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phihat))+facet_wrap(~name)
+  #ggplot(mat[unclass(bin2)<23&unclass(bin1)>13])+geom_raster(aes(bin1,bin2,fill=phihat))+#geom_raster(aes(bin2,bin1,fill=phi))+
+  #  facet_wrap(~name)+scale_fill_gradient2()
+  #ggplot(mat[unclass(bin2)<23&unclass(bin1)>13])+geom_raster(aes(bin1,bin2,fill=weight))+
+  #  facet_wrap(~name)+scale_fill_gradient2()
+  #mat[unclass(bin2)<23&unclass(bin1)>13][bin1==bin2]
+  #ggplot(cts.cp)+geom_violin(aes(bin1,count))
   #
   #perform fused lasso on signal
   groupnames=mat[,unique(name)]
