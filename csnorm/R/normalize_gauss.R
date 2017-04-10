@@ -750,10 +750,10 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3, BIC.type=1) {
+csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_predict_binned_counts_irls(cs, cs@settings$base.res, cs@zeros$sig)
-  mat = csnorm:::csnorm_compute_raw_signal(cts, cs@par$alpha, cs@par$signal, BIC.type=BIC.type)
+  mat = csnorm:::csnorm_compute_raw_signal(cts, cs@par$alpha, cs@par$signal)
   if (verbose==T) cat("  predict\n")
   #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phihat))+facet_wrap(~name)
   #ggplot(mat[unclass(bin2)<23&unclass(bin1)>13])+geom_raster(aes(bin1,bin2,fill=phihat))+#geom_raster(aes(bin2,bin1,fill=phi))+
@@ -974,7 +974,7 @@ plot_diagnostics = function(cs) {
 #' 
 run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
                      ngibbs = 20, iter=10000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
-                     verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10, BIC.type=1,
+                     verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
                      tol.obj=1e-1, type="perf", ncores=1) {
   #basic checks
   type=match.arg(type,c("outer","perf"))
@@ -1048,7 +1048,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     init.mean="mean"
     #fit signal using sparse fused lasso
     if (fit.signal==T) {
-      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, ncores=ncores, BIC.type=BIC.type))
+      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, ncores=ncores))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4], type="perf")
       if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
     }

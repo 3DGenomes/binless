@@ -343,34 +343,15 @@ prepare_binless_decay = function(csg, mat) {
 
 #' compute input to fused lasso
 #' @keywords internal
-csnorm_compute_raw_signal = function(cts, dispersion, mat, BIC.type=1) {
+csnorm_compute_raw_signal = function(cts, dispersion, mat) {
   mat=mat[,.(name,bin1,bin2,phi)]
   cts.cp = mat[cts,,on=c("name","bin1","bin2")]
   cts.cp[,c("z","var"):=list(count/exp(phi+eC+lmu.base+log_decay)-1,
                              (1/exp(phi+eC+lmu.base+log_decay)+1/dispersion))]
-  if (BIC.type==1) { #total nb crossings
-    mat = cts.cp[,.(phihat=weighted.mean(z+phi, weight/var),
-                    phihat.var=1/sum(weight/var),
-                    ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat]
-    mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
-  } else if (BIC.type==2) { #nb >0 crossings
-    mat = cts.cp[,.(phihat=weighted.mean(z+phi, weight/var),
-                    phihat.var=1/sum(weight/var),
-                    ncounts=sum(ifelse(count>0,weight,0))),keyby=c("name","bin1","bin2")][mat]
-    mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
-  } else if (BIC.type==3) {
-    mat = cts.cp[,.(phihat=weighted.mean(z+phi, weight/var),
-                    phihat.var=1/sum(weight/var),
-                    ncounts=sum(weight*count)),keyby=c("name","bin1","bin2")][mat]
-    mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
-  } else {
-    mat = cts.cp[,.(phihat=weighted.mean(z+phi, weight/var),
-                    phihat.var=1/sum(weight/var),
-                    ncounts=1),keyby=c("name","bin1","bin2")][mat]
-    mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
-  }
-  cat("Using BIC type",BIC.type,"\n")
-  cat(print(mat[,log(sum(ncounts)),keyby=name]))
+  mat = cts.cp[,.(phihat=weighted.mean(z+phi, weight/var),
+                  phihat.var=1/sum(weight/var),
+                  ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat]
+  mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
   mat[,c("valuehat","weight"):=list(phihat,1/phihat.var)]
   setkey(mat,name,bin1,bin2)
   return(mat)
