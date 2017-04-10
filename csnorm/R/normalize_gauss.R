@@ -259,8 +259,8 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
       epsilon = abs(lambda_diag-nlambda_diag)
       lambda_diag = nlambda_diag
       maxiter = maxiter+1
-      if (verbose==T) cat("   step",maxiter,": lambda_diag",nlambda_diag,"\n")
     }
+    if (verbose==T) cat("   step",maxiter-1,": lambda_diag",nlambda_diag,"\n")
     
     log_decay = X%*%beta
     log_mean_counts = log_decay
@@ -561,8 +561,8 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       lambda_iota = nlambda_iota
       lambda_rho = nlambda_rho
       maxiter = maxiter+1
-      if (verbose==T) cat("   step",maxiter,"lambda_iota",lambda_iota,"\n")
     }
+    if (verbose==T) cat("   step",maxiter-1,"lambda_iota",lambda_iota,"\n")
     
     eRJ = array(0,dim=c(Dsets))
     eDE = array(0,dim=c(Dsets))
