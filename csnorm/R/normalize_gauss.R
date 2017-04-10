@@ -72,7 +72,7 @@ csnorm_gauss_decay_muhat_data = function(cs, pseudocount=1e-2) {
 #' Compute means for positive and zero counts using previous params
 #' @keywords internal
 #' 
-csnorm_gauss_common_muhat_mean = function(cs, var.tol=1e-20) {
+csnorm_gauss_common_muhat_mean = function(cs) {
   init=cs@par
   ### positive counts
   #compute means
@@ -125,12 +125,6 @@ csnorm_gauss_common_muhat_mean = function(cs, var.tol=1e-20) {
     cts[,bin:=cut(pos, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
     signal=merge(cs@zeros$sig, cs@par$signal, by=c("name","bin1","bin2"), all.x=T)
     stopifnot(all(complete.cases(signal)))
-    signal[,varphi:=var(phi),by=dbin]
-    #ggplot(signal[,.SD[1],keyby=dbin])+geom_point(aes(dbin,varphi))
-    if (signal[phi!=0,any(varphi<var.tol)]) {
-      cat("Warning: signal has been removed from some distance bins.\n")
-      signal[varphi<var.tol,phi:=0]
-    }
     signal=rbind(signal[,.(name,bin=bin1,dbin,ncross,phi)],signal[bin2>bin1,.(name,bin=bin2,dbin,ncross,phi)])
     signal=signal[,.(phi=weighted.mean(phi,ncross)),keyby=c("name","bin","dbin")]
     cts=signal[cts,,on=key(signal)]
