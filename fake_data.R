@@ -128,7 +128,7 @@ decays=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
   sig[,step:=i]
   sig
 }
-ggplot(decays[name==name[1]])+geom_pointrange(aes(distance,kappahat,ymin=kappahat-std,ymax=kappahat+std),alpha=0.01)+
+ggplot(decays[name==name[1]])+geom_pointrange(aes(distance,kappahat,ymin=kappahat-std,ymax=kappahat+std),alpha=0.1)+
   geom_line(aes(distance,kappa))+facet_wrap(~ step)+scale_x_log10()#+
   geom_line(aes(distance,base_count),colour="red",data=cs@counts[name==name[1]][sample(.N,min(.N,10000))])
 
@@ -284,10 +284,10 @@ ggplot(mat)+geom_raster(aes(bin1,bin2,fill=difference))+facet_wrap(~name)+
   geom_point(aes(bin1,bin2,colour=direction),data=mat[is.significant==T])
 
 
-cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=30, niter=10)
+cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=30, niter=5)
 mat=get_interactions(cs, type="binteractions", resolution=resolution, group="all", threshold=-1, ref="expected")
-ggplot(mat)+geom_raster(aes(begin1,begin2,fill=pmin(phi,2.5)))+
-  geom_raster(aes(begin2,begin1,fill=pmin(phi,2.5)))+
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=phi))+
+  geom_raster(aes(begin2,begin1,fill=phi))+
   facet_wrap(~name)+scale_fill_gradient(high=muted("red"), low="white", na.value = "white")
 #ggsave(filename="fake_binless_signal_20k.png",width=15,height=7)
 plot_binless_matrix(mat)
