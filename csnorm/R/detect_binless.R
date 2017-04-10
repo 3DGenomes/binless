@@ -192,7 +192,7 @@ gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
 #' cross-validate lambda1 and eCprime
 #' 
 #' @keywords internal
-optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=F, zero.corner=F, lambda1.min=0.05) {
+optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=F, lambda1.min=0.05) {
   #compute values for lambda1=0 and eCprime=0
   matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
   matg[,value.ori:=value]
@@ -210,29 +210,24 @@ optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=
   minval=patches[,min(value)]
   maxval=patches[,max(value)]
   valrange=maxval-minval
-  if (zero.corner==T) {
-    cornerval=matg[bin1==min(bin1)&bin2==max(bin2),value]
-    lambda1.min=max(lambda1.min,(cornerval-minval)/2+tol)
-  }
   #
   obj = function(lambda1) {
-    eCvals = c(patches[,value-lambda1],patches[,value+lambda1]) #where local minima are
+    eCvals = c(patches[,value-lambda1],patches[,value+lambda1])
     if (positive==T) eCvals=eCvals[eCvals<=lambda1+minval]
-    if (zero.corner==T) eCvals=eCvals[abs(cornerval-eCvals)<=lambda1]
     dt = foreach (eCprime=eCvals, .combine=rbind) %do% {
-      matg[,value:=value.ori-eCprime]
-      dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
-      stopifnot(dof<=cl$no)
-      #now soft-threshold the value around eCprime
-      matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
-      #compute BIC
-      #BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof-2*.N*log(lambda1)]
-      BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]#-9*log(lambda1)+5*lambda1]
-      data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
+    matg[,value:=value.ori-eCprime]
+    dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
+    stopifnot(dof<=cl$no)
+    #now soft-threshold the value around eCprime
+    matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
+    #compute BIC
+    #BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof-2*.N*log(lambda1)]
+    BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]#-9*log(lambda1)+5*lambda1]
+    data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
     }
     dt[BIC==min(BIC)][lambda1==max(lambda1)][eCprime==min(eCprime)]
   }
-  #dt=foreach(lambda1=seq(tol/2,valrange,length.out=50), .combine=rbind) %dopar% obj(lambda1)
+  #dt=foreach(lambda1=seq(tol/2,valrange,length.out=50), .combine=rbind) %do% obj(lambda1)
   #ggplot(dt)+geom_point(aes(lambda1,BIC))+geom_line(aes(lambda1,BIC))
   #dt[,g:=dof*matg[,log(sum(ncounts))]]
   #dt[,h:=-2*matg[,.N]*log(lambda1)]
@@ -314,12 +309,12 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda2.max=1000) {
 #' 
 #' finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(matg, trails, positive=T, zero.corner=T, tol=1e-3, verbose=T, ncores=ncores) {
+csnorm_fused_lasso = function(matg, trails, positive=T, tol=1e-3, verbose=T, ncores=ncores) {
   groupname=matg[,name[1]]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=valuehat))+scale_fill_gradient2())
   lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol)
   #get best lambda1 and set eCprime to lower bound
-  vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2, positive=positive, zero.corner=zero.corner)
+  vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2, positive=positive)
   lambda1=vals$lambda1
   eCprime=vals$eCprime
   BIC=vals$BIC
@@ -408,8 +403,7 @@ csnorm_compute_raw_differential = function(cts, dispersion, mat, ref) {
 #' @export
 #' 
 #' @examples
-detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol=1e-3,
-                                       zero.corner=(cs@settings$circularize<=0), verbose=T){
+detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol=1e-3, verbose=T){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
@@ -434,8 +428,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     if (verbose==T) cat("  Fused lasso\n")
     groupnames=mat[,unique(name)]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso(mat[name==g], trails, positive=T, zero.corner=zero.corner,
-                                  tol=tol, ncores=ncores, verbose=verbose)
+      csnorm:::csnorm_fused_lasso(mat[name==g], trails, positive=T, tol=tol, ncores=ncores, verbose=verbose)
     #display param info
     if (verbose==T)
       for (i in 1:params[,.N])

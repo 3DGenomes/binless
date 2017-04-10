@@ -767,8 +767,7 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   groupnames=mat[,unique(name)]
   registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %dopar%
-    csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, positive=T, zero.corner=(cs@settings$circularize<=0),
-                                tol=tol, ncores=ncores, verbose=verbose)
+    csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, positive=T, tol=tol, ncores=ncores, verbose=verbose)
   #compute matrix at new params
   #save(mat,params,file=paste0("mat_step_",step,".RData"))
   mat = foreach (g=groupnames, .combine=rbind) %dopar% {
@@ -779,7 +778,8 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   }
   #store new signal in cs and update eC
   mat[,phi:=value]
-  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phihat))+scale_fill_gradient2()
+  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phihat))+
+  #  scale_fill_gradient2()
   #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
   setkey(mat,name,bin1,bin2)
   cs@par$signal=mat[,.(name,bin1,bin2,phi)]
