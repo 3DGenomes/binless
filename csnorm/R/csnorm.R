@@ -155,7 +155,7 @@ setClass("CSgroup",
                       group="character",
                       cts="data.table",
                       par="list",
-                      names="character"))
+                      names="data.table"))
 
 setMethod("show",signature="CSgroup",definition=function(object) {
   if (length(object@group)==1 && object@group=="all") {
@@ -163,7 +163,7 @@ setMethod("show",signature="CSgroup",definition=function(object) {
   } else {
     cat("   *** Group [", object@group,"] at", object@resolution/1000, "kb resolution")
   }
-  cat( " : ", object@names, "\n")
+  cat( " : ", object@names[,do.call(paste,c(as.list(groupname), sep=" / "))], "\n")
   if (length(object@interactions)==0) {
     cat("        No interactions computed\n")
   } else {
