@@ -239,36 +239,48 @@ optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=
   return(as.list(obj(10^(op$minimum))))
 }
 
-#' cross-validate lambda1 and set eCprime at minimum
+#' cross-validate lambda1 and assume eCprime=0
 #' 
 #' @keywords internal
-optimize_lambda1_only = function(matg, trails, tol=1e-3, lambda2=0) {
-  #set eCprime to lower bound when lambda1=0
+optimize_lambda1_only = function(matg, trails, tol=1e-3, lambda2=0, positive=F, lambda1.min=0.05) {
+  #compute values for lambda1=0 and eCprime=0
   matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
-  eCprime = matg[,min(value)-tol]
   matg[,value.ori:=value]
+  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
+  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=factor(round(value,3))))+guides(fill=F))
+  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value<0.30)))
   #get the number of patches to compute degrees of freedom
   cl = csnorm:::build_patch_graph(matg, trails, tol.value=tol)$components
   matg[,patchno:=cl$membership]
-  patches = matg[,.(value=value[1]),by=patchno][,.N,keyby=value]
+  patches = matg[,.(value=value[1],size=.N),by=patchno][,.(N=.N,size=size[1]),keyby=value]
+  if (patches[,.N]==1 & abs(patches[,value])<=lambda1.min) #matrix is just one big bin
+    return(data.table(lambda1=lambda1.min,
+                      BIC=matg[,sum(weight*(valuehat-value)^2)],dof=0))
   stopifnot(patches[,sum(N)]==cl$no)
+  minval=patches[,min(value)]
+  maxval=patches[,max(value)]
+  if (positive==T) lambda1.min=max(lambda1.min, -min(minval,0))
   #
-  dt = foreach (lambda1=c(0,patches[,value]-eCprime,patches[,max(value)]-eCprime+tol),.combine=rbind) %do% {
-      matg[,value:=value.ori-eCprime]
-      dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
-      stopifnot(dof<=cl$no)
-      #now soft-threshold the value around eCprime
-      matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
-      #compute BIC
-      BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
-      data.table(lambda1=lambda1,BIC=BIC,dof=dof)
-    }
-  #ggplot(dt)+geom_line(aes(lambda1,dof))
-  #ggplot(dt[lambda1<0.1])+geom_line(aes(lambda1,dof))
-  #ggplot(dt)+geom_line(aes(lambda1,BIC))
-  #ggplot(dt[lambda1<0.2])+geom_point(aes(lambda1,BIC))
-  matg[,c("value","value.ori","patchno"):=NULL]
-  return(dt[BIC==min(BIC)][lambda1==min(lambda1)][1,list(lambda1=lambda1,eCprime=eCprime,BIC=BIC)])
+  obj = function(lambda1) {
+    dof = matg[abs(value.ori)>lambda1,uniqueN(patchno)] #sparse fused lasso
+    stopifnot(dof<=cl$no)
+    #now soft-threshold the value around zero
+    matg[,value:=sign(value.ori)*pmax(abs(value.ori)-lambda1, 0)]
+    #compute BIC
+    #BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof-2*.N*log(lambda1)]
+    BIC = matg[,sum(weight*((valuehat-value)^2))+log(sum(ncounts))*dof]#-9*log(lambda1)+5*lambda1]
+    data.table(lambda1=lambda1,BIC=BIC,dof=dof)
+  }
+  #dt=foreach(lambda1=seq(tol/2,valrange,length.out=50), .combine=rbind) %do% obj(lambda1)
+  #ggplot(dt)+geom_point(aes(lambda1,BIC))+geom_line(aes(lambda1,BIC))
+  #dt[,g:=dof*matg[,log(sum(ncounts))]]
+  #dt[,h:=-2*matg[,.N]*log(lambda1)]
+  #dt[,h:=-9*log(lambda1)+5*lambda1]
+  #dt[,f:=BIC-g-h]
+  #ggplot(dt)+geom_line(aes(lambda1,f,colour="f"))+geom_line(aes(lambda1,g,colour="g"))+geom_line(aes(lambda1,h,colour="h"))
+  #ggplot(data.table(x=seq(0,valrange,l=1000))[,.(x,y=dgamma(x,rate=10,shape=5,log=T))])+geom_line(aes(x,y))
+  op=optimize(function(x){obj(10^(x))[,BIC]}, c(log10(max(lambda1.min,tol/2)),log10(maxval)), tol=tol)
+  return(as.list(obj(10^(op$minimum))))
 }
 
 #' cross-validate lambda2
@@ -309,14 +321,19 @@ optimize_lambda2 = function(matg, trails, tol=1e-3, lambda2.max=1000) {
 #' 
 #' finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(matg, trails, positive=T, tol=1e-3, verbose=T, ncores=ncores) {
+csnorm_fused_lasso = function(matg, trails, positive=T, fixed=F, tol=1e-3, verbose=T, ncores=ncores) {
   groupname=matg[,name[1]]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=valuehat))+scale_fill_gradient2())
   lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=tol)
   #get best lambda1 and set eCprime to lower bound
-  vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2, positive=positive)
+  if (fixed==F) {
+    vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=tol, lambda2=lambda2, positive=positive)
+    eCprime=vals$eCprime
+  } else {
+    vals = csnorm:::optimize_lambda1_only(matg, trails, tol=tol, lambda2=lambda2, positive=positive)
+    eCprime=0
+  }
   lambda1=vals$lambda1
-  eCprime=vals$eCprime
   BIC=vals$BIC
   #matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=abs(value-eCprime)<=lambda1)))
@@ -344,7 +361,7 @@ prepare_signal_matrix = function(cs, names, resolution) {
       sbins=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
       pos=head(sbins,n=-1)+resolution/2
       bins=unique(data.table(refbin=cut(pos, cs@settings$sbins,
-                                     ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+                                        ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                              bin=cut(pos, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)))
       stopifnot(bins[,.N]==length(sbins)-1)
       mat=CJ(name=names[,groupname],bin1=bins[,unique(bin)],bin2=bins[,unique(bin)],
@@ -368,21 +385,7 @@ prepare_signal_matrix = function(cs, names, resolution) {
   return(list(mat=mat,trails=trails))
 }
 
-#' produce fused lasso solution at the given set of parameters
-#' 
-#' @keywords internal
-prepare_binless_decay = function(csg, mat) {
-  #add new signal values to cts
-  cts=merge(csg@cts[,.(name,bin1,bin2,dbin,cat,count,lmu.base,log_decay,eC,weight)],
-            mat[,.(name,bin1,bin2,phi,eCprime)], by=c("name","bin1","bin2"), all.x=T)
-  cts[,c("mu","kappaij"):=list(exp(eC+eCprime+lmu.base+log_decay+phi),eC+eCprime+log_decay)]
-  cts[,c("z","var"):=list(count/mu-1,(1/mu+1/csg@par$alpha))]
-  dbins=csg@par$dbins
-  csd = cts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
-               kappahat=weighted.mean(z+kappaij, weight/var),
-               std=1/sqrt(sum(weight/var)), weight=sum(weight)/2), keyby=c("name", "dbin")] #each count appears twice
-  return(csd)
-}
+
 
 #' compute input to fused lasso
 #' @keywords internal
@@ -466,12 +469,13 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
     mat = csnorm:::csnorm_compute_raw_signal(csg@cts, csg@par$alpha, mat)
+    ggplot(mat)+geom_raster(aes(bin2,bin1,fill=phi))+geom_raster(aes(bin1,bin2,fill=phihat))+scale_fill_gradient2()+facet_wrap(~name)
     #
-    #perform fused lasso on signal
+    #perform fused lasso on signal, at fixed offset
     if (verbose==T) cat("  Fused lasso\n")
     groupnames=mat[,unique(name)]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso(mat[name==g], trails, positive=T, tol=tol, ncores=ncores, verbose=verbose)
+      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=T, positive=T, tol=tol, ncores=ncores, verbose=verbose)
     #display param info
     if (verbose==T)
       for (i in 1:params[,.N])
@@ -527,9 +531,9 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
   csg=cs@groups[[idx1]]
   if (get_cs_interaction_idx(csg, type="bdifferences", threshold=-1, ref=ref, raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
-  if (verbose==T) cat("  Prepare for signal estimation\n")
-  stuff = csnorm:::prepare_signal(cs, cs@biases, csg@names[groupname != ref], resolution)
-  mat=stuff$signal[,.(name,bin1,bin2,phi.ref=0,delta=0)]
+  if (verbose==T) cat("  Prepare for difference estimation\n")
+  stuff = csnorm:::prepare_difference_matrix(cs, csg@names, resolution, ref)
+  mat=stuff$mat
   trails=stuff$trails
   ### main loop
   registerDoParallel(cores=ncores)
