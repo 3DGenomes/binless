@@ -325,6 +325,49 @@ csnorm_fused_lasso = function(matg, trails, positive=T, tol=1e-3, verbose=T, nco
   return(data.table(name=groupname,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime,BIC=BIC))
 }
 
+#' Build grouped signal matrix using normalization data if available
+#' @keywords internal
+prepare_signal_matrix = function(cs, names, resolution) {
+  if (cs@par$signal[,.N]==0) {
+    sbins=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
+    signal.bins=unique(cut(c(sbins,head(sbins,n=-1)+resolution/2), sbins,
+                           ordered_result=T, right=F, include.lowest=T,dig.lab=12))
+    mat=CJ(name=names[,groupname],bin1=signal.bins,bin2=signal.bins,sorted=F,unique=F)[bin2>=bin1]
+    mat[,phi:=0]
+  } else {
+    #report phi values for each group
+    if (resolution!=cs@settings$base.res) {
+      refmat=names[cs@par$signal[,.(name,bin1,bin2,phi)]][
+        !is.na(groupname),.(name=groupname,refbin1=bin1,refbin2=bin2,phi)][
+          ,.(phi=mean(phi)),by=c("name","refbin1","refbin2")]
+      #merge signal to new binning
+      sbins=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
+      pos=head(sbins,n=-1)+resolution/2
+      bins=unique(data.table(refbin=cut(pos, cs@settings$sbins,
+                                     ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+                             bin=cut(pos, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)))
+      stopifnot(bins[,.N]==length(sbins)-1)
+      mat=CJ(name=names[,groupname],bin1=bins[,unique(bin)],bin2=bins[,unique(bin)],
+             sorted=F,unique=F)[bin2>=bin1]
+      mat=merge(mat,bins,by.x="bin1",by.y="bin",all.y=T)
+      mat=merge(mat,bins,by.x="bin2",by.y="bin",all.y=T, suffixes=c("1","2"))
+      mat=merge(mat,refmat,by=c("name","refbin1","refbin2"),all.x=T)
+      mat[is.na(phi),phi:=0]
+      mat=mat[,.(name,bin1,bin2,phi)]
+    } else {
+      mat=names[cs@par$signal[,.(name,bin1,bin2,phi)]][!is.na(groupname),.(name=groupname,bin1,bin2,phi)]
+    }
+    mat=mat[,.(phi=mean(phi)),keyby=c("name","bin1","bin2")]
+  }
+  #ggplot(cs@par$signal)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()
+  #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()
+  #
+  trails = csnorm:::gfl_compute_trails(mat[,nlevels(bin1)])
+  stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
+  stopifnot(all(length(V(trails$graph))==mat[,.N,by=name]$N))
+  return(list(mat=mat,trails=trails))
+}
+
 #' produce fused lasso solution at the given set of parameters
 #' 
 #' @keywords internal
@@ -414,8 +457,8 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
   #
   ### prepare signal estimation
   if (verbose==T) cat("  Prepare for signal estimation\n")
-  stuff = csnorm:::prepare_signal(cs, cs@biases, csg@names, resolution)
-  mat=stuff$signal
+  stuff = csnorm:::prepare_signal_matrix(cs, csg@names, resolution)
+  mat=stuff$mat
   trails=stuff$trails
   ### main loop
   registerDoParallel(cores=ncores)
@@ -485,7 +528,7 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
   if (get_cs_interaction_idx(csg, type="bdifferences", threshold=-1, ref=ref, raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
   if (verbose==T) cat("  Prepare for signal estimation\n")
-  stuff = csnorm:::prepare_signal(cs, cs@biases, csg@names[csg@names != ref], resolution)
+  stuff = csnorm:::prepare_signal(cs, cs@biases, csg@names[groupname != ref], resolution)
   mat=stuff$signal[,.(name,bin1,bin2,phi.ref=0,delta=0)]
   trails=stuff$trails
   ### main loop

@@ -896,7 +896,7 @@ subsample_counts = function(cs, ncounts, dset=NA) {
 
 #' Prepare for concurrent signal estimation 
 #' @keywords internal
-prepare_signal = function(cs, biases, names, base.res) {
+prepare_signal_estimation = function(biases, names, base.res) {
   ### build matrix
   #create an empty matrix containing all cells, even those with no cut-site intersection
   sbins=seq(biases[,min(pos)-1],biases[,max(pos)+1+base.res],base.res)
@@ -1020,7 +1020,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
   #prepare signal matrix and trails
   if (fit.signal==T & cs@zeros$sig[,.N]==0) { #either restart==F or restart==T but was run with fit.signal==F
     if(verbose==T) cat("Preparing for signal estimation\n")
-    stuff = csnorm:::prepare_signal(cs, cs@biases, cs@experiments[,name], base.res)
+    stuff = csnorm:::prepare_signal_estimation(cs@biases, cs@experiments[,name], base.res)
     cs@par$signal=stuff$signal
     cs@settings$sbins=stuff$sbins
     cs@settings$trails=stuff$trails
