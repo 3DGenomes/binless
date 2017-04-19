@@ -20,10 +20,8 @@ RcppExport SEXP weighted_graphfl(Rcpp::NumericVector y_i, Rcpp::NumericVector w_
   std::vector<double> z_r = Rcpp::as<std::vector<double> >(z_i);
   std::vector<double> u_r = Rcpp::as<std::vector<double> >(u_i);
 
-  printf("*** begin parallel computation on %d threads (max %d)\n",nthreads, omp_get_max_threads());
   omp_set_dynamic(0);
   omp_set_num_threads(nthreads);
-  printf("*** number of detected threads: %d\n", omp_get_num_threads());
   int res;
   res = graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails, &trails_r[0], &breakpoints_r[0],
                                      lam, alpha, inflate, maxsteps, converge,

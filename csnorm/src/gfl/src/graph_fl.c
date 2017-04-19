@@ -453,8 +453,6 @@ void update_z(int ntrails, int *trails, int *breakpoints, double *beta, double *
     #pragma omp parallel for default(none) private(i) shared(ntrails,breakpoints,ybuf,beta,trails,u,tf_dp_buf,z,lam,wbuf)
     for (i = 0; i < ntrails; i++)
     {
-        //printf("Trail %d executed by thread %d of %d\n", i, omp_get_thread_num(),
-        //        omp_get_num_threads());
         int j;
         int trailstart;
         int trailend;
