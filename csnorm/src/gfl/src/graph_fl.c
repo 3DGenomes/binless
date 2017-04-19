@@ -142,49 +142,57 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
     cur_converge = converge + 1;
 
     /* Perform the ADMM iterations until convergence */
-    while(step < maxsteps && cur_converge > converge)
+    #pragma omp parallel
     {
-        /* Update beta */
-        if (w)
-            update_beta_weight(n, y, w, z, u, nzmap, zmap, alpha, beta);
-        else
-            update_beta(n, y, z, u, nzmap, zmap, alpha, beta);
-
-        /* swap the z buffers */
-        ztemp = z;
-        z = zold;
-        zold = ztemp;
-        
-        /* Update each trail dual variable */
-        update_z(ntrails, trails, breakpoints, beta, u, lam, z_ybuff, z_wbuff, tf_dp_buf, z);
-
-        /* Update the scaled dual variable */
-        update_u(n, beta, z, zmap, nzmap, u);
-
-        /* Update the convergence diagnostics */
-        presnorm = primal_resnorm(n, beta, z, nzmap, zmap);
-        dresnorm = dual_resnorm(nz, z, zold, alpha);
-        cur_converge = MAX(presnorm, dresnorm);
-
-        /* Varying penalty parameter */
-        if (step % VARYING_PENALTY_DELAY == 0 && presnorm > 10 * dresnorm)
+        while(step < maxsteps && cur_converge > converge)
         {
-            alpha *= inflate;
-            for(i = 0; i < nz; i++) {
-                u[i] /= inflate;
-                z_wbuff[i] = alpha / 2.0; /* weight for each fused lasso */
+            #pragma omp single
+            {
+                /* Update beta */
+                if (w)
+                    update_beta_weight(n, y, w, z, u, nzmap, zmap, alpha, beta);
+                else
+                    update_beta(n, y, z, u, nzmap, zmap, alpha, beta);
+
+                /* swap the z buffers */
+                ztemp = z;
+                z = zold;
+                zold = ztemp;
+            }
+            
+            /* Update each trail dual variable */
+            update_z(ntrails, trails, breakpoints, beta, u, lam, z_ybuff, z_wbuff, tf_dp_buf, z);
+
+            #pragma omp single
+            {
+                /* Update the scaled dual variable */
+                update_u(n, beta, z, zmap, nzmap, u);
+
+                /* Update the convergence diagnostics */
+                presnorm = primal_resnorm(n, beta, z, nzmap, zmap);
+                dresnorm = dual_resnorm(nz, z, zold, alpha);
+                cur_converge = MAX(presnorm, dresnorm);
+
+                /* Varying penalty parameter */
+                if (step % VARYING_PENALTY_DELAY == 0 && presnorm > 10 * dresnorm)
+                {
+                    alpha *= inflate;
+                    for(i = 0; i < nz; i++) {
+                        u[i] /= inflate;
+                        z_wbuff[i] = alpha / 2.0; /* weight for each fused lasso */
+                    }
+                }
+                else if (step % VARYING_PENALTY_DELAY == 0 && dresnorm > 10 * presnorm)
+                {
+                    alpha /= inflate;
+                    for(i = 0; i < nz; i++) {
+                        u[i] *= inflate;
+                        z_wbuff[i] = alpha / 2.0; /* weight for each fused lasso */
+                    }
+                }
+            step++;
             }
         }
-        else if (step % VARYING_PENALTY_DELAY == 0 && dresnorm > 10 * presnorm)
-        {
-            alpha /= inflate;
-            for(i = 0; i < nz; i++) {
-                u[i] *= inflate;
-                z_wbuff[i] = alpha / 2.0; /* weight for each fused lasso */
-            }
-        }
-
-        step++;
     }
 
     /* Make sure to return the final z to the user */
@@ -447,13 +455,18 @@ void update_beta_weight(int n, double *y, double *w, double *z, double *u, int *
 
 void update_z(int ntrails, int *trails, int *breakpoints, double *beta, double *u, double lam, double *ybuf, double *wbuf, double *tf_dp_buf, double *z)
 {
-    int i;
+    #pragma omp single
+    {
+        /* Calculate the trail y values: (beta + u) */
+        int j;
+        for (j = 0; j < breakpoints[ntrails-1]; j++) { ybuf[j] = beta[trails[j]] + u[j]; }
+    }
     
     /* Update each trail via a 1-d fused lasso. */
-    #pragma omp parallel for default(none) private(i) shared(ntrails,breakpoints,ybuf,beta,trails,u,tf_dp_buf,z,lam,wbuf)
+    int i;
+    #pragma omp for private(i) schedule(dynamic)
     for (i = 0; i < ntrails; i++)
     {
-        int j;
         int trailstart;
         int trailend;
         int trailsize;
@@ -466,9 +479,6 @@ void update_z(int ntrails, int *trails, int *breakpoints, double *beta, double *
         trailend = breakpoints[i];
         if (i==0) { trailstart=0; } else { trailstart=breakpoints[i-1]; }
         trailsize = trailend - trailstart;
-
-        /* Calculate the trail y values: (beta + u) */
-        for (j = trailstart; j < trailend; j++) { ybuf[j] = beta[trails[j]] + u[j]; }
 
         /* Calculate the starts of this z's buffers */
         x = tf_dp_buf + 8*trailstart - 2*i;

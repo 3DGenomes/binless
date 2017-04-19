@@ -13,13 +13,13 @@ setwd("/home/yannick/simulations/cs_norm")
 load("tmp_matg.RData")
 ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value.ref))+geom_raster(aes(bin2,bin1,fill=valuehat))+scale_fill_gradient2()
 
-matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, .1, 1, 0, nthreads=30)]
+matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, .1, 1, 0, nthreads=10)]
 matg[,all(value==value.ref)]
 matg[,mean(abs(value-value.ref))]
 ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+geom_raster(aes(bin2,bin1,fill=value.ref))+scale_fill_gradient2()
 
 bench=function(x){matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, .1, 1, 0, nthreads=x)]}
-jobs = lapply(1:17, function(s) local({s = s; bquote(bench(.(s)))}) )
+jobs = lapply(1:20, function(s) local({s = s; bquote(bench(.(s)))}) )
 a=microbenchmark(list=jobs,times=100) 
 plot(a)
 a.dt=data.table(call=a$expr,time=a$time)[,.(call,time,ncpus=unclass(call))]
