@@ -547,6 +547,40 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "H
   return(csd)
 }
 
+#' Fuse cut sites that are very close to each other
+#'
+#' @param csd CSData object
+#' @keywords internal
+#' @return a list with filtered biases and counts
+#'
+fuse_close_cut_sites = function(csd) {
+  #group cut sites
+  dfuse=csd@settings$dfuse
+  fused=csd@biases[,.(id,pos,newid=cumsum(ifelse(shift(pos,type = "lead")-pos>dfuse,1,0)))]
+  lastid=fused[.N-1,newid]+as.integer(fused[,pos[.N]-pos[.N-1]]>dfuse)
+  fused[.N,newid:=lastid]
+  setkey(fused,id)
+  fused[,newpos:=as.integer(mean(pos)),by=newid]
+  cat(csd@info$name, ": fused ", fused[,.N]-fused[,uniqueN(newid)], " cut sites (",
+      (1-fused[,uniqueN(newid)]/fused[,.N])*100, " %)\n")
+  #transfer new IDs
+  biases=fused[csd@biases,.(id=newid,pos=newpos,dangling.L,dangling.R,rejoined)]
+  counts=merge(csd@counts[,.(id1,id2,contact.close,contact.down,contact.far,contact.up)],fused,by.x="id1",by.y="id")
+  counts=merge(counts,fused,by.x="id2",by.y="id",suffixes=c("1","2"))
+  counts[,c("id1","id2","pos1","pos2"):=NULL]
+  setnames(counts,c("newid1","newid2","newpos1","newpos2"),c("id1","id2","pos1","pos2"))
+  #sum counts and average positions
+  biases=biases[,.(pos=pos[1],dangling.L=sum(dangling.L),
+                   dangling.R=sum(dangling.R),rejoined=sum(rejoined)),keyby=id]
+  counts=counts[id1!=id2,.(pos1=pos1[1],pos2=pos2[1],
+                   contact.close=sum(contact.close),contact.down=sum(contact.down),
+                   contact.far=sum(contact.far),contact.up=sum(contact.down)),
+                keyby=c("id1","id2")]
+  counts[,distance:=pos2-pos1]
+  if (csd@settings$circularize>0) counts[,distance:=pmin(distance,csd@settings$circularize-distance+1)]
+  return(list(biases=biases,counts=counts))
+}
+
 #' Remove cut sites above or below the quantiles specified in the csd object
 #'
 #' @param csd CSData object
@@ -598,13 +632,15 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
   experiments[,name:=ordered(name, levels=name)]
   setkey(experiments, name)
   if (!(experiments[,.N]==experiments[,uniqueN(name)])) stop("experiment names must be unique")
-  if (uniqueN(rbindlist(lapply(datasets, function(x) x@settings[c("dmin","circularize")])))!=1)
-    stop("all experiments must have the same dmin and circularize settings!")
-  settings=datasets[[1]]@settings[c("dmin","circularize")]
+  if (uniqueN(rbindlist(lapply(datasets, function(x) x@settings[c("dmin","circularize","dfuse")])))!=1)
+    stop("all experiments must have the same dmin, circularize settings!")
+  settings=datasets[[1]]@settings[c("dmin","circularize","dfuse")]
   settings$dmax=max(sapply(datasets, function(x) x@settings$dmax))
   #
-  cat("Remove suspicious cut sites\n")
-  filtered = lapply(datasets, remove_suspicious_cut_sites)
+  #cat("Remove suspicious cut sites\n")
+  #filtered = lapply(datasets, remove_suspicious_cut_sites)
+  cat("Fuse close cut sites\n")
+  filtered = lapply(datasets, fuse_close_cut_sites)
   biases = lapply(filtered, function(x) x$biases)
   counts = lapply(filtered, function(x) x$counts)
   names(biases) <- sapply(datasets, function(x) x@info$name)
