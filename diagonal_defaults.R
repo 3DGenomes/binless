@@ -52,7 +52,7 @@ ggplot(b[,.(dist=pos-shift(pos),ori)][dist<500])+geom_histogram(aes(dist),bins=1
 ggplot(cs@biases[,.(pos,var=pos-shift(pos)==175)])+geom_point(aes(pos,1+var))
 
 #vary resolutions
-resolution=2500
+resolution=5000
 #zeros and cts
 zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores = 30)
 cts = csnorm:::csnorm_predict_binned_counts_irls(cs, resolution, zeros)
@@ -129,9 +129,18 @@ ggplot(cs@biases[pos<73890000&pos>73880000,.(name,pos,bin=cut(pos, sbins,
                                 ,mean(pos-shift(pos),na.rm=T),by=c("name","bin")])+
   geom_point(aes(bin,V1))
 
-cs@biases[pos<73890000&pos>73880000,.(name,pos,bin=cut(pos, sbins,
-                                                       ordered_result=T, right=F, include.lowest=T,dig.lab=12))][
-                                                         ,.(pos,pos-shift(pos),unclass(bin))]
+ggplot(cs@biases[pos<73890000&pos>73880000,.(name,dist=pos-shift(pos),bin=cut(pos, sbins,
+                                                              ordered_result=T, right=F, include.lowest=T,dig.lab=12))])+
+  geom_boxplot(aes(bin,dist))
+
+ggplot(cts[pos<73890000&pos>73880000,.(pos,value,bin=cut(pos, sbins,
+                                                  ordered_result=T, right=F, include.lowest=T,dig.lab=12))])+
+  geom_jitter(aes(bin,value,colour=bin))
+
+cts[pos<73890000&pos>73880000,
+    .(pos,value,bin=cut(pos, sbins,ordered_result=T, right=F, include.lowest=T,dig.lab=12))][
+      ,sum(value),by=bin]
+
 
 ggplot(cs@biases[,.(name,pos,dist=pos-shift(pos))])+geom_histogram(aes(dist),bins=100)+scale_x_log10()
 ggplot(cs@biases[,.(name,pos,dist=pos-shift(pos))][dist<1000])+geom_histogram(aes(dist),bins=100)
@@ -163,3 +172,42 @@ load("data/caulo_NcoI_all_csdata.RData")
 load("data/rao_HiC035_HindIII_GM12878_Peak1_450k_csdata.RData")
 load("data/rao_HiC036_NcoI_GM12878_Peak1_450k_csdata.RData")
 ggplot(csd@biases[,.(dist=pos-shift(pos))][dist<5000])+geom_histogram(aes(dist),bins=100)#+scale_x_log10()
+
+
+
+mat=mat[,.(name,bin1,bin2,phi=0)]
+cts.cp = mat[cts,,on=c("name","bin1","bin2")]
+cts.cp[,c("z","var"):=list(count/exp(phi+eC+lmu.base+log_decay)-1,
+                           (1/exp(phi+eC+lmu.base+log_decay)+1/dispersion))]
+mat = cts.cp[,.(phihat=weighted.mean(z+phi, weight/var),
+                phihat.var=1/sum(weight/var),
+                ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat,,on=c("name","bin1","bin2")]
+mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
+mat[,c("valuehat","weight"):=list(phihat,1/phihat.var)]
+bin1.begin=mat[,bin1]
+bin2.begin=mat[,bin2]
+levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[][,)]")[[2]]
+levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[][,)]")[[2]]
+mat[,begin1:=as.integer(as.character(bin1.begin))]
+mat[,begin2:=as.integer(as.character(bin2.begin))]
+mat[,res:=resolution]
+ggplot(mat[bin1==bin2&begin2<73900000&begin1>73860000])+geom_pointrange(aes(begin1,phihat,colour=factor(res),
+                                                                                           ymin=phihat-sqrt(phihat.var),ymax=phihat+sqrt(phihat.var)))
+
+bin1.begin=cts.cp[,bin1]
+bin2.begin=cts.cp[,bin2]
+levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[][,)]")[[2]]
+levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[][,)]")[[2]]
+cts.cp[,begin1:=as.integer(as.character(bin1.begin))]
+cts.cp[,begin2:=as.integer(as.character(bin2.begin))]
+cts.cp[,res:=resolution]
+#weight
+ggplot(cts.cp[bin1==bin2&begin2<73900000&begin1>73860000])+geom_jitter(aes(begin1,weight,colour=factor(count)))
+#var
+ggplot(cts.cp[bin1==bin2&begin2<73900000&begin1>73860000])+geom_jitter(aes(begin1,var,colour=factor(count)))
+#weight/var
+ggplot(cts.cp[bin1==bin2&begin2<73900000&begin1>73860000])+geom_jitter(aes(begin1,weight/var,colour=factor(count)))
+#z
+cts.cp[,alpha:=weight/var]
+cts.cp[,alpha:=alpha/max(alpha),by=c("bin1","bin2")]
+ggplot(cts.cp[bin1==bin2&begin2<73900000&begin1>73860000])+geom_jitter(aes(begin1,z,colour=factor(count),alpha=alpha))

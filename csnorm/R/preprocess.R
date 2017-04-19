@@ -553,19 +553,18 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "H
 #' @keywords internal
 #' @return a list with filtered biases and counts
 #'
-fuse_close_cut_sites = function(csd) {
+fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
   #group cut sites
-  dfuse=csd@settings$dfuse
-  fused=csd@biases[,.(id,pos,newid=cumsum(ifelse(shift(pos,type = "lead")-pos>dfuse,1,0)))]
+  fused=biases[,.(id,pos,newid=cumsum(ifelse(shift(pos,type = "lead")-pos>dfuse,1,0)))]
   lastid=fused[.N-1,newid]+as.integer(fused[,pos[.N]-pos[.N-1]]>dfuse)
   fused[.N,newid:=lastid]
   setkey(fused,id)
   fused[,newpos:=as.integer(mean(pos)),by=newid]
-  cat(csd@info$name, ": fused ", fused[,.N]-fused[,uniqueN(newid)], " cut sites (",
+  cat(name, ": fused ", fused[,.N]-fused[,uniqueN(newid)], " cut sites (",
       (1-fused[,uniqueN(newid)]/fused[,.N])*100, " %)\n")
   #transfer new IDs
-  biases=fused[csd@biases,.(id=newid,pos=newpos,dangling.L,dangling.R,rejoined)]
-  counts=merge(csd@counts[,.(id1,id2,contact.close,contact.down,contact.far,contact.up)],fused,by.x="id1",by.y="id")
+  biases=fused[biases,.(id=newid,pos=newpos,dangling.L,dangling.R,rejoined)]
+  counts=merge(counts[,.(id1,id2,contact.close,contact.down,contact.far,contact.up)],fused,by.x="id1",by.y="id")
   counts=merge(counts,fused,by.x="id2",by.y="id",suffixes=c("1","2"))
   counts[,c("id1","id2","pos1","pos2"):=NULL]
   setnames(counts,c("newid1","newid2","newpos1","newpos2"),c("id1","id2","pos1","pos2"))
@@ -577,7 +576,7 @@ fuse_close_cut_sites = function(csd) {
                    contact.far=sum(contact.far),contact.up=sum(contact.down)),
                 keyby=c("id1","id2")]
   counts[,distance:=pos2-pos1]
-  if (csd@settings$circularize>0) counts[,distance:=pmin(distance,csd@settings$circularize-distance+1)]
+  if (circularize>0) counts[,distance:=pmin(distance,circularize-distance+1)]
   return(list(biases=biases,counts=counts))
 }
 
@@ -587,15 +586,15 @@ fuse_close_cut_sites = function(csd) {
 #' @keywords internal
 #' @return a list with filtered biases and counts
 #'
-remove_suspicious_cut_sites = function(csd) {
+remove_suspicious_cut_sites = function(biases,counts,name,qmin,qmax) {
   #sum all counts on each cut site
-  cts=melt(csd@biases,id.vars=c("id","pos"))[,.(value=sum(value)),by="id"]
+  cts=melt(biases,id.vars=c("id","pos"))[,.(value=sum(value)),by="id"]
   #get limits and filter out cut sites
-  limits=cts[,quantile(value,c(csd@settings$qmin,csd@settings$qmax))]
+  limits=cts[,quantile(value,c(qmin,qmax))]
   bad_ids=cts[value>limits[2]|value<limits[1],id]
-  cat(csd@info$name, ": removed ", length(bad_ids), " extreme cut sites (", length(bad_ids)/cts[,.N]*100, " %)\n")
-  biases=csd@biases[!(id%in%bad_ids)]
-  counts=csd@counts[!(id1%in%bad_ids|id2%in% bad_ids)]
+  cat(name, ": removed ", length(bad_ids), " extreme cut sites (", length(bad_ids)/cts[,.N]*100, " %)\n")
+  biases=biases[!(id%in%bad_ids)]
+  counts=counts[!(id1%in%bad_ids|id2%in% bad_ids)]
   #reorganize ids
   biases[,newid:=.I]
   counts=merge(counts,biases[,.(id,newid)],by.x="id1",by.y="id")
@@ -605,6 +604,19 @@ remove_suspicious_cut_sites = function(csd) {
   setnames(biases,"newid","id")
   setnames(counts,c("newid1","newid2"),c("id1","id2"))
   return(list(biases=biases,counts=counts))
+}
+
+#' Perform pruning / fusing of cut sites
+#'
+#' @param csd CSData object
+#' @keywords internal
+#' @return a list with filtered biases and counts
+#'
+clean_cut_sites = function(csd) {
+  stuff = fuse_close_cut_sites(csd@biases,csd@counts,csd@settings$dfuse,
+                               csd@info$name,csd@settings$circularize)
+  stuff = remove_suspicious_cut_sites(stuff$biases, stuff$counts, csd@info$name, csd@settings$qmin, csd@settings$qmax)
+  return(stuff)
 }
 
 #' Merge one or more CSdata objects into a CSnorm object and set experimental design
@@ -637,10 +649,7 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
   settings=datasets[[1]]@settings[c("dmin","circularize","dfuse")]
   settings$dmax=max(sapply(datasets, function(x) x@settings$dmax))
   #
-  #cat("Remove suspicious cut sites\n")
-  #filtered = lapply(datasets, remove_suspicious_cut_sites)
-  cat("Fuse close cut sites\n")
-  filtered = lapply(datasets, fuse_close_cut_sites)
+  filtered = lapply(datasets, clean_cut_sites)
   biases = lapply(filtered, function(x) x$biases)
   counts = lapply(filtered, function(x) x$counts)
   names(biases) <- sapply(datasets, function(x) x@info$name)
