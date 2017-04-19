@@ -116,11 +116,11 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
     {
         if (breakpoints[i]-breakpoints[i-1] > wbufsize) { wbufsize = breakpoints[i]-breakpoints[i-1]; }
     }
-    z_wbuff         = (double *) malloc(wbufsize * sizeof(double));
-    z_ybuff         = (double *) malloc(wbufsize * sizeof(double));
+    z_wbuff = (double *) malloc(nz * sizeof(double));
+    z_ybuff = (double *) malloc(nz * sizeof(double));
 
     /* weight for each fused lasso */
-    for (i = 0; i < wbufsize; i++) { z_wbuff[i] = alpha / 2.0; }
+    for (i = 0; i < nz; i++) { z_wbuff[i] = alpha / 2.0; }
 
     /* Create map from z to beta */
     for (i = 0; i < nz; i++){ nzmap[trails[i]]++; } /* number of repetitions of beta_i */
@@ -170,14 +170,18 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
         if (step % VARYING_PENALTY_DELAY == 0 && presnorm > 10 * dresnorm)
         {
             alpha *= inflate;
-            for(i = 0; i < nz; i++){ u[i] /= inflate; }
-            for(i = 0; i < wbufsize; i++) { z_wbuff[i] = alpha / 2.0; } /* weight for each fused lasso */
+            for(i = 0; i < nz; i++) {
+                u[i] /= inflate;
+                z_wbuff[i] = alpha / 2.0; /* weight for each fused lasso */
+            }
         }
         else if (step % VARYING_PENALTY_DELAY == 0 && dresnorm > 10 * presnorm)
         {
             alpha /= inflate;
-            for(i = 0; i < nz; i++){ u[i] *= inflate; }
-            for(i = 0; i < wbufsize; i++) { z_wbuff[i] = alpha / 2.0; } /* weight for each fused lasso */
+            for(i = 0; i < nz; i++) {
+                u[i] *= inflate;
+                z_wbuff[i] = alpha / 2.0; /* weight for each fused lasso */
+            }
         }
 
         step++;
@@ -460,12 +464,13 @@ void update_z(int ntrails, int *trails, int *breakpoints, double *beta, double *
         double *b;
         double *tm;
         double *tp;
+
         trailend = breakpoints[i];
         if (i==0) { trailstart=0; } else { trailstart=breakpoints[i-1]; }
         trailsize = trailend - trailstart;
 
         /* Calculate the trail y values: (beta + u) */
-        for (j = trailstart; j < trailend; j++) { ybuf[j-trailstart] = beta[trails[j]] + u[j]; }
+        for (j = trailstart; j < trailend; j++) { ybuf[j] = beta[trails[j]] + u[j]; }
 
         /* Calculate the starts of this z's buffers */
         x = tf_dp_buf + 8*trailstart - 2*i;
@@ -474,7 +479,7 @@ void update_z(int ntrails, int *trails, int *breakpoints, double *beta, double *
         tm = x + 6*trailsize;
         tp = x + 7*trailsize - 1;
         
-        tf_dp_weight(trailsize, ybuf, wbuf, lam, z + trailstart,
+        tf_dp_weight(trailsize, ybuf + trailstart, wbuf + trailstart, lam, z + trailstart,
                         x, a, b, tm, tp);
     }
 }
