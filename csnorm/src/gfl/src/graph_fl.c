@@ -444,22 +444,24 @@ void update_beta_weight(int n, double *y, double *w, double *z, double *u, int *
 void update_z(int ntrails, int *trails, int *breakpoints, double *beta, double *u, double lam, double *ybuf, double *wbuf, double *tf_dp_buf, double *z)
 {
     int i;
-    int j;
-    int trailstart;
-    int trailend;
-    int trailsize;
-    double *x;
-    double *a;
-    double *b;
-    double *tm;
-    double *tp;
-    
-    trailstart = 0;
     
     /* Update each trail via a 1-d fused lasso. */
+    #pragma omp parallel for default(none) private(i) shared(ntrails,breakpoints,ybuf,beta,trails,u,tf_dp_buf,z,lam,wbuf)
     for (i = 0; i < ntrails; i++)
     {
+        //printf("Trail %d executed by thread %d of %d\n", i, omp_get_thread_num(),
+        //        omp_get_num_threads());
+        int j;
+        int trailstart;
+        int trailend;
+        int trailsize;
+        double *x;
+        double *a;
+        double *b;
+        double *tm;
+        double *tp;
         trailend = breakpoints[i];
+        if (i==0) { trailstart=0; } else { trailstart=breakpoints[i-1]; }
         trailsize = trailend - trailstart;
 
         /* Calculate the trail y values: (beta + u) */
@@ -474,8 +476,6 @@ void update_z(int ntrails, int *trails, int *breakpoints, double *beta, double *
         
         tf_dp_weight(trailsize, ybuf, wbuf, lam, z + trailstart,
                         x, a, b, tm, tp);
-        
-        trailstart = trailend;
     }
 }
 
