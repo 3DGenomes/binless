@@ -7,11 +7,11 @@ gfl_triangle_grid_chain = function(nrow) {
   #rows of consecutive numbers
   ntotal = nrow*(nrow+1)/2-1
   l=nrow
-  chains=list()
+  rowchains=list()
   current=c(0)
   for (i in 1:ntotal) {
     if (length(current)==l) {
-      chains=c(chains,list(current))
+      rowchains=c(rowchains,list(current))
       current=c(i)
       l=l-1
     } else {
@@ -19,8 +19,9 @@ gfl_triangle_grid_chain = function(nrow) {
     }
   }
   #diagonal
-  chains=c(chains,list(c(sapply(chains,function(x){x[1]}),ntotal)))
+  diagchain=list(c(sapply(rowchains,function(x){x[1]}),ntotal))
   #columns with Ui+1 = Ui + (N-i) with U1 from 2 to nrow
+  colchains=list()
   for (U1 in 2:nrow) {
     Ui=U1
     current=c(Ui-1)
@@ -29,8 +30,12 @@ gfl_triangle_grid_chain = function(nrow) {
       current=c(current,Uip1-1)
       Ui=Uip1
     }
-    chains=c(chains,list(current))
+    colchains=c(colchains,list(current))
   }
+  #reorder for better load balancing
+  stopifnot(length(colchains)==length(rowchains))
+  chains = foreach (i=1:length(colchains),.combine=c) %do% c(rowchains[i],colchains[i])
+  chains = c(chains, diagchain)
   return(chains)
 }
 

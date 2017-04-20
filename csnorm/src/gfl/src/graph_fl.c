@@ -464,7 +464,7 @@ void update_z(int ntrails, int *trails, int *breakpoints, double *beta, double *
     
     /* Update each trail via a 1-d fused lasso. */
     int i;
-    #pragma omp for private(i) schedule(dynamic)
+    #pragma omp for private(i) schedule(static)
     for (i = 0; i < ntrails; i++)
     {
         int trailstart;
