@@ -23,6 +23,7 @@
 #include <math.h>
 #include "tf.h"
 #include "utils.h"
+#include <omp.h>
 
 #define VARYING_PENALTY_DELAY 50
 

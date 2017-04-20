@@ -35,19 +35,19 @@ ggplot(binned)+geom_raster(aes(bin1,bin2,fill=log(count)))
 
 load("data/fake_csnorm_optimized.RData")
 
-load("data/fake_signal_replicate1_csdata.RData")
+load("data/fake_replicate1_csdata.RData")
 csd1=csd
-load("data/fake_signal_replicate2_csdata.RData")
+load("data/fake_signal_replicate1_csdata.RData")
 csd2=csd
-load("data/fake_signal_replicate3_csdata.RData")
+load("data/fake_signal_replicate1_csdata.RData")
 csd3=csd
-load("data/fake_signal_replicate4_csdata.RData")
+load("data/fake_signal_replicate2_csdata.RData")
 csd4=csd
-load("data/fake_signal_replicate5_csdata.RData")
+load("data/fake_signal_replicate3_csdata.RData")
 csd5=csd
 #cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
 cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
-cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 4, base.res=10000,
+cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 15, base.res=10000,
                iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=10, fit.signal=T)
 #cs@par$signal[,phi:=2*phi]
 cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 5, base.res=20000,
@@ -118,7 +118,7 @@ ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+facet_wrap(~
 ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi==0))+facet_wrap(~ step)#+scale_fill_gradient2()
 
 #last signal
-ggplot(signals[step==step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+
+ggplot(cs@par$signal)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+
   facet_wrap(~name)+scale_fill_gradient(high=muted("red"), low="white", na.value = "white")
 
 
@@ -219,20 +219,24 @@ ggplot(melt(data.table(x=seq(1,100),a=eigen(a)$vectors[,val], b=eigen(b,symmetri
 
 
 
-resolution=5000
+resolution=20000
 ncores=30
 cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
 mat=get_matrices(cs, resolution=resolution, group="all")
 #observed
-ggplot(mat)+geom_raster(aes(begin1,begin2,fill=observed))+
-  geom_raster(aes(begin2,begin1,fill=observed))+facet_wrap(~name)+
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=pmin(observed,5)))+
+  geom_raster(aes(begin2,begin1,fill=pmin(observed,5)))+facet_wrap(~name)+
   scale_fill_gradient(high="red", low="white", na.value = "white")
 #ggsave(filename="fake_observed_20k.png",width=15,height=7)
 #expected
 ggplot(mat)+geom_raster(aes(begin1,begin2,fill=expected))+facet_wrap(~name)+
   scale_fill_gradient(high="red", low="white", na.value = "white")
 #observed vs expected
-ggplot(mat)+geom_raster(aes(begin1,begin2,fill=expected))+geom_raster(aes(begin2,begin1,fill=observed))+facet_wrap(~name)+
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=pmin(expected,5)))+geom_raster(aes(begin2,begin1,fill=pmin(observed,5)))+facet_wrap(~name)+
+  scale_fill_gradient(high="red", low="white", na.value = "white")
+#observed/expected
+ggplot(mat)+geom_raster(aes(begin1,begin2,fill=observed/expected))+
+  geom_raster(aes(begin2,begin1,fill=observed/expected))+facet_wrap(~name)+
   scale_fill_gradient(high="red", low="white", na.value = "white")
 #expected vs ice
 iced=iterative_normalization(mat)
@@ -241,7 +245,7 @@ ggplot(mat)+geom_raster(aes(begin1,begin2,fill=expected))+
   scale_fill_gradient(high="red", low="white", na.value = "white")
 ggsave(filename="fake_expected_with_ice_20k.png",width=15,height=7)
 #signal
-ggplot(mat)+geom_raster(aes(begin2,begin1,fill=signal))+geom_raster(aes(begin1,begin2,fill=signal))+facet_wrap(~name)+
+ggplot(mat)+geom_raster(aes(begin2,begin1,fill=pmin(signal,5)))+geom_raster(aes(begin1,begin2,fill=pmin(signal,5)))+facet_wrap(~name)+
   scale_fill_gradient(high="black", low="white", na.value = "white")
 ggplot(mat[begin2<73900000&begin1>73850000])+geom_raster(aes(bin2,bin1,fill=signal))+geom_raster(aes(bin1,bin2,fill=signal))+facet_wrap(~name)+
   scale_fill_gradient(high="black", low="white", na.value = "white")
@@ -300,7 +304,7 @@ save(cs,file="data/fake_signal_csnorm_optimized.RData")
 
 
 cs=detect_binless_differences(cs, resolution=resolution, group="all", ncores=ncores,
-                              ref=as.character(cs@experiments[1,name]), niter=5)
+                              ref=as.character(cs@experiments[1,name]), niter=3)
 mat=get_interactions(cs, type="bdifferences", resolution=resolution, group="all", threshold=-1,
                      ref=as.character(cs@experiments[1,name]))
 ggplot(mat)+geom_raster(aes(begin1,begin2,fill=delta))+
@@ -311,29 +315,13 @@ save(cs, file=fname)
 
 
 
+mat=get_interactions(cs, type="binteractions", resolution=resolution, group="all", threshold=-1, ref="expected")
+write.table(mat, file = "data/ledily_data5k.dat", row.names = F)
+write.table(dmat, file = "data/ledily_differences.dat", row.names = F)
 
-plot_raw(csd@data, b1=73825158, e1=73830158, b2=74080158, e2=74085158)
-cs@biases[name==name[1]&pos>=73825158&pos<73830158]
-cs@biases[name==name[1]&pos>=74080158&pos<74085158]
-pos1=cs@biases[name==name[1]&pos>=73825158&pos<73830158,pos]
-pos2=cs@biases[name==name[1]&pos>=74080158&pos<74085158,pos]
-a=CJ(pos1=pos1,pos2=pos2)[pos1<pos2,.(pos1,pos2,distance=pos2-pos1)]
-a[,dbin:=cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-
-cs@biases[name==name[1]&pos>=73827178+251188.643151&pos<73827178+257039.578277]
-
-#dmin
-74085158-73825158
-#dmax
-74080158-73830158
-#dbin sz
-257039.578277-251188.643151
-
-
-dbs=cs@zeros$bg[name==name[1]&pos>=73825158&pos<73830158][,sort(unique(dbin))][209:211]
-cs@zeros$bg[name==name[1]&pos>=73825158&pos<73830158&dbin%in%dbs]
-
-cs@zeros$sig[name==name[1]&bin1=="[73825158,73830158)"&bin2=="[74080158,74085158)"]
-
-
+dmat=get_interactions(cs, type="bdifferences", resolution=resolution, group="all", threshold=-1,
+                     ref=as.character(cs@experiments[1,name]))
+ggplot(mat[begin1>1.51e8&begin2<1.52e8])+geom_raster(aes(begin1,begin2,fill=phi/max(abs(phi))))+
+  geom_raster(aes(begin2,begin1,fill=delta/max(abs(delta))),data=dmat[begin1>1.51e8&begin2<1.52e8])+
+  facet_wrap(~name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")
 

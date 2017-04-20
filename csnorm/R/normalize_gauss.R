@@ -745,14 +745,14 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   #perform fused lasso on signal
   groupnames=mat[,unique(name)]
   registerDoParallel(cores=ncores)
-  params = foreach(g=groupnames, .combine=rbind) %dopar%
+  params = foreach(g=groupnames, .combine=rbind) %do%
     csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, positive=T, tol=tol, ncores=ncores, verbose=verbose)
   #compute matrix at new params
   #save(mat,params,file=paste0("mat_step_",step,".RData"))
-  mat = foreach (g=groupnames, .combine=rbind) %dopar% {
+  mat = foreach (g=groupnames, .combine=rbind) %do% {
     p=params[name==g]
     matg=mat[name==g]
-    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, cs@settings$trails, p$lambda1, p$lambda2, p$eCprime)]
+    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, cs@settings$trails, p$lambda1, p$lambda2, p$eCprime, nthreads=ncores)]
     matg
   }
   #store new signal in cs and update eC
