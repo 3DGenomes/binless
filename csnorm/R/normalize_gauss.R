@@ -152,6 +152,16 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
   return(csd)
 }
 
+#' Generate cubic spline
+#' @keywords internal
+#' 
+csnorm_generate_cubic_spline = function(cutsites, Krow, sparse=F) {
+  splinedegree=3 #Cubic spline
+  dx = 1.01*(max(cutsites)-min(cutsites))/(Krow-splinedegree)
+  t = min(cutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
+  return(spline.des(cutsites, knots = t, outer.ok = T, sparse=sparse)$design)
+}
+  
 #' Optimize decay parameters
 #' @keywords internal
 #' 
@@ -162,15 +172,12 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
   TotalDsets = design[,.N]
   XD=as.array(design[,decay])
   
-  all_beta_diag = matrix(0,nrow=TotalDsets,ncol=Kdiag)
-  all_beta_diag_diff = matrix(0,nrow=TotalDsets,ncol=Kdiag-2)
-  all_beta_diag_centered = c()
-  all_log_decay = c()
-  all_log_mean_counts = c()
-  all_eC = c()
-  all_value = 0
+  decay_out = list(beta_diag = matrix(0,nrow=TotalDsets,ncol=Kdiag),
+                   beta_diag_diff = matrix(0,nrow=TotalDsets,ncol=Kdiag-2),
+                   beta_diag_centered = c(), log_decay = c(), log_mean_counts = c(),
+                   eC = c(),value = 0)
   if (type=="perf") {
-    all_lambda_diag = c()
+    decay_out$lambda_diag = c()
   }
   for(uXD in unique(XD)) {
     if (verbose==T) cat("  group",uXD,"\n")
@@ -183,14 +190,9 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
       }
     }
     SD = cbegin[2]-cbegin[1]
-    #sparse spline design
     cutsites = csd[,distance][cbegin[1]:(cbegin[2]-1)]
-    q = 3
-    dx = 1.01*(max(log(cutsites))-min(log(cutsites)))/(Kdiag-q)
-    t = min(log(cutsites)) - dx*0.01 + dx * seq(-q,Kdiag-q+3)
-    X = spline.des(log(cutsites), knots = t, outer.ok = T, sparse=F)$design
+    X = csnorm_generate_cubic_spline(log(cutsites), Kdiag, sparse=F)
     W=csd[,weight][cbegin[1]:(cbegin[2]-1)]
-    stan_W = W
     diags = list(rep(1,Kdiag), rep(-2,Kdiag))
     D = bandSparse(Kdiag-2, Kdiag, k=0:2, diagonals=c(diags, diags[1]))
     if (type=="outer" || (!is.null(original_lambda_diag))) {
@@ -204,14 +206,11 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     if (Dsets > 1) {
       for (d in 2:Dsets) {
         ncutsites = csd[,distance][cbegin[(2*d-1)]:(cbegin[2*d]-1)]
-        dx = 1.01*(max(log(ncutsites))-min(log(ncutsites)))/(Kdiag-q)
-        t = min(log(ncutsites)) - dx*0.01 + dx * seq(-q,Kdiag-q+3)
-        nBsp = spline.des(log(ncutsites), knots = t, outer.ok = T, sparse=F)$design
+        nBsp = csnorm_generate_cubic_spline(log(ncutsites), Kdiag, sparse=F)
         cutsites = c(cutsites,ncutsites)
         X = rbind(X,nBsp)
         SDd = cbegin[2*d]-cbegin[(2*d-1)]
         W = c(W,c(rep(0,SDd)))
-        stan_W=c(stan_W,csd[,weight][cbegin[(2*d-1)]:(cbegin[2*d]-1)])
         nU_e = Matrix(rep.int(1,SDd),ncol=1)
         U_e = bdiag(U_e,nU_e) 
         kappa_hat=c(kappa_hat,csd[,kappahat][cbegin[(2*d-1)]:(cbegin[2*d]-1)])
@@ -269,42 +268,28 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     }
     for (d2 in 1:TotalDsets) {
       if(XD[d2] == uXD) {
-        all_beta_diag[d2,] = as.array(beta)
-        all_beta_diag_diff[d2,] = as.array(D%*%beta)
-        all_beta_diag_centered = c(all_beta_diag_centered,as.array(beta))
+        decay_out$beta_diag[d2,] = as.array(beta)
+        decay_out$beta_diag_diff[d2,] = as.array(D%*%beta)
+        decay_out$beta_diag_centered = c(decay_out$beta_diag_centered,as.array(beta))
       }
     }
-    all_log_mean_counts = c(all_log_mean_counts,as.array(log_mean_counts))
-    all_log_decay = c(all_log_decay,log_decay)
-    all_eC = c(all_eC,eC)
+    decay_out$log_mean_counts = c(decay_out$log_mean_counts,as.array(log_mean_counts))
+    decay_out$log_decay = c(decay_out$log_decay,log_decay)
+    decay_out$eC = c(decay_out$eC,eC)
     if (type=="perf") {
-      all_lambda_diag = c(all_lambda_diag,lambda_diag)
+      decay_out$lambda_diag = c(decay_out$lambda_diag,lambda_diag)
     }
     
-    mus = sdl
-    all_value = sum(dnorm(kappa_hat, mean = as.array(all_log_mean_counts), sd = as.array(mus), log = TRUE))
+    decay_out$value = sum(dnorm(kappa_hat, mean = as.array(decay_out$log_mean_counts), sd = as.array(sdl), log = TRUE))
     
   }
-  op = list()
-  attr(op,'par')
-  for(nattr in list('beta_diag_centered','beta_diag','beta_diag_diff','log_decay','log_mean_counts','eC','lambda_diag','value','decay')) {
-    attr(op$par,nattr)
-  }
-  op$par$beta_diag_centered=as.array(all_beta_diag_centered)
-  op$par$beta_diag=as.matrix(all_beta_diag)
-  op$par$beta_diag_diff=as.matrix(all_beta_diag_diff)
-  op$par$log_mean_counts=as.array(all_log_mean_counts)
-  op$par$log_decay=as.array(all_log_decay)
-  op$par$eC=as.array(all_eC)
-  if (type=="perf") {
-    op$par$lambda_diag = as.array(all_lambda_diag)
-  }
-  op$par$value = all_value
+  decay_out$beta_diag=as.matrix(decay_out$beta_diag)
+  decay_out$beta_diag_diff=as.matrix(decay_out$beta_diag_diff)
   #make decay data table, reused at next call
-  dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=all_log_mean_counts,log_decay=all_log_decay)]
+  dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=decay_out$log_mean_counts,log_decay=decay_out$log_decay)]
   setkey(dmat,name,dbin)
-  op$par$decay=dmat 
-  return(op)
+  decay_out$decay=dmat 
+  return(decay_out)
 }
 
 #' Single-cpu simplified fitting for iota and rho
@@ -323,7 +308,7 @@ csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", type=c("outer","p
                                             type, verbose=verbose, max_perf_iteration=max_perf_iteration,
                                             convergence_epsilon=convergence_epsilon)
   #update par slot
-  cs@par=modifyList(cs@par, op$par)
+  cs@par=modifyList(cs@par, op)
   return(cs)
 }
 
@@ -426,12 +411,8 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       }
     }
     SD = bbegin[2]-bbegin[1]
-    #sparse spline design
-    splinedegree=3 #Cubic spline
     cutsites = biases[,pos][bbegin[1]:(bbegin[2]-1)]
-    dx = 1.01*(max(cutsites)-min(cutsites))/(Krow-splinedegree)
-    t = min(cutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
-    Bsp = spline.des(cutsites, knots = t, outer.ok = T, sparse=T)$design
+    Bsp = csnorm_generate_cubic_spline(cutsites, Krow, sparse=T)
     X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
     if (is.null(sbins)) {
       centering=Matrix(rep(1,SD),ncol=1)
@@ -467,9 +448,7 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     if (Dsets > 1) {
       for (d in 2:Dsets) {
         ncutsites = biases[,pos][bbegin[(2*d-1)]:(bbegin[2*d]-1)]
-        dx = 1.01*(max(ncutsites)-min(ncutsites))/(Krow-splinedegree)
-        t = min(ncutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
-        nBsp = spline.des(ncutsites, knots = t, outer.ok = T, sparse=T)$design
+        nBsp  = csnorm_generate_cubic_spline(ncutsites, Krow, sparse=T)
         cutsites = c(cutsites,ncutsites)
         nX = rbind(cbind(nBsp/2,nBsp/2),bdiag(nBsp,nBsp),bdiag(nBsp,nBsp))
         SDd = bbegin[2*d]-bbegin[(2*d-1)]

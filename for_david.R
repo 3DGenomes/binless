@@ -6,10 +6,10 @@ library(foreach)
 library(scales)
 
 
-# load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIIdSMC_all_csdata.RData"))
-# csd1 = csd
-# load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIInov_all_csdata.RData"))
-# csd2 = csd
+load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIIdSMC_all_csdata.RData"))
+csd1 = csd
+load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIInov_all_csdata.RData"))
+csd2 = csd
 # load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIIr1_all_csdata.RData"))
 # csd3 = csd
 # load(file=paste0("/scratch/workspace/csnorm_data/data/caulo_BglIIr2_all_csdata.RData"))
@@ -24,7 +24,7 @@ bpk=3
 type="perf"
 
 setwd("/scratch/workspace/csnorm")
-load('cs_r_3_5_ledily.RData')
+#load('cs_r_3_5_ledily.RData')
 #merge datasets
 load(paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_GM12878_",sub,"_csdata.RData"))
 csd1=csd
@@ -40,7 +40,7 @@ csd4 = csd
 csd4@info$replicate="1"
 csd4@info$name="T47D es 60 MboI 3"
 
-cs_r=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
+cs_r=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
 cs_r=merge_cs_norm_datasets(list(csd1), different.decays="none")
 cs_stan=merge_cs_norm_datasets(list(csd1), different.decays="none")
 
