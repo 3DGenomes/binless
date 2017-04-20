@@ -24,29 +24,6 @@ fill_parameters_perf = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.ge
   cs
 }
 
-#' Compute decay etahat and weights using data as initial guess
-#' @keywords internal
-#' 
-fill_parameters_outer = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.genomic=T, fit.disp=T) {
-  nBiases=cs@design[,uniqueN(genomic)]
-  Decays=cs@design[,uniqueN(decay)]
-  init=list(alpha=dispersion,
-            lambda_iota=array(lambda,dim=nBiases), lambda_rho=array(lambda,dim=nBiases), lambda_diag=array(lambda,dim=Decays))
-  if (fit.decay==F) {
-    Kdiag=cs@settings$Kdiag
-    beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
-    init=c(init,list(beta_diag=beta_diag))
-  }
-  if (fit.genomic==F) {
-    init=c(init,list(log_iota=array(0,dim=cs@biases[,.N]), log_rho=array(0,dim=cs@biases[,.N])))
-  }
-  if (fit.genomic==F || fit.decay==F || fit.disp==F) {
-    init=c(init,list(eC=array(0,dim=cs@design[,.N]),  eRJ=array(0,dim=cs@design[,.N]),  eDE=array(0,dim=cs@design[,.N])))
-  }
-  cs@par=init
-  cs
-}
-
 #' Compute decay etahat and weights using data as initial guess. Signal is assumed to be zero.
 #' @keywords internal
 #' 
@@ -165,7 +142,7 @@ csnorm_generate_cubic_spline = function(cutsites, Krow, sparse=F) {
 #' Optimize decay parameters
 #' @keywords internal
 #' 
-csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag, type,
+csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
                                        verbose=T, max_perf_iteration=1000, convergence_epsilon=1e-9) {
   Totalcbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
   #cbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
@@ -176,9 +153,7 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
                    beta_diag_diff = matrix(0,nrow=TotalDsets,ncol=Kdiag-2),
                    beta_diag_centered = c(), log_decay = c(), log_mean_counts = c(),
                    eC = c(),value = 0)
-  if (type=="perf") {
-    decay_out$lambda_diag = c()
-  }
+  decay_out$lambda_diag = c()
   for(uXD in unique(XD)) {
     if (verbose==T) cat("  group",uXD,"\n")
     Dsets = 0
@@ -195,7 +170,7 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     W=csd[,weight][cbegin[1]:(cbegin[2]-1)]
     diags = list(rep(1,Kdiag), rep(-2,Kdiag))
     D = bandSparse(Kdiag-2, Kdiag, k=0:2, diagonals=c(diags, diags[1]))
-    if (type=="outer" || (!is.null(original_lambda_diag))) {
+    if (!is.null(original_lambda_diag)) {
       lambda_diag = original_lambda_diag[uXD]
     } else {
       lambda_diag = 1
@@ -244,8 +219,6 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
       eC=as.array(betat[1:Dsets])
       beta=betat[(Dsets+1):(Kdiag+Dsets)]
       
-      if(type == 'outer') break
-      
       nlambda_diag = (Kdiag - 2)/((Kdiag^2)*crossprod(D%*%beta)+1)
       nlambda_diag = sqrt(as.numeric(nlambda_diag))
       
@@ -276,9 +249,7 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     decay_out$log_mean_counts = c(decay_out$log_mean_counts,as.array(log_mean_counts))
     decay_out$log_decay = c(decay_out$log_decay,log_decay)
     decay_out$eC = c(decay_out$eC,eC)
-    if (type=="perf") {
-      decay_out$lambda_diag = c(decay_out$lambda_diag,lambda_diag)
-    }
+    decay_out$lambda_diag = c(decay_out$lambda_diag,lambda_diag)
     
     decay_out$value = sum(dnorm(kappa_hat, mean = as.array(decay_out$log_mean_counts), sd = as.array(sdl), log = TRUE))
     
@@ -295,9 +266,8 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", type=c("outer","perf"), max_perf_iteration=1000, convergence_epsilon=1e-9) {
+csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", max_perf_iteration=1000, convergence_epsilon=1e-9) {
   if (verbose==T) cat(" Decay\n")
-  type=match.arg(type)
   if (init.mean=="mean") {
     csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
   } else {
@@ -305,7 +275,7 @@ csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", type=c("outer","p
   }
   #run optimization
   op = csnorm:::csnorm_gauss_decay_optimize(csd, cs@design, cs@settings$Kdiag, cs@par$lambda_diag,
-                                            type, verbose=verbose, max_perf_iteration=max_perf_iteration,
+                                            verbose=verbose, max_perf_iteration=max_perf_iteration,
                                             convergence_epsilon=convergence_epsilon)
   #update par slot
   cs@par=modifyList(cs@par, op)
@@ -373,7 +343,7 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
 
 
 csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
-                                         lambda_iota, lambda_rho, type, verbose=T,
+                                         lambda_iota, lambda_rho, verbose=T,
                                          max_perf_iteration=1000, convergence_epsilon=1e-5) {
   XB = as.array(design[,genomic])
   
@@ -395,10 +365,8 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
   all_eC = c()
   all_eDE = c()
   all_eRJ = c()
-  if (type=="perf") {
-    all_lambda_iota = c()
-    all_lambda_rho = c()
-  }
+  all_lambda_iota = c()
+  all_lambda_rho = c()
   
   for(uXB in unique(XB)) {
     if (verbose==T) cat("  group",uXB,"\n")
@@ -426,7 +394,7 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
             rbind(Matrix(0,nrow=4*SD,ncol=ncol(centering)),centering))
     diags = list(rep(1,Krow), rep(-2,Krow))
     D1 = bandSparse(Krow-2, Krow, k=0:2, diagonals=c(diags, diags[1]))
-    if (type=="outer" || (!is.null(lambda_iota) && !is.null(lambda_rho))) {
+    if (!is.null(lambda_iota) && !is.null(lambda_rho)) {
       lambda_iota = lambda_iota[uXB]
       lambda_rho = lambda_rho[uXB]
     } else {
@@ -523,8 +491,6 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       beta_iota = beta[1:Krow]
       beta_rho = beta[(Krow+1):(2*Krow)]
       
-      if(type == 'outer') break
-      
       nlambda_iota = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_iota)+1e6)
       nlambda_iota = sqrt(as.numeric(nlambda_iota))
       nlambda_rho = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_rho)+1e6)
@@ -594,10 +560,8 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     all_eC = c(all_eC,eC)
     all_eRJ = c(all_eRJ,eRJ)
     all_eDE = c(all_eDE,eDE)
-    if (type=="perf") {
-      all_lambda_iota = c(all_lambda_iota,lambda_iota)
-      all_lambda_rho = c(all_lambda_rho,lambda_rho)
-    }
+    all_lambda_iota = c(all_lambda_iota,lambda_iota)
+    all_lambda_rho = c(all_lambda_rho,lambda_rho)
     op = list(par=list())
     op$par$beta_iota=as.array(all_beta_iota)
     op$par$beta_rho=as.array(all_beta_rho)
@@ -608,10 +572,8 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     op$par$eC=as.array(all_eC)
     op$par$eRJ=as.array(all_eRJ)
     op$par$eDE=as.array(all_eDE)
-    if (type=="perf") {
-      op$par$lambda_iota = as.array(all_lambda_iota)
-      op$par$lambda_rho = as.array(all_lambda_rho)
-    }
+    op$par$lambda_iota = as.array(all_lambda_iota)
+    op$par$lambda_rho = as.array(all_lambda_rho)
     means = cbind(all_log_mean_RJ,all_log_mean_DL,all_log_mean_DR,all_log_mean_cleft,all_log_mean_cright)
     mus = cbind(sd_RJ,sd_DL,sd_DR,sd_L,sd_R)
     op$par$value = sum(dnorm(etas, mean = as.array(means), sd = as.array(mus), log = TRUE))
@@ -634,9 +596,8 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","outer"), max_perf_iteration=1000, convergence_epsilon=1e-5) {
+csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", max_perf_iteration=1000, convergence_epsilon=1e-5) {
   if (verbose==T) cat(" Genomic\n")
-  type=match.arg(type)
   if (init.mean=="mean") {
     a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
   } else {
@@ -649,7 +610,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
   }
   #run optimization
   op = csnorm:::csnorm_gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, sbins,
-                                              cs@par$lambda_iota, cs@par$lambda_rho, type, verbose=verbose,
+                                              cs@par$lambda_iota, cs@par$lambda_rho, verbose=verbose,
                                               max_perf_iteration=max_perf_iteration,
                                               convergence_epsilon=convergence_epsilon)
   #update par slot
@@ -660,9 +621,8 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", type=c("perf","
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
 #' 
-csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T, init_alpha=1e-7, type=c("outer","perf"), ncores=ncores) {
+csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T, init_alpha=1e-7, ncores=ncores) {
   if (verbose==T) cat(" Dispersion\n")
-  type=match.arg(type)
   #predict all means and put into table
   counts=csnorm:::csnorm_predict_all_parallel(cs,counts,ncores = ncores)
   setkeyv(counts,key(cs@counts))
@@ -706,21 +666,9 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   #cs@par$eC=cs@par$eC+op$par$eC_sup
   if (verbose==T) cat("  fit: dispersion",cs@par$alpha,"\n")
   #
-  #estimate lambdas if outer iteration
+  #compute log-posterior
   Krow=cs@settings$Krow
   Kdiag=cs@settings$Kdiag
-  if (type=="outer") {
-    lambdas = copy(cs@design)
-    lambdas[,lambda_iota:=sqrt((Krow-2)/(Krow^2*diag(tcrossprod(cs@par$beta_iota_diff))+1e6))] #sigma=1e-3 for genomic
-    lambdas[,lambda_rho:=sqrt((Krow-2)/(Krow^2*diag(tcrossprod(cs@par$beta_rho_diff))+1e6))]
-    lambdas[,lambda_diag:=sqrt((Kdiag-2)/(Kdiag^2*diag(tcrossprod(cs@par$beta_diag_diff))+1))] #sigma=1 for decay
-    
-    cs@par$lambda_iota=as.array(lambdas[unique(genomic)][order(genomic),lambda_iota])
-    cs@par$lambda_rho=as.array(lambdas[unique(genomic)][order(genomic),lambda_rho])
-    cs@par$lambda_diag=as.array(lambdas[unique(decay)][order(decay),lambda_diag])
-  }
-  #
-  #compute log-posterior
   cs@par$value = op$value + (Krow-2)/2*sum(log(cs@par$lambda_iota/exp(1))+log(cs@par$lambda_rho/exp(1))) +
     (Kdiag-2)/2*sum(log(cs@par$lambda_diag/exp(1)))
   return(cs)
@@ -940,10 +888,6 @@ plot_diagnostics = function(cs) {
 #'   line search.
 #' @param init.dispersion positive numeric. Value of the dispersion to use initially.
 #' @param tol.obj positive numeric (default 1e-1). Convergence tolerance on changes in the three likelihoods.
-#' @param type character. Type of iteration to perform. The outer iteration ("outer", default) optimizes
-#'   penalties with the dispersion parameter. The performance iteration ("perf") optimizes penalties with
-#'   the biases. It is recommended to try performance iteration, but if convergence fails to revert to outer
-#'   iteration.
 #' @param ncores positive integer (default 1). Number of cores to use for initialization and dispersion step.
 #'   
 #' @return A csnorm object
@@ -954,13 +898,12 @@ plot_diagnostics = function(cs) {
 run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
                      ngibbs = 20, iter=10000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
                      verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
-                     tol.obj=1e-1, type="perf", ncores=1) {
+                     tol.obj=1e-1, ncores=1) {
   #basic checks
-  type=match.arg(type,c("outer","perf"))
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
   #
-  if (verbose==T) cat("Normalization with fast approximation and",type,"iteration\n")
+  if (verbose==T) cat("Normalization with fast approximation and performance iteration\n")
   setkey(cs@biases, id, name)
   setkey(cs@counts, id1, id2, name)
   if (restart==F) {
@@ -978,13 +921,8 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     cs@diagnostics=list()
     laststep=0
     init.mean="data"
-    if (type=="outer") {
-      cs=csnorm:::fill_parameters_outer(cs, dispersion=init.dispersion, fit.decay=fit.decay,
-                                        fit.genomic=fit.genomic, fit.disp=fit.disp)
-    } else {
-      cs=csnorm:::fill_parameters_perf(cs, dispersion=init.dispersion, fit.decay=fit.decay,
-                                       fit.genomic=fit.genomic, fit.disp=fit.disp)
-    }
+    cs=csnorm:::fill_parameters_perf(cs, dispersion=init.dispersion, fit.decay=fit.decay,
+                                     fit.genomic=fit.genomic, fit.disp=fit.disp)
     #get number of zeros along cut sites and decay
     if(verbose==T) cat("Counting zeros\n")
     stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
@@ -1014,28 +952,28 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     if (verbose==T) cat("\n### Iteration",i,"\n")
     #fit diagonal decay given iota and rho
     if (fit.decay==T) {
-      a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean, type=type))
-      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4], type=type)
+      a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean))
+      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
       if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     }
     #fit iota and rho given diagonal decay
     if (fit.genomic==T) {
-      a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean, type=type))
-      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4], type=type)
+      a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean))
+      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
       if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     }
     init.mean="mean"
     #fit signal using sparse fused lasso
     if (fit.signal==T) {
       a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, ncores=ncores))
-      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4], type="perf")
+      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
       if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
     }
     #fit dispersion
     if (fit.disp==T) {
       a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight,
-                                                          init_alpha=init_alpha, type=type, ncores = ncores))
-      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4], type=type)
+                                                          init_alpha=init_alpha, ncores = ncores))
+      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
       if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
     }
     if (i-laststep>1) if (has_converged(cs)) {
