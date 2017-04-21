@@ -438,7 +438,7 @@ generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1
                                 enzyme=enzyme, experiment="Hi-C",
                                 dangling.L="NA", dangling.R="NA", maxlen="NA",
                                 filename="NA"),
-            settings=list(circularize=-1, dmin=dmin, dmax=dmax, qmin=0, qmax=1),
+            settings=list(circularize=-1, dmin=dmin, dmax=dmax),
             data=data.table(), biases=biases, counts=counts)
   return(csd)
 }
@@ -504,10 +504,6 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000, s
 #' @param dmin numeric. Minimum disrance between cut sites to consider this as a
 #'   contact. Note that this setting will only be enforced upon merging, and the
 #'   returned object might contain contacts at a smaller distance.
-#' @param qmin,qmax lower and upper quantile (default 0.01 and 0.99) of total
-#'   read count per cut site. Used to determine abnormal cut sites that are to
-#'   be discarded prior to normalization. As dmin, these parameters are only
-#'   enforced upon merging.
 #' @param save.data boolean. Whether to save a CSdata object that contains the
 #'   raw data
 #'   
@@ -518,7 +514,7 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000, s
 read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "HindIII", experiment = "Hi-C",
                             name = paste(condition, enzyme, replicate), skip = 0L, nrows = -1L,
                             circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1), maxlen = 600,
-                            read.len=40, dmin=2000, qmin=0.02, qmax=0.99, save.data=T) {
+                            read.len=40, dmin=2000, save.data=T) {
   match.arg(experiment)
   cat("*** READ\n")
   data=read_tsv(infile, skip=skip, nrows=nrows)
@@ -539,7 +535,7 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "H
                                 enzyme=enzyme, experiment=experiment,
                                 dangling.L=deparse(dangling.L), dangling.R=deparse(dangling.R), maxlen=maxlen,
                                 filename=infile),
-            settings=list(circularize=circularize, dmin=dmin, dmax=dmax, qmin=qmin, qmax=qmax),
+            settings=list(circularize=circularize, dmin=dmin, dmax=dmax),
             data=data, biases=cs_data$biases, counts=cs_data$counts)
   if (save.data==T) save(csd, file=paste0(outprefix,"_csdata_with_data.RData"))
   csd@data=data.table()
@@ -580,33 +576,7 @@ fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
   return(list(biases=biases,counts=counts))
 }
 
-#' Remove cut sites above or below the quantiles specified in the csd object
-#'
-#' @param csd CSData object
-#' @keywords internal
-#' @return a list with filtered biases and counts
-#'
-remove_suspicious_cut_sites = function(biases,counts,name,qmin,qmax) {
-  #sum all counts on each cut site
-  cts=melt(biases,id.vars=c("id","pos"))[,.(value=sum(value)),by="id"]
-  #get limits and filter out cut sites
-  limits=cts[,quantile(value,c(qmin,qmax))]
-  bad_ids=cts[value>limits[2]|value<limits[1],id]
-  cat(name, ": removed ", length(bad_ids), " extreme cut sites (", length(bad_ids)/cts[,.N]*100, " %)\n")
-  biases=biases[!(id%in%bad_ids)]
-  counts=counts[!(id1%in%bad_ids|id2%in% bad_ids)]
-  #reorganize ids
-  biases[,newid:=.I]
-  counts=merge(counts,biases[,.(id,newid)],by.x="id1",by.y="id")
-  counts=merge(counts,biases[,.(id,newid)],by.x="id2",by.y="id",suffixes=c("1","2"))
-  biases[,id:=NULL]
-  counts[,c("id1","id2"):=list(NULL,NULL)]
-  setnames(biases,"newid","id")
-  setnames(counts,c("newid1","newid2"),c("id1","id2"))
-  return(list(biases=biases,counts=counts))
-}
-
-#' Perform pruning / fusing of cut sites
+#' Perform fusing of cut sites
 #'
 #' @param csd CSData object
 #' @keywords internal
@@ -615,7 +585,6 @@ remove_suspicious_cut_sites = function(biases,counts,name,qmin,qmax) {
 clean_cut_sites = function(csd) {
   stuff = fuse_close_cut_sites(csd@biases,csd@counts,csd@settings$dfuse,
                                csd@info$name,csd@settings$circularize)
-  stuff = remove_suspicious_cut_sites(stuff$biases, stuff$counts, csd@info$name, csd@settings$qmin, csd@settings$qmax)
   return(stuff)
 }
 
@@ -633,12 +602,13 @@ clean_cut_sites = function(csd) {
 #'   "enzyme", experiments with a different enzyme get their own decay. If
 #'   "condition", experiments with a different condition get their own decay.
 #'   Arguments can be abbreviated and combined
+#' @param qmax Discard at most a fraction qmax of signal rows who do not have signal along the diagonal (default 0.05)
 #'
 #' @return CSnorm object
 #' @export
 #'
 #' @examples
-merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enzyme","condition")) {
+merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enzyme","condition"), qmax=0.05) {
   cat("compile table of experiments, sorted by id\n")
   experiments = rbindlist(lapply(datasets, function(x) x@info))
   experiments[,name:=ordered(name, levels=name)]
@@ -648,6 +618,7 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
     stop("all experiments must have the same dmin, circularize settings!")
   settings=datasets[[1]]@settings[c("dmin","circularize","dfuse")]
   settings$dmax=max(sapply(datasets, function(x) x@settings$dmax))
+  settings$qmax=qmax
   #
   filtered = lapply(datasets, clean_cut_sites)
   biases = lapply(filtered, function(x) x$biases)
