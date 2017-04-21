@@ -116,11 +116,11 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
     {
         if (breakpoints[i]-breakpoints[i-1] > wbufsize) { wbufsize = breakpoints[i]-breakpoints[i-1]; }
     }
-    z_wbuff = (double *) malloc(nz * sizeof(double));
-    z_ybuff = (double *) malloc(nz * sizeof(double));
+    z_wbuff         = (double *) malloc(wbufsize * sizeof(double));
+    z_ybuff         = (double *) malloc(wbufsize * sizeof(double));
 
     /* weight for each fused lasso */
-    for (i = 0; i < nz; i++) { z_wbuff[i] = alpha / 2.0; }
+    for (i = 0; i < wbufsize; i++) { z_wbuff[i] = alpha / 2.0; }
 
     /* Create map from z to beta */
     for (i = 0; i < nz; i++){ nzmap[trails[i]]++; } /* number of repetitions of beta_i */
@@ -142,57 +142,45 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
     cur_converge = converge + 1;
 
     /* Perform the ADMM iterations until convergence */
-    #pragma omp parallel
+    while(step < maxsteps && cur_converge > converge)
     {
-        while(step < maxsteps && cur_converge > converge)
+        /* Update beta */
+        if (w)
+            update_beta_weight(n, y, w, z, u, nzmap, zmap, alpha, beta);
+        else
+            update_beta(n, y, z, u, nzmap, zmap, alpha, beta);
+
+        /* swap the z buffers */
+        ztemp = z;
+        z = zold;
+        zold = ztemp;
+        
+        /* Update each trail dual variable */
+        update_z(ntrails, trails, breakpoints, beta, u, lam, z_ybuff, z_wbuff, tf_dp_buf, z);
+
+        /* Update the scaled dual variable */
+        update_u(n, beta, z, zmap, nzmap, u);
+
+        /* Update the convergence diagnostics */
+        presnorm = primal_resnorm(n, beta, z, nzmap, zmap);
+        dresnorm = dual_resnorm(nz, z, zold, alpha);
+        cur_converge = MAX(presnorm, dresnorm);
+
+        /* Varying penalty parameter */
+        if (step % VARYING_PENALTY_DELAY == 0 && presnorm > 10 * dresnorm)
         {
-            #pragma omp single
-            {
-                /* Update beta */
-                if (w)
-                    update_beta_weight(n, y, w, z, u, nzmap, zmap, alpha, beta);
-                else
-                    update_beta(n, y, z, u, nzmap, zmap, alpha, beta);
-
-                /* swap the z buffers */
-                ztemp = z;
-                z = zold;
-                zold = ztemp;
-            }
-            
-            /* Update each trail dual variable */
-            update_z(ntrails, trails, breakpoints, beta, u, lam, z_ybuff, z_wbuff, tf_dp_buf, z);
-
-            #pragma omp single
-            {
-                /* Update the scaled dual variable */
-                update_u(n, beta, z, zmap, nzmap, u);
-
-                /* Update the convergence diagnostics */
-                presnorm = primal_resnorm(n, beta, z, nzmap, zmap);
-                dresnorm = dual_resnorm(nz, z, zold, alpha);
-                cur_converge = MAX(presnorm, dresnorm);
-
-                /* Varying penalty parameter */
-                if (step % VARYING_PENALTY_DELAY == 0 && presnorm > 10 * dresnorm)
-                {
-                    alpha *= inflate;
-                    for(i = 0; i < nz; i++) {
-                        u[i] /= inflate;
-                        z_wbuff[i] = alpha / 2.0; /* weight for each fused lasso */
-                    }
-                }
-                else if (step % VARYING_PENALTY_DELAY == 0 && dresnorm > 10 * presnorm)
-                {
-                    alpha /= inflate;
-                    for(i = 0; i < nz; i++) {
-                        u[i] *= inflate;
-                        z_wbuff[i] = alpha / 2.0; /* weight for each fused lasso */
-                    }
-                }
-            step++;
-            }
+            alpha *= inflate;
+            for(i = 0; i < nz; i++){ u[i] /= inflate; }
+            for(i = 0; i < wbufsize; i++) { z_wbuff[i] = alpha / 2.0; } /* weight for each fused lasso */
         }
+        else if (step % VARYING_PENALTY_DELAY == 0 && dresnorm > 10 * presnorm)
+        {
+            alpha /= inflate;
+            for(i = 0; i < nz; i++){ u[i] *= inflate; }
+            for(i = 0; i < wbufsize; i++) { z_wbuff[i] = alpha / 2.0; } /* weight for each fused lasso */
+        }
+
+        step++;
     }
 
     /* Make sure to return the final z to the user */
@@ -455,30 +443,27 @@ void update_beta_weight(int n, double *y, double *w, double *z, double *u, int *
 
 void update_z(int ntrails, int *trails, int *breakpoints, double *beta, double *u, double lam, double *ybuf, double *wbuf, double *tf_dp_buf, double *z)
 {
-    #pragma omp single
-    {
-        /* Calculate the trail y values: (beta + u) */
-        int j;
-        for (j = 0; j < breakpoints[ntrails-1]; j++) { ybuf[j] = beta[trails[j]] + u[j]; }
-    }
+    int i;
+    int j;
+    int trailstart;
+    int trailend;
+    int trailsize;
+    double *x;
+    double *a;
+    double *b;
+    double *tm;
+    double *tp;
+    
+    trailstart = 0;
     
     /* Update each trail via a 1-d fused lasso. */
-    int i;
-    #pragma omp for private(i) schedule(static)
     for (i = 0; i < ntrails; i++)
     {
-        int trailstart;
-        int trailend;
-        int trailsize;
-        double *x;
-        double *a;
-        double *b;
-        double *tm;
-        double *tp;
-
         trailend = breakpoints[i];
-        if (i==0) { trailstart=0; } else { trailstart=breakpoints[i-1]; }
         trailsize = trailend - trailstart;
+
+        /* Calculate the trail y values: (beta + u) */
+        for (j = trailstart; j < trailend; j++) { ybuf[j-trailstart] = beta[trails[j]] + u[j]; }
 
         /* Calculate the starts of this z's buffers */
         x = tf_dp_buf + 8*trailstart - 2*i;
@@ -487,8 +472,10 @@ void update_z(int ntrails, int *trails, int *breakpoints, double *beta, double *
         tm = x + 6*trailsize;
         tp = x + 7*trailsize - 1;
         
-        tf_dp_weight(trailsize, ybuf + trailstart, wbuf + trailstart, lam, z + trailstart,
+        tf_dp_weight(trailsize, ybuf, wbuf, lam, z + trailstart,
                         x, a, b, tm, tp);
+        
+        trailstart = trailend;
     }
 }
 
