@@ -681,7 +681,25 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_predict_binned_counts_irls(cs, cs@settings$base.res, cs@zeros$sig)
   mat = csnorm:::csnorm_compute_raw_signal(cts, cs@par$alpha, cs@par$signal)
+  #
+  if (cs@par$signal[bin1==bin2,any(phi!=0)]) { #do not remove anything at first iteration
+    if (verbose==T) cat(" Remove bad bins\n")
+    tmp=cs@par$signal[bin1==bin2,.(is.bad=all(phi==0)),by=bin1][is.bad==T,unclass(bin1)]
+    if (length(cs@par$badbins)>0) tmp=union(tmp,cs@par$badbins)
+    if (length(tmp)>cs@settings$qmax*cs@par$signal[bin1==bin2&name==name[1],.N]) {
+      cat("Refusing to remove more signal rows than the fraction qmax=",cs@settings$qmax,"allows. Attempted:",
+          length(tmp),"allowed:",as.integer(cs@settings$qmax*cs@par$signal[bin1==bin2&name==name[1],.N]),"\n")
+    } else {
+      cs@par$badbins=tmp
+    }
+    if(length(cs@par$badbins)>0) {
+      cat("removing",length(cs@par$badbins),"bad signal rows\n")
+      mat[unclass(bin1) %in% cs@par$badbins | unclass(bin2) %in% cs@par$badbins, weight:=0]
+    }
+  }
+  #
   if (verbose==T) cat("  predict\n")
+  #ggplot(mat[bin1==bin2])+geom_point(aes(bin1,phi,colour=bin1%in%cs@par$badbins))+facet_wrap(~name)
   #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phihat))+facet_wrap(~name)
   #ggplot(mat[unclass(bin2)<23&unclass(bin1)>13])+geom_raster(aes(bin1,bin2,fill=phihat))+#geom_raster(aes(bin2,bin1,fill=phi))+
   #  facet_wrap(~name)+scale_fill_gradient2()
@@ -694,7 +712,8 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   groupnames=mat[,unique(name)]
   registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %dopar%
-    csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, positive=T, tol=tol, ncores=ncores, verbose=verbose)
+    csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, fixed=F, positive=T,
+                                tol=tol, ncores=ncores, verbose=verbose)
   #compute matrix at new params
   #save(mat,params,file=paste0("mat_step_",step,".RData"))
   mat = foreach (g=groupnames, .combine=rbind) %dopar% {
@@ -704,8 +723,9 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
     matg
   }
   #store new signal in cs and update eC
+  #mat[,phi.old:=phi]
   mat[,phi:=value]
-  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phihat))+
+  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+
   #  scale_fill_gradient2()
   #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
   setkey(mat,name,bin1,bin2)
