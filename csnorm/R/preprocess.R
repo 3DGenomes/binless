@@ -576,18 +576,6 @@ fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
   return(list(biases=biases,counts=counts))
 }
 
-#' Perform fusing of cut sites
-#'
-#' @param csd CSData object
-#' @keywords internal
-#' @return a list with filtered biases and counts
-#'
-clean_cut_sites = function(csd) {
-  stuff = fuse_close_cut_sites(csd@biases,csd@counts,csd@settings$dfuse,
-                               csd@info$name,csd@settings$circularize)
-  return(stuff)
-}
-
 #' Merge one or more CSdata objects into a CSnorm object and set experimental design
 #'
 #' This will do some cleanup on the data, namely:
@@ -602,25 +590,28 @@ clean_cut_sites = function(csd) {
 #'   "enzyme", experiments with a different enzyme get their own decay. If
 #'   "condition", experiments with a different condition get their own decay.
 #'   Arguments can be abbreviated and combined
+#' @param dfuse Fuse cut sites that are closer than dfuse to each other
 #' @param qmax Discard at most a fraction qmax of signal rows who do not have signal along the diagonal (default 0.05)
 #'
 #' @return CSnorm object
 #' @export
 #'
 #' @examples
-merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enzyme","condition"), qmax=0.05) {
+merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enzyme","condition"), dfuse=20, qmax=0.05) {
   cat("compile table of experiments, sorted by id\n")
   experiments = rbindlist(lapply(datasets, function(x) x@info))
   experiments[,name:=ordered(name, levels=name)]
   setkey(experiments, name)
   if (!(experiments[,.N]==experiments[,uniqueN(name)])) stop("experiment names must be unique")
-  if (uniqueN(rbindlist(lapply(datasets, function(x) x@settings[c("dmin","circularize","dfuse")])))!=1)
-    stop("all experiments must have the same dmin, circularize settings!")
-  settings=datasets[[1]]@settings[c("dmin","circularize","dfuse")]
+  if (uniqueN(rbindlist(lapply(datasets, function(x) x@settings[c("dmin","circularize")])))!=1)
+    stop("all experiments must have the same dmin and circularize settings!")
+  settings=datasets[[1]]@settings[c("dmin","circularize")]
   settings$dmax=max(sapply(datasets, function(x) x@settings$dmax))
+  settings$dfuse=dfuse
   settings$qmax=qmax
   #
-  filtered = lapply(datasets, clean_cut_sites)
+  filtered = lapply(datasets, function(csd){fuse_close_cut_sites(csd@biases, csd@counts, dfuse,
+                                                                 csd@info$name, csd@settings$circularize)})
   biases = lapply(filtered, function(x) x$biases)
   counts = lapply(filtered, function(x) x$counts)
   names(biases) <- sapply(datasets, function(x) x@info$name)
