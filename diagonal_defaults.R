@@ -20,6 +20,8 @@ ggplot(mat)+geom_raster(aes(begin2,begin1,fill=pmin(phi,3)))+
   facet_wrap(~name)+scale_fill_gradient(high=muted("red"), low="white", na.value = "white")+stat_function(fun=identity)+
   geom_point(data=cs@biases[pos-shift(pos)==175,.(pos)],aes(pos,pos))
 
+ggplot(mat[begin1==begin2])+geom_point(aes(begin1,phi,colour=name))
+
 ggplot(mat[begin2<74000000])+geom_raster(aes(begin1,begin2,fill=phihat))+
   geom_raster(aes(begin2,begin1,fill=phi))+
   facet_wrap(~name)+scale_fill_gradient(high=muted("red"), low="white", na.value = "white")+stat_function(fun=identity)+
