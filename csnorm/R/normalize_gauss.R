@@ -254,6 +254,7 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     decay_out$value = sum(dnorm(kappa_hat, mean = as.array(decay_out$log_mean_counts), sd = as.array(sdl), log = TRUE))
     
   }
+  decay_out$eC=as.array(decay_out$eC)
   decay_out$beta_diag=as.matrix(decay_out$beta_diag)
   decay_out$beta_diag_diff=as.matrix(decay_out$beta_diag_diff)
   #make decay data table, reused at next call
@@ -683,7 +684,7 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   mat = csnorm:::csnorm_compute_raw_signal(cts, cs@par$alpha, cs@par$signal)
   #
   if (cs@par$signal[bin1==bin2,any(phi!=0)]) { #do not remove anything at first iteration
-    if (verbose==T) cat(" Remove bad bins\n")
+    if (verbose==T) cat("  Remove bad bins\n")
     tmp=cs@par$signal[bin1==bin2,.(is.bad=all(phi==0)),by=bin1][is.bad==T,unclass(bin1)]
     if (length(cs@par$badbins)>0) tmp=union(tmp,cs@par$badbins)
     if (length(tmp)>cs@settings$qmax*cs@par$signal[bin1==bin2&name==name[1],.N]) {
