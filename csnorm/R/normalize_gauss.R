@@ -869,13 +869,13 @@ prepare_signal_estimation = function(biases, names, base.res) {
 #' @export
 #' 
 #' @examples
-plot_diagnostics = function(cs) {
-  plot=ggplot(cs@diagnostics$params[,.(step,leg,value)])+
+plot_diagnostics = function(cs, start=1) {
+  plot=ggplot(cs@diagnostics$params[step>=start,.(step,leg,value)])+
     geom_line(aes(step,value))+geom_point(aes(step,value))+facet_wrap(~leg, scales = "free")+
     theme(legend.position="bottom")
   vars=foreach(var=c("eC","eRJ","eDE","alpha","lambda_iota","lambda_rho","lambda_diag", "lambda1", "lambda2", "eCprime"),
                trans=(c(NA,NA,NA,NA,"log10","log10","log10","log10","log10",NA)),.combine=rbind) %do% get_all_values(cs,var,trans)
-  plot2=ggplot(vars)+geom_line(aes(step,value))+
+  plot2=ggplot(vars[step>=start])+geom_line(aes(step,value))+
     geom_point(aes(step,value,colour=leg))+facet_wrap(~variable, scales = "free_y")
   return(list(plot=plot,plot2=plot2))
 }
