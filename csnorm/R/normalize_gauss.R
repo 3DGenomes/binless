@@ -752,6 +752,57 @@ has_converged = function(cs) {
   return(all(delta<tol))
 }
 
+#' count number of zeros in a given cut site, distance bin and signal bin
+#' @keywords internal
+#' 
+get_nzeros = function(cs, ncores=1) {
+  stopifnot(cs@counts[id1>=id2,.N]==0)
+  #positive counts: group per cut site and signal / distance bin
+  cts=melt(cs@counts[,.(name,pos1,pos2,distance,contact.close,contact.down,contact.far,contact.up)],
+           id.vars=c("name","pos1","pos2","distance"))[value>0]
+  cts[,c("bin1","bin2","dbin"):=
+        list(cut(pos1, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+             cut(pos2, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+             cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
+  cts=rbind(cts[,.(name,pos1,bin1,bin2,dbin,variable)][
+              ,.(nnz=.N,dir="fwd"),keyby=c("name","pos1","bin1","bin2","dbin","variable")],
+            cts[,.(name,pos1=pos2,bin1=bin2,bin2=bin1,dbin,variable)][
+              ,.(nnz=.N,dir="rev"),keyby=c("name","pos1","bin1","bin2","dbin","variable")])
+  #Count the number of crossings per distance bin
+  #looping over IDs avoids building NxN matrix
+  biases=cs@biases[,.(name,id,pos)]
+  biases[,bin:=cut(pos, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
+  registerDoParallel(cores=ncores)
+  chunksize=cs@biases[,ceiling(.N/(10*ncores))]
+  nchunks=cs@biases[,ceiling(.N/chunksize)]
+  crossings = foreach(chunk=1:nchunks, .combine=rbind) %dopar% {
+    bs=biases[((chunk-1)*chunksize+1):min(.N,chunk*chunksize)]
+    foreach(n=bs[,name], p=bs[,pos], b=bs[,bin], .combine=rbind) %do% {
+      crossings = biases[name==n&pos!=p,.(name,pos2=pos,bin2=bin,distance=abs(pos-p))]
+      if (cs@settings$circularize>0)  crossings[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
+      crossings[,c("dbin","dir"):=list(
+        cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12),
+        ifelse(pos2>p,"fwd","rev"))]
+      crossings[distance>=cs@settings$dmin,.(pos1=p,bin1=b,ncross=.N),by=c("name","bin2","dbin","dir")]
+    }
+  }
+  #now merge with positive counts and deduce number of zeros
+  zeros = rbind(
+    merge(crossings,cts[variable=="contact.close"],by=c("name","pos1","bin1","bin2","dbin","dir"),all=T)[
+      ,.(name,pos1,bin1,bin2,dbin,dir,cat="close",ncross,nnz)],
+    merge(crossings,cts[variable=="contact.far"],by=c("name","pos1","bin1","bin2","dbin","dir"),all=T)[
+      ,.(name,pos1,bin1,bin2,dbin,dir,cat="far",ncross,nnz)],
+    merge(crossings,cts[variable=="contact.down"],by=c("name","pos1","bin1","bin2","dbin","dir"),all=T)[
+      ,.(name,pos1,bin1,bin2,dbin,dir,cat="down",ncross,nnz)],
+    merge(crossings,cts[variable=="contact.up"],by=c("name","pos1","bin1","bin2","dbin","dir"),all=T)[
+      ,.(name,pos1,bin1,bin2,dbin,dir,cat="up",ncross,nnz)])
+  zeros[is.na(nnz),nnz:=0]
+  zeros[,nzero:=ncross-nnz]
+  stopifnot(zeros[is.na(ncross),.N==0])
+  stopifnot(zeros[nzero<0,.N==0])
+  return(zeros)
+}
+
 #' count number of zeros in each decay and genomic bin
 #' @keywords internal
 #' 
