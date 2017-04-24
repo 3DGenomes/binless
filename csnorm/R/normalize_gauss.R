@@ -34,7 +34,7 @@ csnorm_gauss_decay_muhat_data = function(cs, pseudocount=1e-2) {
                variable.name = "category", value.name = "count")[count>0,.(name,distance,category,count)]
   mcounts[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #add zero counts
-  zdecay = cs@zeros$both[,.(nzero=sum(nzero)/2),keyby=c("name","dbin")] #each contact is counted twice
+  zdecay = cs@zeros[,.(nzero=sum(nzero)/2),keyby=c("name","dbin")] #each contact is counted twice
   mcounts = rbind(mcounts[,.(name,dbin,category,count,weight=1)],
                   zdecay[,.(name,dbin,category=NA,count=0,weight=nzero)])
   #compute z-scores and sum counts
@@ -87,7 +87,7 @@ csnorm_gauss_common_muhat_mean = function(cs) {
              cpos[contact.up>0,   .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact L", dir="rev",
                                     count=contact.up,    lmu=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota2)])
   ### zero counts
-  czero = merge(init$decay[,.(name,dbin,log_decay)], cs@zeros$both, by=c("name","dbin"))
+  czero = merge(init$decay[,.(name,dbin,log_decay)], cs@zeros, by=c("name","dbin"))
   stopifnot(czero[is.na(log_decay),.N]==0)
   czero = merge(czero[nzero>0],bsub, by.x="id1",by.y="id",all.x=T,all.y=F)
   czero[,log_bias:=ifelse(cat=="contact L", log_iota, log_rho)]
@@ -288,7 +288,7 @@ csnorm_gauss_genomic_muhat_data = function(cs, pseudocount=1e-2) {
   setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
   #counts
-  zbias = cs@zeros$both[,.(id=id1,name,cat,nzero)][,.(nzero=sum(nzero)),keyby=c("id","name","cat")][cs@biases[,.(name,id,pos)]]
+  zbias = cs@zeros[,.(id=id1,name,cat,nzero)][,.(nzero=sum(nzero)),keyby=c("id","name","cat")][cs@biases[,.(name,id,pos)]]
   cts=rbind(cs@counts[contact.close>0,.(name,id=id1,pos=pos1, cat="contact R", count=contact.close, weight=1)],
             cs@counts[contact.far>0,  .(name,id=id1,pos=pos1, cat="contact L", count=contact.far, weight=1)],
             cs@counts[contact.down>0, .(name,id=id1,pos=pos1, cat="contact R", count=contact.down, weight=1)],
@@ -365,7 +365,7 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     cutsites = biases[,pos][bbegin[1]:(bbegin[2]-1)]
     Bsp = csnorm_generate_cubic_spline(cutsites, Krow, sparse=T)
     X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
-    if (is.null(sbins)) {
+    if (length(sbins)<=2) {
       centering=Matrix(rep(1,SD),ncol=1)
     } else {
       sbinned=biases[bbegin[1]:(bbegin[2]-1), cut(pos, sbins, ordered_result=T,
@@ -579,13 +579,8 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", max_perf_iterat
   } else {
     a = csnorm:::csnorm_gauss_genomic_muhat_data(cs)
   }
-  if (cs@zeros$sig[,.N]>0) {
-    sbins=cs@settings$sbins
-  } else {
-    sbins=NULL
-  }
   #run optimization
-  op = csnorm:::csnorm_gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, sbins,
+  op = csnorm:::csnorm_gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, cs@settings$sbins,
                                               cs@par$lambda_iota, cs@par$lambda_rho, verbose=verbose,
                                               max_perf_iteration=max_perf_iteration,
                                               convergence_epsilon=convergence_epsilon)
@@ -604,7 +599,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   setkeyv(counts,key(cs@counts))
   stopifnot(cs@biases[,.N]==length(cs@par$log_iota))
   #add signal contribution if available
-  if (cs@zeros$sig[,.N]>0) {
+  if (length(cs@settings$sbins)>2) {
     counts[,bin1:=cut(pos1, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
     counts[,bin2:=cut(pos2, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
     counts=cs@par$signal[counts,,on=key(cs@par$signal)]
@@ -782,57 +777,6 @@ get_nzeros = function(cs, ncores=1) {
   return(zeros)
 }
 
-#' count number of zeros in each decay and genomic bin
-#' @keywords internal
-#' 
-get_nzeros_normalization = function(cs, ncores=1) {
-  stopifnot(cs@counts[id1>=id2,.N]==0)
-  #count left and right
-  cts=rbind(cs@counts[contact.close>0,.(name, id=id1, distance, cat="contact R", count=contact.close)],
-            cs@counts[contact.far>0,  .(name, id=id1, distance, cat="contact L", count=contact.far)],
-            cs@counts[contact.down>0, .(name, id=id1, distance, cat="contact R", count=contact.down)],
-            cs@counts[contact.up>0,   .(name, id=id1, distance, cat="contact L", count=contact.up)],
-            cs@counts[contact.far>0,  .(name, id=id2, distance, cat="contact R", count=contact.far)],
-            cs@counts[contact.close>0,.(name, id=id2, distance, cat="contact L", count=contact.close)],
-            cs@counts[contact.down>0, .(name, id=id2, distance, cat="contact R", count=contact.down)],
-            cs@counts[contact.up>0,   .(name, id=id2, distance, cat="contact L", count=contact.up)])
-  #bin distances
-  dbins=cs@settings$dbins
-  cts[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-  #count per cut site and distance bin
-  cts=cts[,.(nnz=.N),keyby=c("id","name","dbin","cat")]
-  #Count the number of crossings per distance bin
-  #looping over IDs avoids building NxN matrix
-  registerDoParallel(cores=ncores)
-  chunksize=cs@biases[,ceiling(.N/(10*ncores))]
-  nchunks=cs@biases[,ceiling(.N/chunksize)]
-  zeros = foreach(chunk=1:nchunks, .combine=rbind) %dopar% {
-    bs=cs@biases[((chunk-1)*chunksize+1):min(.N,chunk*chunksize)]
-    dists = foreach(n=bs[,name], i=bs[,id], p=bs[,pos], .combine=rbind) %do% {
-      dists=cs@biases[name==n & id!=i,.(name,id,distance=abs(pos-p))]
-      if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
-      dists[,dbin:=cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-      dists[!is.na(dbin),.(name=n,id=i,ncross=.N),by=dbin]
-    }
-    dists
-  }
-  setkey(zeros,id,name,dbin)
-  stopifnot(zeros[,uniqueN(id)]==cs@biases[,.N])
-  zeros=rbind(cts[cat=="contact L"][zeros,.(name,id,dbin,cat="contact L",nnz,nposs=2*ncross)],
-              cts[cat=="contact R"][zeros,.(name,id,dbin,cat="contact R",nnz,nposs=2*ncross)])
-  zeros[is.na(nnz),nnz:=0]
-  setkey(zeros,id,name,dbin,cat)
-  zeros[,nzero:=nposs-nnz]
-  #add positions
-  zeros=cs@biases[,.(name,id,pos)][zeros]
-  setkeyv(zeros,c("id","name","dbin","cat"))
-  #Nkz=csnorm:::get_nzeros_per_decay(cs,ncores)
-  #all(zeros[,.(ncross=sum(nposs)/8,nnz=sum(nnz)/2,nzero=sum(nzero)/2),keyby=c("name","dbin")]==Nkz)
-  #zbias=csnorm:::get_nzeros_per_cutsite(cs,ncores)
-  #all(zeros[,.(nnz=sum(nnz),nzero=sum(nzero)),keyby=c("name","id","cat")]==zbias[,.(name,id,cat,nnz,nzero)])
-  return(zeros)
-}
-
 #' Get the first ncounts/d of each of d datasets, including zeros 
 #' 
 #' count is always a bit smaller because we censor those that are <dmin without adding more counts
@@ -967,6 +911,8 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
                          iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
+    stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
+    cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
     #initial guess
     if (verbose==T) cat("No initial guess provided\n")
     cs@diagnostics=list()
@@ -974,31 +920,31 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     init.mean="data"
     cs=csnorm:::fill_parameters_perf(cs, dispersion=init.dispersion, fit.decay=fit.decay,
                                      fit.genomic=fit.genomic, fit.disp=fit.disp)
+    #prepare signal matrix and trails
+    if (fit.signal==T) {
+      if(verbose==T) cat("Preparing for signal estimation\n")
+      stuff = csnorm:::prepare_signal_estimation(cs@biases, cs@experiments[,name], base.res)
+      cs@par$signal=stuff$signal
+      cs@settings$sbins=stuff$sbins
+      cs@settings$trails=stuff$trails
+    } else {
+      cs@settings$sbins=cs@biases[,c(min(pos)-1,max(pos)+1)]
+      cs@par$signal=cs@biases[,.(phi=0,bin1=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+                                 bin2=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)),by=name]
+      cs@par$settings$trails=NA
+    }
     #get number of zeros along cut sites and decay
     if(verbose==T) cat("Counting zeros\n")
-    stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
-    cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
-    cs@zeros = list(both=csnorm:::get_nzeros(cs, ncores=ncores),
-                    bg=csnorm:::get_nzeros_normalization(cs, ncores=ncores), sig=data.table())
+    cs@zeros = csnorm:::get_nzeros(cs, ncores=ncores)
   } else {
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
     init.mean="mean"
   }
   #
-  #prepare signal matrix and trails
-  if (fit.signal==T & cs@zeros$sig[,.N]==0) { #either restart==F or restart==T but was run with fit.signal==F
-    if(verbose==T) cat("Preparing for signal estimation\n")
-    stuff = csnorm:::prepare_signal_estimation(cs@biases, cs@experiments[,name], base.res)
-    cs@par$signal=stuff$signal
-    cs@settings$sbins=stuff$sbins
-    cs@settings$trails=stuff$trails
-    cs@zeros=modifyList(list(sig=csnorm:::get_nzeros_binning(cs, base.res, ncores = ncores)), cs@zeros)
-  }
-  #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
   subcounts = csnorm:::subsample_counts(cs, ncounts)
-  subcounts.weight = merge(cs@zeros$both[,.(nc=sum(ncross)/4),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
+  subcounts.weight = merge(cs@zeros[,.(nc=sum(ncross)/4),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
   #gibbs sampling
   for (i in (laststep + 1:ngibbs)) {
     if (verbose==T) cat("\n### Iteration",i,"\n")
