@@ -53,7 +53,7 @@ cs_stan = cs_r
 cs_stan = run_gauss(cs_stan, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 8, iter=100000, init_alpha=1e-7,
                  ncounts = 1000000, type=type, fit_model="stan", fit.disp = T, ncores = 8)
 cs_r = run_gauss(cs_r, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
-               ncounts = 1000000, type=type, fit.disp = T, fit.genomic = T, init.dispersion=10, ncores = 8)
+               ncounts = 1000000, fit.disp = T, fit.genomic = T, init.dispersion=10, ncores = 8)
 save(cs_r,file=paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
 
 #look at the following objects

@@ -351,22 +351,11 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
   Totalbbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
   TotalDsets = design[,.N]
   
-  all_beta_iota = c()
-  all_beta_rho = c()
-  all_beta_iota_diff = matrix(0, nrow = TotalDsets, ncol = Krow-2)
-  all_beta_rho_diff = matrix(0, nrow = TotalDsets, ncol = Krow-2)
-  all_log_iota = c()
-  all_log_rho = c()
-  all_log_mean_RJ = c()
-  all_log_mean_DL = c()
-  all_log_mean_DR = c()
-  all_log_mean_cleft  = c()
-  all_log_mean_cright = c()
-  all_eC = c()
-  all_eDE = c()
-  all_eRJ = c()
-  all_lambda_iota = c()
-  all_lambda_rho = c()
+  genomic_out = list(beta_iota_diff = matrix(0, nrow = TotalDsets, ncol = Krow-2), beta_rho_diff = matrix(0, nrow = TotalDsets, ncol = Krow-2),
+                     beta_iota = c(), beta_rho = c(), log_iota = c(), log_rho = c(),
+                     log_mean_RJ = c(), log_mean_DL = c(), log_mean_DR = c(), log_mean_cleft  = c(), log_mean_cright = c(),
+                     eC = c(), eDE = c(), eRJ = c(), lambda_iota = c(), lambda_rho = c(),
+                     value = 0)
   
   for(uXB in unique(XB)) {
     if (verbose==T) cat("  group",uXB,"\n")
@@ -542,53 +531,46 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       }
     }
     
-    all_beta_iota = c(all_beta_iota,as.array(beta_iota))
-    all_beta_rho = c(all_beta_rho,as.array(beta_rho))
+    genomic_out$beta_iota = c(genomic_out$beta_iota,as.array(beta_iota))
+    genomic_out$beta_rho = c(genomic_out$beta_rho,as.array(beta_rho))
     for (d2 in 1:TotalDsets) {
       if(XB[d2] == uXB) {
-        all_beta_iota_diff[d2,] = as.array(D1%*%beta_iota)
-        all_beta_rho_diff[d2,] = as.array(D1%*%beta_rho)
+        genomic_out$beta_iota_diff[d2,] = as.array(D1%*%beta_iota)
+        genomic_out$beta_rho_diff[d2,] = as.array(D1%*%beta_rho)
       }
     }
-    all_log_iota = c(all_log_iota,as.array(log_iota))
-    all_log_rho = c(all_log_rho,as.array(log_rho))
-    all_log_mean_RJ = c(all_log_mean_RJ,as.array(log_mean_RJ))
-    all_log_mean_DL = c(all_log_mean_DL,as.array(log_mean_DL))
-    all_log_mean_DR = c(all_log_mean_DR,as.array(log_mean_DR))
-    all_log_mean_cleft  = c(all_log_mean_cleft,as.array(log_mean_cleft))
-    all_log_mean_cright = c(all_log_mean_cright,as.array(log_mean_cright))
-    all_eC = c(all_eC,eC)
-    all_eRJ = c(all_eRJ,eRJ)
-    all_eDE = c(all_eDE,eDE)
-    all_lambda_iota = c(all_lambda_iota,lambda_iota)
-    all_lambda_rho = c(all_lambda_rho,lambda_rho)
-    op = list(par=list())
-    op$par$beta_iota=as.array(all_beta_iota)
-    op$par$beta_rho=as.array(all_beta_rho)
-    op$par$beta_rho_diff=as.matrix(all_beta_rho_diff)
-    op$par$beta_iota_diff=as.matrix(all_beta_iota_diff)
-    op$par$log_iota=as.array(all_log_iota)
-    op$par$log_rho=as.array(all_log_rho)
-    op$par$eC=as.array(all_eC)
-    op$par$eRJ=as.array(all_eRJ)
-    op$par$eDE=as.array(all_eDE)
-    op$par$lambda_iota = as.array(all_lambda_iota)
-    op$par$lambda_rho = as.array(all_lambda_rho)
-    means = cbind(all_log_mean_RJ,all_log_mean_DL,all_log_mean_DR,all_log_mean_cleft,all_log_mean_cright)
+    genomic_out$lambda_iota = c(genomic_out$lambda_iota,lambda_iota)
+    genomic_out$lambda_rho = c(genomic_out$lambda_rho,lambda_rho)
+    genomic_out$log_iota = c(genomic_out$log_iota,as.array(log_iota))
+    genomic_out$log_rho = c(genomic_out$log_rho,as.array(log_rho))
+    genomic_out$log_mean_RJ = c(genomic_out$log_mean_RJ,as.array(log_mean_RJ))
+    genomic_out$log_mean_DL = c(genomic_out$log_mean_DL,as.array(log_mean_DL))
+    genomic_out$log_mean_DR = c(genomic_out$log_mean_DR,as.array(log_mean_DR))
+    genomic_out$log_mean_cleft  = c(genomic_out$log_mean_cleft,as.array(log_mean_cleft))
+    genomic_out$log_mean_cright = c(genomic_out$log_mean_cright,as.array(log_mean_cright))
+    genomic_out$eC = c(genomic_out$eC,eC)
+    genomic_out$eRJ = c(genomic_out$eRJ,eRJ)
+    genomic_out$eDE = c(genomic_out$eDE,eDE)
+    genomic_out$lambda_iota = c(genomic_out$lambda_iota,lambda_iota)
+    genomic_out$lambda_rho = c(genomic_out$lambda_rho,lambda_rho)
+    genomic_out$beta_iota_diff = as.matrix(genomic_out$beta_iota_diff)
+    genomic_out$beta_rho_diff = as.matrix(genomic_out$beta_rho_diff)
+    
+    means = cbind(genomic_out$log_mean_RJ,genomic_out$log_mean_DL,genomic_out$log_mean_DR,genomic_out$log_mean_cleft,genomic_out$log_mean_cright)
     mus = cbind(sd_RJ,sd_DL,sd_DR,sd_L,sd_R)
-    op$par$value = sum(dnorm(etas, mean = as.array(means), sd = as.array(mus), log = TRUE))
+    genomic_out$value = sum(dnorm(etas, mean = as.array(means), sd = as.array(mus), log = TRUE))
   }
   
   #make nice output table
-  bout=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=as.array(all_log_mean_DL))],
-             bts[cat=="dangling R",.(cat, name, id, pos, etahat, std, eta=as.array(all_log_mean_DR))],
-             bts[cat=="rejoined",.(cat, name, id, pos, etahat, std, eta=as.array(all_log_mean_RJ))])
-  cout=rbind(cts[cat=="contact L",.(cat, name, id, pos, etahat, std, eta=as.array(all_log_mean_cleft))],
-             cts[cat=="contact R",.(cat, name, id, pos, etahat, std, eta=as.array(all_log_mean_cright))])
+  bout=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_DL))],
+             bts[cat=="dangling R",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_DR))],
+             bts[cat=="rejoined",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_RJ))])
+  cout=rbind(cts[cat=="contact L",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_cleft))],
+             cts[cat=="contact R",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_cright))])
   bout=rbind(bout,cout)
   setkey(bout, id, name, cat)
-  op$par$biases=bout
-  return(op)
+  genomic_out$biases=bout
+  return(genomic_out)
 }
 
 #' Single-cpu simplified fitting for iota and rho
@@ -614,7 +596,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", max_perf_iterat
                                               max_perf_iteration=max_perf_iteration,
                                               convergence_epsilon=convergence_epsilon)
   #update par slot
-  cs@par=modifyList(cs@par, op$par)
+  cs@par=modifyList(cs@par, op)
   return(cs)
 }
 
