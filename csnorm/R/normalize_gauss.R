@@ -34,7 +34,7 @@ csnorm_gauss_decay_muhat_data = function(cs, pseudocount=1e-2) {
                variable.name = "category", value.name = "count")[count>0,.(name,distance,category,count)]
   mcounts[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #add zero counts
-  zdecay = cs@zeros$bg[,.(nzero=sum(nzero)/2),keyby=c("name","dbin")] #each contact is counted twice
+  zdecay = cs@zeros$both[,.(nzero=sum(nzero)/2),keyby=c("name","dbin")] #each contact is counted twice
   mcounts = rbind(mcounts[,.(name,dbin,category,count,weight=1)],
                   zdecay[,.(name,dbin,category=NA,count=0,weight=nzero)])
   #compute z-scores and sum counts
@@ -59,8 +59,10 @@ csnorm_gauss_common_muhat_mean = function(cs) {
   cpos=merge(bsub[,.(id1=id,log_iota,log_rho)],cpos,by="id1",all.x=F,all.y=T)
   cpos=merge(bsub[,.(id2=id,log_iota,log_rho)],cpos,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
   cpos=merge(cbind(cs@design[,.(name)],eC=init$eC), cpos, by="name",all.x=F,all.y=T)
-  dbins=cs@settings$dbins
-  cpos[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  cpos[,c("bin1","bin2","dbin"):=
+         list(cut(pos1, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+              cut(pos2, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+              cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
   cpos=merge(cpos,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
   cpos[,log_mu.base:=eC + log_decay]
   cpos[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_iota1+log_rho2,
@@ -68,43 +70,35 @@ csnorm_gauss_common_muhat_mean = function(cs) {
                                                            log_mu.base+log_rho1 +log_iota2,
                                                            log_mu.base+log_iota1+log_iota2)]
   cpos[,log_mu.base:=NULL]
-  #collect all counts on left/right side, per distance
-  cpos=rbind(cpos[contact.close>0,.(name, id=id1, pos=pos1, distance, cat="contact R",
+  cpos=rbind(cpos[contact.close>0,.(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact R", dir="fwd",
                                     count=contact.close, lmu=lmu.close, weight=1, eC, log_decay, log_bias=log_rho1)],
-             cpos[contact.far>0,  .(name, id=id1, pos=pos1, distance, cat="contact L",
+             cpos[contact.far>0,  .(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact L", dir="fwd",
                                     count=contact.far,   lmu=lmu.far,   weight=1, eC, log_decay, log_bias=log_iota1)],
-             cpos[contact.down>0, .(name, id=id1, pos=pos1, distance, cat="contact R",
+             cpos[contact.down>0, .(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact R", dir="fwd",
                                     count=contact.down,  lmu=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho1)],
-             cpos[contact.up>0,   .(name, id=id1, pos=pos1, distance, cat="contact L",
+             cpos[contact.up>0,   .(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact L", dir="fwd",
                                     count=contact.up,    lmu=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota1)],
-             cpos[contact.far>0,  .(name, id=id2, pos=pos2, distance, cat="contact R",
+             cpos[contact.far>0,  .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact R", dir="rev",
                                     count=contact.far,   lmu=lmu.far,   weight=1, eC, log_decay, log_bias=log_rho2)],
-             cpos[contact.close>0,.(name, id=id2, pos=pos2, distance, cat="contact L",
+             cpos[contact.close>0,.(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact L", dir="rev",
                                     count=contact.close, lmu=lmu.close, weight=1, eC, log_decay, log_bias=log_iota2)],
-             cpos[contact.down>0, .(name, id=id2, pos=pos2, distance, cat="contact R",
+             cpos[contact.down>0, .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact R", dir="rev",
                                     count=contact.down,  lmu=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho2)],
-             cpos[contact.up>0,   .(name, id=id2, pos=pos2, distance, cat="contact L",
+             cpos[contact.up>0,   .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact L", dir="rev",
                                     count=contact.up,    lmu=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota2)])
-  dbins=cs@settings$dbins
-  cpos[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-  cpos[,distance:=NULL]
   ### zero counts
-  czero = merge(init$decay[,.(name,dbin,log_decay)], cs@zeros$bg, by=c("name","dbin"))
+  czero = merge(init$decay[,.(name,dbin,log_decay)], cs@zeros$both, by=c("name","dbin"))
   stopifnot(czero[is.na(log_decay),.N]==0)
-  czero = merge(bsub,czero,by="id",all.x=F,all.y=T)
-  czero[,log_bias:=ifelse(cat=="contact L",log_iota,log_rho)]
+  czero = merge(czero[nzero>0],bsub, by.x="id1",by.y="id",all.x=T,all.y=F)
+  czero[,log_bias:=ifelse(cat=="contact L", log_iota, log_rho)]
   czero = merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
   czero[,lmu:=eC + log_decay + log_bias] #we don't average over j
-  czero = czero[nzero>0,.(name,id,pos,dbin,cat,count=0,lmu,weight=nzero,log_bias,log_decay,eC)]
+  czero = czero[,.(name,id1,pos1,bin1,bin2,dbin,cat,dir,count=0,lmu,weight=nzero,log_bias,log_decay,eC)]
   cts=rbind(cpos,czero)
   ### add signal
-  if (cs@zeros$sig[,.N]>0) {
-    cts[,bin:=cut(pos, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
-    signal=merge(cs@zeros$sig, cs@par$signal, by=c("name","bin1","bin2"), all.x=T)
-    stopifnot(all(complete.cases(signal)))
-    signal=rbind(signal[,.(name,bin=bin1,dbin,ncross,phi)],signal[bin2>bin1,.(name,bin=bin2,dbin,ncross,phi)])
-    signal=signal[,.(phi=weighted.mean(phi,ncross)),keyby=c("name","bin","dbin")]
-    cts=signal[cts,,on=key(signal)]
+  if (cs@par$signal[,.N]>0) {
+    signal=rbind(cs@par$signal,cs@par$signal[bin1!=bin2,.(name,bin1=bin2,bin2=bin1,phi)])
+    cts=signal[cts,,on=c("name","bin1","bin2")]
     cts[,mu:=exp(lmu+phi)]
   } else {
     cts[,mu:=exp(lmu)]
@@ -112,7 +106,7 @@ csnorm_gauss_common_muhat_mean = function(cs) {
   ### finalize
   cts[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
   #ggplot(cts[name=="T47D es 60 MboI 1"&cat=="contact R"])+geom_line(aes(dbin,log_decay,colour=count>0,group=count>0))
-  cts[,c("count","mu","pos","lmu"):=NULL] #not needed downstream
+  #cts[,c("count","mu","pos","lmu"):=NULL] #not needed downstream
   return(cts)
 }
 
@@ -122,7 +116,6 @@ csnorm_gauss_common_muhat_mean = function(cs) {
 csnorm_gauss_decay_muhat_mean = function(cs) {
   cts = csnorm:::csnorm_gauss_common_muhat_mean(cs)
   cts[,kappaij:=eC+log_decay]
-  dbins=cs@settings$dbins
   csd = cts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
                kappahat=weighted.mean(z+kappaij, weight/var),
                std=1/sqrt(sum(weight/(2*var))), weight=sum(weight)/2), keyby=c("name", "dbin")] #each count appears twice
@@ -295,7 +288,7 @@ csnorm_gauss_genomic_muhat_data = function(cs, pseudocount=1e-2) {
   setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
   #counts
-  zbias = cs@zeros$bg[,.(nzero=sum(nzero)),keyby=c("id","name","cat")][cs@biases[,.(name,id,pos)]]
+  zbias = cs@zeros$both[,.(id=id1,name,cat,nzero)][,.(nzero=sum(nzero)),keyby=c("id","name","cat")][cs@biases[,.(name,id,pos)]]
   cts=rbind(cs@counts[contact.close>0,.(name,id=id1,pos=pos1, cat="contact R", count=contact.close, weight=1)],
             cs@counts[contact.far>0,  .(name,id=id1,pos=pos1, cat="contact L", count=contact.far, weight=1)],
             cs@counts[contact.down>0, .(name,id=id1,pos=pos1, cat="contact R", count=contact.down, weight=1)],
@@ -336,8 +329,8 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
   cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs)
   cts.common[,etaij:=eC+log_bias]
   cts = cts.common[,.(etahat=weighted.mean(z+etaij, weight/var),std=sqrt(2/sum(weight/var))),
-                   keyby=c("id","name","cat")]
-  cts = merge(cts,cs@biases[,.(name,id,pos)],by=c("name","id"))
+                   keyby=c("id1","name","cat")]
+  cts = merge(cs@biases[,.(name,id,pos)],cts,by.x=c("name","id"),by.y=c("name","id1"))
   setkey(cts, id, name, cat)
   return(list(bts=bts,cts=cts))
 }
@@ -662,8 +655,13 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' 
 csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   if (verbose==T) cat(" Signal\n")
-  cts = csnorm:::csnorm_predict_binned_counts_irls(cs, cs@settings$base.res, cs@zeros$sig)
-  mat = csnorm:::csnorm_compute_raw_signal(cts, cs@par$alpha, cs@par$signal)
+  cts = csnorm:::csnorm_gauss_common_muhat_mean(cs)
+  mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
+               phihat.var=2/sum(weight/var),
+               ncounts=sum(weight)),keyby=c("name","bin1","bin2")][cs@par$signal[,.(name,bin1,bin2)],,on=c("name","bin1","bin2")]
+  mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
+  mat[,c("valuehat","weight"):=list(phihat,1/phihat.var)]
+  setkey(mat,name,bin1,bin2)
   #
   if (cs@par$signal[bin1==bin2,any(phi!=0)]) { #do not remove anything at first iteration
     if (verbose==T) cat("  Remove bad bins\n")
@@ -750,6 +748,9 @@ get_nzeros = function(cs, ncores=1) {
               ,.(nnz=.N,dir="fwd"),keyby=c("name","pos1","bin1","bin2","dbin","variable")],
             cts[,.(name,pos1=pos2,bin1=bin2,bin2=bin1,dbin,variable)][
               ,.(nnz=.N,dir="rev"),keyby=c("name","pos1","bin1","bin2","dbin","variable")])
+  cts[,cat:=ifelse(dir=="fwd",ifelse(variable %in% c("contact.up","contact.far"), "contact L", "contact R"),
+                              ifelse(variable %in% c("contact.up","contact.close"), "contact L", "contact R"))]
+  cts=cts[,.(nnz=sum(nnz)),keyby=c("name","pos1","bin1","bin2","dbin","cat","dir")]
   #Count the number of crossings per distance bin
   #looping over IDs avoids building NxN matrix
   biases=cs@biases[,.(name,id,pos)]
@@ -759,27 +760,23 @@ get_nzeros = function(cs, ncores=1) {
   nchunks=cs@biases[,ceiling(.N/chunksize)]
   crossings = foreach(chunk=1:nchunks, .combine=rbind) %dopar% {
     bs=biases[((chunk-1)*chunksize+1):min(.N,chunk*chunksize)]
-    foreach(n=bs[,name], p=bs[,pos], b=bs[,bin], .combine=rbind) %do% {
+    foreach(i=bs[,id], n=bs[,name], p=bs[,pos], b=bs[,bin], .combine=rbind) %do% {
       crossings = biases[name==n&pos!=p,.(name,pos2=pos,bin2=bin,distance=abs(pos-p))]
       if (cs@settings$circularize>0)  crossings[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
       crossings[,c("dbin","dir"):=list(
         cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12),
         ifelse(pos2>p,"fwd","rev"))]
-      crossings[distance>=cs@settings$dmin,.(pos1=p,bin1=b,ncross=.N),by=c("name","bin2","dbin","dir")]
+      crossings[distance>=cs@settings$dmin,.(id1=i, pos1=p,bin1=b,ncross=.N),by=c("name","bin2","dbin","dir")]
     }
   }
   #now merge with positive counts and deduce number of zeros
   zeros = rbind(
-    merge(crossings,cts[variable=="contact.close"],by=c("name","pos1","bin1","bin2","dbin","dir"),all=T)[
-      ,.(name,pos1,bin1,bin2,dbin,dir,cat="close",ncross,nnz)],
-    merge(crossings,cts[variable=="contact.far"],by=c("name","pos1","bin1","bin2","dbin","dir"),all=T)[
-      ,.(name,pos1,bin1,bin2,dbin,dir,cat="far",ncross,nnz)],
-    merge(crossings,cts[variable=="contact.down"],by=c("name","pos1","bin1","bin2","dbin","dir"),all=T)[
-      ,.(name,pos1,bin1,bin2,dbin,dir,cat="down",ncross,nnz)],
-    merge(crossings,cts[variable=="contact.up"],by=c("name","pos1","bin1","bin2","dbin","dir"),all=T)[
-      ,.(name,pos1,bin1,bin2,dbin,dir,cat="up",ncross,nnz)])
+    merge(crossings,cts[cat=="contact L"],by=c("name","pos1","bin1","bin2","dbin","dir"),all=T)[
+      ,.(name,id1,pos1,bin1,bin2,dbin,dir,cat="contact L",ncross,nnz)],
+    merge(crossings,cts[cat=="contact R"],by=c("name","pos1","bin1","bin2","dbin","dir"),all=T)[
+      ,.(name,id1,pos1,bin1,bin2,dbin,dir,cat="contact R",ncross,nnz)])
   zeros[is.na(nnz),nnz:=0]
-  zeros[,nzero:=ncross-nnz]
+  zeros[,nzero:=2*ncross-nnz]
   stopifnot(zeros[is.na(ncross),.N==0])
   stopifnot(zeros[nzero<0,.N==0])
   return(zeros)
@@ -981,7 +978,8 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     if(verbose==T) cat("Counting zeros\n")
     stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
     cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
-    cs@zeros = list(bg=csnorm:::get_nzeros_normalization(cs, ncores=ncores), sig=data.table())
+    cs@zeros = list(both=csnorm:::get_nzeros(cs, ncores=ncores),
+                    bg=csnorm:::get_nzeros_normalization(cs, ncores=ncores), sig=data.table())
   } else {
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
@@ -1000,7 +998,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
   subcounts = csnorm:::subsample_counts(cs, ncounts)
-  subcounts.weight = merge(cs@zeros$bg[,.(nc=sum(nposs)/8),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
+  subcounts.weight = merge(cs@zeros$both[,.(nc=sum(ncross)/4),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
   #gibbs sampling
   for (i in (laststep + 1:ngibbs)) {
     if (verbose==T) cat("\n### Iteration",i,"\n")
