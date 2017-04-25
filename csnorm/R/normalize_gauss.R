@@ -829,6 +829,7 @@ prepare_signal_estimation = function(biases, names, base.res) {
                          ordered_result=T, right=F, include.lowest=T,dig.lab=12))
   signal.mat=CJ(name=names,bin1=signal.bins,bin2=signal.bins,sorted=F,unique=F)[bin2>=bin1]
   signal.mat[,phi:=0]
+  setkey(signal.mat,name,bin1,bin2)
   ### build optimization trails
   trails = csnorm:::gfl_compute_trails(signal.mat[,nlevels(bin1)])
   stopifnot(all(signal.mat[,.N,by=name]$N==signal.mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
@@ -935,6 +936,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
       cs@settings$sbins=cs@biases[,c(min(pos)-1,max(pos)+1)]
       cs@par$signal=cs@biases[,.(phi=0,bin1=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                                  bin2=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)),by=name]
+      setkey(cs@par$signal,name,bin1,bin2)
       cs@par$settings$trails=NA
     }
     #get number of zeros along cut sites and decay
@@ -968,13 +970,6 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
       if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     }
     init.mean="mean"
-    #fit signal using sparse fused lasso
-    if (fit.signal==T) {
-      update.eC=F
-      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, ncores=ncores))
-      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
-      if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
-    }
     #fit dispersion
     if (fit.disp==T) {
       a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight,
@@ -982,6 +977,14 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
       if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
     }
+    #fit signal using sparse fused lasso
+    if (fit.signal==T) {
+      update.eC=F
+      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, ncores=ncores))
+      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
+      if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
+    }
+    #check for convergence
     if (i-laststep>1) if (has_converged(cs)) {
       if (verbose==T) cat("Normalization has converged\n")
       break
