@@ -724,10 +724,25 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores) {
 #' 
 has_converged = function(cs) {
   params=cs@diagnostics$params
-  tol=cs@settings$tol.obj
   laststep=params[,step[.N]]
-  delta=abs(params[step==laststep,value]-params[step==laststep-1,value])
-  return(all(delta<tol))
+  #objective convergence
+  delta = abs(params[step==laststep,value]-params[step==laststep-1,value])
+  conv.obj = all(delta<cs@settings$tol.obj)
+  #parameter convergence
+  conv.eC = abs(params[step==laststep&leg==leg[.N],eC[[1]]]-params[step==laststep-1&leg==leg[.N],eC[[1]]])
+  conv.alpha = abs(params[step==laststep&leg==leg[.N],alpha[[1]]]-params[step==laststep-1&leg==leg[.N],alpha[[1]]])
+  conv.ldiag = abs(params[step==laststep&leg==leg[.N],log(lambda_diag[[1]])]
+                   -params[step==laststep-1&leg==leg[.N],log(lambda_diag[[1]])])
+  conv.liota = abs(params[step==laststep&leg==leg[.N],log(lambda_iota[[1]])]
+                   -params[step==laststep-1&leg==leg[.N],log(lambda_iota[[1]])])
+  conv.lrho = abs(params[step==laststep&leg==leg[.N],log(lambda_rho[[1]])]
+                  -params[step==laststep-1&leg==leg[.N],log(lambda_rho[[1]])])
+  conv.l1 = abs(params[step==laststep&leg==leg[.N],log(lambda1[[1]])]
+                  -params[step==laststep-1&leg==leg[.N],log(lambda1[[1]])])
+  conv.l2 = abs(params[step==laststep&leg==leg[.N],log(lambda2[[1]])]
+                   -params[step==laststep-1&leg==leg[.N],log(lambda2[[1]])])
+  conv.param = all(c(conv.eC,conv.alpha,conv.ldiag,conv.liota,conv.lrho,conv.l1,conv.l2)<cs@settings$tol.val)
+  return(conv.obj | conv.param)
 }
 
 #' count number of zeros in a given cut site, distance bin and signal bin
