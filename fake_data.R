@@ -48,7 +48,7 @@ csd5=csd
 #cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4,csd5), different.decays="none")
 cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
 cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 15, base.res=10000,
-               iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=10, fit.signal=T)
+               iter=100000, init_alpha=1e-7, ncounts = 100000, ncores=10, fit.signal=T)
 #cs@par$signal[,phi:=2*phi]
 cs = run_gauss(cs, restart=T, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, ngibbs = 5, base.res=20000,
                iter=100000, init_alpha=1e-7, ncounts = 100000, type="perf", ncores=30, fit.signal=T, fit.disp=F, fit.genomic=F, fit.decay=F)
@@ -114,7 +114,7 @@ signals=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
     sig
   }
 }
-ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+facet_wrap(~ step)+scale_fill_gradient2()
+ggplot(signals[name==name[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+facet_wrap(~ step)+scale_fill_gradient2()
 ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi==0))+facet_wrap(~ step)#+scale_fill_gradient2()
 
 #last signal
