@@ -261,8 +261,7 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", update.eC=T,
-                              max_perf_iteration=1000, convergence_epsilon=1e-9) {
+csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", update.eC=T) {
   if (verbose==T) cat(" Decay\n")
   if (init.mean=="mean") {
     csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
@@ -271,8 +270,8 @@ csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", update.eC=T,
   }
   #run optimization
   op = csnorm:::csnorm_gauss_decay_optimize(csd, cs@design, cs@settings$Kdiag, cs@par$lambda_diag,
-                                            verbose=verbose, max_perf_iteration=max_perf_iteration,
-                                            convergence_epsilon=convergence_epsilon)
+                                            verbose=verbose, max_perf_iteration=cs@settings$iter,
+                                            convergence_epsilon=cs@settings$tol.leg)
   #update par slot
   if (update.eC==F) op$eC=NULL
   cs@par=modifyList(cs@par, op)
@@ -575,8 +574,7 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", update.eC=T,
-                                max_perf_iteration=1000, convergence_epsilon=1e-5) {
+csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", update.eC=T) {
   if (verbose==T) cat(" Genomic\n")
   if (init.mean=="mean") {
     a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
@@ -586,8 +584,8 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", update.eC=T,
   #run optimization
   op = csnorm:::csnorm_gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, cs@settings$sbins,
                                               cs@par$lambda_iota, cs@par$lambda_rho, verbose=verbose,
-                                              max_perf_iteration=max_perf_iteration,
-                                              convergence_epsilon=convergence_epsilon)
+                                              max_perf_iteration=cs@settings$iter,
+                                              convergence_epsilon=cs@settings$tol.leg)
   #update par slot
   if (update.eC==F) op$eC=NULL
   cs@par=modifyList(cs@par, op)
@@ -597,7 +595,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", update.eC=T,
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
 #' 
-csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T, init_alpha=1e-7, ncores=ncores) {
+csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T, ncores=ncores) {
   if (verbose==T) cat(" Dispersion\n")
   #predict all means and put into table
   counts=csnorm:::csnorm_predict_all_parallel(cs,counts,ncores = ncores)
@@ -636,8 +634,8 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   init$alpha=max(0.001,1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu))
   init$mu=NULL
   out=capture.output(op<-optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion,
-                                             data=data, iter=cs@settings$iter,
-                                             verbose=verbose, init=init, init_alpha=init_alpha))
+                                             data=data, iter=cs@settings$iter, tol_obj=cs@settings$tol.leg,
+                                             verbose=verbose, init=init, init_alpha=cs@settings$init_alpha))
   cs@par=modifyList(cs@par, op$par[c("eRJ","eDE","alpha")])
   #cs@par$eC=cs@par$eC+op$par$eC_sup
   if (verbose==T) cat("  fit: dispersion",cs@par$alpha,"\n")
@@ -653,7 +651,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
+csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
@@ -694,7 +692,7 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %dopar%
     csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, fixed=F, positive=T,
-                                tol=tol, ncores=ncores, verbose=verbose)
+                                tol=cs@settings$tol.leg, ncores=ncores, verbose=verbose)
   #compute matrix at new params
   #save(mat,params,file=paste0("mat_step_",step,".RData"))
   mat = foreach (g=groupnames, .combine=rbind) %dopar% {
@@ -879,16 +877,16 @@ plot_diagnostics = function(cs, start=1) {
 #' @param lambdas positive numeric. Length scales to try out as initial
 #'   condition.
 #' @param ngibbs positive integer. Number of gibbs sampling iterations.
-#' @param iter positive integer. Number of optimization steps for each stan 
-#'   optimization call.
-#' @param fit.decay,fit.genomic,fit.disp boolean. Whether to fit diagonal decay or
-#'   genomic biases. Set to FALSE only for diagnostics.
+#' @param iter positive integer. Maximum number of optimization steps for each leg.
+#' @param fit.decay,fit.genomic,fit.signal,fit.disp boolean. Set to FALSE only for diagnostics.
 #' @param verbose Display progress if TRUE
 #' @param init_alpha positive numeric, default 1e-5. Initial step size of LBFGS
-#'   line search.
+#'   line search (dispersion leg).
 #' @param init.dispersion positive numeric. Value of the dispersion to use initially.
-#' @param tol.obj positive numeric (default 1e-1). Convergence tolerance on changes in the three likelihoods.
-#' @param ncores positive integer (default 1). Number of cores to use for initialization and dispersion step.
+#' @param tol.obj positive numeric (default 1e-1). Convergence tolerance on changes in the four likelihoods.
+#' @param tol.val positive numeric (default 1e-3). Convergence tolerance on (relative) changes in the parameters.
+#' @param tol.leg positive numeric (default 1e-5). Convergence tolerance on changes in the likelihood within each leg.
+#' @param ncores positive integer (default 1). Number of cores to use.
 #'   
 #' @return A csnorm object
 #' @export
@@ -896,9 +894,9 @@ plot_diagnostics = function(cs, start=1) {
 #' @examples
 #' 
 run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
-                     ngibbs = 20, iter=10000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
+                     ngibbs = 20, iter=1000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
                      verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
-                     tol.obj=1e-1, ncores=1) {
+                     tol.obj=1e-1, tol.val=1e-3, tol.leg=1e-5, ncores=1) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -913,7 +911,8 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     #add settings
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","qmax")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
-                         iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj))
+                         iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj,
+                         tol.val=tol.val, tol.leg=tol.leg))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
     stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
@@ -979,7 +978,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     #fit dispersion
     if (fit.disp==T) {
       a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight,
-                                                          init_alpha=init_alpha, ncores = ncores))
+                                                           ncores = ncores))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
       if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
     }
