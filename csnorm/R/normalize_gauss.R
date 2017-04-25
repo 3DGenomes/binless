@@ -261,7 +261,8 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", max_perf_iteration=1000, convergence_epsilon=1e-9) {
+csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", update.eC=T,
+                              max_perf_iteration=1000, convergence_epsilon=1e-9) {
   if (verbose==T) cat(" Decay\n")
   if (init.mean=="mean") {
     csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
@@ -273,6 +274,7 @@ csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", max_perf_iteratio
                                             verbose=verbose, max_perf_iteration=max_perf_iteration,
                                             convergence_epsilon=convergence_epsilon)
   #update par slot
+  if (update.eC==F) op$eC=NULL
   cs@par=modifyList(cs@par, op)
   return(cs)
 }
@@ -573,7 +575,8 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", max_perf_iteration=1000, convergence_epsilon=1e-5) {
+csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", update.eC=T,
+                                max_perf_iteration=1000, convergence_epsilon=1e-5) {
   if (verbose==T) cat(" Genomic\n")
   if (init.mean=="mean") {
     a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
@@ -586,6 +589,7 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", max_perf_iterat
                                               max_perf_iteration=max_perf_iteration,
                                               convergence_epsilon=convergence_epsilon)
   #update par slot
+  if (update.eC==F) op$eC=NULL
   cs@par=modifyList(cs@par, op)
   return(cs)
 }
@@ -937,10 +941,13 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     #get number of zeros along cut sites and decay
     if(verbose==T) cat("Counting zeros\n")
     cs@zeros = csnorm:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
+    #update eC everywhere in the first step
+    update.eC=T
   } else {
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
     init.mean="mean"
+    update.eC=(fit.signal==T)
   }
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
@@ -951,19 +958,20 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     if (verbose==T) cat("\n### Iteration",i,"\n")
     #fit diagonal decay given iota and rho
     if (fit.decay==T) {
-      a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean))
+      a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean, update.eC=update.eC))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
       if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     }
     #fit iota and rho given diagonal decay
     if (fit.genomic==T) {
-      a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean))
+      a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean, update.eC=update.eC))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
       if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     }
     init.mean="mean"
     #fit signal using sparse fused lasso
     if (fit.signal==T) {
+      update.eC=F
       a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, ncores=ncores))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
       if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
