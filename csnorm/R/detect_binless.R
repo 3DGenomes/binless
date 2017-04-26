@@ -192,7 +192,7 @@ gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
 #' cross-validate lambda1 and eCprime
 #' 
 #' @keywords internal
-optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=F, lambda1.min=0.05) {
+optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=F, lambda1.min=0.1) {
   #compute values for lambda1=0 and eCprime=0
   matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
   matg[,value.ori:=value]
@@ -215,20 +215,23 @@ optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=
     eCvals = c(patches[,value-lambda1],patches[,value+lambda1])
     if (positive==T) eCvals=eCvals[eCvals<=lambda1+minval]
     dt = foreach (eCprime=eCvals, .combine=rbind) %do% {
-    matg[,value:=value.ori-eCprime]
-    dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
-    stopifnot(dof<=cl$no)
-    #now soft-threshold the value around eCprime
-    matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
-    #compute BIC
-    #BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof-2*.N*log(lambda1)]
-    BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]#-9*log(lambda1)+5*lambda1]
-    data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
+      matg[,value:=value.ori-eCprime]
+      dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
+      stopifnot(dof<=cl$no)
+      #now soft-threshold the value around eCprime
+      matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
+      #compute BIC
+      #BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof-2*.N*log(lambda1)]
+      BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]#-9*log(lambda1)+5*lambda1]
+      data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
     }
     dt[BIC==min(BIC)][lambda1==max(lambda1)][eCprime==min(eCprime)]
   }
   #dt=foreach(lambda1=seq(tol/2,valrange,length.out=50), .combine=rbind) %do% obj(lambda1)
-  #ggplot(dt)+geom_point(aes(lambda1,BIC))+geom_line(aes(lambda1,BIC))
+  #dt=foreach(lambda1=seq(0,0.1,length.out=50), .combine=rbind) %do% obj(lambda1)
+  #ggplot(dt)+geom_point(aes(lambda1,BIC,colour=ori))+geom_line(aes(lambda1,BIC,colour=ori))
+  #ggplot(melt(dt,id.vars=c("lambda1","ori")))+geom_point(aes(lambda1,value,colour=ori))+
+  #  geom_line(aes(lambda1,value,colour=ori))+facet_wrap(~variable,scales="free")
   #dt[,g:=dof*matg[,log(sum(ncounts))]]
   #dt[,h:=-2*matg[,.N]*log(lambda1)]
   #dt[,h:=-9*log(lambda1)+5*lambda1]
@@ -242,7 +245,7 @@ optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=
 #' cross-validate lambda1 and assume eCprime=0
 #' 
 #' @keywords internal
-optimize_lambda1_only = function(matg, trails, tol=1e-3, lambda2=0, positive=F, lambda1.min=0.05) {
+optimize_lambda1_only = function(matg, trails, tol=1e-3, lambda2=0, positive=F, lambda1.min=0.1) {
   #compute values for lambda1=0 and eCprime=0
   matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
   matg[,value.ori:=value]
