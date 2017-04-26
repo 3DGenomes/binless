@@ -574,7 +574,7 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", update.eC=T) {
+csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", update.exposures=T) {
   if (verbose==T) cat(" Genomic\n")
   if (init.mean=="mean") {
     a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
@@ -587,7 +587,11 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", update.eC=T) {
                                               max_perf_iteration=cs@settings$iter,
                                               convergence_epsilon=cs@settings$tol.leg)
   #update par slot
-  if (update.eC==F) op$eC=NULL
+  if (update.exposures==F) {
+    op$eC=NULL
+    op$eRJ=NULL
+    op$eDE=NULL
+  }
   cs@par=modifyList(cs@par, op)
   return(cs)
 }
@@ -724,25 +728,10 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores) {
 #' 
 has_converged = function(cs) {
   params=cs@diagnostics$params
+  tol=cs@settings$tol.obj
   laststep=params[,step[.N]]
-  #objective convergence
-  delta = abs(params[step==laststep,value]-params[step==laststep-1,value])
-  conv.obj = all(delta<cs@settings$tol.obj)
-  #parameter convergence
-  conv.eC = abs(params[step==laststep&leg==leg[.N],eC[[1]]]-params[step==laststep-1&leg==leg[.N],eC[[1]]])
-  conv.alpha = abs(params[step==laststep&leg==leg[.N],alpha[[1]]]-params[step==laststep-1&leg==leg[.N],alpha[[1]]])
-  conv.ldiag = abs(params[step==laststep&leg==leg[.N],log(lambda_diag[[1]])]
-                   -params[step==laststep-1&leg==leg[.N],log(lambda_diag[[1]])])
-  conv.liota = abs(params[step==laststep&leg==leg[.N],log(lambda_iota[[1]])]
-                   -params[step==laststep-1&leg==leg[.N],log(lambda_iota[[1]])])
-  conv.lrho = abs(params[step==laststep&leg==leg[.N],log(lambda_rho[[1]])]
-                  -params[step==laststep-1&leg==leg[.N],log(lambda_rho[[1]])])
-  conv.l1 = abs(params[step==laststep&leg==leg[.N],log(lambda1[[1]])]
-                  -params[step==laststep-1&leg==leg[.N],log(lambda1[[1]])])
-  conv.l2 = abs(params[step==laststep&leg==leg[.N],log(lambda2[[1]])]
-                   -params[step==laststep-1&leg==leg[.N],log(lambda2[[1]])])
-  conv.param = all(c(conv.eC,conv.alpha,conv.ldiag,conv.liota,conv.lrho,conv.l1,conv.l2)<cs@settings$tol.val)
-  return(conv.obj | conv.param)
+  delta=abs(params[step==laststep,value]-params[step==laststep-1,value])
+  return(all(delta<tol))
 }
 
 #' count number of zeros in a given cut site, distance bin and signal bin
@@ -958,12 +947,12 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     if(verbose==T) cat("Counting zeros\n")
     cs@zeros = csnorm:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
     #update eC everywhere in the first step
-    update.eC=T
+    update.exposures=T
   } else {
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
     init.mean="mean"
-    update.eC=(fit.signal==T)
+    update.exposures=(fit.signal==T)
   }
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
@@ -974,13 +963,13 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     if (verbose==T) cat("\n### Iteration",i,"\n")
     #fit diagonal decay given iota and rho
     if (fit.decay==T) {
-      a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean, update.eC=update.eC))
+      a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean, update.eC=update.exposures))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
       if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     }
     #fit iota and rho given diagonal decay
     if (fit.genomic==T) {
-      a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean, update.eC=update.eC))
+      a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean, update.exposures=update.exposures))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
       if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     }
@@ -994,7 +983,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     }
     #fit signal using sparse fused lasso
     if (fit.signal==T) {
-      update.eC=F
+      update.exposures=F
       a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, ncores=ncores))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
       if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
