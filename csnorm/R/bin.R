@@ -176,7 +176,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
     cat("Warning: resolution is smaller than base.res, results might be inconsistent\n")
   if (resolution == cs@settings$base.res) {
     sbins = cs@settings$sbins
-    zeros = cs@zeros$sig
+    zeros = cs@zeros
   } else {
     sbins = seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
     zeros = csnorm:::get_nzeros(cs, sbins, ncores=ncores)
