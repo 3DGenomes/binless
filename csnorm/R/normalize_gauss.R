@@ -989,7 +989,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
       if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
     }
     #check for convergence
-    if (i-laststep>1) if (has_converged(cs)) {
+    if (i>1) if (has_converged(cs)) {
       if (verbose==T) cat("Normalization has converged\n")
       break
     }
