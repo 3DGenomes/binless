@@ -109,6 +109,7 @@ get_nzeros_binning = function(cs, resolution, ncores=1) {
 csnorm_predict_binned_matrices_irls = function(cts, dispersion, ncores=1, niter=100, tol=1e-3, verbose=T) {
   #matrices
   if (verbose==T) cat("   Other matrices\n")
+  cts[,decay:=exp(log_decay)]
   mat=cts[,.(ncounts=sum(weight),
              observed=sum(count*weight),
              expected=sum(mu*weight),
