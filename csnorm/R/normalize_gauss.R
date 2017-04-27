@@ -637,7 +637,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],log_mean_cclose]))
   init$alpha=max(0.001,1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu))
   init$mu=NULL
-  out=capture.output(op<-optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion,
+  out=capture.output(op<-optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, tol_param=cs@settings$tol.val,
                                              data=data, iter=cs@settings$iter, tol_obj=cs@settings$tol.leg,
                                              verbose=verbose, init=init, init_alpha=cs@settings$init_alpha))
   cs@par=modifyList(cs@par, op$par[c("eRJ","eDE","alpha")])
@@ -696,13 +696,14 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores) {
   registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %dopar%
     csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, fixed=F, positive=T,
-                                tol=cs@settings$tol.leg, ncores=ncores, verbose=verbose)
+                                tol.val=cs@settings$tol.val, ncores=ncores, verbose=verbose)
   #compute matrix at new params
   #save(mat,params,file=paste0("mat_step_",step,".RData"))
   mat = foreach (g=groupnames, .combine=rbind) %dopar% {
     p=params[name==g]
     matg=mat[name==g]
-    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, cs@settings$trails, p$lambda1, p$lambda2, p$eCprime)]
+    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, cs@settings$trails,
+                                        p$lambda1, p$lambda2, p$eCprime, tol.beta=cs@settings$tol.val)]
     matg
   }
   #store new signal in cs and update eC
@@ -901,7 +902,7 @@ plot_diagnostics = function(cs, start=1) {
 run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
                      ngibbs = 20, iter=1000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
                      verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
-                     tol.obj=1e-1, tol.val=1e-3, tol.leg=1e-5, ncores=1) {
+                     tol.obj=1e-1, tol.val=1e-5, tol.leg=1e-3, ncores=1) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
