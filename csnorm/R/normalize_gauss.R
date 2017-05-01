@@ -655,16 +655,17 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores) {
+csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
                phihat.var=2/sum(weight/var),
                ncounts=sum(weight)),keyby=c("name","bin1","bin2")][cs@par$signal[,.(name,bin1,bin2)],,on=c("name","bin1","bin2")]
   mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
-  mat[,c("valuehat","weight"):=list(phihat,1/phihat.var)]
+  mat[,c("valuehat","weight","diag.idx"):=list(phihat,1/phihat.var,unclass(bin2)-unclass(bin1))]
   setkey(mat,name,bin1,bin2)
   #
+  mat[diag.idx<=1,weight:=0] #remove diagonal+1 data, usually badly modelled
   if (cs@par$signal[bin1==bin2,any(phi!=0)]) { #do not remove anything at first iteration
     if (verbose==T) cat("  Remove bad bins\n")
     tmp=cs@par$signal[bin1==bin2,.(is.bad=all(phi==0)),by=bin1][is.bad==T,unclass(bin1)]
@@ -695,7 +696,7 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores) {
   groupnames=mat[,unique(name)]
   registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %dopar%
-    csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, fixed=F, positive=T,
+    csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, fixed=F, positive=T, constrained=constrained,
                                 tol.val=cs@settings$tol.val, ncores=ncores, verbose=verbose)
   #compute matrix at new params
   #save(mat,params,file=paste0("mat_step_",step,".RData"))
@@ -1000,7 +1001,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     #fit signal using sparse fused lasso
     if (fit.signal==T) {
       update.exposures=F
-      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, ncores=ncores))
+      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=fit.decay, ncores=ncores))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
       if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
     }

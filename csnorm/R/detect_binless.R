@@ -192,62 +192,8 @@ gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
 #' cross-validate lambda1 and eCprime
 #' 
 #' @keywords internal
-optimize_lambda1_eCprime = function(matg, trails, tol=1e-3, lambda2=0, positive=F, lambda1.min=0.05) {
-  #compute values for lambda1=0 and eCprime=0
-  matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
-  matg[,value.ori:=value]
-  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
-  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=factor(round(value,3))))+guides(fill=F))
-  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value<0.30)))
-  #get the number of patches to compute degrees of freedom
-  cl = csnorm:::build_patch_graph(matg, trails, tol.value=tol)$components
-  matg[,patchno:=cl$membership]
-  patches = matg[,.(value=value[1],size=.N),by=patchno][,.(N=.N,size=size[1]),keyby=value]
-  if (patches[,.N]==1) #matrix is just one big bin
-    return(data.table(eCprime=patches[,value],lambda1=lambda1.min,
-                      BIC=matg[,sum(weight*((valuehat-(value+patches[,value]))^2))],dof=0))
-  stopifnot(patches[,sum(N)]==cl$no)
-  minval=patches[,min(value)]
-  maxval=patches[,max(value)]
-  valrange=maxval-minval
-  #
-  obj = function(lambda1) {
-    eCvals = c(patches[,value-lambda1],patches[,value+lambda1])
-    if (positive==T) eCvals=eCvals[eCvals<=lambda1+minval]
-    dt = foreach (eCprime=eCvals, .combine=rbind) %do% {
-      matg[,value:=value.ori-eCprime]
-      dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
-      stopifnot(dof<=cl$no)
-      #now soft-threshold the value around eCprime
-      matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
-      #compute BIC
-      #BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof-2*.N*log(lambda1)]
-      BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]#-9*log(lambda1)+5*lambda1]
-      data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
-    }
-    dt[BIC==min(BIC)][lambda1==max(lambda1)][eCprime==min(eCprime)]
-  }
-  #dt=foreach(lambda1=seq(tol/2,valrange,length.out=50), .combine=rbind) %do% obj(lambda1)
-  #dt=foreach(lambda1=seq(0,0.1,length.out=50), .combine=rbind) %do% obj(lambda1)
-  #ggplot(dt)+geom_point(aes(lambda1,BIC,colour=ori))+geom_line(aes(lambda1,BIC,colour=ori))
-  #ggplot(melt(dt,id.vars=c("lambda1","ori")))+geom_point(aes(lambda1,value,colour=ori))+
-  #  geom_line(aes(lambda1,value,colour=ori))+facet_wrap(~variable,scales="free")
-  #dt[,g:=dof*matg[,log(sum(ncounts))]]
-  #dt[,h:=-2*matg[,.N]*log(lambda1)]
-  #dt[,h:=-9*log(lambda1)+5*lambda1]
-  #dt[,f:=BIC-g-h]
-  #ggplot(dt)+geom_line(aes(lambda1,f,colour="f"))+geom_line(aes(lambda1,g,colour="g"))+geom_line(aes(lambda1,h,colour="h"))
-  #ggplot(data.table(x=seq(0,valrange,l=1000))[,.(x,y=dgamma(x,rate=10,shape=5,log=T))])+geom_line(aes(x,y))
-  op=optimize(function(x){obj(10^(x))[,BIC]}, c(log10(max(lambda1.min,tol/2)),log10(valrange)), tol=tol.val)
-  values=as.list(obj(10^(op$minimum)))
-  #patches[,removed:=abs(value-values$eCprime)<=values$lambda1]
-  return(values)
-}
-
-#' cross-validate lambda1 and eCprime, assuming positive=T and holding eCprime=lambda1+min(value)
-#' 
-#' @keywords internal
-optimize_lambda1_eCprime_simplified = function(matg, trails, tol.val=1e-3, lambda2=0, lambda1.min=0.05) {
+optimize_lambda1_eCprime = function(matg, trails, tol.val=1e-3, lambda2=0, positive=F,
+                                    lambda1.min=0.05, constrained=T) {
   #compute values for lambda1=0 and eCprime=0
   matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0, tol.beta=tol.val)]
   matg[,value.ori:=value]
@@ -266,18 +212,35 @@ optimize_lambda1_eCprime_simplified = function(matg, trails, tol.val=1e-3, lambd
   maxval=patches[,max(value)]
   valrange=maxval-minval
   #
+  if (constrained==T) { #some patches must be zeroed to avoid degeneracy with diagonal decay fit
+    forbidden.vals = matg[,.(max(value.ori)-min(value.ori)<=tol.val,value.ori[1]),by=diag.idx][V1==T,unique(V2)]
+    if (positive==T) {
+      lambda1.min = max(lambda1.min, (max(forbidden.vals)-minval)/2+tol.val)
+    } else {
+      lambda1.min = max(lambda1.min, (max(forbidden.vals)-min(forbidden.vals))/2+tol.val)
+    }
+  } else {
+    forbidden.vals = c()
+  }
+  #
   obj = function(lambda1) {
     eCvals = c(patches[,value-lambda1],patches[,value+lambda1])
-    eCprime=lambda1+minval
-    matg[,value:=value.ori-eCprime]
-    dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
-    stopifnot(dof<=cl$no)
-    #now soft-threshold the value around eCprime
-    matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
-    #compute BIC
-    #BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof-2*.N*log(lambda1)]
-    BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]#-9*log(lambda1)+5*lambda1]
-    data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
+    if (positive==T) eCvals=eCvals[eCvals<=lambda1+minval]
+    if (constrained==T) for (fv in forbidden.vals) eCvals = eCvals[abs(eCvals-fv)<=lambda1]
+    if (length(eCvals)==0) 
+      return(data.table(eCprime=NA,lambda1=lambda1,BIC=.Machine$double.xmax,dof=NA))
+    dt = foreach (eCprime=eCvals, .combine=rbind) %do% {
+      matg[,value:=value.ori-eCprime]
+      dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
+      stopifnot(dof<=cl$no)
+      #now soft-threshold the value around eCprime
+      matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
+      #compute BIC
+      #BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof-2*.N*log(lambda1)]
+      BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]#-9*log(lambda1)+5*lambda1]
+      data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
+    }
+    dt[BIC==min(BIC)][lambda1==max(lambda1)][eCprime==min(eCprime)]
   }
   #dt=foreach(lambda1=seq(tol.val/2,valrange,length.out=50), .combine=rbind) %do% obj(lambda1)
   #dt=foreach(lambda1=seq(0,0.1,length.out=50), .combine=rbind) %do% obj(lambda1)
@@ -290,6 +253,69 @@ optimize_lambda1_eCprime_simplified = function(matg, trails, tol.val=1e-3, lambd
   #dt[,f:=BIC-g-h]
   #ggplot(dt)+geom_line(aes(lambda1,f,colour="f"))+geom_line(aes(lambda1,g,colour="g"))+geom_line(aes(lambda1,h,colour="h"))
   #ggplot(data.table(x=seq(0,valrange,l=1000))[,.(x,y=dgamma(x,rate=10,shape=5,log=T))])+geom_line(aes(x,y))
+  #if (valrange <= 2*lambda1.min) return(as.list(obj(lambda1.min)))
+  op=optimize(function(x){obj(10^(x))[,BIC]}, c(log10(max(lambda1.min,tol.val/2)),log10(valrange)), tol=tol.val)
+  values=as.list(obj(10^(op$minimum)))
+  #patches[,removed:=abs(value-values$eCprime)<=values$lambda1]
+  return(values)
+}
+
+#' cross-validate lambda1 and eCprime, assuming positive=T and holding eCprime=lambda1+min(value)
+#' 
+#' @keywords internal
+optimize_lambda1_eCprime_simplified = function(matg, trails, tol.val=1e-3, lambda2=0,
+                                               lambda1.min=0.05, constrained=T) {
+  #compute values for lambda1=0 and eCprime=0
+  matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0, tol.beta=tol.val)]
+  matg[,value.ori:=value]
+  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
+  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=factor(round(value,3))))+guides(fill=F))
+  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value<0.30)))
+  #get the number of patches to compute degrees of freedom
+  cl = csnorm:::build_patch_graph(matg, trails, tol.value=tol.val)$components
+  matg[,patchno:=cl$membership]
+  patches = matg[,.(value=value[1],size=.N),by=patchno][,.(N=.N,size=size[1]),keyby=value]
+  if (patches[,.N]==1) #matrix is just one big bin
+    return(data.table(eCprime=patches[,value],lambda1=lambda1.min,
+                      BIC=matg[,sum(weight*((valuehat-(value+patches[,value]))^2))],dof=0))
+  stopifnot(patches[,sum(N)]==cl$no)
+  minval=patches[,min(value)]
+  maxval=patches[,max(value)]
+  valrange=maxval-minval
+  #
+  if (constrained==T) { #some patches must be zeroed to avoid degeneracy with diagonal decay fit
+    forbidden.vals = matg[,.(max(value.ori)-min(value.ori)<=tol.val,value.ori[1]),by=diag.idx][V1==T,unique(V2)]
+    lambda1.min = max(lambda1.min, (max(forbidden.vals)-minval)/2 + tol.val)
+  } else {
+    forbidden.vals = c()
+  }
+  #
+  obj = function(lambda1) {
+    eCprime=lambda1+minval
+    if (constrained==T & any(abs(eCprime-forbidden.vals)>lambda1+tol.val))
+      return(data.table(eCprime=NA,lambda1=lambda1,BIC=.Machine$double.xmax,dof=NA))
+    matg[,value:=value.ori-eCprime]
+    dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
+    stopifnot(dof<=cl$no)
+    #now soft-threshold the value around eCprime
+    matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
+    #compute BIC
+    #BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof-2*.N*log(lambda1)]
+    BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]#-9*log(lambda1)+5*lambda1]
+    data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
+  }
+  #dt=foreach(lambda1=seq(lambda1.min,valrange,length.out=50), .combine=rbind) %do% obj(lambda1)
+  #dt=foreach(lambda1=seq(0,0.1,length.out=50), .combine=rbind) %do% obj(lambda1)
+  #ggplot(dt)+geom_point(aes(lambda1,BIC,colour=ori))+geom_line(aes(lambda1,BIC,colour=ori))
+  #ggplot(melt(dt,id.vars=c("lambda1","ori")))+geom_point(aes(lambda1,value,colour=ori))+
+  #  geom_line(aes(lambda1,value,colour=ori))+facet_wrap(~variable,scales="free")
+  #dt[,g:=dof*matg[,log(sum(ncounts))]]
+  #dt[,h:=-2*matg[,.N]*log(lambda1)]
+  #dt[,h:=-9*log(lambda1)+5*lambda1]
+  #dt[,f:=BIC-g-h]
+  #ggplot(dt)+geom_line(aes(lambda1,f,colour="f"))+geom_line(aes(lambda1,g,colour="g"))+geom_line(aes(lambda1,h,colour="h"))
+  #ggplot(data.table(x=seq(0,valrange,l=1000))[,.(x,y=dgamma(x,rate=10,shape=5,log=T))])+geom_line(aes(x,y))
+  if (valrange <= 2*lambda1.min) return(as.list(obj(lambda1.min)))
   op=optimize(function(x){obj(10^(x))[,BIC]}, c(log10(max(lambda1.min,tol.val/2)),log10(valrange)), tol=tol.val)
   values=as.list(obj(10^(op$minimum)))
   #patches[,removed:=abs(value-values$eCprime)<=values$lambda1]
@@ -299,7 +325,8 @@ optimize_lambda1_eCprime_simplified = function(matg, trails, tol.val=1e-3, lambd
 #' cross-validate lambda1 and assume eCprime=0
 #' 
 #' @keywords internal
-optimize_lambda1_only = function(matg, trails, tol.val=1e-3, lambda2=0, positive=F, lambda1.min=0.05) {
+optimize_lambda1_only = function(matg, trails, tol.val=1e-3, lambda2=0, positive=F,
+                                 lambda1.min=0.05, constrained=T) {
   #compute values for lambda1=0 and eCprime=0
   matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0, tol.beta=tol.val)]
   matg[,value.ori:=value]
@@ -317,6 +344,14 @@ optimize_lambda1_only = function(matg, trails, tol.val=1e-3, lambda2=0, positive
   minval=patches[,min(value)]
   maxval=patches[,max(value)]
   if (positive==T) lambda1.min=max(lambda1.min, -min(minval,0))
+  #
+  if (constrained==T) { #some patches must be zeroed to avoid degeneracy with diagonal decay fit
+    forbidden.vals = matg[,.(max(value.ori)-min(value.ori)<=tol.val,value.ori[1]),by=diag.idx][V1==T,unique(V2)]
+    lambda1.min = max(lambda1.min, (max(forbidden.vals)-min(forbidden.vals))/2)
+    stopifnot(maxval>lambda1.min)
+  } else {
+    forbidden.vals = c()
+  }
   #
   obj = function(lambda1) {
     dof = matg[abs(value.ori)>lambda1,uniqueN(patchno)] #sparse fused lasso
@@ -378,7 +413,7 @@ optimize_lambda2 = function(matg, trails, tol.val=1e-3, lambda2.max=1000) {
 #' 
 #' finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(matg, trails, positive=T, fixed=F, tol.val=1e-3,
+csnorm_fused_lasso = function(matg, trails, positive=T, fixed=F, constrained=T, tol.val=1e-3,
                               verbose=T, ncores=ncores) {
   groupname=matg[,name[1]]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=valuehat))+scale_fill_gradient2())
@@ -386,10 +421,12 @@ csnorm_fused_lasso = function(matg, trails, positive=T, fixed=F, tol.val=1e-3,
   #get best lambda1 and set eCprime to lower bound
   if (fixed==F) {
     if (positive!=T) stop("should be calling optimize_lambda1_eCprime, aborting.")
-    vals = csnorm:::optimize_lambda1_eCprime_simplified(matg, trails, tol.val=tol.val, lambda2=lambda2)
+    vals = csnorm:::optimize_lambda1_eCprime_simplified(matg, trails, tol.val=tol.val, lambda2=lambda2,
+                                                        constrained=constrained)
     eCprime=vals$eCprime
   } else {
-    vals = csnorm:::optimize_lambda1_only(matg, trails, tol.val=tol.val, lambda2=lambda2, positive=positive)
+    vals = csnorm:::optimize_lambda1_only(matg, trails, tol.val=tol.val, lambda2=lambda2, positive=positive,
+                                          constrained=constrained)
     eCprime=0
   }
   lambda1=vals$lambda1
@@ -547,7 +584,8 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     if (verbose==T) cat("  Fused lasso\n")
     groupnames=mat[,unique(name)]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=T, positive=T, tol=tol, ncores=ncores, verbose=verbose)
+      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=T, positive=T, constrained=F, tol=tol,
+                                  ncores=ncores, verbose=verbose)
     #display param info
     if (verbose==T)
       for (i in 1:params[,.N])
@@ -621,7 +659,8 @@ detect_binless_differences = function(cs, resolution, group, ref, niter=10, tol=
     if (verbose==T) cat("  Fused lasso\n")
     groupnames=mat[,unique(name)]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso(mat[name==g], trails, positive=F, fixed=T, tol=tol, ncores=ncores, verbose=verbose)
+      csnorm:::csnorm_fused_lasso(mat[name==g], trails, positive=F, fixed=T, constrained=F,
+                                  tol=tol, ncores=ncores, verbose=verbose)
     #display param info
     if (verbose==T)
       for (i in 1:params[,.N])
