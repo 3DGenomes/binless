@@ -228,7 +228,7 @@ optimize_lambda1_eCprime = function(matg, trails, tol.val=1e-3, lambda2=0, posit
     if (positive==T) eCvals=eCvals[eCvals<=lambda1+minval]
     if (constrained==T) for (fv in forbidden.vals) eCvals = eCvals[abs(eCvals-fv)<=lambda1]
     if (length(eCvals)==0) 
-      return(data.table(eCprime=NA,lambda1=lambda1,BIC=.Machine$double.xmax,dof=NA))
+      return(data.table(eCprime=0,lambda1=lambda1,BIC=.Machine$double.xmax,dof=NA))
     dt = foreach (eCprime=eCvals, .combine=rbind) %do% {
       matg[,value:=value.ori-eCprime]
       dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
@@ -293,7 +293,7 @@ optimize_lambda1_eCprime_simplified = function(matg, trails, tol.val=1e-3, lambd
   obj = function(lambda1) {
     eCprime=lambda1+minval
     if (constrained==T & any(abs(eCprime-forbidden.vals)>lambda1+tol.val))
-      return(data.table(eCprime=NA,lambda1=lambda1,BIC=.Machine$double.xmax,dof=NA))
+      return(data.table(eCprime=0,lambda1=lambda1,BIC=.Machine$double.xmax,dof=NA))
     matg[,value:=value.ori-eCprime]
     dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
     stopifnot(dof<=cl$no)
