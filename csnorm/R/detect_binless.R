@@ -443,10 +443,10 @@ csnorm_fused_lasso = function(matg, trails, positive, fixed, constrained, tol.va
   }
   lambda1=vals$lambda1
   BIC=vals$BIC
-  #matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0)]
+  #matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0, tol.value = tol.val)]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=abs(value-eCprime)<=lambda1)))
-  #matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime)]
+  #matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1, lambda2, eCprime, tol.value = tol.val)]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   return(data.table(name=groupname,lambda1=lambda1,lambda2=lambda2,eCprime=eCprime,BIC=BIC))
 }
@@ -596,7 +596,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     mat = foreach (g=groupnames, .combine=rbind) %dopar% {
       p=params[name==g]
       matg=mat[name==g]
-      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, p$lambda1, p$lambda2, p$eCprime)]
+      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, p$lambda1, p$lambda2, p$eCprime, tol.value = tol.val)]
       matg[,eCprime:=p$eCprime]
       matg
     }
@@ -672,7 +672,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, nite
     mat = foreach (g=groupnames, .combine=rbind) %dopar% {
       p=params[name==g]
       matg=mat[name==g]
-      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, p$lambda1, p$lambda2, p$eCprime)]
+      matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, p$lambda1, p$lambda2, p$eCprime, tol.value = tol.val)]
       matg[,eCprime:=p$eCprime]
       matg
     }
