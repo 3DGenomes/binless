@@ -147,12 +147,12 @@ gfl_compute_trails = function(nrow) {
 #' compute sparse fused lasso coefficients for a given value of lambda1, lambda2 and eCprime
 #' @keywords internal
 gfl_get_value = function(valuehat, weight, trails, lambda1, lambda2, eCprime,
-                         alpha=0.2, inflate=2, tol.beta=1e-6, maxsteps=100000) {
+                         alpha=0.2, inflate=2, tol.value=1e-6, maxsteps=100000) {
   #assume lambda1=0 and compute the fused lasso solution, centered around eCprime
   z=rep(0,tail(trails$breakpoints,n=1))
   u=rep(0,tail(trails$breakpoints,n=1))
   value = csnorm:::weighted_graphfl(valuehat, weight, trails$ntrails, trails$trails,
-                         trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.beta, z, u) - eCprime
+                                    trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.value/2, z, u) - eCprime
   #now soft-threshold the shifted value around eCprime
   value=sign(value)*pmax(abs(value)-lambda1, 0)
   return(value)
@@ -174,7 +174,7 @@ gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
   #get value with lambda1 set to zero to avoid round-off errors in degrees of freedom
   submat = matg[,.(name,bin1,bin2,valuehat,weight,ncounts)]
   submat[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1=0, lambda2=lambda2,
-                                        eCprime=eCprime, tol.beta=tol.value)]
+                                        eCprime=eCprime, tol.value=tol.value)]
   #get the number of patches and deduce degrees of freedom
   cl = csnorm:::build_patch_graph(submat, trails, tol.value=tol.value)$components
   submat[,patchno:=cl$membership]
@@ -195,7 +195,7 @@ gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
 optimize_lambda1_eCprime = function(matg, trails, tol.val=1e-3, lambda2=0, positive=F,
                                     lambda1.min=0.05, constrained=T) {
   #compute values for lambda1=0 and eCprime=0
-  matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0, tol.beta=tol.val)]
+  matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0, tol.value=tol.val)]
   matg[,value.ori:=value]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=factor(round(value,3))))+guides(fill=F))
@@ -266,7 +266,7 @@ optimize_lambda1_eCprime = function(matg, trails, tol.val=1e-3, lambda2=0, posit
 optimize_lambda1_eCprime_simplified = function(matg, trails, tol.val=1e-3, lambda2=0,
                                                lambda1.min=0.05, constrained=T) {
   #compute values for lambda1=0 and eCprime=0
-  matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0, tol.beta=tol.val)]
+  matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0, tol.value=tol.val)]
   matg[,value.ori:=value]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=factor(round(value,3))))+guides(fill=F))
@@ -328,7 +328,7 @@ optimize_lambda1_eCprime_simplified = function(matg, trails, tol.val=1e-3, lambd
 optimize_lambda1_only = function(matg, trails, tol.val=1e-3, lambda2=0, positive=F,
                                  lambda1.min=0.05, constrained=T) {
   #compute values for lambda1=0 and eCprime=0
-  matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0, tol.beta=tol.val)]
+  matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, lambda2, 0, tol.value=tol.val)]
   matg[,value.ori:=value]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=factor(round(value,3))))+guides(fill=F))
@@ -385,7 +385,7 @@ optimize_lambda2 = function(matg, trails, tol.val=1e-3, lambda2.max=1000) {
   #cat("*** maxlambda ",maxlambda," (range=",matg[,max(value)-min(value)],")\n")
   #shrink maximum lambda, in case initial guess is too big
   repeat {
-    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, maxlambda, 0, tol.beta=tol.val)]
+    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, maxlambda, 0, tol.value=tol.val)]
     #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+geom_raster(aes(bin2,bin1,fill=valuehat)))
     if (matg[,max(value)-min(value)] > tol.val) {
       if (maxlambda==lambda2.max) cat("   Warning: maxlambda hit boundary.\n")

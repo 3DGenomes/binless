@@ -710,7 +710,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
     p=params[name==g]
     matg=mat[name==g]
     matg[,value:=csnorm:::gfl_get_value(valuehat, weight, cs@settings$trails,
-                                        p$lambda1, p$lambda2, p$eCprime, tol.beta=cs@settings$tol.val)]
+                                        p$lambda1, p$lambda2, p$eCprime, tol.value=cs@settings$tol.val)]
     matg
   }
   #store new signal in cs and update eC
