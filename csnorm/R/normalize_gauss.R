@@ -71,42 +71,41 @@ csnorm_gauss_common_muhat_mean = function(cs, zeros, sbins) {
                                                            log_mu.base+log_iota1+log_iota2)]
   cpos[,log_mu.base:=NULL]
   cpos=rbind(cpos[contact.close>0,.(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact R", dir="fwd",
-                                    count=contact.close, lmu=lmu.close, weight=1, eC, log_decay, log_bias=log_rho1)],
+                                    count=contact.close, lmu.nosig=lmu.close, weight=1, eC, log_decay, log_bias=log_rho1)],
              cpos[contact.far>0,  .(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact L", dir="fwd",
-                                    count=contact.far,   lmu=lmu.far,   weight=1, eC, log_decay, log_bias=log_iota1)],
+                                    count=contact.far,   lmu.nosig=lmu.far,   weight=1, eC, log_decay, log_bias=log_iota1)],
              cpos[contact.down>0, .(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact R", dir="fwd",
-                                    count=contact.down,  lmu=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho1)],
+                                    count=contact.down,  lmu.nosig=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho1)],
              cpos[contact.up>0,   .(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact L", dir="fwd",
-                                    count=contact.up,    lmu=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota1)],
+                                    count=contact.up,    lmu.nosig=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota1)],
              cpos[contact.far>0,  .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact R", dir="rev",
-                                    count=contact.far,   lmu=lmu.far,   weight=1, eC, log_decay, log_bias=log_rho2)],
+                                    count=contact.far,   lmu.nosig=lmu.far,   weight=1, eC, log_decay, log_bias=log_rho2)],
              cpos[contact.close>0,.(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact L", dir="rev",
-                                    count=contact.close, lmu=lmu.close, weight=1, eC, log_decay, log_bias=log_iota2)],
+                                    count=contact.close, lmu.nosig=lmu.close, weight=1, eC, log_decay, log_bias=log_iota2)],
              cpos[contact.down>0, .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact R", dir="rev",
-                                    count=contact.down,  lmu=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho2)],
+                                    count=contact.down,  lmu.nosig=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho2)],
              cpos[contact.up>0,   .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact L", dir="rev",
-                                    count=contact.up,    lmu=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota2)])
+                                    count=contact.up,    lmu.nosig=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota2)])
   ### zero counts
   czero = merge(init$decay[,.(name,dbin,log_decay)], zeros, by=c("name","dbin"))
   stopifnot(czero[is.na(log_decay),.N]==0)
   czero = merge(czero[nzero>0],bsub, by.x="id1",by.y="id",all.x=T,all.y=F)
   czero[,log_bias:=ifelse(cat=="contact L", log_iota, log_rho)]
   czero = merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
-  czero[,lmu:=eC + log_decay + log_bias] #we don't average over j
-  czero = czero[,.(name,id1,pos1,bin1,bin2,dbin,cat,dir,count=0,lmu,weight=nzero,log_bias,log_decay,eC)]
+  czero[,lmu.nosig:=eC + log_decay + log_bias] #we don't average over j
+  czero = czero[,.(name,id1,pos1,bin1,bin2,dbin,cat,dir,count=0,lmu.nosig,weight=nzero,log_bias,log_decay,eC)]
   cts=rbind(cpos,czero)
   ### add signal
   if (cs@par$signal[,.N]>0) {
     signal=rbind(cs@par$signal,cs@par$signal[bin1!=bin2,.(name,bin1=bin2,bin2=bin1,phi)])
     cts=signal[cts,,on=c("name","bin1","bin2")]
-    cts[,mu:=exp(lmu+phi)]
+    cts[,mu:=exp(lmu.nosig+phi)]
   } else {
-    cts[,mu:=exp(lmu)]
+    cts[,mu:=exp(lmu.nosig)]
   }
   ### finalize
   cts[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
   #ggplot(cts[name=="T47D es 60 MboI 1"&cat=="contact R"])+geom_line(aes(dbin,log_decay,colour=count>0,group=count>0))
-  #cts[,c("count","mu","pos","lmu"):=NULL] #not needed downstream
   return(cts)
 }
 
