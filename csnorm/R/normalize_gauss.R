@@ -664,6 +664,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
   mat[,c("valuehat","weight","diag.idx"):=list(phihat,1/phihat.var,unclass(bin2)-unclass(bin1))]
   setkey(mat,name,bin1,bin2)
+  stopifnot(mat[is.na(valuehat)|is.na(weight),.N]==0)
   #
   mat[diag.idx<=1,weight:=0] #remove diagonal+1 data, usually badly modelled
   if (cs@par$signal[bin1==bin2,any(phi!=0)]) { #do not remove anything at first iteration
