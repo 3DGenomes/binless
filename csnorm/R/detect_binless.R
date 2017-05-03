@@ -401,8 +401,8 @@ optimize_lambda2 = function(matg, trails, tol.val=1e-3, lambda2.max=1000) {
   #ggplot(dt)+geom_point(aes(10^(x),y))#+scale_x_log10()+scale_y_log10()
   op=optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=tol.val)
   lambda2=10^op$minimum
-  if (lambda2==minlambda | lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
-  if (lambda2<tol.val) {
+  if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
+  if (lambda2 <= tol.val) {
     cat("   Warning: lambda2 hit lower boundary.")
     lambda2=0
   }
@@ -473,6 +473,7 @@ prepare_signal_matrix = function(cs, names, resolution) {
     }
     mat=mat[,.(phi=mean(phi)),keyby=c("name","bin1","bin2")]
   }
+  mat[,eCprime:=0]
   #ggplot(cs@par$signal)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()
   #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()
   #
@@ -497,10 +498,10 @@ prepare_difference_matrix = function(cs, names, resolution, ref) {
 #' compute input to fused lasso
 #' @keywords internal
 csnorm_compute_raw_signal = function(cts, dispersion, mat) {
-  mat=mat[,.(name,bin1,bin2,phi)]
-  cts.cp = mat[cts,,on=c("name","bin1","bin2")]
-  cts.cp[,c("z","var"):=list(count/exp(phi+eC+lmu.base+log_decay)-1,
-                             (1/exp(phi+eC+lmu.base+log_decay)+1/dispersion))]
+  mat=mat[,.(name,bin1,bin2,phi,eCprime)]
+  cts.cp = mat[cts[,.(name,bin1,bin2,count,lmu.nosig,weight,var)],,on=c("name","bin1","bin2")]
+  cts.cp[,mu:=exp(lmu.nosig+phi+eCprime)]
+  cts.cp[,c("z","var"):=list(count/mu-1, (1/mu+1/dispersion))]
   mat = cts.cp[,.(phihat=weighted.mean(z+phi, weight/var),
                   phihat.var=1/sum(weight/var),
                   ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat,,on=c("name","bin1","bin2")]
@@ -558,7 +559,7 @@ csnorm_compute_raw_differential = function(cts, dispersion, mat, ref) {
 #' @export
 #' 
 #' @examples
-detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol=1e-3, verbose=T){
+detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol.val=1e-3, verbose=T){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
@@ -584,7 +585,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     if (verbose==T) cat("  Fused lasso\n")
     groupnames=mat[,unique(name)]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=T, positive=T, constrained=F, tol=tol,
+      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=T, positive=T, constrained=F, tol.val=tol.val,
                                   ncores=ncores, verbose=verbose)
     #display param info
     if (verbose==T)
@@ -597,6 +598,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
       p=params[name==g]
       matg=mat[name==g]
       matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, p$lambda1, p$lambda2, p$eCprime)]
+      matg[,eCprime:=p$eCprime]
       matg
     }
     #convert back value to the actual signal
@@ -609,7 +611,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     #ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
     #
     #check convergence
-    if(mat[,all(abs(phi-phi.old)<tol)]) break
+    if(mat[,all(abs(phi-phi.old)<tol.val)] & mat[,eCprime[1],by=name][,all(abs(V1)<tol)]) break
   }
   #
   if (verbose==T) cat(" Detect patches\n")
