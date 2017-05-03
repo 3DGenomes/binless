@@ -666,7 +666,9 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   setkey(mat,name,bin1,bin2)
   stopifnot(mat[is.na(valuehat)|is.na(weight),.N]==0)
   #
-  mat[diag.idx<=1,weight:=0] #remove diagonal+1 data, usually badly modelled
+  #remove data that contains the dmin threshold, usually badly modelled
+  mat[diag.idx <= ceiling(cs@settings$dmin/cs@settings$base.res), weight:=0]
+  #
   if (cs@par$signal[bin1==bin2,any(phi!=0)]) { #do not remove anything at first iteration
     if (verbose==T) cat("  Remove bad bins\n")
     tmp=cs@par$signal[bin1==bin2,.(is.bad=all(phi==0)),by=bin1][is.bad==T,unclass(bin1)]
