@@ -657,9 +657,13 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+  cts = rbind(cts[bin1<=bin2,.(name,bin1,bin2,z,phi,weight,var)],
+              cts[bin1>bin2,.(name,bin1=bin2,bin2=bin1,z,phi,weight,var)]) #put in triangular form
+  stopifnot(cts[,all(bin1<=bin2)])
   mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
                phihat.var=2/sum(weight/var),
-               ncounts=sum(weight)),keyby=c("name","bin1","bin2")][cs@par$signal[,.(name,bin1,bin2)],,on=c("name","bin1","bin2")]
+               ncounts=sum(weight)),keyby=c("name","bin1","bin2")]
+  mat = mat[cs@par$signal[,.(name,bin1,bin2)],,on=c("name","bin1","bin2")] #to add empty rows/cols
   mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
   mat[,c("valuehat","weight","diag.idx"):=list(phihat,1/phihat.var,unclass(bin2)-unclass(bin1))]
   setkey(mat,name,bin1,bin2)

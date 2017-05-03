@@ -183,8 +183,14 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
     zeros = csnorm:::get_nzeros(cs, sbins, ncores=ncores)
   }
   #
+  #predict means, put in triangular form and add signal column if absent
   if (verbose==T) cat("   Predict means\n")
   cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros, sbins)
+  cts2 = cts[bin1>bin2]
+  setnames(cts2,c("bin1","bin2"),c("bin2","bin1"))
+  cts = rbind(cts[bin1<=bin2],cts2)
+  rm(cts2)
+  stopifnot(cts[,all(bin1<=bin2)])
   if (!("phi" %in% names(cts))) cts[,phi:=0]
   #
   if (verbose==T) cat("   Group\n")
