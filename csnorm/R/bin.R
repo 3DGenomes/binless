@@ -185,6 +185,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   #
   if (verbose==T) cat("   Predict means\n")
   cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros, sbins)
+  if (!("phi" %in% names(cts))) cts[,phi:=0]
   #
   if (verbose==T) cat("   Group\n")
   if (group=="all") {
