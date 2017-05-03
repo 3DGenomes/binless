@@ -379,7 +379,7 @@ optimize_lambda1_only = function(matg, trails, tol.val=1e-3, lambda2=0, positive
 #' @keywords internal
 optimize_lambda2 = function(matg, trails, tol.val=1e-3, lambda2.max=1000) {
   obj = function(x){csnorm:::gfl_BIC(matg, trails, lambda1=0, lambda2=10^(x), eCprime=0, tol.value = tol.val)}
-  minlambda=tol.val/2
+  minlambda=tol.val*10
   maxlambda=lambda2.max
   #save(matg,trails,tol,lambda1,eCprime,file="debug_lambda2.RData")
   #cat("*** maxlambda ",maxlambda," (range=",matg[,max(value)-min(value)],")\n")
