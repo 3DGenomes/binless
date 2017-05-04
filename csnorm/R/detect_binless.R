@@ -392,7 +392,6 @@ optimize_lambda2 = function(matg, trails, tol.val=1e-3, lambda2.max=1000) {
     matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, maxlambda, 0, tol.value=tol.val)]
     #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+geom_raster(aes(bin2,bin1,fill=valuehat)))
     if (matg[,max(value)-min(value)] > tol.val) {
-      if (maxlambda==lambda2.max) cat("   Warning: maxlambda hit boundary.\n")
       maxlambda = maxlambda*2
       break
     }
@@ -406,8 +405,8 @@ optimize_lambda2 = function(matg, trails, tol.val=1e-3, lambda2.max=1000) {
   op=optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=tol.val)
   lambda2=10^op$minimum
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
-  if (lambda2 <= tol.val) {
-    cat("   Warning: lambda2 hit lower boundary.")
+  if (lambda2 <= tol.val*10) {
+    cat("   Warning: lambda2 too close to lower boundary.")
     lambda2=0
   }
   return(lambda2)
