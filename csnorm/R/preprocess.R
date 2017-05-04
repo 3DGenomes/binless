@@ -221,7 +221,7 @@ plot_raw = function(dt, b1, e1, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
 #' @keywords internal
 #' 
 #' @examples
-categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0,4), dangling.R = c(3,-1), read.len=40) {
+categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0), dangling.R = c(3), read.len=40) {
   sub[,category:="other"]
   #careful: order is important because attribution criteria overlap
   cat("Contacts\n")
@@ -234,7 +234,7 @@ categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0,4), dangling
   sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & re.dn1 == re.dn2, category:="random"]
   cat("Rejoined\n")
   sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & re.dn1 <= re.up2, category:="rejoined"]
-  #sub[re.closest1.idx != re.closest2.idx & rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0, category:="random"]
+  sub[category=="rejoined" & (length1 != read.len | length2 != read.len), category:="random"]
   cat("Self Circle\n")
   sub[re.dn1 == re.dn2 & strand1==0 & strand2==1 & rbegin1 - re.up1 < maxlen & re.dn2 - rbegin2 < maxlen, category:="self circle"]
   cat("Dangling L/R\n")
