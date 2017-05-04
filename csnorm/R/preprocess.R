@@ -5,16 +5,21 @@ NULL
 #'
 #' @param fname The filename
 #' @param nrows,skip see \code{\link[data.table]{fread}}
+#' @param locus if not NULL, a vector in the format c("chr3",123,456) to keep only
+#' paired-end reads where both ends map in region chr3:123-456. Otherwise, read everything.
 #'
 #' @return a data.table
 #' @export
 #'
 #' @examples
-read_tsv = function(fname, nrows=-1L, skip=0L) {
+read_tsv = function(fname, nrows=-1L, skip=0L, locus=NULL) {
   data = fread(fname, col.names=c("id", "chr1","begin1","strand1", "length1",
                                   "re.up1","re.dn1",
                                   "chr2","begin2","strand2", "length2",
                                   "re.up2","re.dn2"), nrows=nrows, skip=skip)
+  if (!is.null(locus)) data=data[chr1==locus[1]&chr2==locus[1]
+                                 &begin1>=as.integer(locus[2])&begin2>=as.integer(locus[2])
+                                 &begin1<=as.integer(locus[3])&begin2<=as.integer(locus[3])]
   #only one chromosome for now
   stopifnot(data[,nlevels(factor(chr1))]==1)
   stopifnot(data[,nlevels(factor(chr2))]==1)
@@ -446,12 +451,11 @@ generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1
 #' Diagnostic plots to determine dangling.L, dangling.R and maxlen arguments
 #' 
 #' @param infile A tadbit .tsv file
-#' @param skip see \code{\link[data.table]{fread}}
-#' @param nrows number of rows to read, default all.
 #' @param window how many bases to plot around cut site
 #' @param maxlen how many bases to plot off-diagonal
 #' @param skip.fbm boolean. If TRUE (default), skip fragment-based IDs, 
 #'   containing # and ~. Otherwise keep them.
+#' @inheritParams read_tsv
 #'   
 #' @return Two plots, pdangling to determine dangling.L and dangling.R, and
 #'   pdiag for maxlen. Also returns data, the reads data table used for the
@@ -459,8 +463,8 @@ generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1
 #' @export
 #' 
 #' @examples
-examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000, skip.fbm=T, read.len=40) {
-  data=read_tsv(infile, skip=skip, nrows=nrows)
+examine_dataset = function(infile, window=15, maxlen=1000, skip.fbm=T, read.len=40, skip=0L, nrows=-1L, locus=NULL) {
+  data=read_tsv(infile, skip=skip, nrows=nrows, locus=locus)
   if (skip.fbm == T) data = data[!grepl("[#~]",id)]
   #dangling
   dleft=data[abs(rbegin1-re.closest1)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0&length1==read.len,
@@ -512,12 +516,12 @@ examine_dataset = function(infile, skip=0L, nrows=-1L, window=15, maxlen=1000, s
 #' 
 #' @examples
 read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "HindIII", experiment = "Hi-C",
-                            name = paste(condition, enzyme, replicate), skip = 0L, nrows = -1L,
+                            name = paste(condition, enzyme, replicate), skip = 0L, nrows = -1L, locus=NULL,
                             circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1), maxlen = 600,
                             read.len=40, dmin=2000, save.data=T) {
   match.arg(experiment)
   cat("*** READ\n")
-  data=read_tsv(infile, skip=skip, nrows=nrows)
+  data=read_tsv(infile, skip=skip, nrows=nrows, locus=locus)
   if (circularize>0) data=data[!((re.closest1 %in% c(1,circularize)) | (re.closest2 %in% c(1,circularize)))]
   cat("*** CATEGORIZE\n")
   data = categorize_by_new_type(data, dangling.L = dangling.L, dangling.R = dangling.R, maxlen = maxlen, read.len=read.len)
