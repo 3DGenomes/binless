@@ -702,7 +702,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   groupnames=mat[,unique(name)]
   registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %dopar%
-    csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, fixed=F, positive=T, constrained=constrained,
+    csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, fixed=F, positive=T, constrained=constrained, simplified=T,
                                 tol.val=cs@settings$tol.val, ncores=ncores, verbose=verbose)
   #compute matrix at new params
   #save(mat,params,file=paste0("mat_step_",step,".RData"))

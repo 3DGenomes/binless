@@ -427,16 +427,21 @@ optimize_lambda2 = function(matg, trails, tol.val=1e-3, lambda2.max=1000) {
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(matg, trails, positive, fixed, constrained, tol.val=1e-3,
+csnorm_fused_lasso = function(matg, trails, positive, fixed, constrained, simplified, tol.val=1e-3,
                               verbose=T, ncores=1) {
   groupname=matg[,name[1]]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=valuehat))+scale_fill_gradient2())
   lambda2 = csnorm:::optimize_lambda2(matg, trails, tol.val = tol.val)
   #get best lambda1 and set eCprime to lower bound
   if (fixed==F) {
-    if (positive!=T) stop("should be calling optimize_lambda1_eCprime, aborting.")
-    vals = csnorm:::optimize_lambda1_eCprime_simplified(matg, trails, tol.val=tol.val, lambda2=lambda2,
-                                                        constrained=constrained)
+    if (simplified==T) {
+      if (positive!=T) stop("Cannot have positive!=T and simplified==T")
+      vals = csnorm:::optimize_lambda1_eCprime_simplified(matg, trails, tol.val=tol.val, lambda2=lambda2,
+                                                          constrained=constrained)
+    } else {
+      vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol.val=tol.val, lambda2=lambda2,
+                                               constrained=constrained, positive=positive)
+    }
     eCprime=vals$eCprime
   } else {
     vals = csnorm:::optimize_lambda1_only(matg, trails, tol.val=tol.val, lambda2=lambda2, positive=positive,
@@ -586,7 +591,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     if (verbose==T) cat("  Fused lasso\n")
     groupnames=mat[,unique(name)]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=T, positive=T, constrained=F, tol.val=tol.val,
+      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=T, positive=T, constrained=F, simplified=T, tol.val=tol.val,
                                   ncores=ncores, verbose=verbose)
     #display param info
     if (verbose==T)
@@ -662,7 +667,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, nite
     if (verbose==T) cat("  Fused lasso\n")
     groupnames=mat[,unique(name)]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=T, positive=F, constrained=F,
+      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=T, positive=F, constrained=F, simplified=T,
                                   tol.val=tol.val, ncores=ncores, verbose=verbose)
     #display param info
     if (verbose==T)
