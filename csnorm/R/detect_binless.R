@@ -521,7 +521,7 @@ csnorm_compute_raw_signal = function(cts, dispersion, mat, eCprime) {
   cts.cp[,mu:=exp(lmu.nosig+phi+eCprime)]
   cts.cp[,c("z","var"):=list(count/mu-1, (1/mu+1/dispersion))]
   mat = cts.cp[,.(phihat=weighted.mean(z+phi, weight/var),
-                  phihat.var=1/sum(weight/var),
+                  phihat.var=2/sum(weight/var),
                   ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat,,on=c("name","bin1","bin2")]
   mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
   mat[,c("valuehat","weight"):=list(phihat,1/phihat.var)]
