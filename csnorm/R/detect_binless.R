@@ -345,14 +345,13 @@ optimize_lambda1_only = function(matg, trails, tol.val=1e-3, lambda2=0, positive
     return(data.table(lambda1=lambda1.min,
                       BIC=matg[,sum(weight*(valuehat-value)^2)],dof=0))
   stopifnot(patches[,sum(N)]==cl$no)
-  minval=patches[,min(value)]
-  maxval=patches[,max(value)]
-  if (positive==T) lambda1.min=max(lambda1.min, -min(minval,0))
+  minval=patches[,min(abs(value))]
+  maxval=patches[,max(abs(value))]
+  if (positive==T) lambda1.min=max(lambda1.min, minval)
   #
   if (constrained==T) { #some patches must be zeroed to avoid degeneracy with diagonal decay fit
     forbidden.vals = matg[,.(max(value.ori)-min(value.ori)<=tol.val,value.ori[1]),by=diag.idx][V1==T,unique(V2)]
-    lambda1.min = max(lambda1.min, (max(forbidden.vals)-min(forbidden.vals))/2)
-    stopifnot(maxval>lambda1.min)
+    lambda1.min = max(lambda1.min, forbidden.vals)
   } else {
     forbidden.vals = c()
   }
@@ -367,7 +366,7 @@ optimize_lambda1_only = function(matg, trails, tol.val=1e-3, lambda2=0, positive
     BIC = matg[,sum(weight*((valuehat-value)^2))+log(sum(ncounts))*dof]#-9*log(lambda1)+5*lambda1]
     data.table(lambda1=lambda1,BIC=BIC,dof=dof)
   }
-  #dt=foreach(lambda1=seq(tol.val/2,valrange,length.out=50), .combine=rbind) %do% obj(lambda1)
+  #dt=foreach(lambda1=seq(lambda1.min,maxval,length.out=50), .combine=rbind) %do% obj(lambda1)
   #ggplot(dt)+geom_point(aes(lambda1,BIC))+geom_line(aes(lambda1,BIC))
   #dt[,g:=dof*matg[,log(sum(ncounts))]]
   #dt[,h:=-2*matg[,.N]*log(lambda1)]
