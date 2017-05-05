@@ -221,8 +221,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   mat[,end2:=as.integer(as.character(bin2.end))]
   ### store matrices
   csg=new("CSgroup", mat=mat, interactions=list(), resolution=resolution, group=group,
-          cts=cts, par=list(alpha=cs@par$alpha,Kdiag=cs@settings$Kdiag, dbins=cs@settings$dbins,
-                            design=cs@design,lambda_diag=cs@par$lambda_diag),
+          cts=cts, par=list(alpha=cs@par$alpha, qmax=cs@settings$qmax, dmin=cs@settings$dmin),
           names=groups)
   cs@groups=append(cs@groups,list(csg))
   return(cs)
