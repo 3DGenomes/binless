@@ -524,7 +524,7 @@ csnorm_compute_raw_signal = function(cts, dispersion, mat, eCprime) {
                   phihat.var=2/sum(weight/var),
                   ncounts=sum(weight)),keyby=c("name","bin1","bin2")][mat,,on=c("name","bin1","bin2")]
   mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
-  mat[,c("valuehat","weight"):=list(phihat,1/phihat.var)]
+  mat[,c("valuehat","weight","diag.idx"):=list(phihat,1/phihat.var,unclass(bin2)-unclass(bin1))]
   setkey(mat,name,bin1,bin2)
   return(mat)
 }
@@ -538,7 +538,7 @@ csnorm_compute_raw_differential = function(cts, dispersion, mat, eCprime, ref) {
   mat=mat[,.(name,bin1,bin2,phi.ref,delta)]
   #
   mat.ref = csnorm:::csnorm_compute_raw_signal(ctsref,dispersion,mat[,.(name,bin1,bin2,phi=phi.ref)], eCprime[,.(name,eCprime=0)])
-  mat.ref[,c("valuehat","weight"):=NULL]
+  mat.ref[,c("valuehat","weight","diag.idx"):=NULL]
   setnames(mat.ref,c("phihat","phihat.var","ncounts","phi"),c("phihat.ref","phihat.var.ref","ncounts.ref","phi.ref"))
   mat.oth = csnorm:::csnorm_compute_raw_signal(ctsoth,dispersion,mat[,.(name,bin1,bin2,phi=phi.ref+delta)],eCprime)
   stopifnot(mat.oth[,.N]==mat.ref[,.N])
@@ -579,12 +579,19 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
   mat=stuff$mat
   trails=stuff$trails
   eCprime=stuff$eCprime
+  badbins=c()
   ### main loop
   registerDoParallel(cores=ncores)
   for (step in 1:niter) {
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
     mat = csnorm:::csnorm_compute_raw_signal(csg@cts, csg@par$alpha, mat, eCprime)
+    if (mat[bin1==bin2,any(phi!=0)]) {
+      badbins = csnorm:::update_bad_bins(mat, csg@par$qmax, badbins)
+      mat = csnorm:::remove_bad_bins(mat, csg@par$dmin, resolution, badbins)
+    } else {
+      mat = csnorm:::remove_bad_bins(mat, csg@par$dmin, resolution, NULL)
+    }
     #ggplot(mat)+geom_raster(aes(bin2,bin1,fill=phi))+geom_raster(aes(bin1,bin2,fill=phihat))+scale_fill_gradient2()+facet_wrap(~name)
     #
     #perform fused lasso on signal, at fixed offset
@@ -661,6 +668,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, nite
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
     mat = csnorm:::csnorm_compute_raw_differential(csg@cts, csg@par$alpha, mat, eCprime, ref)
+    mat = csnorm:::remove_bad_bins(mat, csg@par$dmin, resolution, NULL)
     #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=deltahat))+facet_wrap(~name)+scale_fill_gradient2()
     #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi.ref))+geom_raster(aes(bin2,bin1,fill=phihat))+facet_wrap(~name)+scale_fill_gradient2()
     #

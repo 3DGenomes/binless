@@ -672,7 +672,7 @@ update_bad_bins = function(signal, qmax, badbins) {
   tmp=signal[bin1==bin2,.(is.bad=all(phi==0)),by=bin1][is.bad==T,unclass(bin1)]
   if (length(badbins)>0) tmp=union(tmp,badbins)
   if (length(tmp)>qmax*signal[bin1==bin2&name==name[1],.N]) {
-    cat("Refusing to remove more signal rows than the fraction qmax=",qmax,"allows. Attempted:",
+    cat("   Refusing to remove more signal rows than the fraction qmax=",qmax,"allows. Attempted:",
         length(tmp),"allowed:",as.integer(qmax*signal[bin1==bin2&name==name[1],.N]),"\n")
     return(badbins)
   } else {
