@@ -442,7 +442,7 @@ csnorm_fused_lasso = function(matg, trails, positive, fixed, constrained, tol.va
   } else {
     vals = csnorm:::optimize_lambda1_only(matg, trails, tol.val=tol.val, lambda2=lambda2, positive=positive,
                                           constrained=constrained)
-    eCprime=0
+    vals$eCprime=0
   }
   vals$lambda2=lambda2
   vals$name=groupname
