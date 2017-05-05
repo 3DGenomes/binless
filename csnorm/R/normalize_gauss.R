@@ -654,12 +654,53 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
+csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
+  cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros, sbins)
+  #put in triangular form
+  cts2 = cts[bin1>bin2]
+  setnames(cts2,c("bin1","bin2"),c("bin2","bin1"))
+  cts = rbind(cts[bin1<=bin2],cts2)
+  rm(cts2)
+  stopifnot(cts[,all(bin1<=bin2)])
+  return(cts)
+}
+
+#' update the list of bad rows/cols
+#' @keywords internal
+#' 
+update_bad_bins = function(signal, qmax, badbins) {
+  tmp=signal[bin1==bin2,.(is.bad=all(phi==0)),by=bin1][is.bad==T,unclass(bin1)]
+  if (length(badbins)>0) tmp=union(tmp,badbins)
+  if (length(tmp)>qmax*signal[bin1==bin2&name==name[1],.N]) {
+    cat("Refusing to remove more signal rows than the fraction qmax=",qmax,"allows. Attempted:",
+        length(tmp),"allowed:",as.integer(qmax*signal[bin1==bin2&name==name[1],.N]),"\n")
+    return(badbins)
+  } else {
+    return(tmp)
+  }
+}
+
+#' set weight of bad bins to zero
+#' @keywords internal
+#' 
+remove_bad_bins = function(mat, dmin, base.res, badbins) {
+  #remove data that contains the dmin threshold, usually badly modelled
+  mat[diag.idx <= ceiling(dmin/base.res), weight:=0]
+  #remove bad rows/cols
+  if(length(badbins)>0) {
+    cat("removing",length(badbins),"bad signal rows\n")
+    mat[unclass(bin1) %in% badbins | unclass(bin2) %in% badbins, weight:=0]
+  }
+  return(mat)
+}
+
+#' fit signal using sparse fused lasso
+#' @keywords internal
+#' 
 csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   if (verbose==T) cat(" Signal\n")
-  cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
-  cts = rbind(cts[bin1<=bin2,.(name,bin1,bin2,z,phi,weight,var)],
-              cts[bin1>bin2,.(name,bin1=bin2,bin2=bin1,z,phi,weight,var)]) #put in triangular form
-  stopifnot(cts[,all(bin1<=bin2)])
+  cts = csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)[,.(name,bin1,bin2,z,phi,weight,var)]
+  #
   mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
                phihat.var=2/sum(weight/var),
                ncounts=sum(weight)),keyby=c("name","bin1","bin2")]
@@ -669,23 +710,12 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   setkey(mat,name,bin1,bin2)
   stopifnot(mat[is.na(valuehat)|is.na(weight),.N]==0)
   #
-  #remove data that contains the dmin threshold, usually badly modelled
-  mat[diag.idx <= ceiling(cs@settings$dmin/cs@settings$base.res), weight:=0]
-  #
-  if (cs@par$signal[bin1==bin2,any(phi!=0)]) { #do not remove anything at first iteration
+  if (cs@par$signal[bin1==bin2,any(phi!=0)]) { #only remove close diagonal at first iteration
     if (verbose==T) cat("  Remove bad bins\n")
-    tmp=cs@par$signal[bin1==bin2,.(is.bad=all(phi==0)),by=bin1][is.bad==T,unclass(bin1)]
-    if (length(cs@par$badbins)>0) tmp=union(tmp,cs@par$badbins)
-    if (length(tmp)>cs@settings$qmax*cs@par$signal[bin1==bin2&name==name[1],.N]) {
-      cat("Refusing to remove more signal rows than the fraction qmax=",cs@settings$qmax,"allows. Attempted:",
-          length(tmp),"allowed:",as.integer(cs@settings$qmax*cs@par$signal[bin1==bin2&name==name[1],.N]),"\n")
-    } else {
-      cs@par$badbins=tmp
-    }
-    if(length(cs@par$badbins)>0) {
-      cat("removing",length(cs@par$badbins),"bad signal rows\n")
-      mat[unclass(bin1) %in% cs@par$badbins | unclass(bin2) %in% cs@par$badbins, weight:=0]
-    }
+    cs@par$badbins = update_bad_bins(cs@par$signal, cs@settings$qmax, cs@par$badbins)
+    mat = remove_bad_bins(mat, cs@settings$dmin, cs@settings$base.res, cs@par$badbins)
+  } else {
+    mat = remove_bad_bins(mat, cs@settings$dmin, cs@settings$base.res, NULL)
   }
   #
   if (verbose==T) cat("  predict\n")
