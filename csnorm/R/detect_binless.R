@@ -284,7 +284,7 @@ optimize_lambda1_eCprime_simplified = function(matg, trails, tol.val=1e-3, lambd
   valrange=maxval-minval
   #
   if (constrained==T) { #some patches must be zeroed to avoid degeneracy with diagonal decay fit
-    forbidden.vals = matg[,.(max(value.ori)-min(value.ori)<=tol.val,value.ori[1]),by=diag.idx][V1==T,unique(V2)]
+    forbidden.vals = matg[,min(value.ori),by=diag.idx][,unique(V1)]
     lambda1.min = max(lambda1.min, (max(forbidden.vals)-minval)/2 + tol.val)
   } else {
     forbidden.vals = c()
