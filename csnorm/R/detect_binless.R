@@ -591,7 +591,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     if (verbose==T) cat("  Fused lasso\n")
     groupnames=mat[,unique(name)]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=T, positive=T, constrained=F, simplified=T, tol.val=tol.val,
+      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=T, positive=T, constrained=F, simplified=F, tol.val=tol.val,
                                   ncores=ncores, verbose=verbose)
     #display param info
     if (verbose==T)
@@ -667,7 +667,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, nite
     if (verbose==T) cat("  Fused lasso\n")
     groupnames=mat[,unique(name)]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=T, positive=F, constrained=F, simplified=T,
+      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=T, positive=F, constrained=F, simplified=F,
                                   tol.val=tol.val, ncores=ncores, verbose=verbose)
     #display param info
     if (verbose==T)
