@@ -1005,7 +1005,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
     init.mean="mean"
-    update.exposures=(fit.signal==T)
+    update.exposures=(fit.signal!=T)
   }
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
