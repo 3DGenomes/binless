@@ -25,9 +25,88 @@ RcppExport SEXP weighted_graphfl(Rcpp::NumericVector y_i, Rcpp::NumericVector
   return Rcpp::wrap(beta_r);
 }
 
+
+RcppExport SEXP wgfl_perf(Rcpp::NumericVector count, Rcpp::NumericVector lmu_nosig,
+        Rcpp::NumericVector weight, double dispersion,
+        int ntrails, Rcpp::NumericVector trails_i, Rcpp::NumericVector breakpoints_i,
+        double lam,  double alpha, double inflate, int maxsteps, double converge)
+{
+  size_t N = count.size();
+  std::vector<int> trails_r = Rcpp::as<std::vector<int> >(trails_i);
+  std::vector<int> breakpoints_r = Rcpp::as<std::vector<int> >(breakpoints_i);
+  std::vector<double> beta_r(N);
+  std::vector<double> z_r(breakpoints_r[ntrails-1], 0);
+  std::vector<double> u_r(breakpoints_r[ntrails-1], 0);
+  return Rcpp::wrap(beta_r);
+}
+
+RcppExport SEXP cts_to_mat(DataFrame cts, double dispersion)
+{
+    //inputs
+    IntegerVector bin1 = cts["bin1"];
+    IntegerVector bin2 = cts["bin2"];
+    NumericVector count = cts["count"];
+    NumericVector lmu_nosig = cts["lmu.nosig"];
+    NumericVector phi = cts["phi"];
+    NumericVector weight = cts["weight"];
+
+    //outputs
+    int nbins = max(bin1);
+    size_t N = cts.nrows();
+    NumericMatrix phihat(nbins, nbins);
+    NumericMatrix phihat_var(nbins, nbins);
+    NumericMatrix ncounts(nbins, nbins);
+    NumericVector phihat_r; //vectorized form
+    NumericVector phihat_var_r;
+    NumericVector ncounts_r;
+    IntegerVector bin1_r;
+    IntegerVector bin2_r;
+
+    //walk through cts
+    for (int i = 0; i < N; ++i) {
+        double mu = std::exp( lmu_nosig(i) + phi(i) );
+        double z = count(i)/mu-1;
+        double var = 1/mu + 1/dispersion;
+        double w2v = weight(i)/(2*var);
+        ncounts(bin1(i)-1, bin2(i)-1) += weight(i);
+        phihat_var(bin1(i)-1, bin2(i)-1) += w2v;
+        phihat(bin1(i)-1, bin2(i)-1) += (z+phi(i))*w2v;
+    }
+
+    //finish mat
+    for (int i = 0; i < nbins; ++i) {
+        for (int j = i; j < nbins; ++j) {
+            phihat_var(i,j) = 1/phihat_var(i,j);
+            phihat(i,j) = phihat(i,j)*phihat_var(i,j);
+        }
+    }
+
+    //vectorize and put into data frame
+    for (int i = 0; i < nbins; ++i) {
+        for (int j = i; j < nbins; ++j) {
+            bin1_r.push_back(i+1);
+            bin2_r.push_back(j+1);
+            phihat_r.push_back(phihat(i,j));
+            phihat_var_r.push_back(phihat_var(i,j));
+            ncounts_r.push_back(ncounts(i,j));
+        }
+    }
+    bin1_r.attr("levels") = bin1.attr("levels");
+    bin2_r.attr("levels") = bin2.attr("levels");
+    bin1_r.attr("class") = CharacterVector::create("ordered", "factor");
+    bin2_r.attr("class") = CharacterVector::create("ordered", "factor");
+
+    return DataFrame::create(_["bin1"]=bin1_r, _["bin2"]=bin2_r, _["phihat"]=phihat_r,
+            _["phihat.var"]=phihat_var_r, _["ncounts"]=ncounts_r);
+}
+
+
+
 RCPP_MODULE(gfl){
   using namespace Rcpp ;
  
   function("weighted_graphfl" , &weighted_graphfl  , "documentation for weighted_graphfl ");
+  function("wgfl_perf" , &wgfl_perf  , "documentation for wgfl_perf ");
+  function("cts_to_mat" , &cts_to_mat  , "documentation for cts_to_mat ");
 } 
 
