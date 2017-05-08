@@ -74,9 +74,10 @@ mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
              ncounts=sum(weight)),keyby=c("name","bin1","bin2")]
 mat = mat[cs@par$signal[,.(name,bin1,bin2)],,on=c("name","bin1","bin2")] #to add empty rows/cols
 mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
-  
-mat.c = as.data.table(csnorm:::cts_to_mat(cts, cs@par$alpha))
-all.equal(mat[,.(bin1,bin2,phihat,phihat.var,ncounts)],mat.c)
+mat[,c("weight","diag.idx"):=list(1/phihat.var,as.integer(unclass(bin2)-unclass(bin1)))]
+
+mat.c = as.data.table(csnorm:::cts_to_mat(cts, trails$nrow, cs@par$alpha, mat[,rep(0,.N)]))
+all.equal(mat[,.(bin1,bin2,phihat,phihat.var,ncounts,weight,diag.idx)],mat.c)
 
 mat.c = as.data.table(csnorm:::wgfl_perf(cts, cs@par$alpha, trails$ntrails, trails$trails,
                                          trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.val/2))

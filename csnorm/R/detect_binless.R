@@ -141,6 +141,7 @@ gfl_compute_trails = function(nrow) {
   trails$graph = csnorm:::compute_2d_connectivity_graph(nrow)
   #plot(trails$graph, vertex.color=factor(V(g)$value), vertex.label=V(g)$count,
   #     layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
+  trails$nrow=nrow
   return(trails)
 }
 

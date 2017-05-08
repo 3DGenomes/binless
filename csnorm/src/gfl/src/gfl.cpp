@@ -145,7 +145,7 @@ RCPP_MODULE(gfl){
   using namespace Rcpp ;
  
   function("weighted_graphfl" , &weighted_graphfl  , "documentation for weighted_graphfl ");
-  //function("cts_to_mat" , &cts_to_mat  , "documentation for cts_to_mat ");
+  function("cts_to_mat" , &cts_to_mat  , "documentation for cts_to_mat ");
   function("phi_to_cts" , &phi_to_cts  , "documentation for phi_to_cts ");
   function("wgfl_perf" , &wgfl_perf  , "documentation for wgfl_perf ");
 } 
