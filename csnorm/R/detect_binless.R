@@ -149,10 +149,8 @@ gfl_compute_trails = function(nrow) {
 gfl_get_value = function(valuehat, weight, trails, lambda1, lambda2, eCprime,
                          alpha=0.2, inflate=2, tol.value=1e-6, maxsteps=100000) {
   #assume lambda1=0 and compute the fused lasso solution, centered around eCprime
-  z=rep(0,tail(trails$breakpoints,n=1))
-  u=rep(0,tail(trails$breakpoints,n=1))
   value = csnorm:::weighted_graphfl(valuehat, weight, trails$ntrails, trails$trails,
-                                    trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.value/2, z, u) - eCprime
+                                    trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.value/2) - eCprime
   #now soft-threshold the shifted value around eCprime
   value=sign(value)*pmax(abs(value)-lambda1, 0)
   return(value)
