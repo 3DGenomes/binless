@@ -423,12 +423,10 @@ optimize_lambda2 = function(matg, trails, tol.val=1e-3, lambda2.max=1000) {
 #'   only one big patch be forced to have 'value'=0 ?
 #' @param tol.val numeric. Convergence tolerance on fused value
 #' @param verbose boolean (default TRUE).
-#' @param ncores integer (default 1).
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(matg, trails, positive, fixed, constrained, simplified, tol.val=1e-3,
-                              verbose=T, ncores=1) {
+csnorm_fused_lasso = function(matg, trails, positive, fixed, constrained, simplified, tol.val=1e-3, verbose=T) {
   groupname=matg[,name[1]]
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=valuehat))+scale_fill_gradient2())
   lambda2 = csnorm:::optimize_lambda2(matg, trails, tol.val = tol.val)
@@ -598,8 +596,8 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     if (verbose==T) cat("  Fused lasso\n")
     groupnames=mat[,unique(name)]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=F, positive=T, constrained=T, simplified=F, tol.val=tol.val,
-                                  ncores=ncores, verbose=verbose)
+      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=F, positive=T, constrained=T, simplified=F,
+                                  tol.val=tol.val, verbose=verbose)
     #display param info
     if (verbose==T)
       for (i in 1:params[,.N])
@@ -677,7 +675,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, nite
     groupnames=mat[,unique(name)]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
       csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=F, positive=F, constrained=F, simplified=F,
-                                  tol.val=tol.val, ncores=ncores, verbose=verbose)
+                                  tol.val=tol.val, verbose=verbose)
     #display param info
     if (verbose==T)
       for (i in 1:params[,.N])

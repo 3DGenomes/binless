@@ -699,7 +699,7 @@ remove_bad_bins = function(mat, dmin, base.res, badbins) {
 #' 
 csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   if (verbose==T) cat(" Signal\n")
-  cts = csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)[,.(name,bin1,bin2,z,phi,weight,var)]
+  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)[,.(name,bin1,bin2,z,phi,weight,var)]
   #
   mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
                phihat.var=2/sum(weight/var),
@@ -733,7 +733,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %dopar%
     csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, fixed=F, positive=T, constrained=constrained, simplified=T,
-                                tol.val=cs@settings$tol.val, ncores=ncores, verbose=verbose)
+                                tol.val=cs@settings$tol.val, verbose=verbose)
   #compute matrix at new params
   #save(mat,params,file=paste0("mat_step_",step,".RData"))
   mat = foreach (g=groupnames, .combine=rbind) %dopar% {
