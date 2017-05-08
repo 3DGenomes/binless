@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <Rcpp.h>
 using namespace Rcpp;
 #include "graph_fl.c"
@@ -25,33 +26,41 @@ RcppExport SEXP weighted_graphfl(Rcpp::NumericVector y_i, Rcpp::NumericVector
   return Rcpp::wrap(beta_r);
 }
 
-
-RcppExport SEXP wgfl_perf(Rcpp::NumericVector count, Rcpp::NumericVector lmu_nosig,
-        Rcpp::NumericVector weight, double dispersion,
-        int ntrails, Rcpp::NumericVector trails_i, Rcpp::NumericVector breakpoints_i,
-        double lam,  double alpha, double inflate, int maxsteps, double converge)
+// [[Rcpp::export]]
+NumericVector phi_to_cts(DataFrame cts, int nbins, const std::vector<double>& phi)
 {
-  size_t N = count.size();
-  std::vector<int> trails_r = Rcpp::as<std::vector<int> >(trails_i);
-  std::vector<int> breakpoints_r = Rcpp::as<std::vector<int> >(breakpoints_i);
-  std::vector<double> beta_r(N);
-  std::vector<double> z_r(breakpoints_r[ntrails-1], 0);
-  std::vector<double> u_r(breakpoints_r[ntrails-1], 0);
-  return Rcpp::wrap(beta_r);
+  NumericMatrix phimat(nbins, nbins);
+  int pos = 0;
+  for (int i = 0; i < nbins; ++i) {
+    for (int j = i; j < nbins; ++j) {
+      phimat(i,j) = phi[pos];
+      pos++;
+      if (pos == phi.size()) break;
+    }
+    if (pos == phi.size()) break;
+  }
+  
+  IntegerVector bin1 = cts["bin1"];
+  IntegerVector bin2 = cts["bin2"];
+  NumericVector phivec(cts.nrows());
+  for(int i=0; i<cts.nrows(); ++i)
+    phivec(i) = phimat(bin1[i]-1, bin2[i]-1);
+  
+  return(phivec);
 }
 
-RcppExport SEXP cts_to_mat(DataFrame cts, double dispersion)
+// [[Rcpp::export]]
+DataFrame cts_to_mat(DataFrame cts, int nbins, double dispersion, const std::vector<double>& phi_mat)
 {
     //inputs
     IntegerVector bin1 = cts["bin1"];
     IntegerVector bin2 = cts["bin2"];
     NumericVector count = cts["count"];
     NumericVector lmu_nosig = cts["lmu.nosig"];
-    NumericVector phi = cts["phi"];
+    NumericVector phi = phi_to_cts(cts,nbins,phi_mat);
     NumericVector weight = cts["weight"];
 
     //outputs
-    int nbins = max(bin1);
     size_t N = cts.nrows();
     NumericMatrix phihat(nbins, nbins);
     NumericMatrix phihat_var(nbins, nbins);
@@ -97,8 +106,38 @@ RcppExport SEXP cts_to_mat(DataFrame cts, double dispersion)
     bin2_r.attr("class") = CharacterVector::create("ordered", "factor");
 
     return DataFrame::create(_["bin1"]=bin1_r, _["bin2"]=bin2_r, _["phihat"]=phihat_r,
-            _["phihat.var"]=phihat_var_r, _["ncounts"]=ncounts_r);
+            _["phihat.var"]=phihat_var_r, _["ncounts"]=ncounts_r, _["weight"]=1/phihat_var_r,
+            _["diag.idx"]=bin2_r-bin1_r);
 }
+
+RcppExport SEXP wgfl_perf(DataFrame cts, double dispersion, int niter, int nbins,
+        int ntrails, Rcpp::NumericVector trails_i, Rcpp::NumericVector breakpoints_i,
+        double lam,  double alpha, double inflate, int maxsteps, double converge)
+{
+   /* std::vector<int> trails_r = Rcpp::as<std::vector<int> >(trails_i);
+    std::vector<int> breakpoints_r = Rcpp::as<std::vector<int> >(breakpoints_i);
+    
+    int N = nbins*(nbins+1)/2; //size of fused lasso problem
+    std::vector<double> phi(N, 0);
+    printf("Fused lasso perf iteration with %d coefficients\n",N);
+    
+    for (int step=0; step<niter; ++step) {
+      std::vector<double> z_r(breakpoints_r[ntrails-1], 0);
+      std::vector<double> u_r(breakpoints_r[ntrails-1], 0);
+      DataFrame mat;
+      mat = cts_to_mat(cts, nbins, dispersion, phi);
+      std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
+      std::vector<double> w_r = Rcpp::as<std::vector<double> >(mat["weight"]);
+      std::vector<double> beta_r(N,0);
+      
+      int res;
+      res = graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails, &trails_r[0], &breakpoints_r[0],
+                                         lam, alpha, inflate, maxsteps, converge,
+                                         &beta_r[0], &z_r[0], &u_r[0]);
+    }*/
+  return cts;
+}
+
 
 
 
@@ -106,7 +145,8 @@ RCPP_MODULE(gfl){
   using namespace Rcpp ;
  
   function("weighted_graphfl" , &weighted_graphfl  , "documentation for weighted_graphfl ");
+  //function("cts_to_mat" , &cts_to_mat  , "documentation for cts_to_mat ");
+  function("phi_to_cts" , &phi_to_cts  , "documentation for phi_to_cts ");
   function("wgfl_perf" , &wgfl_perf  , "documentation for wgfl_perf ");
-  function("cts_to_mat" , &cts_to_mat  , "documentation for cts_to_mat ");
 } 
 
