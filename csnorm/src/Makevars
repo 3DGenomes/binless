@@ -7,7 +7,7 @@ SOURCES_C = $(wildcard gfl/src/*.c)
 PKG_LIBS = $(SOURCES_C:.c=.o) -lgsl -lgslcblas
 
 #OBJECTS = Modules.o $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)
-OBJECTS = Modules.o $(SOURCES:.cpp=.o)
+OBJECTS = $(SOURCES:.cpp=.o) Modules.o
 
 SUBDIRS = gfl
 all: $(SHLIB)
