@@ -213,7 +213,7 @@ optimize_lambda1_eCprime = function(matg, trails, tol.val=1e-3, lambda2=0, posit
   valrange=maxval-minval
   #
   if (constrained==T) { #some patches must be zeroed to avoid degeneracy with diagonal decay fit
-    forbidden.vals = matg[,.(max(value.ori)-min(value.ori)<=tol.val,value.ori[1]),by=diag.idx][V1==T,unique(V2)]
+    forbidden.vals = matg[,min(value.ori),by=diag.idx][,unique(V1)]
     if (positive==T) {
       lambda1.min = max(lambda1.min, (max(forbidden.vals)-minval)/2+tol.val)
     } else {
@@ -350,7 +350,7 @@ optimize_lambda1_only = function(matg, trails, tol.val=1e-3, lambda2=0, positive
   if (positive==T) lambda1.min=max(lambda1.min, minval)
   #
   if (constrained==T) { #some patches must be zeroed to avoid degeneracy with diagonal decay fit
-    forbidden.vals = matg[,.(max(value.ori)-min(value.ori)<=tol.val,value.ori[1]),by=diag.idx][V1==T,unique(V2)]
+    forbidden.vals = matg[,min(value.ori),by=diag.idx][,unique(V1)]
     lambda1.min = max(lambda1.min, forbidden.vals)
   } else {
     forbidden.vals = c()
@@ -598,7 +598,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     if (verbose==T) cat("  Fused lasso\n")
     groupnames=mat[,unique(name)]
     params = foreach(g=groupnames, .combine=rbind) %dopar%
-      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=F, positive=T, constrained=F, simplified=F, tol.val=tol.val,
+      csnorm:::csnorm_fused_lasso(mat[name==g], trails, fixed=F, positive=T, constrained=T, simplified=F, tol.val=tol.val,
                                   ncores=ncores, verbose=verbose)
     #display param info
     if (verbose==T)
