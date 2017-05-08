@@ -27,7 +27,7 @@ RcppExport SEXP weighted_graphfl(Rcpp::NumericVector y_i, Rcpp::NumericVector
 }
 
 // [[Rcpp::export]]
-NumericVector phi_to_cts(DataFrame cts, int nbins, const std::vector<double>& phi)
+NumericVector phi_to_cts(const DataFrame cts, int nbins, const std::vector<double>& phi)
 {
   NumericMatrix phimat(nbins, nbins);
   int pos = 0;
@@ -50,7 +50,7 @@ NumericVector phi_to_cts(DataFrame cts, int nbins, const std::vector<double>& ph
 }
 
 // [[Rcpp::export]]
-DataFrame cts_to_mat(DataFrame cts, int nbins, double dispersion, const std::vector<double>& phi_mat)
+DataFrame cts_to_mat(const DataFrame cts, int nbins, double dispersion, const std::vector<double>& phi_mat)
 {
     //inputs
     IntegerVector bin1 = cts["bin1"];
@@ -110,8 +110,8 @@ DataFrame cts_to_mat(DataFrame cts, int nbins, double dispersion, const std::vec
             _["diag.idx"]=bin2_r-bin1_r);
 }
 
-RcppExport SEXP wgfl_perf(DataFrame cts, double dispersion, int niter, int nbins,
-        int ntrails, Rcpp::NumericVector trails_i, Rcpp::NumericVector breakpoints_i,
+RcppExport SEXP wgfl_perf(const DataFrame cts, double dispersion, int niter, int nbins,
+        int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
         double lam,  double alpha, double inflate, int maxsteps, double converge)
 {
     std::vector<int> trails_r = Rcpp::as<std::vector<int> >(trails_i);
@@ -119,13 +119,12 @@ RcppExport SEXP wgfl_perf(DataFrame cts, double dispersion, int niter, int nbins
     std::vector<double> z_r(breakpoints_r[ntrails-1], 0);
     std::vector<double> u_r(breakpoints_r[ntrails-1], 0);
     
-    int N = nbins*(nbins+1)/2; //size of fused lasso problem
+    const int N = nbins*(nbins+1)/2; //size of fused lasso problem
     std::vector<double> phi(N, 0);
     printf("Fused lasso perf iteration with %d coefficients\n",phi.size());
     
     for (int step=0; step<niter; ++step) {
-      DataFrame mat;
-      mat = cts_to_mat(cts, nbins, dispersion, phi);
+      const DataFrame mat = cts_to_mat(cts, nbins, dispersion, phi);
       std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
       std::vector<double> w_r = Rcpp::as<std::vector<double> >(mat["weight"]);
       
