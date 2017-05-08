@@ -767,22 +767,23 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
 has_converged = function(cs) {
   params=cs@diagnostics$params
   laststep=params[,step[.N]]
+  #check if legs have changed
+  if (!setequal(params[step==laststep,.(leg)],params[step==laststep-1,.(leg)])) return(FALSE)
   #objective convergence
-  delta = abs(params[step==laststep,value]-params[step==laststep-1,value])
+  delta = merge(params[step==laststep,.(leg,value)],params[step==laststep-1,.(leg,value)],
+                by="leg")[,abs(value.x-value.y)]
   conv.obj = all(delta<cs@settings$tol.obj)
   #parameter convergence
-  conv.eC = abs(params[step==laststep&leg==leg[.N],eC[[1]]]-params[step==laststep-1&leg==leg[.N],eC[[1]]])
-  conv.alpha = abs(params[step==laststep&leg==leg[.N],alpha[[1]]]-params[step==laststep-1&leg==leg[.N],alpha[[1]]])
-  conv.ldiag = abs(params[step==laststep&leg==leg[.N],log(lambda_diag[[1]])]
-                   -params[step==laststep-1&leg==leg[.N],log(lambda_diag[[1]])])
-  conv.liota = abs(params[step==laststep&leg==leg[.N],log(lambda_iota[[1]])]
-                   -params[step==laststep-1&leg==leg[.N],log(lambda_iota[[1]])])
-  conv.lrho = abs(params[step==laststep&leg==leg[.N],log(lambda_rho[[1]])]
-                  -params[step==laststep-1&leg==leg[.N],log(lambda_rho[[1]])])
-  conv.l1 = abs(params[step==laststep&leg==leg[.N],log(lambda1[[1]])]
-                  -params[step==laststep-1&leg==leg[.N],log(lambda1[[1]])])
-  conv.l2 = abs(params[step==laststep&leg==leg[.N],log(lambda2[[1]])]
-                   -params[step==laststep-1&leg==leg[.N],log(lambda2[[1]])])
+  getdiff=function(name,fn=identity){merge(params[step==laststep,.(leg,get(name))],
+                               params[step==laststep-1,.(leg,get(name))],by="leg")[
+                                 leg==leg[.N],abs(fn(V2.x[[1]])-fn(V2.y[[1]]))]}
+  conv.eC = getdiff("eC")
+  conv.alpha = getdiff("alpha")
+  conv.ldiag = getdiff("lambda_diag",fn=log10)
+  conv.liota = getdiff("lambda_iota",fn=log10)
+  conv.lrho = getdiff("lambda_rho",fn=log10)
+  conv.l1 = getdiff("lambda1",fn=log10)
+  conv.l2 = getdiff("lambda2",fn=log10)
   conv.param = all(c(conv.eC,conv.alpha,conv.ldiag,conv.liota,conv.lrho,conv.l1,conv.l2)<cs@settings$tol.val)
   return(conv.obj | conv.param)
 }
