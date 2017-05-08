@@ -114,28 +114,27 @@ RcppExport SEXP wgfl_perf(DataFrame cts, double dispersion, int niter, int nbins
         int ntrails, Rcpp::NumericVector trails_i, Rcpp::NumericVector breakpoints_i,
         double lam,  double alpha, double inflate, int maxsteps, double converge)
 {
-   /* std::vector<int> trails_r = Rcpp::as<std::vector<int> >(trails_i);
+    std::vector<int> trails_r = Rcpp::as<std::vector<int> >(trails_i);
     std::vector<int> breakpoints_r = Rcpp::as<std::vector<int> >(breakpoints_i);
+    std::vector<double> z_r(breakpoints_r[ntrails-1], 0);
+    std::vector<double> u_r(breakpoints_r[ntrails-1], 0);
     
     int N = nbins*(nbins+1)/2; //size of fused lasso problem
     std::vector<double> phi(N, 0);
-    printf("Fused lasso perf iteration with %d coefficients\n",N);
+    printf("Fused lasso perf iteration with %d coefficients\n",phi.size());
     
     for (int step=0; step<niter; ++step) {
-      std::vector<double> z_r(breakpoints_r[ntrails-1], 0);
-      std::vector<double> u_r(breakpoints_r[ntrails-1], 0);
       DataFrame mat;
       mat = cts_to_mat(cts, nbins, dispersion, phi);
       std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
       std::vector<double> w_r = Rcpp::as<std::vector<double> >(mat["weight"]);
-      std::vector<double> beta_r(N,0);
       
       int res;
       res = graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails, &trails_r[0], &breakpoints_r[0],
                                          lam, alpha, inflate, maxsteps, converge,
-                                         &beta_r[0], &z_r[0], &u_r[0]);
-    }*/
-  return cts;
+                                         &phi[0], &z_r[0], &u_r[0]);
+    }
+    return wrap(phi);
 }
 
 
@@ -145,8 +144,8 @@ RCPP_MODULE(gfl){
   using namespace Rcpp ;
  
   function("weighted_graphfl" , &weighted_graphfl  , "documentation for weighted_graphfl ");
-  function("cts_to_mat" , &cts_to_mat  , "documentation for cts_to_mat ");
-  function("phi_to_cts" , &phi_to_cts  , "documentation for phi_to_cts ");
+  //function("cts_to_mat" , &cts_to_mat  , "documentation for cts_to_mat ");
+  //function("phi_to_cts" , &phi_to_cts  , "documentation for phi_to_cts ");
   function("wgfl_perf" , &wgfl_perf  , "documentation for wgfl_perf ");
 } 
 

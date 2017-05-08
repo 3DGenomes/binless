@@ -20,14 +20,8 @@ cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)[
 setkeyv(cts,c("name","bin1","bin2"))
 trails$nrow = cts[,max(unclass(bin2))]
 
-a=csnorm:::phi_to_cts(cts,trails$nrow,mat[,phi]);
-
-cts[,phi:=a]
-mat.c=cts[,.(phi=phi[1]),by=c("bin1","bin2")]
-mat.c[,all.equal(phi,.I)]
-
 ### performance iteration: R
-niter=10
+niter=2
 values=data.table()
 cts[,phi:=0]
 for (i in 1:niter) {
@@ -60,29 +54,10 @@ for (i in 1:niter) {
   cts[,phi:=NULL]
   cts=merge(cts,mat[,.(name,bin1,bin2,phi)],keyby=c("name","bin1","bin2"))
 }
+value.r=value
 
 ggplot(values)+geom_raster(aes(bin1,bin2,fill=phi))+facet_wrap(~step)+scale_fill_gradient2()
 
-
-### verify cts_to_mat
-cts[,phi:=0]
-cts[,mu:=exp(lmu.nosig+phi)]
-cts[,c("z","var"):=list(count/mu-1,(1/mu+1/dispersion))]
-
-mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
-             phihat.var=2/sum(weight/var),
-             ncounts=sum(weight)),keyby=c("name","bin1","bin2")]
-mat = mat[cs@par$signal[,.(name,bin1,bin2)],,on=c("name","bin1","bin2")] #to add empty rows/cols
-mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
-mat[,c("weight","diag.idx"):=list(1/phihat.var,as.integer(unclass(bin2)-unclass(bin1)))]
-
-mat.c = as.data.table(csnorm:::cts_to_mat(cts, trails$nrow, cs@par$alpha, mat[,rep(0,.N)]))
-all.equal(mat[,.(bin1,bin2,phihat,phihat.var,ncounts,weight,diag.idx)],mat.c)
-
-mat.c = as.data.table(csnorm:::wgfl_perf(cts, cs@par$alpha, trails$ntrails, trails$trails,
-                                         trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.val/2))
-all.equal(mat[,.(bin1,bin2,phihat,phihat.var,ncounts,valuehat=phihat,weight=1/phihat.var,
-                 diag.idx=unclass(bin2)-unclass(bin1))],mat.c)
 
 
 ### performance iteration: C++
@@ -93,14 +68,11 @@ alpha=0.2
 inflate=2
 maxsteps=10000
 
-  value.old=value
-  value = csnorm:::weighted_graphfl(mat[,valuehat], mat[,weight], trails$ntrails, trails$trails,
-                                    trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.val/2)
-  cat("epsilon=",mean(abs(value-value.old)))
-  
-  #report phi
-  mat[,phi:=value]
-  values=rbind(values,mat[,.(step=i,bin1,bin2,phi)])
-  cts[,phi:=NULL]
-  cts=merge(cts,mat[,.(name,bin1,bin2,phi)],keyby=c("name","bin1","bin2"))
-}
+
+value.c=csnorm:::wgfl_perf(cts, cs@par$alpha, niter, trails$nrow, trails$ntrails, trails$trails,
+                           trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.val/2)
+
+all.equal(value.c,value.r)
+
+
+
