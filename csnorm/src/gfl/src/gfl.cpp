@@ -21,8 +21,8 @@ RcppExport SEXP weighted_graphfl(Rcpp::NumericVector y_i, Rcpp::NumericVector
   
   int res;
   res = graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails, &trails_r[0], &breakpoints_r[0],
-                                     lam, alpha, inflate, maxsteps, converge,
-                                     &beta_r[0], &z_r[0], &u_r[0]);
+                                       lam, alpha, inflate, maxsteps, converge,
+                                       &beta_r[0], &z_r[0], &u_r[0]);
   
   return Rcpp::wrap(beta_r);
 }

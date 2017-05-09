@@ -119,9 +119,10 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
         zmapoffsets[ti]--;
     }
     
-    step = 0;
+    step = 1;
     cur_converge = converge + 1;
-
+    //printf("START ADMM iterations with alpha= %f beta[0]=%.5e z[0]=%.5e u[0]=%.5e\n", alpha, beta[0], z[0], u[0]);
+    
     /* Perform the ADMM iterations until convergence */
     while(step < maxsteps && cur_converge > converge)
     {
@@ -160,23 +161,28 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
             for(i = 0; i < nz; i++){ u[i] *= inflate; }
             for(i = 0; i < wbufsize; i++) { z_wbuff[i] = alpha / 2.0; } /* weight for each fused lasso */
         }
-
+        //printf("ADMM step %05d presnorm= %.5e dresnorm= %.5e alpha= %f beta[0]=%.5e z[0]=%.5e u[0]=%.5e\n",
+        //       step, presnorm, dresnorm, alpha, beta[0], z[0], u[0]);
         step++;
     }
     
     if (cur_converge <= converge) {
-      printf("ADMM: Reached convergence %.5e <= %.5e after %d steps\n", cur_converge, converge, step);
+      printf("ADMM: Reached convergence %.5e <= %.5e after %d steps (last alpha: %.5e)\n",
+             cur_converge, converge, step, alpha);
     } else {
-      printf("ADMM: Did not converge %d steps: residual %.5e > %.5e\n", step, cur_converge, converge);
+      printf("ADMM: Did not converge after %d steps: residual %.5e > %.5e  (last alpha: %.5e)\n",
+             step, cur_converge, converge, alpha);
     }
-
+    
     /* Make sure to return the final z to the user */
     if (z_ptr == zold)
     {
         ztemp = z;
         z = zold;
         zold = ztemp;
+        memcpy(z, zold, nz * sizeof(double));
     }
+    //printf("FINISHED ADMM iterations with alpha= %f beta[0]=%.5e z[0]=%.5e u[0]=%.5e\n", alpha, beta[0], z[0], u[0]);
     
     /* free up the resources */
     free(zold);
