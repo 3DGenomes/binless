@@ -52,62 +52,119 @@ NumericVector phi_to_cts(const DataFrame cts, int nbins, const std::vector<doubl
 // [[Rcpp::export]]
 DataFrame cts_to_mat(const DataFrame cts, int nbins, double dispersion, const std::vector<double>& phi_mat)
 {
+  //inputs
+  IntegerVector bin1 = cts["bin1"];
+  IntegerVector bin2 = cts["bin2"];
+  NumericVector count = cts["count"];
+  NumericVector lmu_nosig = cts["lmu.nosig"];
+  NumericVector phi = phi_to_cts(cts,nbins,phi_mat);
+  NumericVector weight = cts["weight"];
+  
+  //outputs
+  size_t N = cts.nrows();
+  NumericMatrix phihat(nbins, nbins);
+  NumericMatrix phihat_var(nbins, nbins);
+  NumericMatrix ncounts(nbins, nbins);
+  NumericVector phihat_r; //vectorized form
+  NumericVector phihat_var_r;
+  NumericVector ncounts_r;
+  IntegerVector bin1_r;
+  IntegerVector bin2_r;
+  
+  //walk through cts
+  for (int i = 0; i < N; ++i) {
+    double mu = std::exp( lmu_nosig(i) + phi(i) );
+    double z = count(i)/mu-1;
+    double var = 1/mu + 1/dispersion;
+    double w2v = weight(i)/(2*var);
+    ncounts(bin1(i)-1, bin2(i)-1) += weight(i);
+    phihat_var(bin1(i)-1, bin2(i)-1) += w2v;
+    phihat(bin1(i)-1, bin2(i)-1) += (z+phi(i))*w2v;
+  }
+  
+  //finish mat
+  for (int i = 0; i < nbins; ++i) {
+    for (int j = i; j < nbins; ++j) {
+      phihat_var(i,j) = 1/phihat_var(i,j);
+      phihat(i,j) = phihat(i,j)*phihat_var(i,j);
+    }
+  }
+  
+  //vectorize and put into data frame
+  for (int i = 0; i < nbins; ++i) {
+    for (int j = i; j < nbins; ++j) {
+      bin1_r.push_back(i+1);
+      bin2_r.push_back(j+1);
+      phihat_r.push_back(phihat(i,j));
+      phihat_var_r.push_back(phihat_var(i,j));
+      ncounts_r.push_back(ncounts(i,j));
+    }
+  }
+  
+  bin1_r.attr("levels") = bin1.attr("levels");
+  bin2_r.attr("levels") = bin2.attr("levels");
+  bin1_r.attr("class") = CharacterVector::create("ordered", "factor");
+  bin2_r.attr("class") = CharacterVector::create("ordered", "factor");
+  
+  return DataFrame::create(_["bin1"]=bin1_r, _["bin2"]=bin2_r, _["phihat"]=phihat_r,
+                           _["phihat.var"]=phihat_var_r, _["ncounts"]=ncounts_r, _["weight"]=1/phihat_var_r,
+                           _["diag.idx"]=bin2_r-bin1_r);
+}
+
+// [[Rcpp::export]]
+DataFrame cts_to_mat_cpp(const DataFrame cts, int nbins, double dispersion, const std::vector<double>& phi)
+{
     //inputs
-    IntegerVector bin1 = cts["bin1"];
-    IntegerVector bin2 = cts["bin2"];
+    size_t N = cts.nrows();
+    IntegerVector cts_bin1 = cts["bin1"];
+    IntegerVector cts_bin2 = cts["bin2"];
     NumericVector count = cts["count"];
     NumericVector lmu_nosig = cts["lmu.nosig"];
-    NumericVector phi = phi_to_cts(cts,nbins,phi_mat);
     NumericVector weight = cts["weight"];
 
     //outputs
-    size_t N = cts.nrows();
-    NumericMatrix phihat(nbins, nbins);
-    NumericMatrix phihat_var(nbins, nbins);
-    NumericMatrix ncounts(nbins, nbins);
-    NumericVector phihat_r; //vectorized form
-    NumericVector phihat_var_r;
-    NumericVector ncounts_r;
-    IntegerVector bin1_r;
-    IntegerVector bin2_r;
+    size_t nbetas = nbins*(nbins+1)/2; //size of fused lasso problem
+    NumericVector phihat(nbetas); //vectorized form
+    NumericVector phihat_var(nbetas);
+    NumericVector ncounts(nbetas);
+    IntegerVector bin1(nbetas);
+    IntegerVector bin2(nbetas);
 
     //walk through cts
     for (int i = 0; i < N; ++i) {
-        double mu = std::exp( lmu_nosig(i) + phi(i) );
+        //pos(b1,b2) starts at 0 and is the index in the 2D triangle grid
+        //of the cell at coordinates (b1,b2), where b1 and b2 start at 1 and b2>=b1
+        int b1 = cts_bin1(i);
+        int b2 = cts_bin2(i);
+        int pos = (b1-1)*(nbins+1) - (b1-1)*b1/2 + b2 - b1;
+        double mu = std::exp( lmu_nosig(i) + phi[pos] );
         double z = count(i)/mu-1;
         double var = 1/mu + 1/dispersion;
         double w2v = weight(i)/(2*var);
-        ncounts(bin1(i)-1, bin2(i)-1) += weight(i);
-        phihat_var(bin1(i)-1, bin2(i)-1) += w2v;
-        phihat(bin1(i)-1, bin2(i)-1) += (z+phi(i))*w2v;
+        ncounts(pos) += weight(i);
+        phihat_var(pos) += w2v;
+        phihat(pos) += (z+phi[pos])*w2v;
     }
 
     //finish mat
-    for (int i = 0; i < nbins; ++i) {
-        for (int j = i; j < nbins; ++j) {
-            phihat_var(i,j) = 1/phihat_var(i,j);
-            phihat(i,j) = phihat(i,j)*phihat_var(i,j);
-        }
+    int b1 = 1;
+    int b2 = 1;
+    for (int i = 0; i < nbetas; ++i) {
+        phihat_var(i) = 1/phihat_var(i);
+        phihat(i) = phihat(i)*phihat_var(i);
+        bin1(i) = b1;
+        bin2(i) = b2++;
+        if (b2 > nbins) b2 = ++b1;
     }
 
-    //vectorize and put into data frame
-    for (int i = 0; i < nbins; ++i) {
-        for (int j = i; j < nbins; ++j) {
-            bin1_r.push_back(i+1);
-            bin2_r.push_back(j+1);
-            phihat_r.push_back(phihat(i,j));
-            phihat_var_r.push_back(phihat_var(i,j));
-            ncounts_r.push_back(ncounts(i,j));
-        }
-    }
-    bin1_r.attr("levels") = bin1.attr("levels");
-    bin2_r.attr("levels") = bin2.attr("levels");
-    bin1_r.attr("class") = CharacterVector::create("ordered", "factor");
-    bin2_r.attr("class") = CharacterVector::create("ordered", "factor");
+    bin1.attr("levels") = cts_bin1.attr("levels");
+    bin2.attr("levels") = cts_bin2.attr("levels");
+    bin1.attr("class") = CharacterVector::create("ordered", "factor");
+    bin2.attr("class") = CharacterVector::create("ordered", "factor");
 
-    return DataFrame::create(_["bin1"]=bin1_r, _["bin2"]=bin2_r, _["phihat"]=phihat_r,
-            _["phihat.var"]=phihat_var_r, _["ncounts"]=ncounts_r, _["weight"]=1/phihat_var_r,
-            _["diag.idx"]=bin2_r-bin1_r);
+    return DataFrame::create(_["bin1"]=bin1, _["bin2"]=bin2, _["phihat"]=phihat,
+            _["phihat.var"]=phihat_var, _["ncounts"]=ncounts, _["weight"]=1/phihat_var,
+            _["diag.idx"]=bin2-bin1);
 }
 
 RcppExport SEXP wgfl_perf(const DataFrame cts, double dispersion, int niter, int nbins,
@@ -143,7 +200,8 @@ RCPP_MODULE(gfl){
   using namespace Rcpp ;
  
   function("weighted_graphfl" , &weighted_graphfl  , "documentation for weighted_graphfl ");
-  //function("cts_to_mat" , &cts_to_mat  , "documentation for cts_to_mat ");
+  function("cts_to_mat" , &cts_to_mat  , "documentation for cts_to_mat ");
+  function("cts_to_mat_cpp" , &cts_to_mat_cpp  , "documentation for cts_to_mat_cpp ");
   //function("phi_to_cts" , &phi_to_cts  , "documentation for phi_to_cts ");
   function("wgfl_perf" , &wgfl_perf  , "documentation for wgfl_perf ");
 } 
