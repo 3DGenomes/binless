@@ -29,57 +29,138 @@ RcppExport SEXP weighted_graphfl(Rcpp::NumericVector y_i, Rcpp::NumericVector
 // [[Rcpp::export]]
 DataFrame cts_to_mat(const DataFrame cts, int nbins, double dispersion, const std::vector<double>& phi)
 {
-    //inputs
-    size_t N = cts.nrows();
-    IntegerVector cts_bin1 = cts["bin1"];
-    IntegerVector cts_bin2 = cts["bin2"];
-    NumericVector count = cts["count"];
-    NumericVector lmu_nosig = cts["lmu.nosig"];
-    NumericVector weight = cts["weight"];
+  //inputs
+  size_t N = cts.nrows();
+  IntegerVector cts_bin1 = cts["bin1"];
+  IntegerVector cts_bin2 = cts["bin2"];
+  NumericVector count = cts["count"];
+  NumericVector lmu_nosig = cts["lmu.nosig"];
+  NumericVector weight = cts["weight"];
+  
+  //outputs
+  size_t nbetas = nbins*(nbins+1)/2; //size of fused lasso problem
+  NumericVector phihat(nbetas); //vectorized form
+  NumericVector phihat_var(nbetas);
+  NumericVector ncounts(nbetas);
+  IntegerVector bin1(nbetas);
+  IntegerVector bin2(nbetas);
+  
+  //walk through cts
+  printf("cts_to_mat N=%d nbetas=%d count(0)=%f phi(0)=%f phihat(0)=%f\n",N,nbetas,count(0),phi[0],phihat(0));
+  for (int i = 0; i < N; ++i) {
+    //pos(b1,b2) starts at 0 and is the index in the 2D triangle grid
+    //of the cell at coordinates (b1,b2), where b1 and b2 start at 1 and b2>=b1
+    int b1 = cts_bin1(i);
+    int b2 = cts_bin2(i);
+    int pos = (b1-1)*(nbins+1) - (b1-1)*b1/2 + b2 - b1;
+    double mu = std::exp( lmu_nosig(i) + phi[pos] );
+    double z = count(i)/mu-1;
+    double var = 1/mu + 1/dispersion;
+    double w2v = weight(i)/(2*var);
+    ncounts(pos) += weight(i);
+    phihat_var(pos) += w2v;
+    phihat(pos) += (z+phi[pos])*w2v;
+  }
+  
+  //finish mat
+  int b1 = 1;
+  int b2 = 1;
+  for (int i = 0; i < nbetas; ++i) {
+    phihat_var(i) = 1/phihat_var(i);
+    phihat(i) = phihat(i)*phihat_var(i);
+    bin1(i) = b1;
+    bin2(i) = b2++;
+    if (b2 > nbins) b2 = ++b1;
+  }
+  printf("phihat(0)=%f bin1(0)=%d bin2(0)=%d\n",phihat(0),bin1(0),bin2(0));
+  
+  bin1.attr("levels") = cts_bin1.attr("levels");
+  bin2.attr("levels") = cts_bin2.attr("levels");
+  bin1.attr("class") = CharacterVector::create("ordered", "factor");
+  bin2.attr("class") = CharacterVector::create("ordered", "factor");
+  
+  return DataFrame::create(_["bin1"]=bin1, _["bin2"]=bin2, _["phihat"]=phihat,
+                           _["phihat.var"]=phihat_var, _["ncounts"]=ncounts, _["weight"]=1/phihat_var,
+                           _["diag.idx"]=bin2-bin1);
+}
 
-    //outputs
-    size_t nbetas = nbins*(nbins+1)/2; //size of fused lasso problem
-    NumericVector phihat(nbetas); //vectorized form
-    NumericVector phihat_var(nbetas);
-    NumericVector ncounts(nbetas);
-    IntegerVector bin1(nbetas);
-    IntegerVector bin2(nbetas);
+void cts_to_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count, double* lmu_nosig, double* weight,
+                          int nbins, double dispersion, double* phi, double* phihat, double* phihat_var,
+                          double* ncounts, int* bin1, int* bin2)
+{
+  //walk through cts
+  int nbetas = nbins*(nbins+1)/2; //size of fused lasso problem
+  printf("cts_to_mat_core N=%d nbetas=%d count[0]=%f phi[0]=%f phihat[0]=%f\n",N,nbetas,count[0],phi[0],phihat[0]);
+  int i;
+  for (i = 0; i < N; ++i) {
+    //pos(b1,b2) starts at 0 and is the index in the 2D triangle grid
+    //of the cell at coordinates (b1,b2), where b1 and b2 start at 1 and b2>=b1
+    int b1 = cts_bin1[i];
+    int b2 = cts_bin2[i];
+    int pos = (b1-1)*(nbins+1) - (b1-1)*b1/2 + b2 - b1;
+    double mu = std::exp( lmu_nosig[i] + phi[pos] );
+    double z = count[i]/mu-1;
+    double var = 1/mu + 1/dispersion;
+    double w2v = weight[i]/(2*var);
+    ncounts[pos] += weight[i];
+    phihat_var[pos] += w2v;
+    phihat[pos] += (z+phi[pos])*w2v;
+  }
+  
+  //finish mat
+  int b1 = 1;
+  int b2 = 1;
+  for (i = 0; i < nbetas; ++i) {
+    phihat_var[i] = 1/phihat_var[i];
+    phihat[i] = phihat[i]*phihat_var[i];
+    bin1[i] = b1;
+    bin2[i] = b2++;
+    if (b2 > nbins) b2 = ++b1;
+  }
+  printf("phihat[0]=%f bin1[0]=%d bin2[0]=%d\n",phihat[0],bin1[0],bin2[0]);
+}
 
-    //walk through cts
-    for (int i = 0; i < N; ++i) {
-        //pos(b1,b2) starts at 0 and is the index in the 2D triangle grid
-        //of the cell at coordinates (b1,b2), where b1 and b2 start at 1 and b2>=b1
-        int b1 = cts_bin1(i);
-        int b2 = cts_bin2(i);
-        int pos = (b1-1)*(nbins+1) - (b1-1)*b1/2 + b2 - b1;
-        double mu = std::exp( lmu_nosig(i) + phi[pos] );
-        double z = count(i)/mu-1;
-        double var = 1/mu + 1/dispersion;
-        double w2v = weight(i)/(2*var);
-        ncounts(pos) += weight(i);
-        phihat_var(pos) += w2v;
-        phihat(pos) += (z+phi[pos])*w2v;
-    }
-
-    //finish mat
-    int b1 = 1;
-    int b2 = 1;
-    for (int i = 0; i < nbetas; ++i) {
-        phihat_var(i) = 1/phihat_var(i);
-        phihat(i) = phihat(i)*phihat_var(i);
-        bin1(i) = b1;
-        bin2(i) = b2++;
-        if (b2 > nbins) b2 = ++b1;
-    }
-
-    bin1.attr("levels") = cts_bin1.attr("levels");
-    bin2.attr("levels") = cts_bin2.attr("levels");
-    bin1.attr("class") = CharacterVector::create("ordered", "factor");
-    bin2.attr("class") = CharacterVector::create("ordered", "factor");
-
-    return DataFrame::create(_["bin1"]=bin1, _["bin2"]=bin2, _["phihat"]=phihat,
-            _["phihat.var"]=phihat_var, _["ncounts"]=ncounts, _["weight"]=1/phihat_var,
-            _["diag.idx"]=bin2-bin1);
+// [[Rcpp::export]]
+DataFrame cts_to_mat_c(const DataFrame cts, int nbins, double dispersion, std::vector<double>& phi)
+{
+  //inputs
+  int N = cts.nrows();
+  std::vector<int> cts_bin1 = as<std::vector<int> >(cts["bin1"]);
+  std::vector<int> cts_bin2 = as<std::vector<int> >(cts["bin2"]);
+  std::vector<double> count = as<std::vector<double> >(cts["count"]);
+  std::vector<double> lmu_nosig = as<std::vector<double> >(cts["lmu.nosig"]);
+  std::vector<double> weight = as<std::vector<double> >(cts["weight"]);
+  
+  //outputs
+  int nbetas = nbins*(nbins+1)/2; //size of fused lasso problem
+  std::vector<double> phihat(nbetas, 0); //vectorized form
+  std::vector<double> phihat_var(nbetas, 0);
+  std::vector<double> ncounts(nbetas, 0);
+  std::vector<int> bin1(nbetas, 0);
+  std::vector<int> bin2(nbetas, 0);
+  
+  
+  cts_to_mat_core(N, &cts_bin1[0], &cts_bin2[0], &count[0], &lmu_nosig[0], &weight[0], nbins, dispersion, &phi[0],
+                  &phihat[0], &phihat_var[0], &ncounts[0], &bin1[0], &bin2[0]);
+  
+  IntegerVector bin1_i, bin2_i;
+  NumericVector phihat_i, phihat_var_i, ncounts_i, weight_i, didx_i;
+  bin1_i = wrap(bin1);
+  bin2_i = wrap(bin2);
+  bin1_i.attr("levels") = as<IntegerVector>(cts["bin1"]).attr("levels");
+  bin2_i.attr("levels") = as<IntegerVector>(cts["bin2"]).attr("levels");
+  bin1_i.attr("class") = CharacterVector::create("ordered", "factor");
+  bin2_i.attr("class") = CharacterVector::create("ordered", "factor");
+  phihat_i = wrap(phihat);
+  phihat_var_i = wrap(phihat_var);
+  ncounts_i = wrap(ncounts);
+  weight_i = 1/phihat_var_i;
+  didx_i = bin2_i-bin1_i;
+  
+  
+  return DataFrame::create(_["bin1"]=bin1_i, _["bin2"]=bin2_i, _["phihat"]=phihat_i,
+                           _["phihat.var"]=phihat_var_i, _["ncounts"]=ncounts_i, _["weight"]=weight_i,
+                           _["diag.idx"]=didx_i);
 }
 
 RcppExport SEXP wgfl_perf(const DataFrame cts, double dispersion, int niter, int nbins,
@@ -116,6 +197,8 @@ RCPP_MODULE(gfl){
  
   function("weighted_graphfl" , &weighted_graphfl  , "documentation for weighted_graphfl ");
   function("cts_to_mat" , &cts_to_mat  , "documentation for cts_to_mat ");
+  function("cts_to_mat_c" , &cts_to_mat_c  , "documentation for cts_to_mat_c ");
+  //function("cts_to_mat_core" , &cts_to_mat_core  , "documentation for cts_to_mat_core ");
   function("wgfl_perf" , &wgfl_perf  , "documentation for wgfl_perf ");
 } 
 
