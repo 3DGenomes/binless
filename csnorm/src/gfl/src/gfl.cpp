@@ -47,7 +47,6 @@ DataFrame cts_to_mat(const DataFrame cts, int nbins, double dispersion, std::vec
   std::vector<int> bin1(nbetas, 0);
   std::vector<int> bin2(nbetas, 0);
   
-  
   cts_to_mat_core(N, &cts_bin1[0], &cts_bin2[0], &count[0], &lmu_nosig[0], &weight[0], nbins, dispersion, &phi[0],
                   &phihat[0], &phihat_var[0], &ncounts[0], &bin1[0], &bin2[0]);
   
@@ -97,7 +96,7 @@ List wgfl_perf_warm(const DataFrame cts, double dispersion, int niter, int nbins
                                          &phi_r[0], &z_r[0], &u_r[0]);
     double maxval = std::abs(phi_r[0]-phi_old[0]);
     for (int i=1; i<N; ++i) maxval = std::max(std::abs(phi_r[i]-phi_old[i]), maxval);
-    printf(" Iteration %d with alpha=%f reached maxval=%.5e after %d steps\n",step,alpha,maxval,res);
+    //printf(" Iteration %d with alpha=%f reached maxval=%.5e after %d steps\n",step,alpha,maxval,res);
     if (maxval<converge) break;
     phi_old = phi_r;
   }
