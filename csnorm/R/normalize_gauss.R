@@ -733,7 +733,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   mat = foreach (g=groupnames, .combine=rbind) %dopar% {
     p=params[name==g]
     matg = csnorm:::gfl_get_matrix(cts[name==g], nbins, cs@par$alpha, cs@settings$trails,
-                                   p$lambda1, p$lambda2, p$eCprime, tol.value = tol.val)
+                                   p$lambda1, p$lambda2, p$eCprime, tol.value = cs@settings$tol.val)
     matg[,name:=g]
     matg
   }
