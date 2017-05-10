@@ -145,13 +145,14 @@ gfl_compute_trails = function(nrow) {
   return(trails)
 }
 
-#' compute sparse fused lasso coefficients for a given value of lambda1, lambda2 and eCprime
+#' compute sparse fused lasso coefficients for a given value of lambda1, lambda2 and eCprime (performance iteration)
 #' @keywords internal
-gfl_get_value = function(valuehat, weight, trails, lambda1, lambda2, eCprime,
-                         alpha=0.2, inflate=2, tol.value=1e-6, maxsteps=100000) {
+gfl_get_value = function(cts, nbins, dispersion, trails, lambda1, lambda2, eCprime,
+                         alpha=5, inflate=2, tol.value=1e-6, nperf=1000, maxsteps=100000) {
   #assume lambda1=0 and compute the fused lasso solution, centered around eCprime
-  value = csnorm:::weighted_graphfl(valuehat, weight, trails$ntrails, trails$trails,
-                                    trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.value/2) - eCprime
+  mat.c = csnorm:::wgfl_perf(cts, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                             trails$breakpoints, lambda2, alpha, inflate, maxsteps, converge/2)
+  value = mat.c$phi - eCprime
   #now soft-threshold the shifted value around eCprime
   value=sign(value)*pmax(abs(value)-lambda1, 0)
   return(value)
@@ -425,10 +426,11 @@ optimize_lambda2 = function(matg, trails, tol.val=1e-3, lambda2.max=1000) {
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(matg, trails, positive, fixed, constrained, simplified, tol.val=1e-3, verbose=T) {
+csnorm_fused_lasso = function(cts, trails, sbins, positive, fixed, constrained, simplified, tol.val=1e-3, verbose=T) {
   groupname=matg[,name[1]]
+  nbins = length(sbins)-1
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=valuehat))+scale_fill_gradient2())
-  lambda2 = csnorm:::optimize_lambda2(matg, trails, tol.val = tol.val)
+  lambda2 = csnorm:::optimize_lambda2(cts, nbins, trails, tol.val = tol.val)
   #get best lambda1 and set eCprime to lower bound
   if (fixed==F) {
     if (simplified==T) {
