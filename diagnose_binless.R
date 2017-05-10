@@ -69,8 +69,8 @@ inflate=2
 maxsteps=10000
 
 
-value.c=csnorm:::wgfl_perf(cts, cs@par$alpha, niter, trails$nrow, trails$ntrails, trails$trails,
-                           trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.val/2)
+value.c = csnorm:::wgfl_perf(cts, cs@par$alpha, niter, trails$nrow, trails$ntrails, trails$trails,
+                             trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.val/2)
 
 all.equal(value.c,value.r)
 

@@ -147,34 +147,25 @@ gfl_compute_trails = function(nrow) {
 
 #' compute sparse fused lasso coefficients for a given value of lambda1, lambda2 and eCprime (performance iteration)
 #' @keywords internal
-gfl_get_value = function(cts, nbins, dispersion, trails, lambda1, lambda2, eCprime,
+gfl_get_value = function(ctsg, nbins, dispersion, trails, lambda1, lambda2, eCprime,
                          alpha=5, inflate=2, tol.value=1e-6, nperf=1000, maxsteps=100000) {
   #assume lambda1=0 and compute the fused lasso solution, centered around eCprime
-  mat.c = csnorm:::wgfl_perf(cts, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+  perf.c = csnorm:::wgfl_perf(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                              trails$breakpoints, lambda2, alpha, inflate, maxsteps, converge/2)
-  value = mat.c$phi - eCprime
+  value = perf.c$phi - eCprime
   #now soft-threshold the shifted value around eCprime
   value=sign(value)*pmax(abs(value)-lambda1, 0)
   return(value)
 }
 
-#' compute sparse fused lasso degrees of freedom
-#' @keywords internal
-get_gfl_degrees_of_freedom = function(mat, trails, tol.value=1e-3) {
-  cl = csnorm:::build_patch_graph(mat, trails, tol.value=tol.value)$components
-  mat[,patchno:=cl$membership]
-  dof = mat[abs(value)>tol.value,uniqueN(patchno)] #sparse fused lasso
-  stopifnot(dof<=cl$no)
-  return(dof)
-}
-
 #' compute BIC for a given value of of lambda1, lambda2 and eCprime
 #' @keywords internal
-gfl_BIC = function(matg, trails, lambda1, lambda2, eCprime, tol.value=1e-3) {
+gfl_BIC = function(ctsg, nbins, dispersion, trails, lambda1, lambda2, eCprime,
+                   alpha=5, inflate=2, tol.value=1e-6, nperf=1000, maxsteps=100000) {
   #get value with lambda1 set to zero to avoid round-off errors in degrees of freedom
-  submat = matg[,.(name,bin1,bin2,valuehat,weight,ncounts)]
-  submat[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, lambda1=0, lambda2=lambda2,
-                                        eCprime=eCprime, tol.value=tol.value)]
+  perf.c = csnorm:::wgfl_perf(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                              trails$breakpoints, lambda2, alpha, inflate, maxsteps, converge/2)
+  submat = as.data.table(perf.c$mat)[,.(bin1,bin2,valuehat=phihat,ncounts,weight,value=perf.c$phi-eCprime)]
   #get the number of patches and deduce degrees of freedom
   cl = csnorm:::build_patch_graph(submat, trails, tol.value=tol.value)$components
   submat[,patchno:=cl$membership]
@@ -380,27 +371,25 @@ optimize_lambda1_only = function(matg, trails, tol.val=1e-3, lambda2=0, positive
 
 #' cross-validate lambda2
 #' @keywords internal
-optimize_lambda2 = function(matg, trails, tol.val=1e-3, lambda2.max=1000) {
-  obj = function(x){csnorm:::gfl_BIC(matg, trails, lambda1=0, lambda2=10^(x), eCprime=0, tol.value = tol.val)}
+optimize_lambda2 = function(ctsg, nbins, dispersion, trails, tol.val=1e-3, lambda2.max=1000) {
+  obj = function(x){csnorm:::gfl_BIC(ctsg, nbins, dispersion, trails,
+                                     lambda1=0, lambda2=10^(x), eCprime=0, tol.value = tol.val)}
   minlambda=tol.val*10
   maxlambda=lambda2.max
   #save(matg,trails,tol,lambda1,eCprime,file="debug_lambda2.RData")
   #cat("*** maxlambda ",maxlambda," (range=",matg[,max(value)-min(value)],")\n")
   #shrink maximum lambda, in case initial guess is too big
   repeat {
-    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, trails, 0, maxlambda, 0, tol.value=tol.val)]
-    #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+geom_raster(aes(bin2,bin1,fill=valuehat)))
-    if (matg[,max(value)-min(value)] > tol.val) {
+    value=csnorm:::gfl_get_value(ctsg, nbins, dispersion, trails, 0, maxlambda, 0, tol.value=tol.val)
+    if (max(value)-min(value) > tol.val) {
       maxlambda = maxlambda*2
       break
     }
     maxlambda = maxlambda/2
-    #dof = csnorm:::get_gfl_degrees_of_freedom(matg, trails, tol.val=tol.val)
-    #cat("shrink maxlambda ",maxlambda," (range=",matg[,max(value)-min(value)],", dof=",dof,")\n")
   }
   #cat("optimize lambda2 between ",minlambda," and ",maxlambda,"\n")
-  #dt = foreach (lam=seq(log10(minlambda),log10(maxlambda),l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
-  #ggplot(dt)+geom_point(aes(10^(x),y))#+scale_x_log10()+scale_y_log10()
+  #dt = foreach (lam=seq(log10(minlambda),log10(maxlambda),l=50),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
+  #ggplot(dt)+geom_point(aes(10^(x),y))+scale_x_log10()+scale_y_log10()
   op=optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=tol.val)
   lambda2=10^op$minimum
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
@@ -426,11 +415,11 @@ optimize_lambda2 = function(matg, trails, tol.val=1e-3, lambda2.max=1000) {
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(cts, trails, sbins, positive, fixed, constrained, simplified, tol.val=1e-3, verbose=T) {
+csnorm_fused_lasso = function(ctsg, nbins, dispersion, trails, positive, fixed, constrained, simplified,
+                              tol.val=1e-3, verbose=T) {
   groupname=matg[,name[1]]
-  nbins = length(sbins)-1
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=valuehat))+scale_fill_gradient2())
-  lambda2 = csnorm:::optimize_lambda2(cts, nbins, trails, tol.val = tol.val)
+  lambda2 = csnorm:::optimize_lambda2(ctsg, nbins, dispersion, trails, tol.val = tol.val)
   #get best lambda1 and set eCprime to lower bound
   if (fixed==F) {
     if (simplified==T) {
