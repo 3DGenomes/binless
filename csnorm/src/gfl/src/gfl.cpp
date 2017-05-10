@@ -72,41 +72,52 @@ DataFrame cts_to_mat(const DataFrame cts, int nbins, double dispersion, std::vec
 }
 
 // [[Rcpp::export]]
+List wgfl_perf_warm(const DataFrame cts, double dispersion, int niter, int nbins,
+                    int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
+                    double lam,  double alpha, double inflate, int maxsteps, double converge,
+                    NumericVector z_i, NumericVector u_i, NumericVector phi_i)
+{
+  const int N = nbins*(nbins+1)/2; //size of fused lasso problem
+  std::vector<int> trails_r = as<std::vector<int> >(trails_i);
+  std::vector<int> breakpoints_r = as<std::vector<int> >(breakpoints_i);
+  std::vector<double> z_r = as<std::vector<double> >(z_i);
+  std::vector<double> u_r = as<std::vector<double> >(u_i);
+  std::vector<double> phi_r = as<std::vector<double> >(phi_i);
+  std::vector<double> phi_old = phi_r;
+  
+  int step;
+  for (step=0; step<niter; ++step) {
+    const DataFrame mat = cts_to_mat(cts, nbins, dispersion, phi_r);
+    std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
+    std::vector<double> w_r = Rcpp::as<std::vector<double> >(mat["weight"]);
+    
+    int res;
+    res = graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails, &trails_r[0], &breakpoints_r[0],
+                                         lam, &alpha, inflate, maxsteps, converge,
+                                         &phi_r[0], &z_r[0], &u_r[0]);
+    double maxval = std::abs(phi_r[0]-phi_old[0]);
+    for (int i=1; i<N; ++i) maxval = std::max(std::abs(phi_r[i]-phi_old[i]), maxval);
+    printf(" Iteration %d with alpha=%f reached maxval=%.5e after %d steps\n",step,alpha,maxval,res);
+    if (maxval<converge) break;
+    phi_old = phi_r;
+  }
+  return List::create(_["phi"]=wrap(phi_r), _["alpha"]=wrap(alpha), _["mat"]=cts_to_mat(cts, nbins, dispersion, phi_r),
+                      _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nsteps"]=step);
+}
+
+// [[Rcpp::export]]
 List wgfl_perf(const DataFrame cts, double dispersion, int niter, int nbins,
         int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
         double lam,  double alpha, double inflate, int maxsteps, double converge)
 {
-    std::vector<int> trails_r = Rcpp::as<std::vector<int> >(trails_i);
-    std::vector<int> breakpoints_r = Rcpp::as<std::vector<int> >(breakpoints_i);
-    std::vector<double> z_r(breakpoints_r[ntrails-1], 0);
-    std::vector<double> u_r(breakpoints_r[ntrails-1], 0);
-    
+    NumericVector z_i(breakpoints_i(ntrails-1));
+    NumericVector u_i(breakpoints_i(ntrails-1));
     const int N = nbins*(nbins+1)/2; //size of fused lasso problem
-    std::vector<double> phi(N, 0);
-    std::vector<double> phi_old(N, 0);
-    //printf("Fused lasso perf iteration with %d coefficients\n",phi.size());
-    
-    int step;
-    for (step=0; step<niter; ++step) {
-      const DataFrame mat = cts_to_mat(cts, nbins, dispersion, phi);
-      std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
-      std::vector<double> w_r = Rcpp::as<std::vector<double> >(mat["weight"]);
-      
-      int res;
-      res = graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails, &trails_r[0], &breakpoints_r[0],
-                                         lam, &alpha, inflate, maxsteps, converge,
-                                         &phi[0], &z_r[0], &u_r[0]);
-      double maxval = std::abs(phi[0]-phi_old[0]);
-      for (int i=1; i<N; ++i) maxval = std::max(std::abs(phi[i]-phi_old[i]), maxval);
-      printf(" Iteration %d with alpha=%f reached maxval=%.5e after %d steps\n",step,alpha,maxval,res);
-      if (maxval<converge) break;
-      phi_old = phi;
-    }
-    return List::create(_["phi"]=wrap(phi), _["alpha"]=wrap(alpha), _["mat"]=cts_to_mat(cts, nbins, dispersion, phi),
-                        _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nsteps"]=step);
+    NumericVector phi_i(N);
+    //printf("Fused lasso cold perf iteration with %d coefficients\n",phi.size());
+    return wgfl_perf_warm(cts, dispersion, niter, nbins, ntrails, trails_i, breakpoints_i,
+                          lam, alpha, inflate, maxsteps, converge, z_i, u_i, phi_i);
 }
-
-
 
 
 RCPP_MODULE(gfl){
@@ -114,7 +125,7 @@ RCPP_MODULE(gfl){
  
   function("weighted_graphfl" , &weighted_graphfl  , "documentation for weighted_graphfl ");
   function("cts_to_mat" , &cts_to_mat  , "documentation for cts_to_mat ");
-  //function("cts_to_mat_core" , &cts_to_mat_core  , "documentation for cts_to_mat_core ");
   function("wgfl_perf" , &wgfl_perf  , "documentation for wgfl_perf ");
+  function("wgfl_perf_warm" , &wgfl_perf_warm  , "documentation for wgfl_perf_warm ");
 } 
 
