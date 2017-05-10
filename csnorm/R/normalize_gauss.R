@@ -699,24 +699,16 @@ remove_bad_bins = function(mat, dmin, base.res, badbins) {
 #' 
 csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   if (verbose==T) cat(" Signal\n")
-  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)[,.(name,bin1,bin2,z,phi,weight,var)]
+  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)[,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  #cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)[,.(name,bin1,bin2,z,phi,weight,var)]
   #
-  mat = cts[,.(phihat=weighted.mean(z+phi, weight/var),
-               phihat.var=2/sum(weight/var),
-               ncounts=sum(weight)),keyby=c("name","bin1","bin2")]
-  mat = mat[cs@par$signal[,.(name,bin1,bin2)],,on=c("name","bin1","bin2")] #to add empty rows/cols
-  mat[is.na(phihat),c("phihat","phihat.var","ncounts"):=list(1,Inf,0)] #bins with no detectable counts
-  mat[,c("valuehat","weight","diag.idx"):=list(phihat,1/phihat.var,unclass(bin2)-unclass(bin1))]
-  setkey(mat,name,bin1,bin2)
-  stopifnot(mat[is.na(valuehat)|is.na(weight),.N]==0)
-  #
-  if (cs@par$signal[bin1==bin2,any(phi!=0)]) { #only remove close diagonal at first iteration
-    if (verbose==T) cat("  Remove bad bins\n")
-    cs@par$badbins = update_bad_bins(cs@par$signal, cs@settings$qmax, cs@par$badbins)
-    mat = remove_bad_bins(mat, cs@settings$dmin, cs@settings$base.res, cs@par$badbins)
-  } else {
-    mat = remove_bad_bins(mat, cs@settings$dmin, cs@settings$base.res, NULL)
-  }
+  #if (cs@par$signal[bin1==bin2,any(phi!=0)]) { #only remove close diagonal at first iteration
+  #  if (verbose==T) cat("  Remove bad bins\n")
+  #  cs@par$badbins = update_bad_bins(cs@par$signal, cs@settings$qmax, cs@par$badbins)
+  #  mat = remove_bad_bins(mat, cs@settings$dmin, cs@settings$base.res, cs@par$badbins)
+  #} else {
+  #  mat = remove_bad_bins(mat, cs@settings$dmin, cs@settings$base.res, NULL)
+  #}
   #
   if (verbose==T) cat("  predict\n")
   #ggplot(mat[bin1==bin2])+geom_point(aes(bin1,phi,colour=bin1%in%cs@par$badbins))+facet_wrap(~name)
@@ -729,18 +721,20 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   #ggplot(cts.cp)+geom_violin(aes(bin1,count))
   #
   #perform fused lasso on signal
-  groupnames=mat[,unique(name)]
+  groupnames=cts[,unique(name)]
+  nbins=length(cs@settings$sbins)-1
   registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %dopar%
-    csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, fixed=F, positive=T, constrained=constrained, simplified=T,
+    csnorm:::csnorm_fused_lasso(cts[name==g], nbins, cs@par$alpha, cs@settings$trails,
+                                positive=T, fixed=F, constrained=constrained, simplified=T,
                                 tol.val=cs@settings$tol.val, verbose=verbose)
   #compute matrix at new params
   #save(mat,params,file=paste0("mat_step_",step,".RData"))
   mat = foreach (g=groupnames, .combine=rbind) %dopar% {
     p=params[name==g]
-    matg=mat[name==g]
-    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, cs@settings$trails,
-                                        p$lambda1, p$lambda2, p$eCprime, tol.value=cs@settings$tol.val)]
+    matg = csnorm:::gfl_get_matrix(cts[name==g], nbins, cs@par$alpha, cs@settings$trails,
+                                   p$lambda1, p$lambda2, p$eCprime, tol.value = tol.val)
+    matg[,name:=g]
     matg
   }
   #store new signal in cs and update eC
