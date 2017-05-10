@@ -21,7 +21,7 @@ setkeyv(cts,c("name","bin1","bin2"))
 trails$nrow = cts[,max(unclass(bin2))]
 
 ### performance iteration: R
-niter=2
+niter=10
 values=data.table()
 cts[,phi:=0]
 for (i in 1:niter) {

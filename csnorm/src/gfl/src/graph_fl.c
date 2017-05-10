@@ -2,7 +2,7 @@
 
 int graph_fused_lasso (int n, double *y,
                         int ntrails, int *trails, int *breakpoints,
-                        double lam, double alpha, double inflate,
+                        double lam, double *alpha, double inflate,
                         int maxsteps, double converge,
                         double *beta)
 {
@@ -12,7 +12,7 @@ int graph_fused_lasso (int n, double *y,
 
 int graph_fused_lasso_weight (int n, double *y, double *w,
                         int ntrails, int *trails, int *breakpoints,
-                        double lam, double alpha, double inflate,
+                        double lam, double *alpha, double inflate,
                         int maxsteps, double converge,
                         double *beta)
 {
@@ -42,7 +42,7 @@ int graph_fused_lasso_weight (int n, double *y, double *w,
 
 int graph_fused_lasso_warm (int n, double *y,
                         int ntrails, int *trails, int *breakpoints,
-                        double lam, double alpha, double inflate,
+                        double lam, double *alpha, double inflate,
                         int maxsteps, double converge,
                         double *beta, double *z, double *u)
 {
@@ -51,7 +51,7 @@ int graph_fused_lasso_warm (int n, double *y,
 
 int graph_fused_lasso_weight_warm (int n, double *y, double *w,
                         int ntrails, int *trails, int *breakpoints,
-                        double lam, double alpha, double inflate,
+                        double lam, double *alpha, double inflate,
                         int maxsteps, double converge,
                         double *beta, double *z, double *u)
 {
@@ -101,7 +101,7 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
     z_ybuff         = (double *) malloc(wbufsize * sizeof(double));
 
     /* weight for each fused lasso */
-    for (i = 0; i < wbufsize; i++) { z_wbuff[i] = alpha / 2.0; }
+    for (i = 0; i < wbufsize; i++) { z_wbuff[i] = (*alpha) / 2.0; }
 
     /* Create map from z to beta */
     for (i = 0; i < nz; i++){ nzmap[trails[i]]++; } /* number of repetitions of beta_i */
@@ -121,16 +121,16 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
     
     step = 1;
     cur_converge = converge + 1;
-    //printf("START ADMM iterations with alpha= %f beta[0]=%.5e z[0]=%.5e u[0]=%.5e\n", alpha, beta[0], z[0], u[0]);
+    //printf("START ADMM iterations with alpha= %f beta[0]=%.5e z[0]=%.5e u[0]=%.5e\n", *alpha, beta[0], z[0], u[0]);
     
     /* Perform the ADMM iterations until convergence */
     while(step < maxsteps && cur_converge > converge)
     {
         /* Update beta */
         if (w)
-            update_beta_weight(n, y, w, z, u, nzmap, zmap, alpha, beta);
+            update_beta_weight(n, y, w, z, u, nzmap, zmap, *alpha, beta);
         else
-            update_beta(n, y, z, u, nzmap, zmap, alpha, beta);
+            update_beta(n, y, z, u, nzmap, zmap, *alpha, beta);
 
         /* swap the z buffers */
         ztemp = z;
@@ -145,33 +145,33 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
 
         /* Update the convergence diagnostics */
         presnorm = primal_resnorm(n, beta, z, nzmap, zmap);
-        dresnorm = dual_resnorm(nz, z, zold, alpha);
+        dresnorm = dual_resnorm(nz, z, zold, *alpha);
         cur_converge = MAX(presnorm, dresnorm);
 
         /* Varying penalty parameter */
         if (step % VARYING_PENALTY_DELAY == 0 && presnorm > 10 * dresnorm)
         {
-            alpha *= inflate;
+            (*alpha) *= inflate;
             for(i = 0; i < nz; i++){ u[i] /= inflate; }
-            for(i = 0; i < wbufsize; i++) { z_wbuff[i] = alpha / 2.0; } /* weight for each fused lasso */
+            for(i = 0; i < wbufsize; i++) { z_wbuff[i] = (*alpha) / 2.0; } /* weight for each fused lasso */
         }
         else if (step % VARYING_PENALTY_DELAY == 0 && dresnorm > 10 * presnorm)
         {
-            alpha /= inflate;
+            (*alpha) /= inflate;
             for(i = 0; i < nz; i++){ u[i] *= inflate; }
-            for(i = 0; i < wbufsize; i++) { z_wbuff[i] = alpha / 2.0; } /* weight for each fused lasso */
+            for(i = 0; i < wbufsize; i++) { z_wbuff[i] = (*alpha) / 2.0; } /* weight for each fused lasso */
         }
-        //printf("ADMM step %05d presnorm= %.5e dresnorm= %.5e alpha= %f beta[0]=%.5e z[0]=%.5e u[0]=%.5e\n",
-        //       step, presnorm, dresnorm, alpha, beta[0], z[0], u[0]);
+        //printf("ADMM step %05d presnorm= %.5e dresnorm= %.5e alpha= %f beta[0]= %.5e z[0]= %.5e u[0]= %.5e\n",
+        //       step, presnorm, dresnorm, *alpha, beta[0], z[0], u[0]);
         step++;
     }
     
     if (cur_converge <= converge) {
-      printf("ADMM: Reached convergence %.5e <= %.5e after %d steps (last alpha: %.5e)\n",
-             cur_converge, converge, step, alpha);
+      printf("ADMM: Reached convergence %.5e <= %.5e after %d steps (last alpha: %f)\n",
+             cur_converge, converge, step, *alpha);
     } else {
-      printf("ADMM: Did not converge after %d steps: residual %.5e > %.5e  (last alpha: %.5e)\n",
-             step, cur_converge, converge, alpha);
+      printf("ADMM: Did not converge after %d steps: residual %.5e > %.5e  (last alpha: %f)\n",
+             step, cur_converge, converge, *alpha);
     }
     
     /* Make sure to return the final z to the user */
@@ -182,7 +182,7 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
         zold = ztemp;
         memcpy(z, zold, nz * sizeof(double));
     }
-    //printf("FINISHED ADMM iterations with alpha= %f beta[0]=%.5e z[0]=%.5e u[0]=%.5e\n", alpha, beta[0], z[0], u[0]);
+    //printf("FINISHED ADMM iterations with alpha= %f beta[0]= %.5e z[0]= %.5e u[0]= %.5e\n", *alpha, beta[0], z[0], u[0]);
     
     /* free up the resources */
     free(zold);

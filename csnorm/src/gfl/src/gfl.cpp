@@ -21,7 +21,7 @@ RcppExport SEXP weighted_graphfl(Rcpp::NumericVector y_i, Rcpp::NumericVector
   
   int res;
   res = graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails, &trails_r[0], &breakpoints_r[0],
-                                       lam, alpha, inflate, maxsteps, converge,
+                                       lam, &alpha, inflate, maxsteps, converge,
                                        &beta_r[0], &z_r[0], &u_r[0]);
   
   return Rcpp::wrap(beta_r);
@@ -82,16 +82,17 @@ RcppExport SEXP wgfl_perf(const DataFrame cts, double dispersion, int niter, int
     
     const int N = nbins*(nbins+1)/2; //size of fused lasso problem
     std::vector<double> phi(N, 0);
-    printf("Fused lasso perf iteration with %d coefficients\n",phi.size());
+    //printf("Fused lasso perf iteration with %d coefficients\n",phi.size());
     
     for (int step=0; step<niter; ++step) {
+      //printf(" Iteration %d with alpha=%f\n",step,alpha);
       const DataFrame mat = cts_to_mat(cts, nbins, dispersion, phi);
       std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
       std::vector<double> w_r = Rcpp::as<std::vector<double> >(mat["weight"]);
       
       int res;
       res = graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails, &trails_r[0], &breakpoints_r[0],
-                                         lam, alpha, inflate, maxsteps, converge,
+                                         lam, &alpha, inflate, maxsteps, converge,
                                          &phi[0], &z_r[0], &u_r[0]);
     }
     return wrap(phi);
