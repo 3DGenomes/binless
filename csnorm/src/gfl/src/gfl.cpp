@@ -85,6 +85,7 @@ List wgfl_perf_warm(const DataFrame cts, double dispersion, int niter, int nbins
   std::vector<double> phi_old = phi_r;
   
   int step;
+  //printf(" Perf iteration: start with alpha=%f phi[0]=%f z[0]=%f u[0]=%f\n", alpha, phi_r[0], z_r[0], u_r[0]);
   for (step=0; step<niter; ++step) {
     const DataFrame mat = cts_to_mat(cts, nbins, dispersion, phi_r);
     std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
@@ -96,10 +97,12 @@ List wgfl_perf_warm(const DataFrame cts, double dispersion, int niter, int nbins
                                          &phi_r[0], &z_r[0], &u_r[0]);
     double maxval = std::abs(phi_r[0]-phi_old[0]);
     for (int i=1; i<N; ++i) maxval = std::max(std::abs(phi_r[i]-phi_old[i]), maxval);
-    //printf(" Iteration %d with alpha=%f reached maxval=%.5e after %d steps\n",step,alpha,maxval,res);
+    //printf(" Iteration %d with alpha=%f reached maxval=%.5e after %d steps (phi[0]=%f z[0]=%f u[0]=%f)\n",
+    //       step,alpha,maxval,res,phi_r[0],z_r[0], u_r[0]);
     if (maxval<converge) break;
     phi_old = phi_r;
   }
+  //printf(" Perf iteration: end with alpha=%f phi[0]=%f z[0]=%f u[0]=%f\n", alpha, phi_r[0], z_r[0], u_r[0]);
   return List::create(_["phi"]=wrap(phi_r), _["alpha"]=wrap(alpha), _["mat"]=cts_to_mat(cts, nbins, dispersion, phi_r),
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nsteps"]=step);
 }

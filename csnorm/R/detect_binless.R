@@ -160,13 +160,20 @@ gfl_get_matrix = function(ctsg, nbins, dispersion, trails, lambda1, lambda2, eCp
   return(matg)
 }
 
-#' compute BICfor a given value of lambda1, lambda2 and eCprime (performance iteration)
+#' compute BIC for a given value of lambda1, lambda2 and eCprime (performance iteration, persistent state)
 #' @keywords internal
 gfl_BIC = function(ctsg, nbins, dispersion, trails, lambda1, lambda2, eCprime,
-                   alpha=5, inflate=2, tol.value=1e-6, nperf=1000, maxsteps=100000) {
+                   alpha=5, inflate=2, tol.value=1e-6, nperf=1000, maxsteps=100000, state=NULL) {
   #get value with lambda1 set to zero to avoid round-off errors in degrees of freedom
-  perf.c = csnorm:::wgfl_perf(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                              trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.value/2)
+  if (is.null(state)) {
+    perf.c = csnorm:::wgfl_perf(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                                trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.value/2)
+  } else {
+    perf.c = csnorm:::wgfl_perf_warm(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                                trails$breakpoints, lambda2, state$alpha, inflate, maxsteps, tol.value/2,
+                                state$z, state$u, state$phi)
+  }
+  state = perf.c[c("z","u","phi","alpha")]
   submat = as.data.table(perf.c$mat)[,.(bin1,bin2,valuehat=phihat,ncounts,weight,value=perf.c$phi-eCprime)]
   #get the number of patches and deduce degrees of freedom
   cl = csnorm:::build_patch_graph(submat, trails, tol.value=tol.value)$components
@@ -179,7 +186,8 @@ gfl_BIC = function(ctsg, nbins, dispersion, trails, lambda1, lambda2, eCprime,
   BIC = submat[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
   #compute mallow's Cp
   #Cp = submat[,sum(weight*((valuehat-(value+eCprime))^2 - 1))]+2*dof
-  return(BIC)
+  state$BIC=BIC
+  return(state)
 }
 
 #' cross-validate lambda1 and eCprime
@@ -343,8 +351,12 @@ optimize_lambda1_only = function(ctsg, nbins, dispersion, trails, tol.val=1e-3, 
 #' cross-validate lambda2
 #' @keywords internal
 optimize_lambda2 = function(ctsg, nbins, dispersion, trails, tol.val=1e-3, lambda2.max=1000) {
-  obj = function(x){csnorm:::gfl_BIC(ctsg, nbins, dispersion, trails,
-                                     lambda1=0, lambda2=10^(x), eCprime=0, tol.value = tol.val)}
+  state=NULL
+  obj = function(x) {
+    state <<- csnorm:::gfl_BIC(ctsg, nbins, dispersion, trails, lambda1=0, lambda2=10^(x),
+                                           eCprime=0, tol.value = tol.val, state=state)
+    return(state$BIC)
+  }
   minlambda=tol.val*10
   maxlambda=lambda2.max
   #shrink maximum lambda, in case initial guess is too big
