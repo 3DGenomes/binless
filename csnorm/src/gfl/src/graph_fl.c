@@ -166,13 +166,13 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
         step++;
     }
     
-    if (cur_converge <= converge) {
+    /*if (cur_converge <= converge) {
       printf("ADMM: Reached convergence %.5e <= %.5e after %d steps (last alpha: %f)\n",
              cur_converge, converge, step, *alpha);
     } else {
       printf("ADMM: Did not converge after %d steps: residual %.5e > %.5e  (last alpha: %f)\n",
              step, cur_converge, converge, *alpha);
-    }
+    }*/
     
     /* Make sure to return the final z to the user */
     if (z_ptr == zold)
