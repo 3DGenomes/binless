@@ -350,26 +350,16 @@ optimize_lambda1_only = function(ctsg, nbins, dispersion, trails, tol.val=1e-3, 
 
 #' cross-validate lambda2
 #' @keywords internal
-optimize_lambda2 = function(ctsg, nbins, dispersion, trails, tol.val=1e-3, lambda2.max=1000) {
+optimize_lambda2 = function(ctsg, nbins, dispersion, trails, tol.val=1e-3, minlambda=0.1, maxlambda=100) {
   state=NULL
   obj = function(x) {
+    cat("eval gfl_BIC at lambda2=",10^(x),"\n")
     state <<- csnorm:::gfl_BIC(ctsg, nbins, dispersion, trails, lambda1=0, lambda2=10^(x),
                                            eCprime=0, tol.value = tol.val, state=state)
     return(state$BIC)
   }
-  minlambda=tol.val*10
-  maxlambda=lambda2.max
-  #shrink maximum lambda, in case initial guess is too big
-  repeat {
-    value=csnorm:::gfl_get_matrix(ctsg, nbins, dispersion, trails, 0, maxlambda, 0, tol.value=tol.val)[,value]
-    if (max(value)-min(value) > tol.val) {
-      maxlambda = maxlambda*2
-      break
-    }
-    maxlambda = maxlambda/2
-  }
   #dt = foreach (lam=seq(log10(minlambda),log10(maxlambda),l=50),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
-  #ggplot(dt)+geom_line(aes(10^(x),y))+scale_x_log10()+scale_y_log10()
+  #ggplot(dt)+geom_line(aes(10^(x),y,colour=ori))+scale_x_log10()+scale_y_log10()
   op=optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=tol.val)
   lambda2=10^op$minimum
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
@@ -396,8 +386,8 @@ optimize_lambda2 = function(ctsg, nbins, dispersion, trails, tol.val=1e-3, lambd
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
 csnorm_fused_lasso = function(ctsg, nbins, dispersion, trails, positive, fixed, constrained, simplified,
-                              tol.val=1e-3, verbose=T) {
-  lambda2 = csnorm:::optimize_lambda2(ctsg, nbins, dispersion, trails, tol.val = tol.val)
+                              tol.val=1e-5, tol.obj=1e-3, verbose=T) {
+  lambda2 = csnorm:::optimize_lambda2(ctsg, nbins, dispersion, trails, tol.val = tol.obj)
   #get best lambda1 and set eCprime to lower bound
   if (fixed==F) {
     if (simplified==T) {
