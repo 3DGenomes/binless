@@ -29,7 +29,11 @@ void cts_to_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
   int b2 = 1;
   for (i = 0; i < nbetas; ++i) {
     phihat_var[i] = 1/phihat_var[i];
-    phihat[i] = phihat[i]*phihat_var[i];
+    if (ncounts[i]>0) {
+      phihat[i] = phihat[i]*phihat_var[i];
+    } else {
+      phihat[i] = 0;
+    }
     bin1[i] = b1;
     bin2[i] = b2++;
     if (b2 > nbins) b2 = ++b1;
