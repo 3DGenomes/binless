@@ -353,7 +353,6 @@ optimize_lambda1_only = function(ctsg, nbins, dispersion, trails, tol.val=1e-3, 
 optimize_lambda2 = function(ctsg, nbins, dispersion, trails, tol.val=1e-3, minlambda=0.1, maxlambda=100) {
   state=NULL
   obj = function(x) {
-    cat("eval gfl_BIC at lambda2=",10^(x),"\n")
     state <<- csnorm:::gfl_BIC(ctsg, nbins, dispersion, trails, lambda1=0, lambda2=10^(x),
                                            eCprime=0, tol.value = tol.val, state=state)
     return(state$BIC)
@@ -386,8 +385,8 @@ optimize_lambda2 = function(ctsg, nbins, dispersion, trails, tol.val=1e-3, minla
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
 csnorm_fused_lasso = function(ctsg, nbins, dispersion, trails, positive, fixed, constrained, simplified,
-                              tol.val=1e-5, tol.obj=1e-3, verbose=T) {
-  lambda2 = csnorm:::optimize_lambda2(ctsg, nbins, dispersion, trails, tol.val = tol.obj)
+                              tol.val=1e-5, verbose=T) {
+  lambda2 = csnorm:::optimize_lambda2(ctsg, nbins, dispersion, trails, tol.val = tol.val)
   #get best lambda1 and set eCprime to lower bound
   if (fixed==F) {
     if (simplified==T) {
