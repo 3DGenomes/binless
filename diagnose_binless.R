@@ -120,6 +120,12 @@ ggplot(decaydiff[step>20])+geom_line(aes(distance,diff,group=step,colour=factor(
 
 
 load("tmp_oscillations.RData")
+cs = run_gauss(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
+               ngibbs = 10, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-3, tol.leg=1e-3,
+               ncounts = 1000000, ncores=ncores, base.res=5000, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T)
+
+
+
 #works
 cs@settings$tol.leg=1e-5
 cs@settings$tol.obj=1e-3

@@ -29,7 +29,7 @@ RcppExport SEXP weighted_graphfl(Rcpp::NumericVector y_i, Rcpp::NumericVector
 
 
 // [[Rcpp::export]]
-DataFrame cts_to_mat(const DataFrame cts, int nbins, double dispersion, std::vector<double>& phi)
+DataFrame cts_to_mat(const DataFrame cts, int nbins, double dispersion, std::vector<double>& phi, int diag_rm)
 {
   //inputs
   int N = cts.nrows();
@@ -48,7 +48,7 @@ DataFrame cts_to_mat(const DataFrame cts, int nbins, double dispersion, std::vec
   std::vector<int> bin2(nbetas, 0);
   
   cts_to_mat_core(N, &cts_bin1[0], &cts_bin2[0], &count[0], &lmu_nosig[0], &weight[0], nbins, dispersion, &phi[0],
-                  &phihat[0], &phihat_var[0], &ncounts[0], &bin1[0], &bin2[0]);
+                  &phihat[0], &phihat_var[0], &ncounts[0], &bin1[0], &bin2[0], diag_rm);
   
   IntegerVector bin1_i, bin2_i;
   NumericVector phihat_i, phihat_var_i, ncounts_i, weight_i, didx_i;
@@ -74,7 +74,7 @@ DataFrame cts_to_mat(const DataFrame cts, int nbins, double dispersion, std::vec
 List wgfl_perf_warm(const DataFrame cts, double dispersion, int niter, int nbins,
                     int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                     double lam,  double alpha, double inflate, int maxsteps, double converge,
-                    NumericVector z_i, NumericVector u_i, NumericVector phi_i)
+                    int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector phi_i)
 {
   const int N = nbins*(nbins+1)/2; //size of fused lasso problem
   std::vector<int> trails_r = as<std::vector<int> >(trails_i);
@@ -87,7 +87,7 @@ List wgfl_perf_warm(const DataFrame cts, double dispersion, int niter, int nbins
   int step;
   //printf(" Perf iteration: start with alpha=%f phi[0]=%f z[0]=%f u[0]=%f\n", alpha, phi_r[0], z_r[0], u_r[0]);
   for (step=0; step<niter; ++step) {
-    const DataFrame mat = cts_to_mat(cts, nbins, dispersion, phi_r);
+    const DataFrame mat = cts_to_mat(cts, nbins, dispersion, phi_r, diag_rm);
     std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
     std::vector<double> w_r = Rcpp::as<std::vector<double> >(mat["weight"]);
     
@@ -104,14 +104,15 @@ List wgfl_perf_warm(const DataFrame cts, double dispersion, int niter, int nbins
   }
   //printf(" Perf iteration: end with alpha=%f phi[0]=%f z[0]=%f u[0]=%f nsteps=%d\n",
   //       alpha, phi_r[0], z_r[0], u_r[0], step);
-  return List::create(_["phi"]=wrap(phi_r), _["alpha"]=wrap(alpha), _["mat"]=cts_to_mat(cts, nbins, dispersion, phi_r),
+  return List::create(_["phi"]=wrap(phi_r), _["alpha"]=wrap(alpha),
+                      _["mat"]=cts_to_mat(cts, nbins, dispersion, phi_r, diag_rm),
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nsteps"]=step);
 }
 
 // [[Rcpp::export]]
 List wgfl_perf(const DataFrame cts, double dispersion, int niter, int nbins,
         int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
-        double lam,  double alpha, double inflate, int maxsteps, double converge)
+        double lam,  double alpha, double inflate, int maxsteps, double converge, int diag_rm)
 {
     NumericVector z_i(breakpoints_i(ntrails-1));
     NumericVector u_i(breakpoints_i(ntrails-1));
@@ -119,7 +120,7 @@ List wgfl_perf(const DataFrame cts, double dispersion, int niter, int nbins,
     NumericVector phi_i(N);
     //printf("Fused lasso cold perf iteration with %d coefficients\n",phi.size());
     return wgfl_perf_warm(cts, dispersion, niter, nbins, ntrails, trails_i, breakpoints_i,
-                          lam, alpha, inflate, maxsteps, converge, z_i, u_i, phi_i);
+                          lam, alpha, inflate, maxsteps, converge, diag_rm, z_i, u_i, phi_i);
 }
 
 

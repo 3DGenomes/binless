@@ -4,7 +4,7 @@
 void cts_to_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
         double* lmu_nosig, double* weight, int nbins, double dispersion,
         double* phi, double* phihat, double* phihat_var, double* ncounts,
-        int* bin1, int* bin2)
+        int* bin1, int* bin2, int diag_rm)
 {
   //walk through cts
   int nbetas = nbins*(nbins+1)/2; //size of fused lasso problem
@@ -37,6 +37,7 @@ void cts_to_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
     bin1[i] = b1;
     bin2[i] = b2++;
     if (b2 > nbins) b2 = ++b1;
+    if (bin2[i]-bin1[i] <= diag_rm) phihat_var[i] = INFINITY;
   }
 }
 
