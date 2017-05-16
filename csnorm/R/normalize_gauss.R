@@ -214,7 +214,6 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
       
       nlambda_diag = (Kdiag - 2)/((Kdiag^2)*crossprod(D%*%beta)+1)
       nlambda_diag = sqrt(as.numeric(nlambda_diag))
-      
       epsilon = abs(lambda_diag-nlambda_diag)
       lambda_diag = nlambda_diag
       maxiter = maxiter+1
@@ -636,7 +635,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],log_mean_cclose]))
   init$alpha=max(0.001,1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu))
   init$mu=NULL
-  out=capture.output(op<-optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, tol_param=cs@settings$tol.val,
+  out=capture.output(op<-optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, tol_param=cs@settings$tol.leg,
                                              data=data, iter=cs@settings$iter, tol_obj=cs@settings$tol.leg,
                                              verbose=verbose, init=init, init_alpha=cs@settings$init_alpha))
   cs@par=modifyList(cs@par, op$par[c("eRJ","eDE","alpha")])
@@ -727,13 +726,13 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   params = foreach(g=groupnames, .combine=rbind) %dopar%
     csnorm:::csnorm_fused_lasso(cts[name==g], nbins, cs@par$alpha, cs@settings$trails,
                                 positive=T, fixed=F, constrained=constrained, simplified=T,
-                                tol.val=cs@settings$tol.val, verbose=verbose)
+                                tol.val=cs@settings$tol.leg, verbose=verbose)
   #compute matrix at new params
   #save(mat,params,file=paste0("mat_step_",step,".RData"))
   mat = foreach (g=groupnames, .combine=rbind) %dopar% {
     p=params[name==g]
     matg = csnorm:::gfl_get_matrix(cts[name==g], nbins, cs@par$alpha, cs@settings$trails,
-                                   p$lambda1, p$lambda2, p$eCprime, tol.value = cs@settings$tol.val)
+                                   p$lambda1, p$lambda2, p$eCprime, tol.value = cs@settings$tol.leg)
     matg[,name:=g]
     matg
   }
@@ -778,7 +777,7 @@ has_converged = function(cs) {
   conv.lrho = getdiff("lambda_rho",fn=log10)
   conv.l1 = getdiff("lambda1",fn=log10)
   conv.l2 = getdiff("lambda2",fn=log10)
-  conv.param = all(c(conv.eC,conv.alpha,conv.ldiag,conv.liota,conv.lrho,conv.l1,conv.l2)<cs@settings$tol.val)
+  conv.param = all(c(conv.eC,conv.alpha,conv.ldiag,conv.liota,conv.lrho,conv.l1,conv.l2)<cs@settings$tol.obj)
   return(conv.obj | conv.param)
 }
 
@@ -937,7 +936,6 @@ plot_diagnostics = function(cs, start=1) {
 #'   line search (dispersion leg).
 #' @param init.dispersion positive numeric. Value of the dispersion to use initially.
 #' @param tol.obj positive numeric (default 1e-1). Convergence tolerance on changes in the four likelihoods.
-#' @param tol.val positive numeric (default 1e-3). Convergence tolerance on (relative) changes in the parameters.
 #' @param tol.leg positive numeric (default 1e-5). Convergence tolerance on changes in the likelihood within each leg.
 #' @param ncores positive integer (default 1). Number of cores to use.
 #'   
@@ -949,7 +947,7 @@ plot_diagnostics = function(cs, start=1) {
 run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
                      ngibbs = 20, iter=1000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
                      verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
-                     tol.obj=1e-1, tol.val=1e-5, tol.leg=1e-3, ncores=1) {
+                     tol.obj=1e-1, tol.leg=1e-3, ncores=1) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -965,7 +963,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","qmax")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
                          iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj,
-                         tol.val=tol.val, tol.leg=tol.leg))
+                         tol.leg=tol.leg))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
     stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
