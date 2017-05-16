@@ -923,7 +923,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     cs@par=list() #in case we have a weird object
     cs@groups=list()
     #add settings
-    cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","qmax")],
+    cs@settings = c(cs@settings[c("circularize","dmin","dmax")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
                          iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj,
                          tol.leg=tol.leg))

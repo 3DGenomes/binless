@@ -538,7 +538,6 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
   mat=stuff$mat
   trails=stuff$trails
   eCprime=stuff$eCprime
-  badbins=c()
   diag.rm = ceiling(csg@settings$dmin/resolution)
   ### main loop
   registerDoParallel(cores=ncores)
@@ -546,12 +545,6 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
     if (verbose==T) cat(" Main loop, step ",step,"\n")
     if (verbose==T) cat("  Estimate raw signal\n")
     mat = csnorm:::csnorm_compute_raw_signal(csg@cts, csg@par$alpha, mat, eCprime)
-    if (mat[bin1==bin2,any(phi!=0)]) {
-      badbins = csnorm:::update_bad_bins(mat, csg@par$qmax, badbins)
-      mat = csnorm:::remove_bad_bins(mat, csg@par$dmin, resolution, badbins)
-    } else {
-      mat = csnorm:::remove_bad_bins(mat, csg@par$dmin, resolution, NULL)
-    }
     #ggplot(mat)+geom_raster(aes(bin2,bin1,fill=phi))+geom_raster(aes(bin1,bin2,fill=phihat))+scale_fill_gradient2()+facet_wrap(~name)
     #
     #perform fused lasso on signal, at fixed offset
