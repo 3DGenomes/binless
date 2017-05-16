@@ -167,10 +167,10 @@ gfl_BIC = function(ctsg, nbins, dispersion, trails, lambda1, lambda2, eCprime,
   #get value with lambda1 set to zero to avoid round-off errors in degrees of freedom
   if (is.null(state)) {
     perf.c = csnorm:::wgfl_perf(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.value/2)
+                                trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.value/20)
   } else {
     perf.c = csnorm:::wgfl_perf_warm(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                trails$breakpoints, lambda2, state$alpha, inflate, maxsteps, tol.value/2,
+                                trails$breakpoints, lambda2, state$alpha, inflate, maxsteps, tol.value/20,
                                 state$z, state$u, state$phi)
   }
   state = perf.c[c("z","u","phi","alpha")]
@@ -179,6 +179,7 @@ gfl_BIC = function(ctsg, nbins, dispersion, trails, lambda1, lambda2, eCprime,
   cl = csnorm:::build_patch_graph(submat, trails, tol.value=tol.value)$components
   submat[,patchno:=cl$membership]
   dof = submat[abs(value)+tol.value>lambda1,uniqueN(patchno)] #sparse fused lasso
+  state$dof=dof
   stopifnot(dof<=cl$no)
   #now soft-threshold the value around eCprime
   submat[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
@@ -187,6 +188,7 @@ gfl_BIC = function(ctsg, nbins, dispersion, trails, lambda1, lambda2, eCprime,
   #compute mallow's Cp
   #Cp = submat[,sum(weight*((valuehat-(value+eCprime))^2 - 1))]+2*dof
   state$BIC=BIC
+  state$mat=submat
   return(state)
 }
 
@@ -357,8 +359,10 @@ optimize_lambda2 = function(ctsg, nbins, dispersion, trails, tol.val=1e-3, minla
                                            eCprime=0, tol.value = tol.val, state=state)
     return(state$BIC)
   }
-  #dt = foreach (lam=seq(log10(minlambda),log10(maxlambda),l=50),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
-  #ggplot(dt)+geom_line(aes(10^(x),y,colour=ori))+scale_x_log10()+scale_y_log10()
+  #ctsg=copy(cts.nodecay)
+  #dt.nodecay = foreach (lam=seq(log10(minlambda),log10(maxlambda),l=50),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
+  #ggplot(rbind(dt.nodecay[,.(x,y,ori="nd")],dt.decay[,.(x,y,ori="d")]))+
+  #         geom_line(aes(10^(x),y,colour=ori))+scale_y_log10()
   op=optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=tol.val)
   lambda2=10^op$minimum
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")

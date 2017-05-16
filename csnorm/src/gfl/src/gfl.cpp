@@ -102,7 +102,8 @@ List wgfl_perf_warm(const DataFrame cts, double dispersion, int niter, int nbins
     if (maxval<converge) break;
     phi_old = phi_r;
   }
-  //printf(" Perf iteration: end with alpha=%f phi[0]=%f z[0]=%f u[0]=%f\n", alpha, phi_r[0], z_r[0], u_r[0]);
+  //printf(" Perf iteration: end with alpha=%f phi[0]=%f z[0]=%f u[0]=%f nsteps=%d\n",
+  //       alpha, phi_r[0], z_r[0], u_r[0], step);
   return List::create(_["phi"]=wrap(phi_r), _["alpha"]=wrap(alpha), _["mat"]=cts_to_mat(cts, nbins, dispersion, phi_r),
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nsteps"]=step);
 }
