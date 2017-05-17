@@ -97,7 +97,7 @@ csnorm_gauss_common_muhat_mean = function(cs, zeros, sbins) {
   cts=rbind(cpos,czero)
   ### add signal
   if (cs@par$signal[,.N]>0) {
-    signal=rbind(cs@par$signal,cs@par$signal[bin1!=bin2,.(name,bin1=bin2,bin2=bin1,phi)])
+    signal=rbind(cs@par$signal[,.(name,bin1,bin2,phi)],cs@par$signal[bin1!=bin2,.(name,bin1=bin2,bin2=bin1,phi)])
     cts=signal[cts,,on=c("name","bin1","bin2")]
     cts[,mu:=exp(lmu.nosig+phi)]
   } else {
@@ -607,7 +607,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   if (length(cs@settings$sbins)>2) {
     counts[,bin1:=cut(pos1, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
     counts[,bin2:=cut(pos2, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
-    counts=cs@par$signal[counts,,on=key(cs@par$signal)]
+    counts=cs@par$signal[,.(name,bin1,bin2,phi)][counts,,on=key(cs@par$signal)]
     counts[,c("log_mean_cclose","log_mean_cfar","log_mean_cup","log_mean_cdown"):=
              list(log_mean_cclose+phi,log_mean_cfar+phi,log_mean_cup+phi,log_mean_cdown+phi)]
   }
@@ -706,7 +706,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   #  scale_fill_gradient2()
   #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
   setkey(mat,name,bin1,bin2)
-  cs@par$signal=mat[,.(name,bin1,bin2,phi)]
+  cs@par$signal=mat[,.(name,bin1,bin2,phihat=valuehat,weight,ncounts,phi)]
   params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
   cs@par$eC=as.array(params[,eC+eCprime])
   cs@par$eCprime=as.array(params[,eCprime])
