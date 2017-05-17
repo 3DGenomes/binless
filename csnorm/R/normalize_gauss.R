@@ -720,9 +720,13 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
 #' 
-has_converged = function(cs) {
+has_converged = function(cs, laststep=NULL) {
   params=cs@diagnostics$params
-  laststep=params[,step[.N]]
+  if (is.null(laststep)) {
+    if (params[,step[.N]]<=2) return(F)
+    return(has_converged(cs, params[,step[.N]]) & has_converged(cs, params[,step[.N]-1]))
+  }
+  stopifnot(length(laststep)==1)
   #check if legs have changed
   if (!setequal(params[step==laststep,.(leg)],params[step==laststep-1,.(leg)])) return(FALSE)
   #objective convergence
