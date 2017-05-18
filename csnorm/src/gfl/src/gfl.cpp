@@ -6,28 +6,6 @@ using namespace Rcpp;
 #include "utils.c"
 #include "gfl_c.c"
 
-RcppExport SEXP weighted_graphfl(Rcpp::NumericVector y_i, Rcpp::NumericVector
-        w_i, int ntrails, Rcpp::NumericVector trails_i, Rcpp::NumericVector breakpoints_i,
-        double lam, double alpha, double inflate, int ninner, double converge)
-{
-  size_t N = y_i.size();
-  std::vector<double> y_r = Rcpp::as<std::vector<double> >(y_i);
-  std::vector<double> w_r = Rcpp::as<std::vector<double> >(w_i);
-  std::vector<int> trails_r = Rcpp::as<std::vector<int> >(trails_i);
-  std::vector<int> breakpoints_r = Rcpp::as<std::vector<int> >(breakpoints_i);
-  std::vector<double> beta_r(N);
-  std::vector<double> z_r(breakpoints_r[ntrails-1], 0);
-  std::vector<double> u_r(breakpoints_r[ntrails-1], 0);
-  
-  int res;
-  res = graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails, &trails_r[0], &breakpoints_r[0],
-                                       lam, &alpha, inflate, ninner, converge,
-                                       &beta_r[0], &z_r[0], &u_r[0]);
-  
-  return Rcpp::wrap(beta_r);
-}
-
-
 // [[Rcpp::export]]
 DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion, std::vector<double>& phi, int diag_rm)
 {
@@ -128,7 +106,6 @@ List wgfl_signal_perf(const DataFrame cts, double dispersion, int nouter, int nb
 RCPP_MODULE(gfl){
   using namespace Rcpp ;
  
-  function("weighted_graphfl" , &weighted_graphfl  , "documentation for weighted_graphfl ");
   function("cts_to_signal_mat" , &cts_to_signal_mat  , "documentation for cts_to_signal_mat ");
   function("wgfl_signal_perf" , &wgfl_signal_perf  , "documentation for wgfl_signal_perf ");
   function("wgfl_signal_perf_warm" , &wgfl_signal_perf_warm  , "documentation for wgfl_signal_perf_warm ");
