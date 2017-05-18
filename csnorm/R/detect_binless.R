@@ -319,13 +319,21 @@ optimize_lambda1_only = function(matg, trails, tol.val=1e-3, positive=F, lambda1
     return(data.table(lambda1=lambda1.min,
                       BIC=matg[,sum(weight*(valuehat-value)^2)],dof=0))
   stopifnot(patches[,sum(N)]==cl$no)
-  minval=patches[,min(abs(value))]
+  if (positive==T) {
+    minval = max(patches[,abs(min(value))], lambda1.min)
+  } else {
+    minval = max(patches[,min(abs(value))], lambda1.min)
+  }
   maxval=patches[,max(abs(value))]
-  if (positive==T) lambda1.min=max(lambda1.min, minval)
   #
   if (constrained==T) { #some patches must be zeroed to avoid degeneracy with diagonal decay fit
-    forbidden.vals = matg[,min(value.ori),by=diag.idx][,unique(V1)]
-    lambda1.min = max(lambda1.min, forbidden.vals)
+    if (positive==T) {
+      forbidden.vals = matg[,min(value.ori),by=diag.idx][,unique(V1)]
+    } else {
+      forbidden.vals = matg[,.(diff=max(value.ori)-min(value.ori),val=min(value.ori)+tol.val/2),by=diag.idx][
+        diff<=tol.val,unique(val)]
+    }
+    minval = max(minval, abs(forbidden.vals))
   } else {
     forbidden.vals = c()
   }
@@ -342,7 +350,7 @@ optimize_lambda1_only = function(matg, trails, tol.val=1e-3, positive=F, lambda1
   }
   #dt=foreach(lambda1=seq(lambda1.min,maxval,length.out=50), .combine=rbind) %do% obj(lambda1)
   #ggplot(dt)+geom_point(aes(lambda1,BIC))+geom_line(aes(lambda1,BIC))
-  op=optimize(function(x){obj(10^(x))[,BIC]}, c(log10(max(lambda1.min,tol.val/2)),log10(maxval)), tol=tol.val)
+  op=optimize(function(x){obj(10^(x))[,BIC]}, c(log10(max(minval,tol.val/2)),log10(maxval)), tol=tol.val)
   return(as.list(obj(10^(op$minimum))))
 }
 
@@ -410,7 +418,7 @@ csnorm_fused_lasso = function(ctsg, nbins, dispersion, diag.rm, trails, positive
   }
   vals$lambda2=lambda2
   vals$name=ctsg[,name[1]]
-  #matg=csnorm:::gfl_get_matrix(ctsg, nbins, dispersion, trails, 0, vals$lambda2, 0, tol.value = tol.val)
+  #matg=csnorm:::gfl_get_matrix(ctsg, nbins, dispersion, diag.rm, trails, 0, lambda2, 0, tol.value = tol.val, state=state)
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=abs(value-vals$eCprime)<=vals$lambda1)))
   #matg=csnorm:::gfl_get_matrix(ctsg, nbins, dispersion, trails, vals$lambda1, vals$lambda2, vals$eCprime, tol.value = tol.val)
@@ -458,7 +466,7 @@ prepare_signal_matrix = function(cs, names, resolution) {
   trails = csnorm:::gfl_compute_trails(mat[,nlevels(bin1)])
   stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
   stopifnot(all(length(V(trails$graph))==mat[,.N,by=name]$N))
-  return(list(mat=mat,trails=trails,eCprime=names[,.(name=groupname,eCprime=0)]))
+  return(list(mat=mat,trails=trails))
 }
 
 #' Build grouped difference matrix using normalization data if available
@@ -524,7 +532,7 @@ csnorm_compute_raw_differential = function(cts, dispersion, mat, eCprime, ref) {
 #' @export
 #' 
 #' @examples
-detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10, tol.val=1e-5, verbose=T){
+detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=1e-5, verbose=T){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
@@ -538,41 +546,34 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, niter=10
   stuff = csnorm:::prepare_signal_matrix(cs, csg@names, resolution)
   mat=stuff$mat
   trails=stuff$trails
-  eCprime=stuff$eCprime
   diag.rm = ceiling(csg@par$dmin/resolution)
+  cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
   #
   #perform fused lasso on signal
-  groupnames=cts[,unique(name)]
-  nbins=length(cs@settings$sbins)-1
+  groupnames=csg@cts[,unique(name)]
   registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %dopar%
-    csnorm:::csnorm_fused_lasso(cts[name==g], nbins, cs@par$alpha, diag.rm, cs@settings$trails,
-                                positive=T, fixed=F, constrained=constrained, simplified=T,
-                                tol.val=cs@settings$tol.leg, verbose=verbose)
+    csnorm:::csnorm_fused_lasso(cts[name==g], csg@par$nbins, csg@par$alpha, diag.rm, trails,
+                                positive=T, fixed=T, constrained=T, simplified=T,
+                                tol.val=tol.val, verbose=verbose, init.phi=mat[name==g,phi])
   #display param info
   if (verbose==T)
     for (i in 1:params[,.N])
       cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],
           " eCprime=",params[i,eCprime],"\n")
   #compute matrix at new params
-  #save(mat,params,file=paste0("mat_step_",step,".RData"))
   mat = foreach (g=groupnames, .combine=rbind) %dopar% {
     p=params[name==g]
-    matg=csnorm:::gfl_get_matrix(valuehat, weight, trails, p$lambda1, p$lambda2, p$eCprime, tol.value = tol.val, diag.rm)
-    matg
+    matg = csnorm:::gfl_get_matrix(cts[name==g], csg@par$nbins, csg@par$alpha, diag.rm, trails,
+                                   p$lambda1, p$lambda2, p$eCprime, tol.value = tol.val)
+    matg[,name:=g]
+    matg[,.(name,bin1,bin2,phihat=valuehat,weight,ncounts,diag.idx,value,phi=value)]
   }
-  eCprime = eCprime[params[,.(name,eCprime2=eCprime)],,on="name"][,.(name,eCprime=eCprime+eCprime2)]
-    #convert back value to the actual signal
-    mat[,phi.old:=phi]
-    mat[,phi:=value]
-    #
-    #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()+facet_wrap(~name)
-    #ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
-    #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))+scale_fill_gradient2()+facet_wrap(~name)
-    #ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
-    #
-    #check convergence
-    if(mat[,all(abs(phi-phi.old)<tol.val)] & eCprime[,all(abs(eCprime)<tol.val)]) break
+  #
+  #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()+facet_wrap(~name)
+  #ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
+  #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))+scale_fill_gradient2()+facet_wrap(~name)
+  #ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
   #
   if (verbose==T) cat(" Detect patches\n")
   mat = csnorm:::detect_binless_patches(mat, trails, tol.value=tol.val)
