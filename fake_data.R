@@ -91,7 +91,7 @@ cs@par$decay=cts[cs@par$decay][,.(name,dbin,distance,kappahat,std,ncounts,kappa,
 
 
 ggplot(cs@par$decay)+geom_pointrange(aes(distance,kappahat,ymin=kappahat-std,ymax=kappahat+std),alpha=0.1)+
-  geom_line(aes(distance,kappa))+facet_wrap(~ name)+scale_x_log10()+
+  geom_line(aes(distance,kappa))+facet_wrap(~ name)+scale_x_log10()#+
   geom_line(aes(distance,base_count),colour="red",data=cs@counts[sample(.N,min(.N,100000))])
 ggplot(cs@par$decay[distance<1e4])+geom_pointrange(aes(distance,kappahat,ymin=kappahat-std,ymax=kappahat+std),alpha=0.1)+
   geom_line(aes(distance,kappa))+facet_wrap(~ name)+scale_x_log10()+
@@ -114,8 +114,29 @@ signals=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
     sig
   }
 }
-ggplot(signals[name==name[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+facet_wrap(~ step)+scale_fill_gradient2()
-ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi==0))+facet_wrap(~ step)#+scale_fill_gradient2()
+ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_wrap(~ step)+scale_fill_gradient2()
+ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi==0))+geom_raster(aes(bin2,bin1,fill=phi==0))+facet_wrap(~ step)#+scale_fill_gradient2()
+ggplot(signals[name==name[1]&bin1==bin2])+geom_point(aes(bin1,phi))+facet_wrap(~step)
+
+ggplot(signals[step==step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_wrap(~ name)+scale_fill_gradient2()
+ggplot(signals[step==step[.N]&bin1==bin2])+geom_point(aes(bin1,phi))+facet_wrap(~name)
+
+signals[,phi.ref:=.SD[step==42,phi]]
+ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi.ref))+
+  facet_wrap(~ step)+scale_fill_gradient2()
+ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi==0))+geom_raster(aes(bin2,bin1,fill=phi.ref==0))+
+  facet_wrap(~ step)
+ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi-phi.ref))+facet_wrap(~ step)+scale_fill_gradient2()
+
+
+ggplot(mat)+facet_wrap(~ori)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+
+  scale_fill_gradient2()
+ggplot(mat)+facet_wrap(~ori)+geom_raster(aes(bin1,bin2,fill=phihat))+geom_raster(aes(bin2,bin1,fill=phihat))+
+  scale_fill_gradient2()
+
+ggplot(dcast(mat,name+bin1+bin2+ncounts~ori, value.var=list("phihat","phihat.var","ncounts","weight","phi")))+
+  geom_point(aes(phihat.var_bad,phihat.var_good))+stat_function(fun=identity)
+
 
 #last signal
 ggplot(cs@par$signal)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+
@@ -130,7 +151,14 @@ decays=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
 }
 ggplot(decays[name==name[1]])+geom_pointrange(aes(distance,kappahat,ymin=kappahat-std,ymax=kappahat+std),alpha=0.1)+
   geom_line(aes(distance,kappa))+facet_wrap(~ step)+scale_x_log10()#+
-  geom_line(aes(distance,base_count),colour="red",data=cs@counts[name==name[1]][sample(.N,min(.N,10000))])
+  #geom_line(aes(distance,base_count),colour="red",data=cs@counts[name==name[1]][sample(.N,min(.N,10000))])
+
+decays[,kappa.ref:=.SD[step==42,kappa]]
+decays[,kappahat.ref:=.SD[step==42,kappahat]]
+decays[,std.ref:=.SD[step==42,std]]
+ggplot(decays[name==name[1]])+geom_point(aes(distance,kappahat-kappahat.ref),alpha=0.1)+
+    geom_line(aes(distance,kappa-kappa.ref))+facet_wrap(~ step)#+scale_x_log10()
+ggplot(decays[name==name[1]])+geom_point(aes(distance,std-std.ref),alpha=0.1)+facet_wrap(~ step)#+scale_x_log10()
 
 #biases
 biases=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {

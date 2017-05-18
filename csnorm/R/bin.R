@@ -183,8 +183,10 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
     zeros = csnorm:::get_nzeros(cs, sbins, ncores=ncores)
   }
   #
+  #predict means, put in triangular form and add signal column if absent
   if (verbose==T) cat("   Predict means\n")
-  cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros, sbins)
+  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, zeros, sbins)
+  if (!("phi" %in% names(cts))) cts[,phi:=0]
   #
   if (verbose==T) cat("   Group\n")
   if (group=="all") {
@@ -219,8 +221,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   mat[,end2:=as.integer(as.character(bin2.end))]
   ### store matrices
   csg=new("CSgroup", mat=mat, interactions=list(), resolution=resolution, group=group,
-          cts=cts, par=list(alpha=cs@par$alpha,Kdiag=cs@settings$Kdiag, dbins=cs@settings$dbins,
-                            design=cs@design,lambda_diag=cs@par$lambda_diag),
+          cts=cts, par=list(alpha=cs@par$alpha, dmin=cs@settings$dmin, nbins=length(sbins)-1),
           names=groups)
   cs@groups=append(cs@groups,list(csg))
   return(cs)

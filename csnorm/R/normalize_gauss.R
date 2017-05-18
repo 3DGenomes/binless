@@ -34,7 +34,7 @@ csnorm_gauss_decay_muhat_data = function(cs, pseudocount=1e-2) {
                variable.name = "category", value.name = "count")[count>0,.(name,distance,category,count)]
   mcounts[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
   #add zero counts
-  zdecay = cs@zeros$bg[,.(nzero=sum(nzero)/2),keyby=c("name","dbin")] #each contact is counted twice
+  zdecay = cs@zeros[,.(nzero=sum(nzero)/2),keyby=c("name","dbin")] #each contact is counted twice
   mcounts = rbind(mcounts[,.(name,dbin,category,count,weight=1)],
                   zdecay[,.(name,dbin,category=NA,count=0,weight=nzero)])
   #compute z-scores and sum counts
@@ -49,7 +49,7 @@ csnorm_gauss_decay_muhat_data = function(cs, pseudocount=1e-2) {
 #' Compute means for positive and zero counts using previous params
 #' @keywords internal
 #' 
-csnorm_gauss_common_muhat_mean = function(cs) {
+csnorm_gauss_common_muhat_mean = function(cs, zeros, sbins) {
   init=cs@par
   ### positive counts
   #compute means
@@ -59,8 +59,10 @@ csnorm_gauss_common_muhat_mean = function(cs) {
   cpos=merge(bsub[,.(id1=id,log_iota,log_rho)],cpos,by="id1",all.x=F,all.y=T)
   cpos=merge(bsub[,.(id2=id,log_iota,log_rho)],cpos,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
   cpos=merge(cbind(cs@design[,.(name)],eC=init$eC), cpos, by="name",all.x=F,all.y=T)
-  dbins=cs@settings$dbins
-  cpos[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
+  cpos[,c("bin1","bin2","dbin"):=
+         list(cut(pos1, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+              cut(pos2, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+              cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
   cpos=merge(cpos,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
   cpos[,log_mu.base:=eC + log_decay]
   cpos[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_iota1+log_rho2,
@@ -68,51 +70,42 @@ csnorm_gauss_common_muhat_mean = function(cs) {
                                                            log_mu.base+log_rho1 +log_iota2,
                                                            log_mu.base+log_iota1+log_iota2)]
   cpos[,log_mu.base:=NULL]
-  #collect all counts on left/right side, per distance
-  cpos=rbind(cpos[contact.close>0,.(name, id=id1, pos=pos1, distance, cat="contact R",
-                                    count=contact.close, lmu=lmu.close, weight=1, eC, log_decay, log_bias=log_rho1)],
-             cpos[contact.far>0,  .(name, id=id1, pos=pos1, distance, cat="contact L",
-                                    count=contact.far,   lmu=lmu.far,   weight=1, eC, log_decay, log_bias=log_iota1)],
-             cpos[contact.down>0, .(name, id=id1, pos=pos1, distance, cat="contact R",
-                                    count=contact.down,  lmu=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho1)],
-             cpos[contact.up>0,   .(name, id=id1, pos=pos1, distance, cat="contact L",
-                                    count=contact.up,    lmu=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota1)],
-             cpos[contact.far>0,  .(name, id=id2, pos=pos2, distance, cat="contact R",
-                                    count=contact.far,   lmu=lmu.far,   weight=1, eC, log_decay, log_bias=log_rho2)],
-             cpos[contact.close>0,.(name, id=id2, pos=pos2, distance, cat="contact L",
-                                    count=contact.close, lmu=lmu.close, weight=1, eC, log_decay, log_bias=log_iota2)],
-             cpos[contact.down>0, .(name, id=id2, pos=pos2, distance, cat="contact R",
-                                    count=contact.down,  lmu=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho2)],
-             cpos[contact.up>0,   .(name, id=id2, pos=pos2, distance, cat="contact L",
-                                    count=contact.up,    lmu=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota2)])
-  dbins=cs@settings$dbins
-  cpos[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-  cpos[,distance:=NULL]
+  cpos=rbind(cpos[contact.close>0,.(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact R", dir="fwd",
+                                    count=contact.close, lmu.nosig=lmu.close, weight=1, eC, log_decay, log_bias=log_rho1)],
+             cpos[contact.far>0,  .(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact L", dir="fwd",
+                                    count=contact.far,   lmu.nosig=lmu.far,   weight=1, eC, log_decay, log_bias=log_iota1)],
+             cpos[contact.down>0, .(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact R", dir="fwd",
+                                    count=contact.down,  lmu.nosig=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho1)],
+             cpos[contact.up>0,   .(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact L", dir="fwd",
+                                    count=contact.up,    lmu.nosig=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota1)],
+             cpos[contact.far>0,  .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact R", dir="rev",
+                                    count=contact.far,   lmu.nosig=lmu.far,   weight=1, eC, log_decay, log_bias=log_rho2)],
+             cpos[contact.close>0,.(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact L", dir="rev",
+                                    count=contact.close, lmu.nosig=lmu.close, weight=1, eC, log_decay, log_bias=log_iota2)],
+             cpos[contact.down>0, .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact R", dir="rev",
+                                    count=contact.down,  lmu.nosig=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho2)],
+             cpos[contact.up>0,   .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact L", dir="rev",
+                                    count=contact.up,    lmu.nosig=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota2)])
   ### zero counts
-  czero = merge(init$decay[,.(name,dbin,log_decay)], cs@zeros$bg, by=c("name","dbin"))
+  czero = merge(init$decay[,.(name,dbin,log_decay)], zeros, by=c("name","dbin"))
   stopifnot(czero[is.na(log_decay),.N]==0)
-  czero = merge(bsub,czero,by="id",all.x=F,all.y=T)
-  czero[,log_bias:=ifelse(cat=="contact L",log_iota,log_rho)]
+  czero = merge(czero[nzero>0],bsub, by.x="id1",by.y="id",all.x=T,all.y=F)
+  czero[,log_bias:=ifelse(cat=="contact L", log_iota, log_rho)]
   czero = merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
-  czero[,lmu:=eC + log_decay + log_bias] #we don't average over j
-  czero = czero[nzero>0,.(name,id,pos,dbin,cat,count=0,lmu,weight=nzero,log_bias,log_decay,eC)]
+  czero[,lmu.nosig:=eC + log_decay + log_bias] #we don't average over j
+  czero = czero[,.(name,id1,pos1,bin1,bin2,dbin,cat,dir,count=0,lmu.nosig,weight=nzero,log_bias,log_decay,eC)]
   cts=rbind(cpos,czero)
   ### add signal
-  if (cs@zeros$sig[,.N]>0) {
-    cts[,bin:=cut(pos, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
-    signal=merge(cs@zeros$sig, cs@par$signal, by=c("name","bin1","bin2"), all.x=T)
-    stopifnot(all(complete.cases(signal)))
-    signal=rbind(signal[,.(name,bin=bin1,dbin,ncross,phi)],signal[bin2>bin1,.(name,bin=bin2,dbin,ncross,phi)])
-    signal=signal[,.(phi=weighted.mean(phi,ncross)),keyby=c("name","bin","dbin")]
-    cts=signal[cts,,on=key(signal)]
-    cts[,mu:=exp(lmu+phi)]
+  if (cs@par$signal[,.N]>0) {
+    signal=rbind(cs@par$signal[,.(name,bin1,bin2,phi)],cs@par$signal[bin1!=bin2,.(name,bin1=bin2,bin2=bin1,phi)])
+    cts=signal[cts,,on=c("name","bin1","bin2")]
+    cts[,mu:=exp(lmu.nosig+phi)]
   } else {
-    cts[,mu:=exp(lmu)]
+    cts[,mu:=exp(lmu.nosig)]
   }
   ### finalize
   cts[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
   #ggplot(cts[name=="T47D es 60 MboI 1"&cat=="contact R"])+geom_line(aes(dbin,log_decay,colour=count>0,group=count>0))
-  cts[,c("count","mu","pos","lmu"):=NULL] #not needed downstream
   return(cts)
 }
 
@@ -120,7 +113,7 @@ csnorm_gauss_common_muhat_mean = function(cs) {
 #' @keywords internal
 #' 
 csnorm_gauss_decay_muhat_mean = function(cs) {
-  cts = csnorm:::csnorm_gauss_common_muhat_mean(cs)
+  cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   cts[,kappaij:=eC+log_decay]
   dbins=cs@settings$dbins
   csd = cts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
@@ -221,7 +214,6 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
       
       nlambda_diag = (Kdiag - 2)/((Kdiag^2)*crossprod(D%*%beta)+1)
       nlambda_diag = sqrt(as.numeric(nlambda_diag))
-      
       epsilon = abs(lambda_diag-nlambda_diag)
       lambda_diag = nlambda_diag
       maxiter = maxiter+1
@@ -254,6 +246,7 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     decay_out$value = sum(dnorm(kappa_hat, mean = as.array(decay_out$log_mean_counts), sd = as.array(sdl), log = TRUE))
     
   }
+  decay_out$eC=as.array(decay_out$eC)
   decay_out$beta_diag=as.matrix(decay_out$beta_diag)
   decay_out$beta_diag_diff=as.matrix(decay_out$beta_diag_diff)
   #make decay data table, reused at next call
@@ -266,7 +259,7 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", max_perf_iteration=1000, convergence_epsilon=1e-9) {
+csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", update.eC=T) {
   if (verbose==T) cat(" Decay\n")
   if (init.mean=="mean") {
     csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
@@ -275,9 +268,10 @@ csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", max_perf_iteratio
   }
   #run optimization
   op = csnorm:::csnorm_gauss_decay_optimize(csd, cs@design, cs@settings$Kdiag, cs@par$lambda_diag,
-                                            verbose=verbose, max_perf_iteration=max_perf_iteration,
-                                            convergence_epsilon=convergence_epsilon)
+                                            verbose=verbose, max_perf_iteration=cs@settings$iter,
+                                            convergence_epsilon=cs@settings$tol.leg)
   #update par slot
+  if (update.eC==F) op$eC=NULL
   cs@par=modifyList(cs@par, op)
   return(cs)
 }
@@ -294,7 +288,7 @@ csnorm_gauss_genomic_muhat_data = function(cs, pseudocount=1e-2) {
   setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
   #counts
-  zbias = cs@zeros$bg[,.(nzero=sum(nzero)),keyby=c("id","name","cat")][cs@biases[,.(name,id,pos)]]
+  zbias = cs@zeros[,.(id=id1,name,cat,nzero)][,.(nzero=sum(nzero)),keyby=c("id","name","cat")][cs@biases[,.(name,id,pos)]]
   cts=rbind(cs@counts[contact.close>0,.(name,id=id1,pos=pos1, cat="contact R", count=contact.close, weight=1)],
             cs@counts[contact.far>0,  .(name,id=id1,pos=pos1, cat="contact L", count=contact.far, weight=1)],
             cs@counts[contact.down>0, .(name,id=id1,pos=pos1, cat="contact R", count=contact.down, weight=1)],
@@ -332,11 +326,11 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
   setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
   #counts
-  cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs)
+  cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   cts.common[,etaij:=eC+log_bias]
   cts = cts.common[,.(etahat=weighted.mean(z+etaij, weight/var),std=sqrt(2/sum(weight/var))),
-                   keyby=c("id","name","cat")]
-  cts = merge(cts,cs@biases[,.(name,id,pos)],by=c("name","id"))
+                   keyby=c("id1","name","cat")]
+  cts = merge(cs@biases[,.(name,id,pos)],cts,by.x=c("name","id"),by.y=c("name","id1"))
   setkey(cts, id, name, cat)
   return(list(bts=bts,cts=cts))
 }
@@ -351,22 +345,11 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
   Totalbbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
   TotalDsets = design[,.N]
   
-  all_beta_iota = c()
-  all_beta_rho = c()
-  all_beta_iota_diff = matrix(0, nrow = TotalDsets, ncol = Krow-2)
-  all_beta_rho_diff = matrix(0, nrow = TotalDsets, ncol = Krow-2)
-  all_log_iota = c()
-  all_log_rho = c()
-  all_log_mean_RJ = c()
-  all_log_mean_DL = c()
-  all_log_mean_DR = c()
-  all_log_mean_cleft  = c()
-  all_log_mean_cright = c()
-  all_eC = c()
-  all_eDE = c()
-  all_eRJ = c()
-  all_lambda_iota = c()
-  all_lambda_rho = c()
+  genomic_out = list(beta_iota_diff = matrix(0, nrow = TotalDsets, ncol = Krow-2), beta_rho_diff = matrix(0, nrow = TotalDsets, ncol = Krow-2),
+                     beta_iota = c(), beta_rho = c(), log_iota = c(), log_rho = c(),
+                     log_mean_RJ = c(), log_mean_DL = c(), log_mean_DR = c(), log_mean_cleft  = c(), log_mean_cright = c(),
+                     eC = c(), eDE = c(), eRJ = c(), lambda_iota = c(), lambda_rho = c(),
+                     value = 0)
   
   for(uXB in unique(XB)) {
     if (verbose==T) cat("  group",uXB,"\n")
@@ -382,7 +365,7 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     cutsites = biases[,pos][bbegin[1]:(bbegin[2]-1)]
     Bsp = csnorm_generate_cubic_spline(cutsites, Krow, sparse=T)
     X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
-    if (is.null(sbins)) {
+    if (length(sbins)<=2) {
       centering=Matrix(rep(1,SD),ncol=1)
     } else {
       sbinned=biases[bbegin[1]:(bbegin[2]-1), cut(pos, sbins, ordered_result=T,
@@ -542,53 +525,46 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       }
     }
     
-    all_beta_iota = c(all_beta_iota,as.array(beta_iota))
-    all_beta_rho = c(all_beta_rho,as.array(beta_rho))
+    genomic_out$beta_iota = c(genomic_out$beta_iota,as.array(beta_iota))
+    genomic_out$beta_rho = c(genomic_out$beta_rho,as.array(beta_rho))
     for (d2 in 1:TotalDsets) {
       if(XB[d2] == uXB) {
-        all_beta_iota_diff[d2,] = as.array(D1%*%beta_iota)
-        all_beta_rho_diff[d2,] = as.array(D1%*%beta_rho)
+        genomic_out$beta_iota_diff[d2,] = as.array(D1%*%beta_iota)
+        genomic_out$beta_rho_diff[d2,] = as.array(D1%*%beta_rho)
       }
     }
-    all_log_iota = c(all_log_iota,as.array(log_iota))
-    all_log_rho = c(all_log_rho,as.array(log_rho))
-    all_log_mean_RJ = c(all_log_mean_RJ,as.array(log_mean_RJ))
-    all_log_mean_DL = c(all_log_mean_DL,as.array(log_mean_DL))
-    all_log_mean_DR = c(all_log_mean_DR,as.array(log_mean_DR))
-    all_log_mean_cleft  = c(all_log_mean_cleft,as.array(log_mean_cleft))
-    all_log_mean_cright = c(all_log_mean_cright,as.array(log_mean_cright))
-    all_eC = c(all_eC,eC)
-    all_eRJ = c(all_eRJ,eRJ)
-    all_eDE = c(all_eDE,eDE)
-    all_lambda_iota = c(all_lambda_iota,lambda_iota)
-    all_lambda_rho = c(all_lambda_rho,lambda_rho)
-    op = list(par=list())
-    op$par$beta_iota=as.array(all_beta_iota)
-    op$par$beta_rho=as.array(all_beta_rho)
-    op$par$beta_rho_diff=as.matrix(all_beta_rho_diff)
-    op$par$beta_iota_diff=as.matrix(all_beta_iota_diff)
-    op$par$log_iota=as.array(all_log_iota)
-    op$par$log_rho=as.array(all_log_rho)
-    op$par$eC=as.array(all_eC)
-    op$par$eRJ=as.array(all_eRJ)
-    op$par$eDE=as.array(all_eDE)
-    op$par$lambda_iota = as.array(all_lambda_iota)
-    op$par$lambda_rho = as.array(all_lambda_rho)
-    means = cbind(all_log_mean_RJ,all_log_mean_DL,all_log_mean_DR,all_log_mean_cleft,all_log_mean_cright)
+    genomic_out$lambda_iota = c(genomic_out$lambda_iota,lambda_iota)
+    genomic_out$lambda_rho = c(genomic_out$lambda_rho,lambda_rho)
+    genomic_out$log_iota = c(genomic_out$log_iota,as.array(log_iota))
+    genomic_out$log_rho = c(genomic_out$log_rho,as.array(log_rho))
+    genomic_out$log_mean_RJ = c(genomic_out$log_mean_RJ,as.array(log_mean_RJ))
+    genomic_out$log_mean_DL = c(genomic_out$log_mean_DL,as.array(log_mean_DL))
+    genomic_out$log_mean_DR = c(genomic_out$log_mean_DR,as.array(log_mean_DR))
+    genomic_out$log_mean_cleft  = c(genomic_out$log_mean_cleft,as.array(log_mean_cleft))
+    genomic_out$log_mean_cright = c(genomic_out$log_mean_cright,as.array(log_mean_cright))
+    genomic_out$eC = as.array(c(genomic_out$eC,eC))
+    genomic_out$eRJ = as.array(c(genomic_out$eRJ,eRJ))
+    genomic_out$eDE = as.array(c(genomic_out$eDE,eDE))
+    genomic_out$lambda_iota = c(genomic_out$lambda_iota,lambda_iota)
+    genomic_out$lambda_rho = c(genomic_out$lambda_rho,lambda_rho)
+    genomic_out$beta_iota_diff = as.matrix(genomic_out$beta_iota_diff)
+    genomic_out$beta_rho_diff = as.matrix(genomic_out$beta_rho_diff)
+    
+    means = cbind(genomic_out$log_mean_RJ,genomic_out$log_mean_DL,genomic_out$log_mean_DR,genomic_out$log_mean_cleft,genomic_out$log_mean_cright)
     mus = cbind(sd_RJ,sd_DL,sd_DR,sd_L,sd_R)
-    op$par$value = sum(dnorm(etas, mean = as.array(means), sd = as.array(mus), log = TRUE))
+    genomic_out$value = sum(dnorm(etas, mean = as.array(means), sd = as.array(mus), log = TRUE))
   }
   
   #make nice output table
-  bout=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=as.array(all_log_mean_DL))],
-             bts[cat=="dangling R",.(cat, name, id, pos, etahat, std, eta=as.array(all_log_mean_DR))],
-             bts[cat=="rejoined",.(cat, name, id, pos, etahat, std, eta=as.array(all_log_mean_RJ))])
-  cout=rbind(cts[cat=="contact L",.(cat, name, id, pos, etahat, std, eta=as.array(all_log_mean_cleft))],
-             cts[cat=="contact R",.(cat, name, id, pos, etahat, std, eta=as.array(all_log_mean_cright))])
+  bout=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_DL))],
+             bts[cat=="dangling R",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_DR))],
+             bts[cat=="rejoined",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_RJ))])
+  cout=rbind(cts[cat=="contact L",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_cleft))],
+             cts[cat=="contact R",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_cright))])
   bout=rbind(bout,cout)
   setkey(bout, id, name, cat)
-  op$par$biases=bout
-  return(op)
+  genomic_out$biases=bout
+  return(genomic_out)
 }
 
 #' Single-cpu simplified fitting for iota and rho
@@ -596,42 +572,42 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", max_perf_iteration=1000, convergence_epsilon=1e-5) {
+csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", update.exposures=T) {
   if (verbose==T) cat(" Genomic\n")
   if (init.mean=="mean") {
     a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
   } else {
     a = csnorm:::csnorm_gauss_genomic_muhat_data(cs)
   }
-  if (cs@zeros$sig[,.N]>0) {
-    sbins=cs@settings$sbins
-  } else {
-    sbins=NULL
-  }
   #run optimization
-  op = csnorm:::csnorm_gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, sbins,
+  op = csnorm:::csnorm_gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, cs@settings$sbins,
                                               cs@par$lambda_iota, cs@par$lambda_rho, verbose=verbose,
-                                              max_perf_iteration=max_perf_iteration,
-                                              convergence_epsilon=convergence_epsilon)
+                                              max_perf_iteration=cs@settings$iter,
+                                              convergence_epsilon=cs@settings$tol.leg)
   #update par slot
-  cs@par=modifyList(cs@par, op$par)
+  if (update.exposures==F) {
+    op$eC=NULL
+    op$eRJ=NULL
+    op$eDE=NULL
+  }
+  cs@par=modifyList(cs@par, op)
   return(cs)
 }
 
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
 #' 
-csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T, init_alpha=1e-7, ncores=ncores) {
+csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T, ncores=ncores) {
   if (verbose==T) cat(" Dispersion\n")
   #predict all means and put into table
   counts=csnorm:::csnorm_predict_all_parallel(cs,counts,ncores = ncores)
   setkeyv(counts,key(cs@counts))
   stopifnot(cs@biases[,.N]==length(cs@par$log_iota))
   #add signal contribution if available
-  if (cs@zeros$sig[,.N]>0) {
+  if (length(cs@settings$sbins)>2) {
     counts[,bin1:=cut(pos1, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
     counts[,bin2:=cut(pos2, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
-    counts=cs@par$signal[counts,,on=key(cs@par$signal)]
+    counts=cs@par$signal[,.(name,bin1,bin2,phi)][counts,,on=key(cs@par$signal)]
     counts[,c("log_mean_cclose","log_mean_cfar","log_mean_cup","log_mean_cdown"):=
              list(log_mean_cclose+phi,log_mean_cfar+phi,log_mean_cup+phi,log_mean_cdown+phi)]
   }
@@ -659,9 +635,9 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],log_mean_cclose]))
   init$alpha=max(0.001,1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu))
   init$mu=NULL
-  out=capture.output(op<-optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion,
-                                             data=data, iter=cs@settings$iter,
-                                             verbose=verbose, init=init, init_alpha=init_alpha))
+  out=capture.output(op<-optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, tol_param=cs@settings$tol.leg,
+                                             data=data, iter=cs@settings$iter, tol_obj=cs@settings$tol.leg,
+                                             verbose=verbose, init=init, init_alpha=cs@settings$init_alpha))
   cs@par=modifyList(cs@par, op$par[c("eRJ","eDE","alpha")])
   #cs@par$eC=cs@par$eC+op$par$eC_sup
   if (verbose==T) cat("  fit: dispersion",cs@par$alpha,"\n")
@@ -677,11 +653,28 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
+csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
+  cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros, sbins)
+  #put in triangular form
+  cts2 = cts[bin1>bin2]
+  setnames(cts2,c("bin1","bin2"),c("bin2","bin1"))
+  cts = rbind(cts[bin1<=bin2],cts2)
+  rm(cts2)
+  stopifnot(cts[,all(bin1<=bin2)])
+  setkey(cts,name,bin1,bin2)
+  return(cts)
+}
+
+#' fit signal using sparse fused lasso
+#' @keywords internal
+#' 
+csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   if (verbose==T) cat(" Signal\n")
-  cts = csnorm:::csnorm_predict_binned_counts_irls(cs, cs@settings$base.res, cs@zeros$sig)
-  mat = csnorm:::csnorm_compute_raw_signal(cts, cs@par$alpha, cs@par$signal)
+  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)[,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  diag.rm = ceiling(cs@settings$dmin/cs@settings$base.res)
+  #
   if (verbose==T) cat("  predict\n")
+  #ggplot(mat[bin1==bin2])+geom_point(aes(bin1,phi,colour=bin1%in%cs@par$badbins))+facet_wrap(~name)
   #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phihat))+facet_wrap(~name)
   #ggplot(mat[unclass(bin2)<23&unclass(bin1)>13])+geom_raster(aes(bin1,bin2,fill=phihat))+#geom_raster(aes(bin2,bin1,fill=phi))+
   #  facet_wrap(~name)+scale_fill_gradient2()
@@ -691,25 +684,30 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
   #ggplot(cts.cp)+geom_violin(aes(bin1,count))
   #
   #perform fused lasso on signal
-  groupnames=mat[,unique(name)]
+  groupnames=cts[,unique(name)]
+  nbins=length(cs@settings$sbins)-1
   registerDoParallel(cores=ncores)
-  params = foreach(g=groupnames, .combine=rbind) %do%
-    csnorm:::csnorm_fused_lasso(mat[name==g], cs@settings$trails, positive=T, tol=tol, ncores=ncores, verbose=verbose)
+  params = foreach(g=groupnames, .combine=rbind) %dopar%
+    csnorm:::csnorm_fused_lasso(cts[name==g], nbins, cs@par$alpha, diag.rm, cs@settings$trails,
+                                positive=T, fixed=F, constrained=constrained, simplified=T,
+                                tol.val=cs@settings$tol.leg, verbose=verbose, init.phi=cs@par$signal[name==g,phi])
   #compute matrix at new params
   #save(mat,params,file=paste0("mat_step_",step,".RData"))
-  mat = foreach (g=groupnames, .combine=rbind) %do% {
+  mat = foreach (g=groupnames, .combine=rbind) %dopar% {
     p=params[name==g]
-    matg=mat[name==g]
-    matg[,value:=csnorm:::gfl_get_value(valuehat, weight, cs@settings$trails, p$lambda1, p$lambda2, p$eCprime, nthreads=ncores)]
+    matg = csnorm:::gfl_get_matrix(cts[name==g], nbins, cs@par$alpha, diag.rm, cs@settings$trails,
+                                   p$lambda1, p$lambda2, p$eCprime, tol.value = cs@settings$tol.leg)
+    matg[,name:=g]
     matg
   }
   #store new signal in cs and update eC
+  #mat[,phi.old:=phi]
   mat[,phi:=value]
-  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phihat))+
+  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+
   #  scale_fill_gradient2()
   #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
   setkey(mat,name,bin1,bin2)
-  cs@par$signal=mat[,.(name,bin1,bin2,phi)]
+  cs@par$signal=mat[,.(name,bin1,bin2,phihat=valuehat,weight,ncounts,phi)]
   params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
   cs@par$eC=as.array(params[,eC+eCprime])
   cs@par$eCprime=as.array(params[,eCprime])
@@ -723,62 +721,81 @@ csnorm_gauss_signal = function(cs, verbose=T, ncores=ncores, tol=1e-3) {
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
 #' 
-has_converged = function(cs) {
+has_converged = function(cs, laststep=NULL) {
   params=cs@diagnostics$params
-  tol=cs@settings$tol.obj
-  laststep=params[,step[.N]]
-  delta=abs(params[step==laststep,value]-params[step==laststep-1,value])
-  return(all(delta<tol))
+  if (is.null(laststep)) {
+    if (params[,step[.N]]<=2) return(F)
+    return(has_converged(cs, params[,step[.N]]) & has_converged(cs, params[,step[.N]-1]))
+  }
+  stopifnot(length(laststep)==1)
+  #check if legs have changed
+  if (!setequal(params[step==laststep,.(leg)],params[step==laststep-1,.(leg)])) return(FALSE)
+  #objective convergence
+  delta = merge(params[step==laststep,.(leg,value)],params[step==laststep-1,.(leg,value)],
+                by="leg")[,abs(value.x-value.y)]
+  conv.obj = all(delta<cs@settings$tol.obj)
+  #parameter convergence
+  getdiff=function(name,fn=identity){merge(params[step==laststep,.(leg,get(name))],
+                               params[step==laststep-1,.(leg,get(name))],by="leg")[
+                                 leg==leg[.N],abs(fn(V2.x[[1]])-fn(V2.y[[1]]))]}
+  conv.eC = getdiff("eC")
+  conv.alpha = getdiff("alpha")
+  conv.ldiag = getdiff("lambda_diag",fn=log10)
+  conv.liota = getdiff("lambda_iota",fn=log10)
+  conv.lrho = getdiff("lambda_rho",fn=log10)
+  conv.l1 = getdiff("lambda1",fn=log10)
+  conv.l2 = getdiff("lambda2",fn=log10)
+  conv.param = all(c(conv.eC,conv.alpha,conv.ldiag,conv.liota,conv.lrho,conv.l1,conv.l2)<cs@settings$tol.obj)
+  return(conv.obj | conv.param)
 }
 
-#' count number of zeros in each decay and genomic bin
+#' count number of zeros in a given cut site, distance bin and signal bin
 #' @keywords internal
 #' 
-get_nzeros_normalization = function(cs, ncores=1) {
+get_nzeros = function(cs, sbins, ncores=1) {
   stopifnot(cs@counts[id1>=id2,.N]==0)
-  #count left and right
-  cts=rbind(cs@counts[contact.close>0,.(name, id=id1, distance, cat="contact R", count=contact.close)],
-            cs@counts[contact.far>0,  .(name, id=id1, distance, cat="contact L", count=contact.far)],
-            cs@counts[contact.down>0, .(name, id=id1, distance, cat="contact R", count=contact.down)],
-            cs@counts[contact.up>0,   .(name, id=id1, distance, cat="contact L", count=contact.up)],
-            cs@counts[contact.far>0,  .(name, id=id2, distance, cat="contact R", count=contact.far)],
-            cs@counts[contact.close>0,.(name, id=id2, distance, cat="contact L", count=contact.close)],
-            cs@counts[contact.down>0, .(name, id=id2, distance, cat="contact R", count=contact.down)],
-            cs@counts[contact.up>0,   .(name, id=id2, distance, cat="contact L", count=contact.up)])
-  #bin distances
-  dbins=cs@settings$dbins
-  cts[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-  #count per cut site and distance bin
-  cts=cts[,.(nnz=.N),keyby=c("id","name","dbin","cat")]
+  #positive counts: group per cut site and signal / distance bin
+  cts=melt(cs@counts[,.(name,pos1,pos2,distance,contact.close,contact.down,contact.far,contact.up)],
+           id.vars=c("name","pos1","pos2","distance"))[value>0]
+  cts[,c("bin1","bin2","dbin"):=
+        list(cut(pos1, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+             cut(pos2, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+             cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
+  cts=rbind(cts[,.(name,pos1,bin1,bin2,dbin,variable)][
+              ,.(nnz=.N,dir="fwd"),keyby=c("name","pos1","bin1","bin2","dbin","variable")],
+            cts[,.(name,pos1=pos2,bin1=bin2,bin2=bin1,dbin,variable)][
+              ,.(nnz=.N,dir="rev"),keyby=c("name","pos1","bin1","bin2","dbin","variable")])
+  cts[,cat:=ifelse(dir=="fwd",ifelse(variable %in% c("contact.up","contact.far"), "contact L", "contact R"),
+                              ifelse(variable %in% c("contact.up","contact.close"), "contact L", "contact R"))]
+  cts=cts[,.(nnz=sum(nnz)),keyby=c("name","pos1","bin1","bin2","dbin","cat","dir")]
   #Count the number of crossings per distance bin
   #looping over IDs avoids building NxN matrix
+  biases=cs@biases[,.(name,id,pos)]
+  biases[,bin:=cut(pos, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
   registerDoParallel(cores=ncores)
   chunksize=cs@biases[,ceiling(.N/(10*ncores))]
   nchunks=cs@biases[,ceiling(.N/chunksize)]
-  zeros = foreach(chunk=1:nchunks, .combine=rbind) %dopar% {
-    bs=cs@biases[((chunk-1)*chunksize+1):min(.N,chunk*chunksize)]
-    dists = foreach(n=bs[,name], i=bs[,id], p=bs[,pos], .combine=rbind) %do% {
-      dists=cs@biases[name==n & id!=i,.(name,id,distance=abs(pos-p))]
-      if (cs@settings$circularize>0)  dists[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
-      dists[,dbin:=cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-      dists[!is.na(dbin),.(name=n,id=i,ncross=.N),by=dbin]
+  crossings = foreach(chunk=1:nchunks, .combine=rbind) %dopar% {
+    bs=biases[((chunk-1)*chunksize+1):min(.N,chunk*chunksize)]
+    foreach(i=bs[,id], n=bs[,name], p=bs[,pos], b=bs[,bin], .combine=rbind) %do% {
+      crossings = biases[name==n&pos!=p,.(name,pos2=pos,bin2=bin,distance=abs(pos-p))]
+      if (cs@settings$circularize>0)  crossings[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
+      crossings[,c("dbin","dir"):=list(
+        cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12),
+        ifelse(pos2>p,"fwd","rev"))]
+      crossings[distance>=cs@settings$dmin,.(id1=i, pos1=p,bin1=b,ncross=.N),by=c("name","bin2","dbin","dir")]
     }
-    dists
   }
-  setkey(zeros,id,name,dbin)
-  stopifnot(zeros[,uniqueN(id)]==cs@biases[,.N])
-  zeros=rbind(cts[cat=="contact L"][zeros,.(name,id,dbin,cat="contact L",nnz,nposs=2*ncross)],
-              cts[cat=="contact R"][zeros,.(name,id,dbin,cat="contact R",nnz,nposs=2*ncross)])
+  #now merge with positive counts and deduce number of zeros
+  zeros = rbind(
+    merge(crossings,cts[cat=="contact L"],by=c("name","pos1","bin1","bin2","dbin","dir"),all=T)[
+      ,.(name,id1,pos1,bin1,bin2,dbin,dir,cat="contact L",ncross,nnz)],
+    merge(crossings,cts[cat=="contact R"],by=c("name","pos1","bin1","bin2","dbin","dir"),all=T)[
+      ,.(name,id1,pos1,bin1,bin2,dbin,dir,cat="contact R",ncross,nnz)])
   zeros[is.na(nnz),nnz:=0]
-  setkey(zeros,id,name,dbin,cat)
-  zeros[,nzero:=nposs-nnz]
-  #add positions
-  zeros=cs@biases[,.(name,id,pos)][zeros]
-  setkeyv(zeros,c("id","name","dbin","cat"))
-  #Nkz=csnorm:::get_nzeros_per_decay(cs,ncores)
-  #all(zeros[,.(ncross=sum(nposs)/8,nnz=sum(nnz)/2,nzero=sum(nzero)/2),keyby=c("name","dbin")]==Nkz)
-  #zbias=csnorm:::get_nzeros_per_cutsite(cs,ncores)
-  #all(zeros[,.(nnz=sum(nnz),nzero=sum(nzero)),keyby=c("name","id","cat")]==zbias[,.(name,id,cat,nnz,nzero)])
+  zeros[,nzero:=2*ncross-nnz]
+  stopifnot(zeros[is.na(ncross),.N==0])
+  stopifnot(zeros[nzero<0,.N==0])
   return(zeros)
 }
 
@@ -831,6 +848,7 @@ prepare_signal_estimation = function(biases, names, base.res) {
                          ordered_result=T, right=F, include.lowest=T,dig.lab=12))
   signal.mat=CJ(name=names,bin1=signal.bins,bin2=signal.bins,sorted=F,unique=F)[bin2>=bin1]
   signal.mat[,phi:=0]
+  setkey(signal.mat,name,bin1,bin2)
   ### build optimization trails
   trails = csnorm:::gfl_compute_trails(signal.mat[,nlevels(bin1)])
   stopifnot(all(signal.mat[,.N,by=name]$N==signal.mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
@@ -848,13 +866,13 @@ prepare_signal_estimation = function(biases, names, base.res) {
 #' @export
 #' 
 #' @examples
-plot_diagnostics = function(cs) {
-  plot=ggplot(cs@diagnostics$params[,.(step,leg,value)])+
+plot_diagnostics = function(cs, start=1) {
+  plot=ggplot(cs@diagnostics$params[step>=start,.(step,leg,value)])+
     geom_line(aes(step,value))+geom_point(aes(step,value))+facet_wrap(~leg, scales = "free")+
     theme(legend.position="bottom")
   vars=foreach(var=c("eC","eRJ","eDE","alpha","lambda_iota","lambda_rho","lambda_diag", "lambda1", "lambda2", "eCprime"),
                trans=(c(NA,NA,NA,NA,"log10","log10","log10","log10","log10",NA)),.combine=rbind) %do% get_all_values(cs,var,trans)
-  plot2=ggplot(vars)+geom_line(aes(step,value))+
+  plot2=ggplot(vars[step>=start])+geom_line(aes(step,value))+
     geom_point(aes(step,value,colour=leg))+facet_wrap(~variable, scales = "free_y")
   return(list(plot=plot,plot2=plot2))
 }
@@ -879,16 +897,15 @@ plot_diagnostics = function(cs) {
 #' @param lambdas positive numeric. Length scales to try out as initial
 #'   condition.
 #' @param ngibbs positive integer. Number of gibbs sampling iterations.
-#' @param iter positive integer. Number of optimization steps for each stan 
-#'   optimization call.
-#' @param fit.decay,fit.genomic,fit.disp boolean. Whether to fit diagonal decay or
-#'   genomic biases. Set to FALSE only for diagnostics.
+#' @param iter positive integer. Maximum number of optimization steps for each leg.
+#' @param fit.decay,fit.genomic,fit.signal,fit.disp boolean. Set to FALSE only for diagnostics.
 #' @param verbose Display progress if TRUE
 #' @param init_alpha positive numeric, default 1e-5. Initial step size of LBFGS
-#'   line search.
+#'   line search (dispersion leg).
 #' @param init.dispersion positive numeric. Value of the dispersion to use initially.
-#' @param tol.obj positive numeric (default 1e-1). Convergence tolerance on changes in the three likelihoods.
-#' @param ncores positive integer (default 1). Number of cores to use for initialization and dispersion step.
+#' @param tol.obj positive numeric (default 1e-1). Convergence tolerance on changes in the four likelihoods.
+#' @param tol.leg positive numeric (default 1e-5). Convergence tolerance on changes in the likelihood within each leg.
+#' @param ncores positive integer (default 1). Number of cores to use.
 #'   
 #' @return A csnorm object
 #' @export
@@ -896,9 +913,9 @@ plot_diagnostics = function(cs) {
 #' @examples
 #' 
 run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
-                     ngibbs = 20, iter=10000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
+                     ngibbs = 20, iter=1000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
                      verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
-                     tol.obj=1e-1, ncores=1) {
+                     tol.obj=1e-2, tol.leg=1e-4, ncores=1) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -911,11 +928,14 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     cs@par=list() #in case we have a weird object
     cs@groups=list()
     #add settings
-    cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","qmax")],
+    cs@settings = c(cs@settings[c("circularize","dmin","dmax")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
-                         iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj))
+                         iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj,
+                         tol.leg=tol.leg))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
+    stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
+    cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
     #initial guess
     if (verbose==T) cat("No initial guess provided\n")
     cs@diagnostics=list()
@@ -923,60 +943,67 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     init.mean="data"
     cs=csnorm:::fill_parameters_perf(cs, dispersion=init.dispersion, fit.decay=fit.decay,
                                      fit.genomic=fit.genomic, fit.disp=fit.disp)
+    #prepare signal matrix and trails
+    if (fit.signal==T) {
+      if(verbose==T) cat("Preparing for signal estimation\n")
+      stuff = csnorm:::prepare_signal_estimation(cs@biases, cs@experiments[,name], base.res)
+      cs@par$signal=stuff$signal
+      cs@settings$sbins=stuff$sbins
+      cs@settings$trails=stuff$trails
+    } else {
+      cs@settings$sbins=cs@biases[,c(min(pos)-1,max(pos)+1)]
+      cs@par$signal=cs@biases[,.(phi=0,bin1=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+                                 bin2=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)),by=name]
+      setkey(cs@par$signal,name,bin1,bin2)
+      cs@par$settings$trails=NA
+    }
     #get number of zeros along cut sites and decay
     if(verbose==T) cat("Counting zeros\n")
-    stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
-    cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
-    cs@zeros = list(bg=csnorm:::get_nzeros_normalization(cs, ncores=ncores), sig=data.table())
+    cs@zeros = csnorm:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
+    #update eC everywhere in the first step
+    update.exposures=T
   } else {
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
     init.mean="mean"
-  }
-  #
-  #prepare signal matrix and trails
-  if (fit.signal==T & cs@zeros$sig[,.N]==0) { #either restart==F or restart==T but was run with fit.signal==F
-    if(verbose==T) cat("Preparing for signal estimation\n")
-    stuff = csnorm:::prepare_signal_estimation(cs@biases, cs@experiments[,name], base.res)
-    cs@par$signal=stuff$signal
-    cs@settings$sbins=stuff$sbins
-    cs@settings$trails=stuff$trails
-    cs@zeros=modifyList(list(sig=csnorm:::get_nzeros_binning(cs, base.res, ncores = ncores)), cs@zeros)
+    update.exposures=(fit.signal!=T)
   }
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
   subcounts = csnorm:::subsample_counts(cs, ncounts)
-  subcounts.weight = merge(cs@zeros$bg[,.(nc=sum(nposs)/8),by=name],subcounts[,.(ns=.N),keyby=name])[,.(name,wt=nc/ns)]
+  subcounts.weight = merge(cs@zeros[,.(nc=sum(ncross)/4),by=name],subcounts[,.(ns=.N),keyby=name],by="name")[,.(name,wt=nc/ns)]
   #gibbs sampling
   for (i in (laststep + 1:ngibbs)) {
     if (verbose==T) cat("\n### Iteration",i,"\n")
     #fit diagonal decay given iota and rho
     if (fit.decay==T) {
-      a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean))
+      a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean, update.eC=update.exposures))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
       if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     }
     #fit iota and rho given diagonal decay
     if (fit.genomic==T) {
-      a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean))
+      a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean, update.exposures=update.exposures))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
       if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     }
     init.mean="mean"
-    #fit signal using sparse fused lasso
-    if (fit.signal==T) {
-      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, ncores=ncores))
-      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
-      if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
-    }
     #fit dispersion
     if (fit.disp==T) {
       a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight,
-                                                          init_alpha=init_alpha, ncores = ncores))
+                                                           ncores = ncores))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
       if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
     }
-    if (i-laststep>1) if (has_converged(cs)) {
+    #fit signal using sparse fused lasso
+    if (fit.signal==T) {
+      update.exposures=F
+      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=fit.decay, ncores=ncores))
+      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
+      if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
+    }
+    #check for convergence
+    if (i>1) if (has_converged(cs)) {
       if (verbose==T) cat("Normalization has converged\n")
       break
     }
