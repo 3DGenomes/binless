@@ -29,7 +29,7 @@ RcppExport SEXP weighted_graphfl(Rcpp::NumericVector y_i, Rcpp::NumericVector
 
 
 // [[Rcpp::export]]
-DataFrame cts_to_mat(const DataFrame cts, int nbins, double dispersion, std::vector<double>& phi, int diag_rm)
+DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion, std::vector<double>& phi, int diag_rm)
 {
   //inputs
   int N = cts.nrows();
@@ -47,7 +47,7 @@ DataFrame cts_to_mat(const DataFrame cts, int nbins, double dispersion, std::vec
   std::vector<int> bin1(nbetas, 0);
   std::vector<int> bin2(nbetas, 0);
   
-  cts_to_mat_core(N, &cts_bin1[0], &cts_bin2[0], &count[0], &lmu_nosig[0], &weight[0], nbins, dispersion, &phi[0],
+  cts_to_signal_mat_core(N, &cts_bin1[0], &cts_bin2[0], &count[0], &lmu_nosig[0], &weight[0], nbins, dispersion, &phi[0],
                   &phihat[0], &phihat_var[0], &ncounts[0], &bin1[0], &bin2[0], diag_rm);
   
   IntegerVector bin1_i, bin2_i;
@@ -71,7 +71,7 @@ DataFrame cts_to_mat(const DataFrame cts, int nbins, double dispersion, std::vec
 }
 
 // [[Rcpp::export]]
-List wgfl_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins,
+List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins,
                     int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                     double lam,  double alpha, double inflate, int ninner, double converge,
                     int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector phi_i)
@@ -89,7 +89,7 @@ List wgfl_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbin
   //printf(" Perf iteration: start with lam=%f alpha=%f phi[0]=%f z[0]=%f u[0]=%f\n",
   //       lam, alpha, phi_r[0], z_r[0], u_r[0]);
   for (step=1; step<=nouter; ++step) {
-    const DataFrame mat = cts_to_mat(cts, nbins, dispersion, phi_r, diag_rm);
+    const DataFrame mat = cts_to_signal_mat(cts, nbins, dispersion, phi_r, diag_rm);
     std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
     std::vector<double> w_r = Rcpp::as<std::vector<double> >(mat["weight"]);
     
@@ -106,12 +106,12 @@ List wgfl_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbin
   //printf(" Perf iteration: end   with lam=%f alpha=%f phi[0]=%f z[0]=%f u[0]=%f nouter=%d ninner=%d\n",
   //       lam, alpha, phi_r[0], z_r[0], u_r[0], step, res);
   return List::create(_["phi"]=wrap(phi_r), _["alpha"]=wrap(alpha),
-                      _["mat"]=cts_to_mat(cts, nbins, dispersion, phi_r, diag_rm),
+                      _["mat"]=cts_to_signal_mat(cts, nbins, dispersion, phi_r, diag_rm),
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res);
 }
 
 // [[Rcpp::export]]
-List wgfl_perf(const DataFrame cts, double dispersion, int nouter, int nbins,
+List wgfl_signal_perf(const DataFrame cts, double dispersion, int nouter, int nbins,
         int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
         double lam,  double alpha, double inflate, int ninner, double converge, int diag_rm)
 {
@@ -120,8 +120,8 @@ List wgfl_perf(const DataFrame cts, double dispersion, int nouter, int nbins,
     const int N = nbins*(nbins+1)/2; //size of fused lasso problem
     NumericVector phi_i(N);
     //printf("Fused lasso cold perf iteration with %d coefficients\n",phi.size());
-    return wgfl_perf_warm(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
-                          lam, alpha, inflate, ninner, converge, diag_rm, z_i, u_i, phi_i);
+    return wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
+                                 lam, alpha, inflate, ninner, converge, diag_rm, z_i, u_i, phi_i);
 }
 
 
@@ -129,8 +129,8 @@ RCPP_MODULE(gfl){
   using namespace Rcpp ;
  
   function("weighted_graphfl" , &weighted_graphfl  , "documentation for weighted_graphfl ");
-  function("cts_to_mat" , &cts_to_mat  , "documentation for cts_to_mat ");
-  function("wgfl_perf" , &wgfl_perf  , "documentation for wgfl_perf ");
-  function("wgfl_perf_warm" , &wgfl_perf_warm  , "documentation for wgfl_perf_warm ");
+  function("cts_to_signal_mat" , &cts_to_signal_mat  , "documentation for cts_to_signal_mat ");
+  function("wgfl_signal_perf" , &wgfl_signal_perf  , "documentation for wgfl_signal_perf ");
+  function("wgfl_signal_perf_warm" , &wgfl_signal_perf_warm  , "documentation for wgfl_signal_perf_warm ");
 } 
 

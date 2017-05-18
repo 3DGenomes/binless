@@ -145,19 +145,39 @@ gfl_compute_trails = function(nrow) {
   return(trails)
 }
 
+#' dispatch for fused lasso perf iteration: warm/cold signal/difference
+#' @keywords internal
+gfl_perf_iteration = function(ctsg, dispersion, diag.rm, nbins, trails, lambda2, ref=NULL,
+                              alpha=5, inflate=2, tol.value=1e-6, nperf=1000, maxsteps=100000, state=NULL) {
+  if (is.null(ref)) {
+    if (is.null(state)) {
+      perf.c = csnorm:::wgfl_signal_perf(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                                         trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.value/20, diag.rm)
+    } else {
+      perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                                              trails$breakpoints, lambda2, state$alpha, inflate, maxsteps, tol.value/20, diag.rm,
+                                              state$z, state$u, state$phi)
+    }
+  } else {
+    if (is.null(state)) {
+      perf.c = csnorm:::wgfl_diff_perf(ctsg, ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                                       trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.value/20, diag.rm)
+    } else {
+      perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                                            trails$breakpoints, lambda2, state$alpha, inflate, maxsteps, tol.value/20, diag.rm,
+                                            state$z, state$u, state$phi)
+    }
+  }
+  return(perf.c)
+}
+
 #' compute sparse fused lasso matrix for a given value of lambda1, lambda2 and eCprime (performance iteration)
 #' @keywords internal
-gfl_get_matrix = function(ctsg, nbins, dispersion, diag.rm, trails, lambda1, lambda2, eCprime,
+gfl_get_matrix = function(ctsg, nbins, dispersion, diag.rm, trails, lambda1, lambda2, eCprime, ref=NULL,
                          alpha=5, inflate=2, tol.value=1e-6, nperf=1000, maxsteps=100000, state=NULL) {
   #assume lambda1=0 and compute the fused lasso solution, centered around eCprime
-  if (is.null(state)) {
-    perf.c = csnorm:::wgfl_perf(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                             trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.value/2, diag.rm)
-  } else {
-    perf.c = csnorm:::wgfl_perf_warm(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                     trails$breakpoints, lambda2, state$alpha, inflate, maxsteps, tol.value/20, diag.rm,
-                                     state$z, state$u, state$phi)
-  }
+  perf.c = gfl_perf_iteration(ctsg, dispersion, diag.rm, nbins, trails, lambda2, ref,
+                              alpha, inflate, tol.value, nperf, maxsteps, state)
   #cat("GFL: initial alpha=",alpha,"final alpha=",perf.c$alpha,"nsteps=",perf.c$nsteps,"\n")
   matg = as.data.table(perf.c$mat)[,.(bin1,bin2,valuehat=phihat,ncounts,weight,value=perf.c$phi-eCprime,diag.idx)]
   #now soft-threshold the shifted value around eCprime
@@ -168,19 +188,11 @@ gfl_get_matrix = function(ctsg, nbins, dispersion, diag.rm, trails, lambda1, lam
 
 #' compute BIC for a given value of lambda1, lambda2 and eCprime (performance iteration, persistent state)
 #' @keywords internal
-gfl_BIC = function(ctsg, nbins, dispersion, diag.rm, trails, lambda1, lambda2, eCprime,
+gfl_BIC = function(ctsg, nbins, dispersion, diag.rm, trails, lambda1, lambda2, eCprime, ref=NULL,
                    alpha=5, inflate=2, tol.value=1e-6, nperf=1000, maxsteps=100000, state=NULL) {
   #get value with lambda1 set to zero to avoid round-off errors in degrees of freedom
-  if (is.null(state)) {
-    #cold start
-    perf.c = csnorm:::wgfl_perf(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                  trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.value/20, diag.rm)
-  } else {
-    #warm start
-    perf.c = csnorm:::wgfl_perf_warm(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                  trails$breakpoints, lambda2, state$alpha, inflate, maxsteps, tol.value/20, diag.rm,
-                                  state$z, state$u, state$phi)
-  }
+  perf.c = gfl_perf_iteration(ctsg, dispersion, diag.rm, nbins, trails, lambda2, ref,
+                              alpha, inflate, tol.value, nperf, maxsteps, state)
   state = perf.c[c("z","u","phi","alpha")]
   submat = as.data.table(perf.c$mat)[,.(bin1,bin2,valuehat=phihat,ncounts,weight,value=perf.c$phi-eCprime)]
   #get the number of patches and deduce degrees of freedom
@@ -554,6 +566,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
   #
   #perform fused lasso on signal
+  if (verbose==T) cat("  Fused lasso\n")
   groupnames=csg@cts[,unique(name)]
   registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %dopar%
@@ -596,7 +609,8 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
 #' 
 #' @examples
 detect_binless_differences = function(cs, resolution, group, ref, ncores=1, niter=10, tol.val=1e-3, verbose=T){
-  if (verbose==T) cat("Binless difference detection with resolution=",resolution," and group=",group,"\n")
+  if (verbose==T) cat("Binless difference detection with resolution=",resolution,
+                      " group=", group," and ref=",as.character(ref),"\n")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
@@ -610,6 +624,21 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, nite
   mat=stuff$mat
   trails=stuff$trails
   diag.rm = ceiling(csg@par$dmin/resolution)
+  cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  #
+  #perform fused lasso on signal
+  if (verbose==T) cat("  Fused lasso\n")
+  groupnames=csg@cts[,unique(name)]
+  registerDoParallel(cores=ncores)
+  params = foreach(g=groupnames, .combine=rbind) %dopar%
+    csnorm:::csnorm_fused_lasso(cts[name==g], csg@par$nbins, csg@par$alpha, diag.rm, trails,
+                                positive=T, fixed=T, constrained=T, simplified=T,
+                                tol.val=tol.val, verbose=verbose, init.phi=mat[name==g,phi])
+  
+  
+  
+  
+  
   ### main loop
   registerDoParallel(cores=ncores)
   for (step in 1:niter) {
