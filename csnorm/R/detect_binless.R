@@ -421,9 +421,13 @@ csnorm_fused_lasso = function(ctsg, nbins, dispersion, diag.rm, trails, positive
   #matg=csnorm:::gfl_get_matrix(ctsg, nbins, dispersion, diag.rm, trails, 0, lambda2, 0, tol.value = tol.val, state=state)
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=abs(value-vals$eCprime)<=vals$lambda1)))
-  #matg=csnorm:::gfl_get_matrix(ctsg, nbins, dispersion, trails, vals$lambda1, vals$lambda2, vals$eCprime, tol.value = tol.val)
+  #matg=csnorm:::gfl_get_matrix(ctsg, nbins, dispersion, diag.rm, trails, vals$lambda1, vals$lambda2, vals$eCprime, tol.value = tol.val, state=state)
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
-  return(as.data.table(vals))
+  matg = csnorm:::gfl_get_matrix(ctsg, nbins, dispersion, diag.rm, trails, vals$lambda1, vals$lambda2, vals$eCprime, tol.value = tol.val, state=state)
+  matg = matg[,.(name=vals$name,bin1,bin2,valuehat,ncounts,weight,diag.idx,value)]
+  params = as.data.table(vals)
+  params[,c("state","mat"):=list(list(state),list(matg))]
+  return(params)
 }
 
 #' Build grouped signal matrix using normalization data if available
@@ -475,9 +479,9 @@ prepare_difference_matrix = function(cs, names, resolution, ref) {
   stuff = csnorm:::prepare_signal_matrix(cs, names, resolution)
   mat = foreach(n=names[groupname!=ref,unique(groupname)],.combine=rbind) %do%
     merge(stuff$mat[name==n],stuff$mat[name==ref,.(bin1,bin2,phi1=phi)],all=T,by=c("bin1","bin2"))
-  mat[,c("phi.ref","delta"):=list((phi+phi1)/2,(phi-phi1)/2)]
+  mat[,c("phi.ref","delta"):=list(phi1,(phi-phi1)/2)]
   mat[,c("phi","phi1"):=NULL]
-  return(list(mat=mat,trails=stuff$trails,eCprime=names[groupname!=ref,.(name=groupname,eCprime=0)]))
+  return(list(mat=mat,trails=stuff$trails))
 }
 
 
@@ -562,13 +566,8 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
       cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],
           " eCprime=",params[i,eCprime],"\n")
   #compute matrix at new params
-  mat = foreach (g=groupnames, .combine=rbind) %dopar% {
-    p=params[name==g]
-    matg = csnorm:::gfl_get_matrix(cts[name==g], csg@par$nbins, csg@par$alpha, diag.rm, trails,
-                                   p$lambda1, p$lambda2, p$eCprime, tol.value = tol.val)
-    matg[,name:=g]
-    matg[,.(name,bin1,bin2,phihat=valuehat,weight,ncounts,diag.idx,value,phi=value)]
-  }
+  mat = rbindlist(params[,mat])
+  mat[,phi:=value]
   #
   #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()+facet_wrap(~name)
   #ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
@@ -597,6 +596,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
 #' 
 #' @examples
 detect_binless_differences = function(cs, resolution, group, ref, ncores=1, niter=10, tol.val=1e-3, verbose=T){
+  if (verbose==T) cat("Binless difference detection with resolution=",resolution," and group=",group,"\n")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
@@ -609,8 +609,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, nite
   stuff = csnorm:::prepare_difference_matrix(cs, csg@names, resolution, ref)
   mat=stuff$mat
   trails=stuff$trails
-  eCprime=stuff$eCprime
-  diag.rm = ceiling(csg@settings$dmin/resolution)
+  diag.rm = ceiling(csg@par$dmin/resolution)
   ### main loop
   registerDoParallel(cores=ncores)
   for (step in 1:niter) {

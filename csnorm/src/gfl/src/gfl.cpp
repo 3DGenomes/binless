@@ -86,8 +86,9 @@ List wgfl_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbin
   
   int step;
   int res=0;
-  //printf(" Perf iteration: start with alpha=%f phi[0]=%f z[0]=%f u[0]=%f\n", alpha, phi_r[0], z_r[0], u_r[0]);
-  for (step=0; step<nouter; ++step) {
+  //printf(" Perf iteration: start with lam=%f alpha=%f phi[0]=%f z[0]=%f u[0]=%f\n",
+  //       lam, alpha, phi_r[0], z_r[0], u_r[0]);
+  for (step=1; step<=nouter; ++step) {
     const DataFrame mat = cts_to_mat(cts, nbins, dispersion, phi_r, diag_rm);
     std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
     std::vector<double> w_r = Rcpp::as<std::vector<double> >(mat["weight"]);
@@ -102,8 +103,8 @@ List wgfl_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbin
     if (maxval<converge) break;
     phi_old = phi_r;
   }
-  //printf(" Perf iteration: end with alpha=%f phi[0]=%f z[0]=%f u[0]=%f nsteps=%d\n",
-  //       alpha, phi_r[0], z_r[0], u_r[0], step);
+  //printf(" Perf iteration: end   with lam=%f alpha=%f phi[0]=%f z[0]=%f u[0]=%f nouter=%d ninner=%d\n",
+  //       lam, alpha, phi_r[0], z_r[0], u_r[0], step, res);
   return List::create(_["phi"]=wrap(phi_r), _["alpha"]=wrap(alpha),
                       _["mat"]=cts_to_mat(cts, nbins, dispersion, phi_r, diag_rm),
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res);
