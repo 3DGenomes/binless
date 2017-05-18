@@ -661,6 +661,7 @@ csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
   cts = rbind(cts[bin1<=bin2],cts2)
   rm(cts2)
   stopifnot(cts[,all(bin1<=bin2)])
+  setkey(cts,name,bin1,bin2)
   return(cts)
 }
 
