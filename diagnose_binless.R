@@ -153,3 +153,52 @@ csnorm:::optimize_lambda2(cts.nodecay, nbins, dispersion, trails, tol.val = tol.
 
 
 
+sub="SELP_150k"
+bpk=30
+dfuse=20
+load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base5k_bpk",bpk,"_dfuse",dfuse,".RData"))
+resolution=5000
+group="all"
+eCprime=cs@design[,.(eCprime=0),keyby=name]
+cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores, niter=1)
+idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+csg=cs@groups[[idx1]]
+diag.rm = ceiling(csg@par$dmin/resolution)
+cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight,phi,var)]
+ref=cs@design[.N,name]
+
+###signal
+stuff = csnorm:::prepare_signal_matrix(cs, csg@names, resolution)
+mat=stuff$mat
+trails=stuff$trails
+#R signal
+mat.R = csnorm:::csnorm_compute_raw_signal(cts[name==ref], csg@par$alpha, mat[name==ref], eCprime)
+mat.R = mat.R[,.(bin1,bin2,phihat,phihat.var,ncounts,weight,diag.idx)]
+mat.R[diag.idx<=diag.rm,c("phihat.var","weight"):=list(Inf,0)]
+#C signal
+mat.C = as.data.table(csnorm:::cts_to_signal_mat(cts[name==ref], csg@par$nbins, csg@par$alpha,
+                                               mat[name==ref,phi], diag.rm))
+all.equal(mat.C,mat.R)
+merge(mat.C,mat.R,by=c("bin1","bin2"),suffixes=c(".R",".C"))[,summary(phihat.R-phihat.C)]
+merge(mat.C,mat.R,by=c("bin1","bin2"),suffixes=c(".R",".C"))[phihat.R-phihat.C==-1]#[,.(unclass(bin1),unclass(bin2))]
+
+
+###diff
+stuff = csnorm:::prepare_difference_matrix(cs, csg@names, resolution, ref)
+mat=stuff$mat
+trails=stuff$trails
+#R diff
+mat.R = csnorm:::csnorm_compute_raw_differential(csg@cts, csg@par$alpha, mat, eCprime, ref)
+mat.R = mat.R[,.(bin1,bin2,phihat,phihat.var,phihat.ref,phihat.var.ref,deltahat,deltahat.var,ncounts,weight,diag.idx)]
+#C diff
+mat.C = as.data.table(csnorm:::cts_to_diff_mat(csg@cts[name!=ref], csg@cts[name==ref], csg@par$nbins, csg@par$alpha,
+  mat[name!=ref,phi.ref], mat[name!=ref,delta], diag.rm))
+
+all.equal(mat.C,mat.R)
+merge(mat.C,mat.R,by=c("bin1","bin2"),suffixes=c(".R",".C"))[,summary(deltahat.R-deltahat.C)]
+
+
+value.C = csnorm:::gfl_perf_iteration(cts[name!=ref], csg@par$alpha, diag.rm, csg@par$nbins, trails, 5, ref=cts[name==ref],
+                                        alpha=5, inflate=2, tol.value=1e-6, nperf=100, maxsteps=100000, state=NULL)
+ggplot(as.data.table(value.C$mat)[,.(bin1,bin2,delta=value.C$delta,phi.ref=value.C$phi.ref)])+geom_raster(aes(bin1,bin2,fill=phi.ref))+scale_fill_gradient2()
+

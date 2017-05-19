@@ -168,7 +168,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref, double disper
                                           &delta_r[0], &z_r[0], &u_r[0]);
     for (int i=0; i<N; ++i) {
       if (phihat_var_ref[i]==INFINITY && phihat_var[i]==INFINITY) {
-        phi_ref_r[i]=0;
+        phi_ref_r[i]=(phihat_ref[i]+phihat[i])/2;
       } else {
         phi_ref_r[i] = (phihat_ref[i]/phihat_var_ref[i] + (phihat[i]-delta_r[i])/phihat_var[i])
                       /(1/phihat_var_ref[i]+1/phihat_var[i]);
