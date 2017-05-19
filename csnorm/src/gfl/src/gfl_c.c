@@ -22,6 +22,7 @@ void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
     ncounts[pos] += weight[i];
     phihat_var[pos] += w2v;
     phihat[pos] += (z+phi[pos])*w2v;
+    //if (b1==31&b2==31) printf("mu=%f z=%f var=%f w2v=%f pos=%d\n",mu,z,var,w2v,pos);
   }
   
   //finish mat
@@ -38,6 +39,7 @@ void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
     bin2[i] = b2++;
     if (b2 > nbins) b2 = ++b1;
     if (bin2[i]-bin1[i] <= diag_rm) phihat_var[i] = INFINITY;
+    //if (bin1[i]==31 & bin2[i]==31) printf("phihat=%f phihat.var=%f i=%d\n",phihat[i],phihat_var[i],i);
   }
 }
 
