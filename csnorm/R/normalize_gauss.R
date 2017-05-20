@@ -690,16 +690,8 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
                                 positive=T, fixed=F, constrained=constrained, simplified=T,
                                 tol.val=cs@settings$tol.leg, verbose=verbose, init.phi=cs@par$signal[name==g,phi])
   #compute matrix at new params
-  #save(mat,params,file=paste0("mat_step_",step,".RData"))
-  mat = foreach (g=groupnames, .combine=rbind) %dopar% {
-    p=params[name==g]
-    matg = csnorm:::gfl_get_matrix(cts[name==g], nbins, cs@par$alpha, diag.rm, cs@settings$trails,
-                                   p$lambda1, p$lambda2, p$eCprime, tol.value = cs@settings$tol.leg)
-    matg[,name:=g]
-    matg
-  }
+  mat = rbindlist(params[,mat])
   #store new signal in cs and update eC
-  #mat[,phi.old:=phi]
   mat[,phi:=value]
   #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+
   #  scale_fill_gradient2()
