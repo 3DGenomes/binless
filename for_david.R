@@ -40,7 +40,8 @@ csd4 = csd
 csd4@info$replicate="1"
 csd4@info$name="T47D es 60 MboI 3"
 
-cs_r=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
+csd2@info$enzyme = "BglIIb"
+cs_r=merge_cs_norm_datasets(list(csd1,csd2), different.decays="all")
 cs_r=merge_cs_norm_datasets(list(csd1), different.decays="none")
 cs_stan=merge_cs_norm_datasets(list(csd1), different.decays="none")
 
@@ -52,8 +53,11 @@ cs_stan = cs_r
 #normalize using approximation
 cs_stan = run_gauss(cs_stan, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 8, iter=100000, init_alpha=1e-7,
                  ncounts = 1000000, type=type, fit_model="stan", fit.disp = T, ncores = 8)
-cs_r = run_gauss(cs_r, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7,
-               ncounts = 1000000, fit.disp = T, fit.genomic = T, init.dispersion=10, ncores = 8)
+cs_r = run_gauss(cs_r, bf_per_kb=bpk, bf_per_decade=10, bins_per_bf=10, ngibbs = 5, iter=100000, init_alpha=1e-7,
+               ncounts = 1000000, fit.disp = T, fit.genomic = T, ncores = 8)
+
+cs_r = run_gauss(cs_r, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=100000, init_alpha=1e-7, ncounts = 1000000, fit.signal = F, ncores=6)
+
 save(cs_r,file=paste0("/scratch/workspace/csnorm_data/data/rao_HiCall_",sub,"_csnorm_optimized_gauss_bpk",bpk,".RData"))
 
 #look at the following objects

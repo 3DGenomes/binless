@@ -6,7 +6,8 @@ library(foreach)
 library(scales)
 library(microbenchmark)
 
-setwd("/home/yannick/simulations/cs_norm")
+#setwd("/home/yannick/simulations/cs_norm")
+setwd("/scratch/workspace/csnorm")
 
 #matg[,value.ref:=csnorm:::gfl_get_value(valuehat, weight, trails, .1, 1, 0)]
 #save(trails,matg,file="tmp_matg.RData")
@@ -29,8 +30,8 @@ ggplot(a.dt)+geom_boxplot(aes(ncpus,speedup,group=ncpus))
 ggplot(a.dt)+geom_boxplot(aes(ncpus,speedup/ncpus,group=ncpus))
 
 
-csnorm:::gfl_BIC(matg, trails, .1, 1, 0, tol.value=1e-3, ncores=30)
+csnorm:::gfl_BIC(matg, trails, .1, 1, 0, tol.value=1e-3, ncores=4)
 
-lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=1e-3, ncores=30)
+lambda2 = csnorm:::optimize_lambda2(matg, trails, tol=1e-3, ncores=4)
 profvis({vals = csnorm:::optimize_lambda1_eCprime(matg, trails, tol=1e-3, lambda2=1, positive=T, ncores=1)})
 vals = csnorm:::optimize_lambda1_only(matg, trails, tol=1e-3, lambda2=1, positive=T, ncores=30)
