@@ -1,19 +1,6 @@
 #' @include csnorm.R
 NULL
 
-#' internal use
-#' @keywords internal
-gfl_chains_to_trails = function(chains) {
-  trails=c()
-  breakpoints=c()
-  for (nodes in chains) {
-    if (length(trails)>0) breakpoints=c(breakpoints,length(trails))
-    trails=c(trails,nodes)
-  }
-  if (length(trails)>0) breakpoints=c(breakpoints,length(trails))
-  return(list(ntrails=length(breakpoints),trails=trails,breakpoints=breakpoints))
-}
-
 #' give a patch ID to each patch in a binless matrix, and report local extrema
 #' @keywords internal
 build_patch_graph = function(mat, trails, tol.value=1e-3) {
@@ -102,7 +89,7 @@ compute_2d_connectivity_graph = function(nbins, start=1) {
 #' @keywords internal
 gfl_compute_trails = function(nrow) {
   chain = csnorm:::boost_triangle_grid_chain(nrow)
-  trails = csnorm:::gfl_chains_to_trails(chain)
+  trails = csnorm:::boost_chains_to_trails(chain)
   stopifnot(uniqueN(trails$trails)==nrow*(nrow+1)/2)
   #store bin graph
   trails$graph = csnorm:::compute_2d_connectivity_graph(nrow)
