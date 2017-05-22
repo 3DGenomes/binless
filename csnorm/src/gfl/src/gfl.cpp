@@ -227,11 +227,6 @@ List boost_triangle_grid_chain(int nrow) {
       current.push_back(i);
     }
   }
-  //diagonal
-  current.clear();
-  for (int i=0; i<chains.size(); ++i) current.push_back(chains[i][0]);
-  current.push_back(ntotal);
-  chains.push_back(current);
   //columns with Ui+1 = Ui + (N-i) with U1 from 2 to nrow
   for (int U1=2; U1<=nrow; ++U1) {
     int Ui=U1;

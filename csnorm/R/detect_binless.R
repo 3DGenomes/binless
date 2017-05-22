@@ -18,8 +18,6 @@ gfl_triangle_grid_chain = function(nrow) {
       current=c(current,i)
     }
   }
-  #diagonal
-  chains=c(chains,list(c(sapply(chains,function(x){x[1]}),ntotal)))
   #columns with Ui+1 = Ui + (N-i) with U1 from 2 to nrow
   for (U1 in 2:nrow) {
     Ui=U1
