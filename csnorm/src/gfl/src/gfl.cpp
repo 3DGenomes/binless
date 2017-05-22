@@ -242,6 +242,18 @@ std::vector<std::vector<int> > boost_triangle_grid_chain(int nrow) {
 }
 
 // [[Rcpp::export]]
+List boost_chains_to_trails(const std::vector<std::vector<int> >& chains) {
+  std::vector<int> trails;
+  std::vector<int> breakpoints;
+  for (std::vector<std::vector<int> >::const_iterator it = chains.begin() ; it != chains.end(); ++it) {
+    if (trails.size()>0) breakpoints.push_back(trails.size());
+    trails.insert(trails.end(), it->begin(), it->end());
+  }
+  if (trails.size()>0) breakpoints.push_back(trails.size());
+  return(List::create(_["ntrails"]=breakpoints.size(), _["trails"]=trails, _["breakpoints"]=breakpoints));
+}
+
+// [[Rcpp::export]]
 void bgl_test() {
   {
   typedef boost::adjacency_list <boost::vecS, boost::vecS, boost::undirectedS> Graph;
@@ -277,6 +289,7 @@ RCPP_MODULE(gfl){
   function("wgfl_diff_perf_warm" , &wgfl_diff_perf_warm  , "documentation for wgfl_diff_perf_warm ");
   
   function("boost_triangle_grid_chain", &boost_triangle_grid_chain, "documentation for boost_triangle_grid_chain ");
+  function("boost_chains_to_trails", &boost_chains_to_trails, "documentation for boost_chains_to_trails ");
   function("bgl_test" , &bgl_test  , "documentation for bgl_test ");
   
 } 
