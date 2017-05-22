@@ -337,7 +337,7 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
 
 
 csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
-                                         lambda_iota, lambda_rho, verbose=T,
+                                         original_lambda_iota, original_lambda_rho, verbose=T,
                                          max_perf_iteration=1000, convergence_epsilon=1e-5) {
   XB = as.array(design[,genomic])
   
@@ -377,9 +377,9 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
             rbind(Matrix(0,nrow=4*SD,ncol=ncol(centering)),centering))
     diags = list(rep(1,Krow), rep(-2,Krow))
     D1 = bandSparse(Krow-2, Krow, k=0:2, diagonals=c(diags, diags[1]))
-    if (!is.null(lambda_iota) && !is.null(lambda_rho)) {
-      lambda_iota = lambda_iota[uXB]
-      lambda_rho = lambda_rho[uXB]
+    if (!is.null(original_lambda_iota) && !is.null(original_lambda_rho)) {
+      lambda_iota = original_lambda_iota[uXB]
+      lambda_rho = original_lambda_rho[uXB]
     } else {
       lambda_iota = 1 
       lambda_rho = 1 
@@ -545,8 +545,6 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     genomic_out$eC = as.array(c(genomic_out$eC,eC))
     genomic_out$eRJ = as.array(c(genomic_out$eRJ,eRJ))
     genomic_out$eDE = as.array(c(genomic_out$eDE,eDE))
-    genomic_out$lambda_iota = c(genomic_out$lambda_iota,lambda_iota)
-    genomic_out$lambda_rho = c(genomic_out$lambda_rho,lambda_rho)
     genomic_out$beta_iota_diff = as.matrix(genomic_out$beta_iota_diff)
     genomic_out$beta_rho_diff = as.matrix(genomic_out$beta_rho_diff)
     
