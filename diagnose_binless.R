@@ -197,8 +197,11 @@ mat.C = as.data.table(csnorm:::cts_to_diff_mat(csg@cts[name!=ref], csg@cts[name=
 all.equal(mat.C,mat.R)
 merge(mat.C,mat.R,by=c("bin1","bin2"),suffixes=c(".R",".C"))[,summary(deltahat.R-deltahat.C)]
 
+perf.c = csnorm:::gfl_perf_iteration(ctsg, dispersion, diag.rm, nbins, trails, lambda2, ctsg.ref,
+                            alpha=5, inflate=2, tol.value=1e-3, nperf=100, maxsteps=1e5, perf.c)
+
 
 value.C = csnorm:::gfl_perf_iteration(cts[name!=ref], csg@par$alpha, diag.rm, csg@par$nbins, trails, 5, ref=cts[name==ref],
-                                        alpha=5, inflate=2, tol.value=1e-6, nperf=100, maxsteps=100000, state=NULL)
+                                        alpha=5, inflate=2, tol.value=1e-6, nperf=100, maxsteps=100000, state=init.state)
 ggplot(as.data.table(value.C$mat)[,.(bin1,bin2,delta=value.C$delta,phi.ref=value.C$phi.ref)])+geom_raster(aes(bin1,bin2,fill=phi.ref))+scale_fill_gradient2()
 
