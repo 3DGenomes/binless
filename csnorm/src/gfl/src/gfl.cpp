@@ -212,7 +212,7 @@ List wgfl_diff_perf(const DataFrame cts, const DataFrame ref, double dispersion,
 }
 
 // [[Rcpp::export]]
-List boost_triangle_grid_chain(int nrow) {
+std::vector<std::vector<int> > boost_triangle_grid_chain(int nrow) {
   int ntotal = nrow*(nrow+1)/2-1;
   std::vector<std::vector<int> > chains;
   int l = nrow;
@@ -238,7 +238,7 @@ List boost_triangle_grid_chain(int nrow) {
     }
     chains.push_back(current);
   }
-  return(wrap(chains));
+  return(chains);
 }
 
 // [[Rcpp::export]]

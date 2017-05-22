@@ -3,37 +3,6 @@ NULL
 
 #' internal use
 #' @keywords internal
-gfl_triangle_grid_chain = function(nrow) {
-  #rows of consecutive numbers
-  ntotal = nrow*(nrow+1)/2-1
-  l=nrow
-  chains=list()
-  current=c(0)
-  for (i in 1:ntotal) {
-    if (length(current)==l) {
-      chains=c(chains,list(current))
-      current=c(i)
-      l=l-1
-    } else {
-      current=c(current,i)
-    }
-  }
-  #columns with Ui+1 = Ui + (N-i) with U1 from 2 to nrow
-  for (U1 in 2:nrow) {
-    Ui=U1
-    current=c(Ui-1)
-    for (i in 1:(U1-1)) {
-      Uip1=Ui+nrow-i
-      current=c(current,Uip1-1)
-      Ui=Uip1
-    }
-    chains=c(chains,list(current))
-  }
-  return(chains)
-}
-
-#' internal use
-#' @keywords internal
 gfl_chains_to_trails = function(chains) {
   trails=c()
   breakpoints=c()
@@ -132,7 +101,7 @@ compute_2d_connectivity_graph = function(nbins, start=1) {
 #' compute trail information for the gfl package, for a triangle trid with nrow rows
 #' @keywords internal
 gfl_compute_trails = function(nrow) {
-  chain = csnorm:::gfl_triangle_grid_chain(nrow)
+  chain = csnorm:::boost_triangle_grid_chain(nrow)
   trails = csnorm:::gfl_chains_to_trails(chain)
   stopifnot(uniqueN(trails$trails)==nrow*(nrow+1)/2)
   #store bin graph
