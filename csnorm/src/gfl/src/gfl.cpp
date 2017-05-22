@@ -1,3 +1,8 @@
+#include <iostream>
+#include <vector>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/connected_components.hpp>
+
 #include <assert.h>
 #include <Rcpp.h>
 using namespace Rcpp;
@@ -5,6 +10,8 @@ using namespace Rcpp;
 #include "tf_dp.c"
 #include "utils.c"
 #include "gfl_c.c"
+
+
 
 // [[Rcpp::export]]
 DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion, std::vector<double>& phi, int diag_rm)
@@ -204,6 +211,29 @@ List wgfl_diff_perf(const DataFrame cts, const DataFrame ref, double dispersion,
                              lam, alpha, inflate, ninner, converge, diag_rm, z_i, u_i, phi_ref_i, delta_i);
 }
 
+// [[Rcpp::export]]
+void bgl_test() {
+  {
+  typedef boost::adjacency_list <boost::vecS, boost::vecS, boost::undirectedS> Graph;
+  
+  Graph G;
+  boost::add_edge(0, 1, G);
+  boost::add_edge(1, 4, G);
+  boost::add_edge(4, 0, G);
+  boost::add_edge(2, 5, G);
+  
+  std::vector<int> component(num_vertices(G));
+  int num = boost::connected_components(G, &component[0]);
+  
+  std::vector<int>::size_type i;
+  std::cout << "Total number of components: " << num << std::endl;
+  for (i = 0; i != component.size(); ++i)
+    std::cout << "Vertex " << i <<" is in component " << component[i] << std::endl;
+  std::cout << std::endl;
+  }
+}
+
+
 
 RCPP_MODULE(gfl){
   using namespace Rcpp ;
@@ -215,5 +245,8 @@ RCPP_MODULE(gfl){
   function("cts_to_diff_mat" , &cts_to_diff_mat  , "documentation for cts_to_diff_mat ");
   function("wgfl_diff_perf" , &wgfl_diff_perf  , "documentation for wgfl_diff_perf ");
   function("wgfl_diff_perf_warm" , &wgfl_diff_perf_warm  , "documentation for wgfl_diff_perf_warm ");
+  
+  function("bgl_test" , &bgl_test  , "documentation for bgl_test ");
+  
 } 
 
