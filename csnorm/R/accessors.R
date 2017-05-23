@@ -39,11 +39,13 @@ get_cs_group_idx = function(cs, resolution, group, raise=T) {
 #' @export
 #'
 #' @examples
-get_cs_interaction_idx = function(csg, type, threshold, ref, raise=T) {
+get_cs_interaction_idx = function(csg, type, threshold=-1, ref=NULL, raise=T) {
   if(length(csg@interactions)>0) {
     for (i in 1:length(csg@interactions)) {
-      if (csg@interactions[[i]]@type==type
-          && csg@interactions[[i]]@threshold==threshold && csg@interactions[[i]]@ref==ref) return(i)
+      if (class(csg@interactions[[i]])!=type) next
+      if (!is.null(ref)) if (csg@interactions[[i]]@ref!=ref) next
+      if (threshold>=0) if (csg@interactions[[i]]@threshold!=threshold) next
+      return(i)
     }
   }
   if (raise==T) {

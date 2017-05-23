@@ -496,7 +496,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
   #check if interaction wasn't calculated already
-  if (get_cs_interaction_idx(csg, type="binteractions", threshold=-1, ref="expected", raise=F)>0)
+  if (get_cs_interaction_idx(csg, type="CSbsig", raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
   #
   ### prepare signal estimation
@@ -535,7 +535,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   mat = csnorm:::detect_binless_patches(mat, trails, tol.value=tol.val)
   #
   ### store interaction
-  csi=new("CSinter", mat=mat, type="binteractions", threshold=-1, ref="expected")
+  csi=new("CSbsig", mat=mat)
   #store back
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
@@ -558,7 +558,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
-  if (get_cs_interaction_idx(csg, type="bdifferences", threshold=-1, ref=ref, raise=F)>0)
+  if (get_cs_interaction_idx(csg, type="CSbdiff", ref=ref, raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
   if (is.character(ref)) ref=csg@names[as.character(groupname)==ref,unique(groupname)]
   if (verbose==T) cat("  Prepare for difference estimation\n")
@@ -594,7 +594,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #
   if (verbose==T) cat(" Detect patches\n")
   mat = csnorm:::detect_binless_patches(mat, trails, tol.value=tol.val)
-  csi=new("CSinter", mat=mat, type="bdifferences", threshold=-1, ref=as.character(ref))
+  csi=new("CSbdiff", mat=mat, ref=as.character(ref))
   #store back
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
