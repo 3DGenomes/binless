@@ -84,7 +84,7 @@ get_matrices = function(cs, resolution, group) {
 #' @export
 #' 
 #' @examples
-get_interactions = function(cs, type, resolution, group, ref, threshold) {
+get_interactions = function(cs, type, resolution, group, threshold=-1, ref=NULL) {
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
   idx2=get_cs_interaction_idx(csg, type, threshold, ref)

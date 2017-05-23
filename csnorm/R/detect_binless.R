@@ -358,7 +358,9 @@ optimize_lambda2 = function(ctsg, nbins, dispersion, diag.rm, trails, tol.val=1e
 #' build initial state from phi / delta
 #' 
 #' @keywords internal
-gfl_compute_initial_state = function(matg, trails, diff=F, init.alpha=5) {
+gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
+  matg = csig@mat
+  trails = csig@trails
   if (diff==F) {
     state = list(phi=matg[,phi], u=rep(0,length(trails$trails)), z=matg[trails$trails+1,phi], alpha=init.alpha)
   } else {
@@ -385,8 +387,15 @@ gfl_compute_initial_state = function(matg, trails, diff=F, init.alpha=5) {
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(ctsg, nbins, dispersion, diag.rm, trails, positive, fixed, constrained, simplified,
-                              tol.val=1e-5, verbose=T, init.state=NULL, ctsg.ref=NULL) {
+csnorm_fused_lasso = function(csig, positive, fixed, constrained, simplified, verbose=T, ctsg.ref=NULL) {
+  ctsg=csig@cts
+  nbins=csig@settings$nbins
+  dispersion=csig@settings$alpha
+  diag.rm=csig@settings$diag.rm
+  trails=csig@trails
+  tol.val=csig@settings$tol.val
+  init.state=csig@state
+  if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
   stuff = csnorm:::optimize_lambda2(ctsg, nbins, dispersion, diag.rm, trails, tol.val = tol.val,
                                     init.state=init.state, ctsg.ref=ctsg.ref)
   lambda2 = stuff$lambda2
@@ -463,18 +472,20 @@ prepare_signal_matrix = function(cs, names, resolution) {
   trails = csnorm:::gfl_compute_trails(mat[,nlevels(bin1)])
   stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
   stopifnot(all(length(V(trails$graph))==mat[,.N,by=name]$N))
-  return(list(mat=mat,trails=trails))
+  csi=new("CSbsig", mat=mat, trails=trails, cts=data.table())
+  return(csi)
 }
 
 #' Build grouped difference matrix using normalization data if available
 #' @keywords internal
 prepare_difference_matrix = function(cs, names, resolution, ref) {
-  stuff = csnorm:::prepare_signal_matrix(cs, names, resolution)
+  csi = csnorm:::prepare_signal_matrix(cs, names, resolution)
   mat = foreach(n=names[groupname!=ref,unique(groupname)],.combine=rbind) %do%
-    merge(stuff$mat[name==n],stuff$mat[name==ref,.(bin1,bin2,phi1=phi)],all=T,by=c("bin1","bin2"))
+    merge(csi@mat[name==n],csi@mat[name==ref,.(bin1,bin2,phi1=phi)],all=T,by=c("bin1","bin2"))
   mat[,c("phi.ref","delta"):=list(phi1,(phi-phi1)/2)]
   mat[,c("phi","phi1"):=NULL]
-  return(list(mat=mat,trails=stuff$trails))
+  csi=new("CSbdiff", mat=mat, trails=csi@trails, cts=data.table(), cts.ref=data.table(), ref=as.character(ref))
+  return(csi)
 }
 
 #' Perform binless interaction detection using fused lasso
@@ -501,21 +512,23 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #
   ### prepare signal estimation
   if (verbose==T) cat("  Prepare for signal estimation\n")
-  stuff = csnorm:::prepare_signal_matrix(cs, csg@names, resolution)
-  mat=stuff$mat
-  trails=stuff$trails
-  diag.rm = ceiling(csg@par$dmin/resolution)
-  cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  csi = csnorm:::prepare_signal_matrix(cs, csg@names, resolution)
+  csi@settings$diag.rm = ceiling(csg@par$dmin/resolution)
+  csi@settings$nbins = csg@par$nbins
+  csi@settings$alpha = csg@par$alpha
+  csi@settings$tol.val = tol.val
+  csi@cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
   #
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
-  groupnames=csg@cts[,unique(name)]
+  groupnames=csi@cts[,unique(name)]
   registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %dopar% {
-    init.state = csnorm:::gfl_compute_initial_state(mat[name==g], trails, diff=F, init.alpha=5)
-    csnorm:::csnorm_fused_lasso(cts[name==g], csg@par$nbins, csg@par$alpha, diag.rm, trails,
-                                positive=T, fixed=T, constrained=T, simplified=T,
-                                tol.val=tol.val, verbose=verbose, init.state=init.state)
+    csig = csi
+    csig@cts = csi@cts[name==g]
+    csig@mat = csi@mat[name==g]
+    csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
+    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=T, simplified=T, verbose=verbose)
   }
   #display param info
   if (verbose==T)
@@ -532,10 +545,9 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
   #
   if (verbose==T) cat(" Detect patches\n")
-  mat = csnorm:::detect_binless_patches(mat, trails, tol.value=tol.val)
+  csi@mat = csnorm:::detect_binless_patches(mat, trails, tol.value=tol.val)
   #
   ### store interaction
-  csi=new("CSbsig", mat=mat)
   #store back
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
@@ -562,21 +574,25 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     stop("Refusing to overwrite this already detected interaction")
   if (is.character(ref)) ref=csg@names[as.character(groupname)==ref,unique(groupname)]
   if (verbose==T) cat("  Prepare for difference estimation\n")
-  stuff = csnorm:::prepare_difference_matrix(cs, csg@names, resolution, ref)
-  mat=stuff$mat
-  trails=stuff$trails
-  diag.rm = ceiling(csg@par$dmin/resolution)
-  cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  csi = csnorm:::prepare_difference_matrix(cs, csg@names, resolution, ref)
+  csi@settings$diag.rm = ceiling(csg@par$dmin/resolution)
+  csi@settings$nbins = csg@par$nbins
+  csi@settings$alpha = csg@par$alpha
+  csi@settings$tol.val = tol.val
+  csi@cts=csg@cts[name!=ref,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  csi@cts.ref=csg@cts[name==ref,.(name,bin1,bin2,count,lmu.nosig,weight)]
   #
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
-  groupnames=csg@cts[name!=ref,unique(name)]
+  groupnames=csi@cts[,unique(name)]
   registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %dopar% {
-    init.state = csnorm:::gfl_compute_initial_state(mat[name==g], trails, diff=T, init.alpha=5)
-    csnorm:::csnorm_fused_lasso(cts[name==g], csg@par$nbins, csg@par$alpha, diag.rm, trails,
-                                positive=F, fixed=T, constrained=T, simplified=F,
-                                tol.val=tol.val, verbose=verbose, init.state=init.state, ctsg.ref=cts[name==ref])
+    csig = csi
+    csig@cts = csi@cts[name==g]
+    csig@mat = csi@mat[name==g]
+    csig@state = csnorm:::gfl_compute_initial_state(csig, diff=T, init.alpha=5)
+    csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=T, simplified=F, verbose=verbose,
+                                ctsg.ref=csig@cts.ref)
   }
   #display param info
   if (verbose==T)
@@ -593,8 +609,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
   #
   if (verbose==T) cat(" Detect patches\n")
-  mat = csnorm:::detect_binless_patches(mat, trails, tol.value=tol.val)
-  csi=new("CSbdiff", mat=mat, ref=as.character(ref))
+  csi@mat = csnorm:::detect_binless_patches(mat, trails, tol.value=tol.val)
   #store back
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
