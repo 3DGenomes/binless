@@ -2,6 +2,7 @@
 #include <vector>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/connected_components.hpp>
+#include <boost/graph/graph_utility.hpp>
 
 #include <assert.h>
 #include <Rcpp.h>
@@ -11,6 +12,7 @@ using namespace Rcpp;
 #include "utils.c"
 #include "gfl_c.c"
 
+typedef boost::adjacency_list <boost::vecS, boost::vecS, boost::undirectedS> Graph;
 
 
 // [[Rcpp::export]]
@@ -253,16 +255,24 @@ List boost_chains_to_trails(const std::vector<std::vector<int> >& chains) {
   return(List::create(_["ntrails"]=breakpoints.size(), _["trails"]=trails, _["breakpoints"]=breakpoints));
 }
 
+Graph build_2d_connectivity_graph(int nrow) {
+  int ntotal = nrow*(nrow+1)/2-1;
+  Graph G(ntotal+1);
+  for (int i=1, l=nrow-1; l>=1; ++i, --l) {
+    for (int j=1; j<=l; ++i, ++j) {
+      boost::add_edge(i-1,i,G);
+      boost::add_edge(i,i+l,G);
+      //std::cout << "added edge " << i << " - " << i-1 << std::endl;
+      //std::cout << "added edge " << i << " - " << i+l << std::endl;
+    }
+  }
+  return(G);
+}
+
 // [[Rcpp::export]]
-void bgl_test() {
-  {
-  typedef boost::adjacency_list <boost::vecS, boost::vecS, boost::undirectedS> Graph;
+void print_2d_connectivity_graph(int nbins) {
   
-  Graph G;
-  boost::add_edge(0, 1, G);
-  boost::add_edge(1, 4, G);
-  boost::add_edge(4, 0, G);
-  boost::add_edge(2, 5, G);
+  Graph G = build_2d_connectivity_graph(nbins);
   
   std::vector<int> component(num_vertices(G));
   int num = boost::connected_components(G, &component[0]);
@@ -272,7 +282,6 @@ void bgl_test() {
   for (i = 0; i != component.size(); ++i)
     std::cout << "Vertex " << i <<" is in component " << component[i] << std::endl;
   std::cout << std::endl;
-  }
 }
 
 
@@ -290,7 +299,7 @@ RCPP_MODULE(gfl){
   
   function("boost_triangle_grid_chain", &boost_triangle_grid_chain, "documentation for boost_triangle_grid_chain ");
   function("boost_chains_to_trails", &boost_chains_to_trails, "documentation for boost_chains_to_trails ");
-  function("bgl_test" , &bgl_test  , "documentation for bgl_test ");
+  function("print_2d_connectivity_graph" , &print_2d_connectivity_graph  , "documentation for print_2d_connectivity_graph ");
   
 } 
 
