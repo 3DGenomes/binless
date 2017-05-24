@@ -85,17 +85,16 @@ compute_2d_connectivity_graph = function(nbins, start=1) {
   return(ret)
 }
 
-#' compute trail information for the gfl package, for a triangle trid with nrow rows
+#' compute trail information for the gfl package, for a triangle trid with nbins rows
 #' @keywords internal
-gfl_compute_trails = function(nrow) {
-  chain = csnorm:::boost_triangle_grid_chain(nrow)
+gfl_compute_trails = function(nbins) {
+  chain = csnorm:::boost_triangle_grid_chain(nbins)
   trails = csnorm:::boost_chains_to_trails(chain)
-  stopifnot(uniqueN(trails$trails)==nrow*(nrow+1)/2)
+  stopifnot(uniqueN(trails$trails)==nbins*(nbins+1)/2)
   #store bin graph
-  trails$graph = csnorm:::compute_2d_connectivity_graph(nrow)
+  trails$graph = csnorm:::compute_2d_connectivity_graph(nbins)
   #plot(trails$graph, vertex.color=factor(V(g)$value), vertex.label=V(g)$count,
   #     layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
-  trails$nrow=nrow
   return(trails)
 }
 
@@ -413,7 +412,7 @@ prepare_signal_matrix = function(cs, csg, resolution) {
   #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()
   #
   #add trail information
-  trails = csnorm:::gfl_compute_trails(mat[,nlevels(bin1)])
+  trails = csnorm:::gfl_compute_trails(csg@par$nbins)
   stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
   stopifnot(all(length(V(trails$graph))==mat[,.N,by=name]$N))
   #add other settings
