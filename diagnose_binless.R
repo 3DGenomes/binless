@@ -242,3 +242,18 @@ matg = csnorm:::gfl_get_matrix(ctsg, nbins, dispersion, diag.rm, trails, 0, lamb
 matg2 = csnorm:::gfl_get_matrix(ctsg.ref, nbins, dispersion, diag.rm, trails, 0, lambda2, 0,
                                tol.value=tol.val, state=state, ctsg.ref=ctsg)[,.(bin1,bin2,phihat.ref=)]
 ggplot(matg)+geom_raster(aes(bin1,bin2,fill=phihat.ref))+geom_raster(aes(bin2,bin1,fill=valuehat))+scale_fill_gradient2()
+
+
+#norm
+csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, simplified=T, verbose=verbose)
+-> lambda1_eCprime_simplified
+#signal
+csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=T, simplified=T, verbose=verbose)
+-> lambda1_only
+#diff
+csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=T, simplified=F, verbose=verbose,
+                            ctsg.ref=csig@cts.ref)
+-> lambda1_only
+
+
+

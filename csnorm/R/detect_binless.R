@@ -183,68 +183,10 @@ gfl_BIC = function(csig, lambda1, lambda2, eCprime) {
   return(state)
 }
 
-#' cross-validate lambda1 and eCprime
-#' 
-#' @keywords internal
-optimize_lambda1_eCprime = function(matg, csig, lambda1.min=0.05, positive=F, constrained=T) {
-  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
-  #get the number of patches to compute degrees of freedom
-  cl = csnorm:::build_patch_graph(matg, csig@trails, tol.value=csig@settings$tol.val)$components
-  matg[,patchno:=cl$membership]
-  patches = matg[,.(value=value[1],size=.N),by=patchno][,.(N=.N,size=size[1]),keyby=value]
-  if (patches[,.N]==1) #matrix is just one big bin
-    return(data.table(eCprime=patches[,value],lambda1=lambda1.min,
-                      BIC=matg[,sum(weight*((valuehat-(value+patches[,value]))^2))],dof=0))
-  stopifnot(patches[,sum(N)]==cl$no)
-  minval=patches[,min(value)]
-  maxval=patches[,max(value)]
-  valrange=maxval-minval
-  #
-  if (constrained==T) { #some patches must be zeroed to avoid degeneracy with diagonal decay fit
-    forbidden.vals = matg[,min(value.ori),by=diag.idx][,unique(V1)]
-    if (positive==T) {
-      lambda1.min = max(lambda1.min, (max(forbidden.vals)-minval)/2+csig@settings$tol.val)
-    } else {
-      lambda1.min = max(lambda1.min, (max(forbidden.vals)-min(forbidden.vals))/2+csig@settings$tol.val)
-    }
-  } else {
-    forbidden.vals = c()
-  }
-  #
-  obj = function(lambda1) {
-    eCvals = c(patches[,value-lambda1],patches[,value+lambda1])
-    if (positive==T) eCvals=eCvals[eCvals<=lambda1+minval]
-    if (constrained==T) for (fv in forbidden.vals) eCvals = eCvals[abs(eCvals-fv)<=lambda1]
-    if (length(eCvals)==0) {
-      csig@par=modifyList(csig@par,list(eCprime=0,lambda1=lambda1,BIC=.Machine$double.xmax,dof=NA))
-      return(csig)
-    }
-    dt = foreach (eCprime=eCvals, .combine=rbind) %do% {
-      matg[,value:=value.ori-eCprime]
-      dof = matg[abs(value)>lambda1,uniqueN(patchno)] #sparse fused lasso
-      stopifnot(dof<=cl$no)
-      #now soft-threshold the value around eCprime
-      matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
-      #compute BIC
-      #BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof-2*.N*log(lambda1)]
-      BIC = matg[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]#-9*log(lambda1)+5*lambda1]
-      data.table(eCprime=eCprime,lambda1=lambda1,BIC=BIC,dof=dof)
-    }
-    dt[BIC==min(BIC)][lambda1==max(lambda1)][eCprime==min(eCprime)]
-  }
-  #dt=foreach(lambda1=seq(tol.val/2,valrange,length.out=50), .combine=rbind) %do% obj(lambda1)
-  #ggplot(dt)+geom_point(aes(lambda1,BIC,colour))+geom_line(aes(lambda1,BIC,colour))
-  op=optimize(function(x){obj(10^(x))[,BIC]}, c(log10(max(lambda1.min,csig@settings$tol.val/2)),log10(valrange)),
-              tol=csig@settings$tol.val)
-  csig@par=modifyList(csig@par,as.list(obj(10^(op$minimum))))
-  #patches[,removed:=abs(value-values$eCprime)<=values$lambda1]
-  return(csig)
-}
-
 #' cross-validate lambda1 and eCprime, assuming positive=T and holding eCprime=lambda1+min(value)
 #' 
 #' @keywords internal
-optimize_lambda1_eCprime_simplified = function(matg, csig, lambda1.min=0.05, constrained=T) {
+optimize_lambda1_eCprime = function(matg, csig, lambda1.min=0.05, constrained=T) {
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   #get the number of patches to compute degrees of freedom
   cl = csnorm:::build_patch_graph(matg, csig@trails, tol.value=csig@settings$tol.val)$components
@@ -406,7 +348,7 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(csig, positive, fixed, constrained, simplified, verbose=T, ctsg.ref=NULL) {
+csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, ctsg.ref=NULL) {
   csig = csnorm:::optimize_lambda2(csig)
   #compute values for lambda1=0 and eCprime=0
   matg = csnorm:::gfl_get_matrix(csig, 0, csig@par$lambda2, 0)
@@ -414,12 +356,7 @@ csnorm_fused_lasso = function(csig, positive, fixed, constrained, simplified, ve
   #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=value))+scale_fill_gradient2()
   #get best lambda1 and set eCprime to lower bound
   if (fixed==F) {
-    if (simplified==T) {
-      if (positive!=T) stop("Cannot have positive!=T and simplified==T")
-      csig = csnorm:::optimize_lambda1_eCprime_simplified(matg, csig, constrained=constrained)
-    } else {
-      csig = csnorm:::optimize_lambda1_eCprime(matg, csig, constrained=constrained, positive=positive)
-    }
+    csig = csnorm:::optimize_lambda1_eCprime(matg, csig, constrained=constrained)
   } else {
     csig = csnorm:::optimize_lambda1_only(matg, csig, constrained=constrained, positive=positive)
   }
@@ -535,7 +472,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
-    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=T, simplified=T, verbose=verbose)
+    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=T, verbose=verbose)
   }
   #display param info
   if (verbose==T)
@@ -601,8 +538,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=T, init.alpha=5)
-    csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=T, simplified=F, verbose=verbose,
-                                ctsg.ref=csig@cts.ref)
+    csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=T, verbose=verbose, ctsg.ref=csig@cts.ref)
   }
   #display param info
   if (verbose==T)

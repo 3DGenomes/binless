@@ -690,7 +690,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
              settings=list(diag.rm=diag.rm, nbins=nbins, dispersion=cs@par$alpha, tol.val=cs@settings$tol.leg,
                            inflate=2, nperf=1000, maxsteps=100000))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
-    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, simplified=T, verbose=verbose)
+    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose)
   }
   #compute matrix at new params
   mat = rbindlist(params[,mat])
