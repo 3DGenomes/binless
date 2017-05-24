@@ -375,7 +375,9 @@ csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, cts
 
 #' Build grouped signal matrix using normalization data if available
 #' @keywords internal
-prepare_signal_matrix = function(cs, names, resolution) {
+prepare_signal_matrix = function(cs, csg, resolution) {
+  names=csg@names
+  #build signal matrix
   if (cs@par$signal[,.N]==0) {
     sbins=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
     signal.bins=unique(cut(c(sbins,head(sbins,n=-1)+resolution/2), sbins,
@@ -410,22 +412,36 @@ prepare_signal_matrix = function(cs, names, resolution) {
   #ggplot(cs@par$signal)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()
   #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()
   #
+  #add trail information
   trails = csnorm:::gfl_compute_trails(mat[,nlevels(bin1)])
   stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
   stopifnot(all(length(V(trails$graph))==mat[,.N,by=name]$N))
-  csi=new("CSbsig", mat=mat, trails=trails, cts=data.table())
+  #add other settings
+  settings=list(diag.rm = ceiling(csg@par$dmin/resolution),
+                nbins = csg@par$nbins,
+                dispersion = csg@par$alpha,
+                tol.val = tol.val,
+                inflate=2,
+                nperf=1000,
+                maxsteps=100000)
+  cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  csi=new("CSbsig", mat=mat, trails=trails, cts=cts, settings=settings)
   return(csi)
 }
 
 #' Build grouped difference matrix using normalization data if available
 #' @keywords internal
-prepare_difference_matrix = function(cs, names, resolution, ref) {
-  csi = csnorm:::prepare_signal_matrix(cs, names, resolution)
+prepare_difference_matrix = function(cs, csg, resolution, ref) {
+  csi = csnorm:::prepare_signal_matrix(cs, csg, resolution)
+  names=csg@names
   mat = foreach(n=names[groupname!=ref,unique(groupname)],.combine=rbind) %do%
     merge(csi@mat[name==n],csi@mat[name==ref,.(bin1,bin2,phi1=phi)],all=T,by=c("bin1","bin2"))
   mat[,c("phi.ref","delta"):=list(phi1,(phi-phi1)/2)]
   mat[,c("phi","phi1"):=NULL]
-  csi=new("CSbdiff", mat=mat, trails=csi@trails, cts=data.table(), cts.ref=data.table(), ref=as.character(ref))
+  cts=csg@cts[name!=ref,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  cts.ref=csg@cts[name==ref,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  csi=new("CSbdiff", mat=mat, trails=csi@trails, cts=cts, cts.ref=cts.ref,
+          ref=as.character(ref), settings=csi@settings)
   return(csi)
 }
 
@@ -453,15 +469,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #
   ### prepare signal estimation
   if (verbose==T) cat("  Prepare for signal estimation\n")
-  csi = csnorm:::prepare_signal_matrix(cs, csg@names, resolution)
-  csi@settings$diag.rm = ceiling(csg@par$dmin/resolution)
-  csi@settings$nbins = csg@par$nbins
-  csi@settings$dispersion = csg@par$alpha
-  csi@settings$tol.val = tol.val
-  csi@settings$inflate=2
-  csi@settings$nperf=1000
-  csi@settings$maxsteps=100000
-  csi@cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  csi = csnorm:::prepare_signal_matrix(cs, csg, resolution)
   #
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
@@ -477,8 +485,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #display param info
   if (verbose==T)
     for (i in 1:params[,.N])
-      cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],
-          " eCprime=",params[i,eCprime],"\n")
+      cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],"\n")
   #compute matrix at new params
   mat = rbindlist(params[,mat])
   mat[,phi:=value]
@@ -518,16 +525,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     stop("Refusing to overwrite this already detected interaction")
   if (is.character(ref)) ref=csg@names[as.character(groupname)==ref,unique(groupname)]
   if (verbose==T) cat("  Prepare for difference estimation\n")
-  csi = csnorm:::prepare_difference_matrix(cs, csg@names, resolution, ref)
-  csi@settings$diag.rm = ceiling(csg@par$dmin/resolution)
-  csi@settings$nbins = csg@par$nbins
-  csi@settings$dispersion = csg@par$alpha
-  csi@settings$tol.val = tol.val
-  csi@settings$inflate=2
-  csi@settings$nperf=1000
-  csi@settings$maxsteps=100000
-  csi@cts=csg@cts[name!=ref,.(name,bin1,bin2,count,lmu.nosig,weight)]
-  csi@cts.ref=csg@cts[name==ref,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  csi = csnorm:::prepare_difference_matrix(cs, csg, resolution, ref)
   #
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
@@ -543,8 +541,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #display param info
   if (verbose==T)
     for (i in 1:params[,.N])
-      cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],
-          " eCprime=",params[i,eCprime],"\n")
+      cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],"\n")
   #compute matrix at new params
   mat = rbindlist(params[,mat])
   mat[,delta:=value]
