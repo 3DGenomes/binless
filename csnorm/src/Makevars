@@ -1,34 +1,24 @@
 STANHEADERS_SRC = `"$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" --vanilla -e "cat(system.file('include', 'src', package = 'StanHeaders'))"`
-PKG_CPPFLAGS = -Igfl/src -Igfl/include -I"$(STANHEADERS_SRC)" -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS
-#PKG_CXXFLAGS = 
+PKG_CPPFLAGS = -Igfl/src -Igfl/include -I"$(STANHEADERS_SRC)" -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS -DEIGEN_NO_DEBUG -DBOOST_MATH_OVERFLOW_ERROR_POLICY=ignore_error
+CXX_STD = CXX14
 
 SOURCES = $(wildcard gfl/src/*.cpp)
+
+OBJECTS = $(SOURCES:.cpp=.o) Modules.o
+
 SOURCES_C = $(wildcard gfl/src/*.c)
 PKG_LIBS = $(SOURCES_C:.c=.o) -lgsl -lgslcblas
 
-#OBJECTS = Modules.o $(SOURCES:.cpp=.o) $(SOURCES_C:.c=.o)
-OBJECTS = $(SOURCES:.cpp=.o) Modules.o
 
-SUBDIRS = gfl
-all: $(SHLIB)
+all: gfl
 
-#$(SHLIB): $(OBJECTS) sublibs
-$(SHLIB): sublibs
-
-sublibs:
-	#mkdir -p ../lib
-	@for d in $(SUBDIRS); do \
-		(cd $${d} && CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" $(MAKE)) || exit 1; \
-	done
-	#cp $(SUBDIRS)/lib/*.so ../lib/
+gfl:
+	(cd gfl && $(MAKE)) || exit 1;
 
 clean: 
 	subclean
-	@-rm -f *.o $(SHLIB)
-	#@-rm -f lib/*.so $(SHLIB)
+	@-rm -f *.o
 
 subclean:
 	@-rm -f *.o
-	@for d in $(SUBDIRS); do \
-		(cd $${d} && $(MAKE) clean) || exit 1; \
-	done
+	@(cd gfl && $(MAKE) clean) || exit 1;

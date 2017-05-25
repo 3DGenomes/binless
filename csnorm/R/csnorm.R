@@ -30,6 +30,8 @@
 #'
 #' @useDynLib csnorm, .registration = TRUE
 #' @import rstan
+#' @import rstantools
+#' @import methods
 #' @import splines
 #' @import data.table
 #' @import doParallel
