@@ -31,16 +31,12 @@
 #' @useDynLib csnorm, .registration = TRUE
 #' @import rstan
 #' @import splines
-#' @import mgcv
 #' @import data.table
 #' @import doParallel
 #' @import foreach
 #' @import matrixStats
 #' @import ggplot2
-#' @import igraph
 #' @import MASS
-#' @import abind
-#' @import methods
 #' @import Matrix
 #' @import quadprog
 #' @importFrom Hmisc cut2
