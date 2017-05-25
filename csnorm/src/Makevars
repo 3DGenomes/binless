@@ -2,23 +2,13 @@ STANHEADERS_SRC = `"$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" --vanilla -e "cat(system
 PKG_CPPFLAGS = -Igfl/src -Igfl/include -I"$(STANHEADERS_SRC)" -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS -DEIGEN_NO_DEBUG -DBOOST_MATH_OVERFLOW_ERROR_POLICY=ignore_error
 CXX_STD = CXX14
 
-SOURCES = $(wildcard gfl/src/*.cpp)
+SOURCES = gfl/src/gfl.cpp
 
 OBJECTS = $(SOURCES:.cpp=.o) Modules.o
 
-SOURCES_C = $(wildcard gfl/src/*.c)
-PKG_LIBS = $(SOURCES_C:.c=.o) -lgsl -lgslcblas
+PKG_LIBS = -lgsl -lgslcblas
 
-
-all: gfl
-
-gfl:
-	(cd gfl && $(MAKE)) || exit 1;
+all:
 
 clean: 
-	subclean
-	@-rm -f *.o
-
-subclean:
-	@-rm -f *.o
-	@(cd gfl && $(MAKE) clean) || exit 1;
+	@-rm -f *.o gfl/src/*.o
