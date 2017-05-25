@@ -1,11 +1,10 @@
 STANHEADERS_SRC = `"$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" --vanilla -e "cat(system.file('include', 'src', package = 'StanHeaders'))"`
-PKG_CPPFLAGS = -Igfl/include -I"$(STANHEADERS_SRC)" -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS -DEIGEN_NO_DEBUG -DBOOST_MATH_OVERFLOW_ERROR_POLICY=ignore_error
+PKG_CPPFLAGS = -Igfl/src -Igfl/include -I"$(STANHEADERS_SRC)" -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS -DEIGEN_NO_DEBUG -DBOOST_MATH_OVERFLOW_ERROR_POLICY=ignore_error
 CXX_STD = CXX14
 
-SOURCES = $(wildcard gfl/src/*.cpp)
-SOURCES_C = $(wildcard gfl/src/*.c)
+SOURCES = gfl/src/gfl.cpp
 
-OBJECTS = $(wildcard gfl/src/*.o) Modules.o
+OBJECTS = $(SOURCES:.cpp=.o) Modules.o
 
 PKG_LIBS = -lgsl -lgslcblas
 
