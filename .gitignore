@@ -3,10 +3,9 @@
 .RData
 .Ruserdata
 csnorm/src/Modules.cpp
-csnorm/src/Modules.o
+csnorm/src/*.o
 csnorm/src/csnorm.so
 csnorm/src/include/models.hpp*
-csnorm/src/gfl/obj
 csnorm/src/gfl/src/*.o
 csnorm/man/*
 .*.sw*
