@@ -114,22 +114,24 @@ std::vector<double> report_values_in_graph(Graph G, const DataFrame mat) {
 }
 
 //mat must be sorted by bin1 and bin2 and will not be checked for that
-List boost_get_number_of_patches(int nbins, const DataFrame mat, double tol_val) {
-
+List boost_build_patch_graph_components(int nbins, const DataFrame mat, double tol_val) {
+  
+  //build triangle grid graph with nbins
   Graph G = build_2d_connectivity_graph(nbins);
   std::vector<double> values = report_values_in_graph(G,mat);
   
+  //filter out edges which connect vertices with different values
   edge_within_patch filter(G, &values[0], tol_val);
   boost::filtered_graph<Graph, edge_within_patch > fG(G, filter);
-  
+  //deduce connected components
   std::vector<int> component(boost::num_vertices(fG));
   int num = boost::connected_components(fG, &component[0]);
-  
-  std::cout << "Total number of components: " << num << std::endl;
-  /*std::vector<int>::size_type i;
+  /*std::cout << "Total number of components: " << num << std::endl;
+  std::vector<int>::size_type i;
   for (i = 0; i != component.size(); ++i)
     std::cout << "Vertex " << i <<" is in component " << component[i] << std::endl;
   std::cout << std::endl;*/
-  return num;
+  
+  return List::create(_["no"]=num, _["membership"]=component);
 }
 
