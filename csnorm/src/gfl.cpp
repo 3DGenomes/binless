@@ -17,7 +17,7 @@ RCPP_MODULE(gfl){
   
   function("boost_triangle_grid_chain", &boost_triangle_grid_chain, "documentation for boost_triangle_grid_chain ");
   function("boost_chains_to_trails", &boost_chains_to_trails, "documentation for boost_chains_to_trails ");
-  function("print_2d_connectivity_graph" , &print_2d_connectivity_graph  , "documentation for print_2d_connectivity_graph ");
+  function("boost_get_number_of_patches" , &boost_get_number_of_patches  , "documentation for boost_get_number_of_patches ");
   
 } 
 

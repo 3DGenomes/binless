@@ -4,13 +4,26 @@ using namespace Rcpp;
 #include <vector>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/filtered_graph.hpp>
 #include <boost/graph/connected_components.hpp>
 #include <boost/graph/graph_utility.hpp>
 #include <assert.h>
 
 struct Coordinate { int bin1,bin2; };
-
 typedef boost::adjacency_list <boost::vecS, boost::vecS, boost::undirectedS, Coordinate> Graph;
+
+struct edge_within_patch {
+  edge_within_patch() { }
+  edge_within_patch(const Graph& G_, double* value_, double tol_val_)
+     : G(G_), value(value_), tol_val(tol_val_) { }
+  template <typename Edge>
+  bool operator()(const Edge& e) const {
+    return std::abs(get(value, boost::source(e, G))-get(value, boost::target(e, G))) < tol_val;
+  }
+  Graph G;
+  double* value;
+  double tol_val;
+};
 
 std::vector<std::vector<int> > boost_triangle_grid_chain(int nrow) {
   int ntotal = nrow*(nrow+1)/2-1;
@@ -56,14 +69,14 @@ Graph build_2d_connectivity_graph(int nrow) {
   //create graph
   int ntotal = nrow*(nrow+1)/2;
   Graph G(ntotal);
-  std::cout << "Graph with " << ntotal << " vertices" << std::endl;
+  //std::cout << "Graph with " << ntotal << " vertices" << std::endl;
   //set coordinates in the 2d plane
   Graph::vertex_descriptor v = *boost::vertices(G).first;
   for (int b1=1, i=0; b1<=nrow; ++b1) {
     for (int b2=b1; b2<=nrow; ++b2, ++v) {
       G[v].bin1 = b1;
       G[v].bin2 = b2;
-      std::cout << "vertex " << v << " has coordinates (" << b1 << "," << b2 << ")" << std::endl;
+      //std::cout << "vertex " << v << " has coordinates (" << b1 << "," << b2 << ")" << std::endl;
     }
   }
   //add edges in 2d triangle grid
@@ -72,24 +85,46 @@ Graph build_2d_connectivity_graph(int nrow) {
     for (int j=1; j<=l; ++v, ++j) {
       boost::add_edge(v-1,v,G);
       boost::add_edge(v,v+l,G);
-      std::cout << "added edge " << v << " - " << v-1 << std::endl;
-      std::cout << "added edge " << v << " - " << v+l << std::endl;
+      //std::cout << "added edge " << v << " - " << v-1 << std::endl;
+      //std::cout << "added edge " << v << " - " << v+l << std::endl;
     }
   }
   return(G);
 }
 
-void print_2d_connectivity_graph(int nbins) {
+std::vector<double> report_values_in_graph(Graph G, const DataFrame mat) {
+  //retrieve data from matrix
+  IntegerVector bin1 = mat["bin1"];
+  IntegerVector bin2 = mat["bin2"];
+  NumericVector value = mat["value"];
+  //loop over cells
+  std::vector<double> values(boost::num_vertices(G));
+  for (std::pair<Graph::vertex_iterator, Graph::vertex_iterator> vp = vertices(G);
+       vp.first != vp.second; ++vp.first) {
+    Graph::vertex_descriptor v = *vp.first;
+    //int i = get(boost::vertex_index,v);
+    //std::assert(G[v].bin1==bin1(v) & G[v].bin2==bin2(v));
+    values[v] = value(v);
+  }
+  return(values);
+}
+
+int boost_get_number_of_patches(int nbins, const DataFrame mat, double tol_val) {
   
   Graph G = build_2d_connectivity_graph(nbins);
+  std::vector<double> values = report_values_in_graph(G,mat);
   
-  std::vector<int> component(num_vertices(G));
-  int num = boost::connected_components(G, &component[0]);
+  edge_within_patch filter(G, &values[0], tol_val);
+  boost::filtered_graph<Graph, edge_within_patch > fG(G, filter);
   
-  std::vector<int>::size_type i;
+  std::vector<int> component(boost::num_vertices(fG));
+  int num = boost::connected_components(fG, &component[0]);
+  
+  /*std::vector<int>::size_type i;
   std::cout << "Total number of components: " << num << std::endl;
   for (i = 0; i != component.size(); ++i)
     std::cout << "Vertex " << i <<" is in component " << component[i] << std::endl;
-  std::cout << std::endl;
+  std::cout << std::endl;*/
+  return num;
 }
 
