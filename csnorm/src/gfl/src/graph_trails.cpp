@@ -7,7 +7,6 @@ using namespace Rcpp;
 #include <boost/graph/filtered_graph.hpp>
 #include <boost/graph/connected_components.hpp>
 #include <boost/graph/graph_utility.hpp>
-#include <assert.h>
 
 struct Coordinate { int index,bin1,bin2; };
 typedef boost::adjacency_list <boost::vecS, boost::vecS, boost::undirectedS, Coordinate> Graph;
@@ -105,15 +104,18 @@ std::vector<double> report_values_in_graph(Graph G, const DataFrame mat) {
        vp.first != vp.second; ++vp.first) {
     Graph::vertex_descriptor v = *vp.first;
     int i=G[v].index;
-    assert(G[v].bin1==bin1(i));
-    assert(G[v].bin2==bin2(i));
+    if (G[v].bin1!=bin1(i) || G[v].bin2!=bin2(i)) {
+      throw std::invalid_argument("mat must be ordered!");
+    }
     values[i] = value(i);
+    //std::cout << "v=" << v << " G[v].bin1=" << G[v].bin1 << " i=" << i << " bin1(i)=" << bin1(i) << std::endl;
   }
   return(values);
 }
 
+//mat must be sorted by bin1 and bin2 and will not be checked for that
 List boost_get_number_of_patches(int nbins, const DataFrame mat, double tol_val) {
-  
+
   Graph G = build_2d_connectivity_graph(nbins);
   std::vector<double> values = report_values_in_graph(G,mat);
   

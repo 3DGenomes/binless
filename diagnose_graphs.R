@@ -13,3 +13,4 @@ data[,value:=(bin1+bin2)%/%2]
 ggplot(data)+geom_raster(aes(bin1,bin2,fill=value))
 
 csnorm:::boost_get_number_of_patches(nbins,data,1e-3)
+csnorm:::boost_get_number_of_patches(nbins,data[order(bin2)],1e-3)
