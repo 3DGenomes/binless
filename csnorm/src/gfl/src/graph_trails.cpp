@@ -9,12 +9,13 @@ using namespace Rcpp;
 #include <boost/graph/graph_utility.hpp>
 #include <assert.h>
 
-struct Coordinate { int bin1,bin2; };
+struct Coordinate { int index,bin1,bin2; };
 typedef boost::adjacency_list <boost::vecS, boost::vecS, boost::undirectedS, Coordinate> Graph;
 
 struct edge_within_patch {
   edge_within_patch() { }
-  edge_within_patch(const Graph& G_, double* value_, double tol_val_)
+  edge_within_patch(const Graph& G_, double* value_, //ptr to begin of std::vector<double> of size |E|
+                    double tol_val_)
      : G(G_), value(value_), tol_val(tol_val_) { }
   template <typename Edge>
   bool operator()(const Edge& e) const {
@@ -73,7 +74,8 @@ Graph build_2d_connectivity_graph(int nrow) {
   //set coordinates in the 2d plane
   Graph::vertex_descriptor v = *boost::vertices(G).first;
   for (int b1=1, i=0; b1<=nrow; ++b1) {
-    for (int b2=b1; b2<=nrow; ++b2, ++v) {
+    for (int b2=b1; b2<=nrow; ++b2, ++v, ++i) {
+      G[v].index = i;
       G[v].bin1 = b1;
       G[v].bin2 = b2;
       //std::cout << "vertex " << v << " has coordinates (" << b1 << "," << b2 << ")" << std::endl;
@@ -102,14 +104,15 @@ std::vector<double> report_values_in_graph(Graph G, const DataFrame mat) {
   for (std::pair<Graph::vertex_iterator, Graph::vertex_iterator> vp = vertices(G);
        vp.first != vp.second; ++vp.first) {
     Graph::vertex_descriptor v = *vp.first;
-    //int i = get(boost::vertex_index,v);
-    //std::assert(G[v].bin1==bin1(v) & G[v].bin2==bin2(v));
-    values[v] = value(v);
+    int i=G[v].index;
+    assert(G[v].bin1==bin1(i));
+    assert(G[v].bin2==bin2(i));
+    values[i] = value(i);
   }
   return(values);
 }
 
-int boost_get_number_of_patches(int nbins, const DataFrame mat, double tol_val) {
+List boost_get_number_of_patches(int nbins, const DataFrame mat, double tol_val) {
   
   Graph G = build_2d_connectivity_graph(nbins);
   std::vector<double> values = report_values_in_graph(G,mat);
@@ -120,8 +123,8 @@ int boost_get_number_of_patches(int nbins, const DataFrame mat, double tol_val) 
   std::vector<int> component(boost::num_vertices(fG));
   int num = boost::connected_components(fG, &component[0]);
   
-  /*std::vector<int>::size_type i;
   std::cout << "Total number of components: " << num << std::endl;
+  /*std::vector<int>::size_type i;
   for (i = 0; i != component.size(); ++i)
     std::cout << "Vertex " << i <<" is in component " << component[i] << std::endl;
   std::cout << std::endl;*/
