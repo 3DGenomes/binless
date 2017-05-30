@@ -108,18 +108,4 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res);
 }
 
-List wgfl_signal_perf(const DataFrame cts, double dispersion, int nouter, int nbins,
-                      int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
-                      double lam1, double lam2, double eCprime, double alpha, double inflate, int ninner,
-                      double converge, int diag_rm)
-{
-  NumericVector z_i(breakpoints_i(ntrails-1));
-  NumericVector u_i(breakpoints_i(ntrails-1));
-  const int N = nbins*(nbins+1)/2; //size of fused lasso problem
-  NumericVector beta_i(N);
-  //printf("Fused lasso cold perf iteration with %d coefficients\n",phi.size());
-  return wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
-                               lam1, lam2, eCprime, alpha, inflate, ninner, converge, diag_rm, z_i, u_i, beta_i);
-}
-
 

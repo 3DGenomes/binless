@@ -95,18 +95,3 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref, double disper
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res);
 }
 
-List wgfl_diff_perf(const DataFrame cts, const DataFrame ref, double dispersion, int nouter, int nbins,
-                    int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
-                    double lam,  double alpha, double inflate, int ninner, double converge, int diag_rm)
-{
-  NumericVector z_i(breakpoints_i(ntrails-1));
-  NumericVector u_i(breakpoints_i(ntrails-1));
-  const int N = nbins*(nbins+1)/2; //size of fused lasso problem
-  NumericVector phi_ref_i(N);
-  NumericVector delta_i(N);
-  //printf("Fused lasso cold perf iteration with %d coefficients\n",phi.size());
-  return wgfl_diff_perf_warm(cts, ref, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
-                             lam, alpha, inflate, ninner, converge, diag_rm, z_i, u_i, phi_ref_i, delta_i);
-}
-
-

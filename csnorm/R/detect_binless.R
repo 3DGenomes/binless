@@ -114,26 +114,15 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
   nperf=csig@settings$nperf
   maxsteps=csig@settings$maxsteps
   if (is.null(ctsg.ref)) {
-    if (length(state)==0) {
-      perf.c = csnorm:::wgfl_signal_perf(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                         trails$breakpoints, lambda1, lambda2, eCprime,
-                                         alpha, inflate, maxsteps, tol.val/20, diag.rm)
-    } else {
-      perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+    perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                                               trails$breakpoints, lambda1, lambda2, eCprime,
                                               state$alpha, inflate, maxsteps, tol.val/20, diag.rm,
                                               state$z, state$u, state$beta)
-    }
   } else {
     stopifnot(lambda1==0 & eCprime==0)
-    if (length(state)==0) {
-      perf.c = csnorm:::wgfl_diff_perf(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                       trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.val/20, diag.rm)
-    } else {
-      perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+    perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                                             trails$breakpoints, lambda2, state$alpha, inflate, maxsteps, tol.val/20, diag.rm,
                                             state$z, state$u, state$phi.ref, state$delta)
-    }
   }
   return(perf.c)
 }

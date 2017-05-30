@@ -16,9 +16,5 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
                            double alpha, double inflate, int ninner, double converge,
                            int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector phi_i);
 
-List wgfl_signal_perf(const DataFrame cts, double dispersion, int nouter, int nbins,
-                      int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
-                      double lam1, double lam2, double eCprime,
-                      double alpha, double inflate, int ninner, double converge, int diag_rm);
 #endif
 
