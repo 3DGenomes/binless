@@ -142,15 +142,13 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
 #' @keywords internal
 gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
   #assume lambda1=0 and compute the fused lasso solution, centered around eCprime
-  perf.c = csnorm:::gfl_perf_iteration(csig, lambda2)
+  perf.c = csnorm:::gfl_perf_iteration(csig, lambda1, lambda2, eCprime)
   #cat("GFL: initial alpha=",alpha,"final alpha=",perf.c$alpha,"nsteps=",perf.c$nsteps,"\n")
   if (class(csig)!="CSbdiff") {
-    matg = as.data.table(perf.c$mat)[,.(bin1,bin2,valuehat=phihat,ncounts,weight,value=perf.c$phi-eCprime,diag.idx)]
+    matg = as.data.table(perf.c$mat)[,.(bin1,bin2,valuehat=phihat,ncounts,weight,value=perf.c$phi,diag.idx)]
   } else {
-    matg = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta-eCprime,diag.idx)]
+    matg = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta,diag.idx)]
   }
-  #now soft-threshold the shifted value around eCprime
-  matg[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
   #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=value))+scale_fill_gradient2()
   return(matg)
 }
@@ -159,27 +157,22 @@ gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
 #' @keywords internal
 gfl_BIC = function(csig, lambda1, lambda2, eCprime) {
   #get value with lambda1 set to zero to avoid round-off errors in degrees of freedom
-  perf.c = csnorm:::gfl_perf_iteration(csig, lambda2)
+  perf.c = csnorm:::gfl_perf_iteration(csig, lambda1, lambda2, eCprime)
   if (class(csig)!="CSbdiff") {
-    state = perf.c[c("z","u","phi","alpha")]
-    submat = as.data.table(perf.c$mat)[,.(bin1,bin2,valuehat=phihat,ncounts,weight,value=perf.c$phi-eCprime)]
+    state = perf.c[c("z","u","beta","alpha")]
+    submat = as.data.table(perf.c$mat)[,.(bin1,bin2,valuehat=phihat,ncounts,weight,value=perf.c$phi)]
   } else {
-    state = perf.c[c("z","u","phi.ref","delta","alpha")]
-    submat = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta-eCprime)]
+    state = perf.c[c("z","u","phi.ref","beta","alpha")]
+    submat = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta)]
   }
   #get the number of patches and deduce degrees of freedom
   tol.value=csig@settings$tol.val
   cl = csnorm:::build_patch_graph(submat, csig@trails, tol.value=tol.value)$components
   submat[,patchno:=cl$membership]
-  dof = submat[abs(value)+tol.value>lambda1,uniqueN(patchno)] #sparse fused lasso
+  dof = submat[,uniqueN(patchno)] #sparse fused lasso
   state$dof=dof
-  stopifnot(dof<=cl$no)
-  #now soft-threshold the value around eCprime
-  submat[,value:=sign(value)*pmax(abs(value)-lambda1, 0)]
   #compute BIC
   BIC = submat[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
-  #compute mallow's Cp
-  #Cp = submat[,sum(weight*((valuehat-(value+eCprime))^2 - 1))]+2*dof
   state$BIC=BIC
   state$mat=submat
   return(state)
@@ -325,9 +318,9 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
   matg = csig@mat
   trails = csig@trails
   if (diff==F) {
-    state = list(phi=matg[,phi], u=rep(0,length(trails$trails)), z=matg[trails$trails+1,phi], alpha=init.alpha)
+    state = list(beta=matg[,phi], u=rep(0,length(trails$trails)), z=matg[trails$trails+1,phi], alpha=init.alpha)
   } else {
-    state = list(phi.ref=matg[,phi.ref], delta=matg[,delta], u=rep(0,length(trails$trails)),
+    state = list(phi.ref=matg[,phi.ref], beta=matg[,delta], u=rep(0,length(trails$trails)),
                  z=matg[trails$trails+1,delta], alpha=init.alpha)
   }
   return(state)

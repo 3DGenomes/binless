@@ -103,7 +103,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
   }
   //printf(" Perf iteration: end   with lam=%f alpha=%f phi[0]=%f z[0]=%f u[0]=%f nouter=%d ninner=%d\n",
   //       lam, alpha, phi_r[0], z_r[0], u_r[0], step, res);
-  return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha),
+  return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha), _["phi"]=wrap(phi_r),
                       _["mat"]=cts_to_signal_mat(cts, nbins, dispersion, phi_r, eCprime, diag_rm),
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res);
 }
