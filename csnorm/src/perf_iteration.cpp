@@ -5,10 +5,7 @@ using namespace Rcpp;
 
 #include "perf_iteration.hpp"
 #include "gfl_c.h"
-#include "graph_fl.c"
-#include "tf_dp.c"
-#include "utils.c"
-
+#include "graph_fl.h"
 
 DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion, std::vector<double>& phi, int diag_rm)
 {

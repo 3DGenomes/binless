@@ -4,6 +4,7 @@
  *                                                                          *
  *                                                                          *
  * Modified by Wesley Tansey on 7/27/2015                                   *
+ * Modified by Yannick Spill on 05/30/2017                                  *
  *                                                                          *
  * This file is part of the glmgen library / package.                       *
  *                                                                          *
@@ -21,16 +22,7 @@
  *   License along with glmgen. If not, see <http://www.gnu.org/licenses/>. *
  ****************************************************************************/
 
-/**
- * @file tf_dp.c
- * @author Taylor Arnold, Veeranjaneyulu Sadhanala, Ryan Tibshirani
- * @date 2014-12-23
- * @brief Dynamic programming algorithm for the 1d fused lasso. 
- *
- * Here.
- */
-
- #include "tf.h"
+#include "tf.h"
 
 /**
  * @brief Implementation of Nick Johnson's dynamic programming algorithm 
