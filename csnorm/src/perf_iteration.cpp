@@ -4,7 +4,7 @@ using namespace Rcpp;
 #include <vector>
 
 #include "perf_iteration.hpp"
-#include "gfl_c.c"
+#include "gfl_c.h"
 #include "graph_fl.c"
 #include "tf_dp.c"
 #include "utils.c"
