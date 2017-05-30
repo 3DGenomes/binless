@@ -11,12 +11,14 @@ using namespace Rcpp;
 DataFrame cts_to_diff_mat(const DataFrame cts, const DataFrame ref, int nbins, double dispersion,
                           std::vector<double>& phi_ref, std::vector<double>& delta, int diag_rm)
 {
-  const DataFrame mat_ref = cts_to_signal_mat(ref, nbins, dispersion, phi_ref, diag_rm);
+  //assume eCprime = 0 for difference step
+  const double eCprime=0;
+  const DataFrame mat_ref = cts_to_signal_mat(ref, nbins, dispersion, phi_ref, eCprime, diag_rm);
   
   std::vector<double> phi_oth;
   phi_oth.reserve(delta.size());
   for (int i=0; i<delta.size(); ++i) phi_oth[i] = phi_ref[i] + delta[i];
-  const DataFrame mat_oth = cts_to_signal_mat(cts, nbins, dispersion, phi_oth, diag_rm);
+  const DataFrame mat_oth = cts_to_signal_mat(cts, nbins, dispersion, phi_oth, eCprime, diag_rm);
   
   IntegerVector bin1 = mat_ref["bin1"];
   IntegerVector bin2 = mat_ref["bin2"];

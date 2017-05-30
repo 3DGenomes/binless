@@ -100,7 +100,7 @@ gfl_compute_trails = function(nbins) {
 
 #' dispatch for fused lasso perf iteration: warm/cold signal/difference
 #' @keywords internal
-gfl_perf_iteration = function(csig, lambda2) {
+gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
   ctsg=csig@cts
   nbins=csig@settings$nbins
   dispersion=csig@settings$dispersion
@@ -116,13 +116,16 @@ gfl_perf_iteration = function(csig, lambda2) {
   if (is.null(ctsg.ref)) {
     if (length(state)==0) {
       perf.c = csnorm:::wgfl_signal_perf(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                         trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.val/20, diag.rm)
+                                         trails$breakpoints, lambda1, lambda2, eCprime,
+                                         alpha, inflate, maxsteps, tol.val/20, diag.rm)
     } else {
       perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                              trails$breakpoints, lambda2, state$alpha, inflate, maxsteps, tol.val/20, diag.rm,
-                                              state$z, state$u, state$phi)
+                                              trails$breakpoints, lambda1, lambda2, eCprime,
+                                              state$alpha, inflate, maxsteps, tol.val/20, diag.rm,
+                                              state$z, state$u, state$beta)
     }
   } else {
+    stopifnot(lambda1==0 & eCprime==0)
     if (length(state)==0) {
       perf.c = csnorm:::wgfl_diff_perf(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                                        trails$breakpoints, lambda2, alpha, inflate, maxsteps, tol.val/20, diag.rm)
