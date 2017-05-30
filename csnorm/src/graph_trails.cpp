@@ -8,22 +8,7 @@ using namespace Rcpp;
 #include <boost/graph/connected_components.hpp>
 #include <boost/graph/graph_utility.hpp>
 
-struct Coordinate { int index,bin1,bin2; };
-typedef boost::adjacency_list <boost::vecS, boost::vecS, boost::undirectedS, Coordinate> Graph;
-
-struct edge_within_patch {
-  edge_within_patch() { }
-  edge_within_patch(const Graph& G_, double* value_, //ptr to begin of std::vector<double> of size |E|
-                    double tol_val_)
-     : G(G_), value(value_), tol_val(tol_val_) { }
-  template <typename Edge>
-  bool operator()(const Edge& e) const {
-    return std::abs(get(value, boost::source(e, G))-get(value, boost::target(e, G))) < tol_val;
-  }
-  Graph G;
-  double* value;
-  double tol_val;
-};
+#include "graph_trails.hpp"
 
 std::vector<std::vector<int> > boost_triangle_grid_chain(int nrow) {
   int ntotal = nrow*(nrow+1)/2-1;

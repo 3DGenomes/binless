@@ -1,7 +1,7 @@
 #include <Rcpp.h>
 using namespace Rcpp;
-#include "perf_iteration.cpp"
-#include "graph_trails.cpp"
+#include "perf_iteration.hpp"
+#include "graph_trails.hpp"
 
 
 RCPP_MODULE(gfl){
