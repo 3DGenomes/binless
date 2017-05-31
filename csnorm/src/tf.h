@@ -25,18 +25,13 @@
  *   License along with glmgen. If not, see <http://www.gnu.org/licenses/>. *
  ****************************************************************************/
 
-/**
- * @file tf.h
- * @author Taylor Arnold, Ryan Tibshirani, Veerun Sadhanala
- * @date 2014-12-23
- * @brief Main functions for fitting trend filtering models.
- *
- * Here.
- */
-
 #ifndef TF_H
 #define TF_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+  
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,4 +55,10 @@
  void tf_dp_weight (int n, double *y, double *w, double lam, double *beta,
                     double *x, double *a, double *b, double *tm, double *tp);
 #endif
+ 
+ 
+#ifdef __cplusplus
+}
+#endif
+
 #endif

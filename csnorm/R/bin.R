@@ -234,8 +234,8 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
 #' @export
 #' 
 #' @examples
-bin_all_datasets = function(cs, resolution=10000, ncores=1, verbose=T) {
-  group_datasets(cs, resolution=resolution, group="all", ncores=ncores, verbose=verbose)
+bin_all_datasets = function(cs, resolution=10000, ncores=1, verbose=T, niter=100) {
+  group_datasets(cs, resolution=resolution, group="all", ncores=ncores, verbose=verbose, niter=niter)
 }
 
 #' Generate iota and rho genomic biases on evenly spaced points along the genome

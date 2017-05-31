@@ -20,6 +20,10 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+  
 #include <math.h>
 #include <stdio.h>
 #include <gsl/gsl_rng.h>
@@ -67,5 +71,9 @@ double log_norm_pdf(double x, double mu, double sigma);
 void cs_dot_vec(cs *A, double *x, double *b);
 void vec_dot_cs(double *x, cs *A, double *b);
 
+#ifdef __cplusplus
+}
+#endif
+  
 #endif
 

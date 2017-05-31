@@ -25,8 +25,7 @@ detect_binned_interactions = function(cs, resolution, group, threshold=0.95, nco
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
   #check if interaction wasn't calculated already
-  if (get_cs_interaction_idx(csg, type="interactions", threshold=threshold,
-                             ref="expected", raise=F)>0)
+  if (get_cs_interaction_idx(csg, type="CSsig", threshold=threshold, raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
   cts = copy(csg@cts)
   #
@@ -80,7 +79,7 @@ detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95,
   csg=cs@groups[[idx1]]
   #
   #check if interaction wasn't calculated already
-  if (get_cs_interaction_idx(csg, type="differences", threshold=threshold, ref=ref, raise=F)>0)
+  if (get_cs_interaction_idx(csg, type="CSdiff", threshold=threshold, ref=ref, raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
   # check if reference is ok
   cts = csg@cts

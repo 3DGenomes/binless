@@ -153,3 +153,107 @@ csnorm:::optimize_lambda2(cts.nodecay, nbins, dispersion, trails, tol.val = tol.
 
 
 
+sub="SELP_150k"
+bpk=30
+dfuse=20
+load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base5k_bpk",bpk,"_dfuse",dfuse,".RData"))
+resolution=5000
+group="all"
+eCprime=cs@design[,.(eCprime=0),keyby=name]
+cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores, niter=1)
+idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+csg=cs@groups[[idx1]]
+diag.rm = ceiling(csg@par$dmin/resolution)
+cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight,phi,var)]
+ref=cs@design[.N,name]
+
+###signal
+stuff = csnorm:::prepare_signal_matrix(cs, csg@names, resolution)
+mat=stuff$mat
+trails=stuff$trails
+#R signal
+mat.R = csnorm:::csnorm_compute_raw_signal(cts[name==ref], csg@par$alpha, mat[name==ref], eCprime)
+mat.R = mat.R[,.(bin1,bin2,phihat,phihat.var,ncounts,weight,diag.idx)]
+mat.R[diag.idx<=diag.rm,c("phihat.var","weight"):=list(Inf,0)]
+#C signal
+mat.C = as.data.table(csnorm:::cts_to_signal_mat(cts[name==ref], csg@par$nbins, csg@par$alpha,
+                                               mat[name==ref,phi], diag.rm))
+all.equal(mat.C,mat.R)
+merge(mat.C,mat.R,by=c("bin1","bin2"),suffixes=c(".R",".C"))[,summary(phihat.R-phihat.C)]
+merge(mat.C,mat.R,by=c("bin1","bin2"),suffixes=c(".R",".C"))[phihat.R-phihat.C==-1]#[,.(unclass(bin1),unclass(bin2))]
+
+
+###diff
+stuff = csnorm:::prepare_difference_matrix(cs, csg@names, resolution, ref)
+mat=stuff$mat
+trails=stuff$trails
+#R diff
+mat.R = csnorm:::csnorm_compute_raw_differential(csg@cts, csg@par$alpha, mat, eCprime, ref)
+mat.R = mat.R[,.(bin1,bin2,phihat,phihat.var,phihat.ref,phihat.var.ref,deltahat,deltahat.var,ncounts,weight,diag.idx)]
+#C diff
+mat.C = as.data.table(csnorm:::cts_to_diff_mat(csg@cts[name!=ref], csg@cts[name==ref], csg@par$nbins, csg@par$alpha,
+  mat[name!=ref,phi.ref], mat[name!=ref,delta], diag.rm))
+
+all.equal(mat.C,mat.R)
+merge(mat.C,mat.R,by=c("bin1","bin2"),suffixes=c(".R",".C"))[,summary(deltahat.R-deltahat.C)]
+
+perf.c = csnorm:::gfl_perf_iteration(ctsg, dispersion, diag.rm, nbins, trails, lambda2, ctsg.ref,
+                            alpha=5, inflate=2, tol.value=1e-3, nperf=100, maxsteps=1e5, perf.c)
+
+
+value.C = csnorm:::gfl_perf_iteration(cts[name!=ref], csg@par$alpha, diag.rm, csg@par$nbins, trails, 5, ref=cts[name==ref],
+                                        alpha=5, inflate=2, tol.value=1e-6, nperf=100, maxsteps=100000, state=init.state)
+ggplot(as.data.table(value.C$mat)[,.(bin1,bin2,delta=value.C$delta,phi.ref=value.C$phi.ref)])+geom_raster(aes(bin1,bin2,fill=phi.ref))+scale_fill_gradient2()
+
+
+
+
+
+matg.diff=as.data.table(csnorm:::cts_to_diff_mat(ctsg,ctsg.ref,nbins,dispersion,rep(0,nbins*(nbins+1)/2),rep(0,nbins*(nbins+1)/2),diag.rm))
+ggplot(matg.diff)+geom_raster(aes(bin1,bin2,fill=phihat.ref))+geom_raster(aes(bin2,bin1,fill=deltahat))+scale_fill_gradient2()
+ggplot(matg.diff)+geom_raster(aes(bin1,bin2,fill=pmin(5,phihat.ref)))+geom_raster(aes(bin2,bin1,fill=pmax(-5,pmin(5,deltahat))))+scale_fill_gradient2()
+ggplot(matg.diff)+geom_raster(aes(bin1,bin2,fill=pmax(-5,pmin(5,phihat.ref*weight))))+geom_raster(aes(bin2,bin1,fill=pmax(-5,pmin(5,deltahat*weight))))+scale_fill_gradient2()
+matg=as.data.table(csnorm:::cts_to_signal_mat(ctsg,nbins,dispersion,rep(0,nbins*(nbins+1)/2),diag.rm))
+ggplot(matg)+geom_raster(aes(bin1,bin2,fill=phihat))+scale_fill_gradient2()
+matg.ref=as.data.table(csnorm:::cts_to_signal_mat(ctsg.ref,nbins,dispersion,rep(0,nbins*(nbins+1)/2),diag.rm))
+ggplot(matg.ref)+geom_raster(aes(bin1,bin2,fill=phihat))+scale_fill_gradient2()
+ggplot()+geom_raster(data=matg,aes(bin1,bin2,fill=pmin(phihat,5)))+geom_raster(data=matg.ref,aes(bin2,bin1,fill=pmin(phihat,5)))+scale_fill_gradient2()
+ggplot()+geom_raster(data=matg,aes(bin1,bin2,fill=weight))+geom_raster(data=matg.ref,aes(bin2,bin1,fill=weight))+scale_fill_gradient2()
+
+
+mat=merge(matg,matg.ref,by=c("bin1","bin2","diag.idx"),suffixes=c("",".ref"))
+mat[,c("deltahat","deltahat.var","ncounts.ref","weight.ref"):=list(phihat-phihat.ref,phihat.var+phihat.var.ref,NULL,NULL)]
+setcolorder(mat,names(matg.diff))
+mat[,c("ncounts","weight"):=NULL]
+matg.diff[,c("ncounts","weight"):=NULL]
+setkeyv(mat,key(matg.diff))
+all.equal(mat,matg.diff)
+merge(mat,matg.diff,by=c("bin1","bin2","diag.idx"),suffixes=c(".man",".diff"))[,all.equal(phihat.var.ref.diff,phihat.var.ref.man)]
+
+matg.diff2=as.data.table(csnorm:::cts_to_diff_mat(ctsg.ref,ctsg,nbins,dispersion,rep(0,nbins*(nbins+1)/2),rep(0,nbins*(nbins+1)/2),diag.rm))
+setnames(matg.diff2,c("phihat","phihat.var","phihat.ref","phihat.var.ref"),c("phihat.ref","phihat.var.ref","phihat","phihat.var"))
+matg.diff2[,deltahat:=-deltahat]
+setcolorder(matg.diff2,names(matg.diff))
+all.equal(matg.diff,matg.diff2)
+
+
+matg = csnorm:::gfl_get_matrix(ctsg, nbins, dispersion, diag.rm, trails, 0, lambda2, 0,
+                               tol.value=tol.val, state=state, ctsg.ref)
+matg2 = csnorm:::gfl_get_matrix(ctsg.ref, nbins, dispersion, diag.rm, trails, 0, lambda2, 0,
+                               tol.value=tol.val, state=state, ctsg.ref=ctsg)[,.(bin1,bin2,phihat.ref=)]
+ggplot(matg)+geom_raster(aes(bin1,bin2,fill=phihat.ref))+geom_raster(aes(bin2,bin1,fill=valuehat))+scale_fill_gradient2()
+
+
+#norm
+csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, simplified=T, verbose=verbose)
+-> lambda1_eCprime_simplified
+#signal
+csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=T, simplified=T, verbose=verbose)
+-> lambda1_only
+#diff
+csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=T, simplified=F, verbose=verbose,
+                            ctsg.ref=csig@cts.ref)
+-> lambda1_only
+
+
+

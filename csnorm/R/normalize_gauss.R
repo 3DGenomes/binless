@@ -685,10 +685,13 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   groupnames=cts[,unique(name)]
   nbins=length(cs@settings$sbins)-1
   registerDoParallel(cores=ncores)
-  params = foreach(g=groupnames, .combine=rbind) %dopar%
-    csnorm:::csnorm_fused_lasso(cts[name==g], nbins, cs@par$alpha, diag.rm, cs@settings$trails,
-                                positive=T, fixed=F, constrained=constrained, simplified=T,
-                                tol.val=cs@settings$tol.leg, verbose=verbose, init.phi=cs@par$signal[name==g,phi])
+  params = foreach(g=groupnames, .combine=rbind) %dopar% {
+    csig=new("CSbsig", mat=cs@par$signal[name==g], trails=cs@settings$trails, cts=cts[name==g],
+             settings=list(diag.rm=diag.rm, nbins=nbins, dispersion=cs@par$alpha, tol.val=cs@settings$tol.leg,
+                           inflate=2, nperf=1000, maxsteps=100000))
+    csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
+    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose)
+  }
   #compute matrix at new params
   mat = rbindlist(params[,mat])
   #store new signal in cs and update eC

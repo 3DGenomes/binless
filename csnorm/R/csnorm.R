@@ -30,17 +30,15 @@
 #'
 #' @useDynLib csnorm, .registration = TRUE
 #' @import rstan
+#' @import rstantools
+#' @import methods
 #' @import splines
-#' @import mgcv
 #' @import data.table
 #' @import doParallel
 #' @import foreach
 #' @import matrixStats
 #' @import ggplot2
-#' @import igraph
 #' @import MASS
-#' @import abind
-#' @import methods
 #' @import Matrix
 #' @import quadprog
 #' @importFrom Hmisc cut2
@@ -101,36 +99,44 @@ setMethod("show",signature="CSdata",definition=function(object) {
   }
 })
 
-#' Class for one interaction detection
-#'
-#'
-#' @slot mat 
-#' @slot type 
-#' @slot threshold 
-#' @slot ref 
-#'
-#' @return
+#' Virtual class for one interaction detection
 #' @keywords internal
-#' @export
-#'
-#' @examples
 setClass("CSinter",
          slots = list(mat="data.table",
-                      type="character",
-                      threshold="numeric",
-                      ref="character"))
-setMethod("show",signature="CSinter",definition=function(object) {
-  if (object@type=="interactions") {
-    cat("        Significant interactions wrt expected") 
-    cat(" (threshold=", object@threshold,")\n")
-  } else if (object@type=="binteractions") {
+                      par="list",
+                      settings="list"),
+         contains = "VIRTUAL")
+
+#' Binned interaction detection
+#' @keywords internal
+setClass("CSsig", slot = list(threshold="numeric"), contains = "CSinter")
+setMethod("show", signature="CSsig", definition=function(object) {
+  cat("        Significant interactions wrt expected") 
+  cat(" (threshold=", object@threshold,")\n")
+})
+
+#' Binless difference detection
+#' @keywords internal
+setClass("CSdiff", slots = list(threshold="numeric", ref="character"), contains = "CSinter")
+setMethod("show", signature="CSdiff", definition=function(object) {
+  cat("        Significant differences wrt ", object@ref)
+  cat(" (threshold=", object@threshold,")\n")
+})
+
+#' Binless interaction detection
+#' @keywords internal
+setClass("CSbsig", slots = list(trails="list",cts="data.table",state="list"), contains = "CSinter")
+setMethod("show", signature="CSbsig", definition=function(object) {
     cat("        Binless interactions wrt expected\n") 
-  } else if (object@type=="differences") {
-    cat("        Significant differences wrt ", object@ref)
-    cat(" (threshold=", object@threshold,")\n")
-  } else {
-    cat("        Binless differences wrt ", object@ref, "\n") 
-  }
+})
+
+#' Binless difference detection
+#' @keywords internal
+setClass("CSbdiff",
+         slots = list(ref="character",trails="list",cts="data.table",cts.ref="data.table",state="list"),
+         contains = "CSinter")
+setMethod("show", signature="CSbdiff", definition=function(object) {
+  cat("        Binless differences wrt ", object@ref, "\n") 
 })
 
 #' Class for one dataset grouping at a given (base) resolution
