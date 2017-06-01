@@ -5,6 +5,8 @@
 using namespace Rcpp;
 #include <vector>
 
+#define SQUARE(x) ((x)*(x))
+
 DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion, std::vector<double>& phi,
                             double eCprime, int diag_rm);
 
@@ -15,6 +17,13 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
                            double lam1, double lam2,  double eCprime,
                            double alpha, double inflate, int ninner, double converge,
                            int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector phi_i);
+
+List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins,
+                     int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
+                     double lam1, double lam2,  double eCprime,
+                     double alpha, double inflate, int ninner, double tol_val,
+                     int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector phi_i);
+
 
 #endif
 

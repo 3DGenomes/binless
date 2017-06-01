@@ -5,8 +5,9 @@ using namespace Rcpp;
 #include <algorithm>
 
 #include "perf_iteration_signal.hpp"
-#include "gfl_c.h"
-#include "graph_fl.h"
+#include "gfl_c.h" //cts_to_signal_mat_core
+#include "graph_fl.h" //graph_fused_lasso_weight_warm
+#include "graph_trails.hpp" //boost_build_patch_graph_components
 
 DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion, std::vector<double>& phi,
                             double eCprime, int diag_rm)
@@ -106,6 +107,50 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
   return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha), _["phi"]=wrap(phi_r),
                       _["mat"]=cts_to_signal_mat(cts, nbins, dispersion, phi_r, eCprime, diag_rm),
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res);
+}
+
+List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins,
+                     int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
+                     double lam1, double lam2,  double eCprime,
+                     double alpha, double inflate, int ninner, double tol_val,
+                     int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector phi_i) {
+  
+  //perf iteration for this set of values
+  List ret = wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
+                                   lam1, lam2, eCprime, alpha, inflate, ninner, tol_val/20., diag_rm,
+                                   z_i, u_i, phi_i);
+  
+  //identify patches
+  DataFrame retmat = wrap(ret["mat"]);
+  DataFrame submat = DataFrame::create(_["bin1"]=retmat["bin1"],
+                                       _["bin2"]=retmat["bin2"],
+                                       _["valuehat"]=retmat["phihat"],
+                                       _["ncounts"]=retmat["ncounts"],
+                                       _["weight"]=retmat["weight"],
+                                       _["value"]=ret["phi"]);
+  List patches = boost_build_patch_graph_components(nbins, submat, tol_val);
+  
+  //count the positive ones and deduce dof
+  NumericVector phi = ret["phi"];
+  IntegerVector patchno = patches["membership"];
+  IntegerVector selected = patchno[abs(phi)>tol_val/2];
+  const int dof = unique(selected).size();
+  
+  //compute BIC
+  NumericVector weight = submat["weight"];
+  NumericVector phihat = submat["valuehat"];
+  NumericVector ncounts = submat["ncounts"];
+  const double BIC = sum(weight * SQUARE(phihat-(phi + eCprime))) + log(sum(ncounts))*dof;
+  
+  DataFrame finalmat = DataFrame::create(_["bin1"]=retmat["bin1"],
+                                       _["bin2"]=retmat["bin2"],
+                                       _["valuehat"]=retmat["phihat"],
+                                       _["ncounts"]=retmat["ncounts"],
+                                       _["weight"]=retmat["weight"],
+                                       _["value"]=ret["phi"],
+                                       _["patchno"]=patchno);
+  return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["beta"]=ret["beta"], _["alpha"]=ret["alpha"],
+                      _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat);
 }
 
 

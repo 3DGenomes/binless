@@ -10,6 +10,7 @@ RCPP_MODULE(gfl){
   
   function("cts_to_signal_mat" , &cts_to_signal_mat  , "documentation for cts_to_signal_mat ");
   function("wgfl_signal_perf_warm" , &wgfl_signal_perf_warm  , "documentation for wgfl_signal_perf_warm ");
+  function("wgfl_signal_BIC" , &wgfl_signal_BIC  , "documentation for wgfl_signal_BIC ");
   
   function("cts_to_diff_mat" , &cts_to_diff_mat  , "documentation for cts_to_diff_mat ");
   function("wgfl_diff_perf_warm" , &wgfl_diff_perf_warm  , "documentation for wgfl_diff_perf_warm ");

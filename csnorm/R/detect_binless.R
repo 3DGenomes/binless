@@ -167,6 +167,29 @@ gfl_BIC = function(csig, lambda1, lambda2, eCprime) {
   return(state)
 }
 
+#' compute BIC for a given value of lambda1, lambda2 and eCprime (performance iteration, persistent state)
+#' @keywords internal
+get_bic = function(csig, lambda1, lambda2, eCprime) {
+  ctsg=csig@cts
+  nbins=csig@settings$nbins
+  dispersion=csig@settings$dispersion
+  diag.rm=csig@settings$diag.rm
+  trails=csig@trails
+  tol.val=csig@settings$tol.val
+  state=csig@state
+  stopifnot(length(state)>0) #warm start only
+  if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
+  inflate=csig@settings$inflate
+  nperf=csig@settings$nperf
+  maxsteps=csig@settings$maxsteps
+  perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                                    trails$breakpoints, lambda1, lambda2, eCprime,
+                                    state$alpha, inflate, maxsteps, tol.val, diag.rm,
+                                    state$z, state$u, state$beta)
+  return(perf.c)
+}
+
+
 #' cross-validate lambda1 and eCprime, assuming positive=T and holding eCprime=lambda1+min(value)
 #' 
 #' @keywords internal

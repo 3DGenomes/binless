@@ -2,7 +2,8 @@ library(csnorm)
 library(data.table)
 library(ggplot2)
 
-setwd("/home/yannick/simulations/cs_norm")
+#setwd("/home/yannick/simulations/cs_norm")
+setwd("/Users/yannick/Documents/simulations/cs_norm")
 
 nbins=5
 
@@ -17,3 +18,22 @@ csnorm:::boost_build_patch_graph_components(nbins,data[order(bin2)],1e-3)
 a=csnorm:::boost_build_patch_graph_components(nbins,data,1e-3)
 b=csnorm:::build_patch_graph(data,csnorm:::gfl_compute_trails(nbins),1e-3)
 all(a$membership==b$components$membership-1)
+
+load("tmp_csig.RData")
+bic_r = csnorm:::gfl_BIC(csig, .1, 10, -0.1)
+ggplot(bic_r$mat)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=value))+scale_fill_gradient2()
+
+
+bic_c = csnorm:::get_bic(csig, .1, 10, -0.1)
+
+bic_c$dof
+bic_r$dof
+
+bic_c$BIC
+bic_r$BIC
+
+all.equal(as.data.table(bic_c$mat),bic_r$mat)
+a=merge(as.data.table(bic_c$mat)[,.(bin1,bin2,value,patchno=patchno+1)],
+      bic_r$mat[,.(bin1,bin2,value,patchno)],by=c("bin1","bin2"),suffixes=c(".c",".r"))
+
+
