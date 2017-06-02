@@ -34,10 +34,6 @@ std::vector<std::vector<int> > boost_triangle_grid_chain(int nrow);
 
 List boost_chains_to_trails(const std::vector<std::vector<int> >& chains);
 
-Graph build_2d_connectivity_graph(int nrow);
-
-std::vector<double> report_values_in_graph(const Graph& G, const DataFrame mat);
-
 Graph build_patch_graph(int nrow, const DataFrame mat, double tol_val);
 
 //mat must be sorted by bin1 and bin2 and will not be checked for that
