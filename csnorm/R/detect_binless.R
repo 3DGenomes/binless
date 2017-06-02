@@ -1,73 +1,6 @@
 #' @include csnorm.R
 NULL
 
-#' give a patch ID to each patch in a binless matrix, and report local extrema
-#' @keywords internal
-build_patch_graph = function(mat, trails, tol.value=1e-3) {
-  g=trails$graph
-  #remove edges that connect different values
-  V(g)$value = mat[,value]
-  values_by_edge = t(matrix(get.vertex.attribute(g,"value",index=get.edges(g,E(g))), ncol=2))
-  to_rm = E(g)[abs(values_by_edge[1,]-values_by_edge[2,])>tol.value]
-  g2 = delete_edges(g, to_rm)
-  #plot(g2, vertex.color=factor(V(g2)$value), layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
-  #
-  #get connected components
-  cl=clusters(g2)
-  #V(g)$patch=cl$membership
-  #plot(g, vertex.color=factor(V(g)$value), vertex.label=V(g)$patch, layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
-  #V(g2)$patch=cl$membership
-  #plot(g2, vertex.color=factor(V(g2)$value), vertex.label=V(g2)$patch, layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
-  #patches=foreach (id=1:cl$no) %do% V(g)[cl$membership==id]
-  #plot(g, vertex.color=factor(V(g)$value), vertex.label=V(g)$patch, edge.arrow.size=0.3,
-  #     mark.groups=patches, layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
-  return(list(g.patches=g2,components=cl))
-}
-
-#' give a patch ID to each patch in a binless matrix, and report local extrema
-#' @keywords internal
-detect_binless_patches = function(mat, trails, tol.value=1e-3) {
-  if (mat[,uniqueN(name)]>1)
-    return(foreach (n=mat[,unique(name)],.combine=rbind) %do%
-             csnorm:::detect_binless_patches(mat[name==n], trails, tol.value=tol.value))
-  #
-  stuff = build_patch_graph(mat, trails, tol.value=tol.value)
-  g=trails$graph
-  V(g)$value = mat[,value]
-  cl=stuff$components
-  #create fused graph
-  g3 = contract(g, cl$membership, vertex.attr.comb = list(value="min", weight="sum")) %>% simplify()
-  #plot(g3, vertex.color=factor(V(g3)$value), vertex.label=V(g3)$weight, vertex.size=10*log(1+V(g3)$weight), layout=layout_as_tree)
-  #
-  #Add directions from high to low values
-  g4 = as.directed(g3)
-  values_by_edge = t(matrix(get.vertex.attribute(g4,"value",index=get.edges(g4,E(g4))), ncol=2))
-  to_rm = E(g4)[values_by_edge[1,]<values_by_edge[2,]]
-  g4 = delete_edges(g4, to_rm)
-  #plot(g4, vertex.color=factor(V(g4)$value), vertex.label=V(g4)$weight,
-  #     vertex.size=5*V(g4)$weight, edge.arrow.size=0.5, layout=layout_nicely)
-  #
-  #report in and outdegree to original graph
-  g5 = as.directed(g)
-  V(g5)$indegree=degree(g4, v=cl$membership, mode="in")
-  V(g5)$outdegree=degree(g4, v=cl$membership, mode="out")
-  values_by_edge = t(matrix(get.vertex.attribute(g5,"value",index=get.edges(g5,E(g5))), ncol=2))
-  to_rm = E(g5)[values_by_edge[1,]<=values_by_edge[2,]]
-  g5 = delete_edges(g5, to_rm)
-  #plot(g5, vertex.color=V(g5)$indegree==0, vertex.label=NA, edge.arrow.size=0.3, vertex.size=3,
-  #     mark.groups=patches, layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
-  #plot(g5, vertex.color=V(g5)$outdegree==0, vertex.label=NA, edge.arrow.size=0.3,
-  #     mark.groups=patches, layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
-  #source_or_sink=ifelse(V(g5)$indegree==0,1,ifelse(V(g5)$outdegree==0,2,0))
-  #plot(g5, vertex.color=source_or_sink, vertex.label=NA, edge.arrow.size=0.01, vertex.size=3,
-  #     layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
-  stopifnot(length(V(g5))==mat[,.N])
-  mat[,is.minimum:=V(g5)$outdegree==0]
-  mat[,is.maximum:=V(g5)$indegree==0]
-  mat[,patchno:=factor(cl$membership)]
-  return(mat)
-}
-
 #' connectivity on a triangle
 #' @keywords internal
 compute_2d_connectivity_graph = function(nbins, start=1) {
@@ -175,7 +108,7 @@ gfl_BIC = function(csig, lambda1, lambda2, eCprime) {
 optimize_lambda1_eCprime = function(matg, csig, lambda1.min=0.05, constrained=T) {
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   #get the number of patches to compute degrees of freedom
-  cl = csnorm:::build_patch_graph(matg, csig@trails, tol.value=csig@settings$tol.val)$components
+  cl = csnorm:::boost_build_patch_graph_components(csig@settings$nbins, matg, csig@settings$tol.val)
   matg[,patchno:=cl$membership]
   patches = matg[,.(value=value[1],size=.N),by=patchno][,.(N=.N,size=size[1]),keyby=value]
   if (patches[,.N]==1) {#matrix is just one big bin
@@ -232,7 +165,7 @@ optimize_lambda1_eCprime = function(matg, csig, lambda1.min=0.05, constrained=T)
 optimize_lambda1_only = function(matg, csig, lambda1.min=0.05, positive=F, constrained=T) {
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   #get the number of patches to compute degrees of freedom
-  cl = csnorm:::build_patch_graph(matg, csig@trails, tol.value=csig@settings$tol.val)$components
+  cl = csnorm:::boost_build_patch_graph_components(csig@settings$nbins, matg, csig@settings$tol.val)
   matg[,patchno:=cl$membership]
   patches = matg[,.(value=value[1],size=.N),by=patchno][,.(N=.N,size=size[1]),keyby=value]
   stopifnot(patches[,sum(N)]==cl$no)
@@ -482,7 +415,12 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
   #
   if (verbose==T) cat(" Detect patches\n")
-  csi@mat = csnorm:::detect_binless_patches(mat, csi@trails, tol.value=csi@settings$tol.val)
+  csi@mat = foreach(g=groupnames, .combine=rbind) %dopar% {
+    matg = csi@mat[name==g]
+    cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
+    matg[,patchno:=factor(cl$membership)]
+    matg
+  }
   #
   ### store interaction
   #store back
@@ -538,7 +476,12 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
   #
   if (verbose==T) cat(" Detect patches\n")
-  csi@mat = csnorm:::detect_binless_patches(mat, csi@trails, tol.value=csi@settings$tol.val)
+  csi@mat = foreach(g=groupnames, .combine=rbind) %dopar% {
+    matg = csi@mat[name==g]
+    cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
+    matg[,patchno:=factor(cl$membership)]
+    matg
+  }
   #store back
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
