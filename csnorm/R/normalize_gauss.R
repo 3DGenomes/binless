@@ -989,7 +989,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
       if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
     }
     #fit signal using sparse fused lasso
-    if (fit.signal==T) {
+    if (fit.signal==T & i > 1) {
       update.exposures=F
       a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=fit.decay, ncores=ncores))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
