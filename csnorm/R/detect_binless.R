@@ -145,31 +145,10 @@ gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
 #' compute BIC for a given value of lambda1, lambda2 and eCprime (performance iteration, persistent state)
 #' @keywords internal
 gfl_BIC = function(csig, lambda1, lambda2, eCprime) {
-  #get value with lambda1 set to zero to avoid round-off errors in degrees of freedom
-  perf.c = csnorm:::gfl_perf_iteration(csig, lambda1, lambda2, eCprime)
-  if (class(csig)!="CSbdiff") {
-    state = perf.c[c("z","u","beta","alpha")]
-    submat = as.data.table(perf.c$mat)[,.(bin1,bin2,valuehat=phihat,ncounts,weight,value=perf.c$phi)]
-  } else {
-    state = perf.c[c("z","u","phi.ref","beta","alpha")]
-    submat = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta)]
-  }
-  #get the number of patches and deduce degrees of freedom
-  tol.value=csig@settings$tol.val
-  cl = csnorm:::build_patch_graph(submat, csig@trails, tol.value=tol.value)$components
-  submat[,patchno:=cl$membership]
-  dof = submat[,uniqueN(patchno)] #sparse fused lasso
-  state$dof=dof
-  #compute BIC
-  BIC = submat[,sum(weight*((valuehat-(value+eCprime))^2))+log(sum(ncounts))*dof]
-  state$BIC=BIC
-  state$mat=submat
-  return(state)
-}
-
-#' compute BIC for a given value of lambda1, lambda2 and eCprime (performance iteration, persistent state)
-#' @keywords internal
-get_bic = function(csig, lambda1, lambda2, eCprime) {
+  stopifnot(class(csig)!="CSbdiff")
+  #state = perf.c[c("z","u","phi.ref","beta","alpha")]
+  #submat = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta)]
+  #
   ctsg=csig@cts
   nbins=csig@settings$nbins
   dispersion=csig@settings$dispersion
