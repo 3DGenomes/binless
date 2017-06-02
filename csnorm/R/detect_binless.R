@@ -71,6 +71,7 @@ gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
   } else {
     matg = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta,diag.idx)]
   }
+  setkey(matg,bin1,bin2)
   #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=value))+scale_fill_gradient2()
   return(matg)
 }
