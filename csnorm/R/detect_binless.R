@@ -294,7 +294,7 @@ csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, cts
 
 #' Build grouped signal matrix using normalization data if available
 #' @keywords internal
-prepare_signal_matrix = function(cs, csg, resolution) {
+prepare_signal_matrix = function(cs, csg, resolution, tol.val) {
   names=csg@names
   #build signal matrix
   if (cs@par$signal[,.N]==0) {
@@ -350,8 +350,8 @@ prepare_signal_matrix = function(cs, csg, resolution) {
 
 #' Build grouped difference matrix using normalization data if available
 #' @keywords internal
-prepare_difference_matrix = function(cs, csg, resolution, ref) {
-  csi = csnorm:::prepare_signal_matrix(cs, csg, resolution)
+prepare_difference_matrix = function(cs, csg, resolution, ref, tol.val) {
+  csi = csnorm:::prepare_signal_matrix(cs, csg, resolution, tol.val)
   names=csg@names
   mat = foreach(n=names[groupname!=ref,unique(groupname)],.combine=rbind) %do%
     merge(csi@mat[name==n],csi@mat[name==ref,.(bin1,bin2,phi1=phi)],all=T,by=c("bin1","bin2"))
@@ -388,7 +388,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #
   ### prepare signal estimation
   if (verbose==T) cat("  Prepare for signal estimation\n")
-  csi = csnorm:::prepare_signal_matrix(cs, csg, resolution)
+  csi = csnorm:::prepare_signal_matrix(cs, csg, resolution, tol.val)
   #
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
@@ -416,9 +416,10 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #
   if (verbose==T) cat(" Detect patches\n")
   csi@mat = foreach(g=groupnames, .combine=rbind) %dopar% {
-    matg = csi@mat[name==g]
+    matg = csi@mat[name==g,.(name,bin1,bin2,value=phi)]
     cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
     matg[,patchno:=factor(cl$membership)]
+    setnames(matg,"value","phi")
     matg
   }
   #
@@ -449,7 +450,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     stop("Refusing to overwrite this already detected interaction")
   if (is.character(ref)) ref=csg@names[as.character(groupname)==ref,unique(groupname)]
   if (verbose==T) cat("  Prepare for difference estimation\n")
-  csi = csnorm:::prepare_difference_matrix(cs, csg, resolution, ref)
+  csi = csnorm:::prepare_difference_matrix(cs, csg, resolution, ref, tol.val)
   #
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
@@ -477,9 +478,10 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #
   if (verbose==T) cat(" Detect patches\n")
   csi@mat = foreach(g=groupnames, .combine=rbind) %dopar% {
-    matg = csi@mat[name==g]
+    matg = csi@mat[name==g,.(name,bin1,bin2,value=delta)]
     cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
     matg[,patchno:=factor(cl$membership)]
+    setnames(matg,"value","delta")
     matg
   }
   #store back

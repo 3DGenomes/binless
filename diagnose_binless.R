@@ -97,7 +97,7 @@ ggplot(signals[step>=step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster
 matdiff=merge(signals[step>step[1],.(name,step,bin1,bin2,phi)],
               signals[step<step[.N],.(name,step=step+1,bin1,bin2,phi)],
               by=c("name","step","bin1","bin2"))[,.(name,step,bin1,bin2,diff=phi.x-phi.y)]
-ggplot(matdiff[step>30])+geom_raster(aes(bin1,bin2,fill=-diff))+geom_raster(aes(bin2,bin1,fill=-(diff)))+
+ggplot(matdiff[step>3])+geom_raster(aes(bin1,bin2,fill=-diff))+geom_raster(aes(bin2,bin1,fill=-(diff)))+
   scale_fill_gradient2()+facet_wrap(~step)+coord_fixed()
 
 
