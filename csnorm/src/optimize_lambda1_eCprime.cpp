@@ -48,7 +48,7 @@ NumericVector get_minimum_diagonal_values(NumericVector value, IntegerVector dia
   //store value for each patch
   int ndiags = max(diag_idx)+1;
   NumericVector diagvals(ndiags, max(value)); //diag_idx starts at 0
-  for (int i=0; i<diag_idx.size(); ++i) diagvals(diag_idx(i)) = std::max(diagvals(diag_idx(i)),value(i));
+  for (int i=0; i<diag_idx.size(); ++i) diagvals(diag_idx(i)) = std::min(diagvals(diag_idx(i)),value(i));
   return diagvals;
 }
 
@@ -81,7 +81,7 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, doubl
                           phi, weight, phihat, ncounts);
   //treat second border case
   if (maxval-minval <= 2*lambda1_min) return obj.get(lambda1_min);
-  //optimize// [[Rcpp::export]]
+  //optimize
   int bits = -8*std::log10(tol_val)+1;
   boost::uintmax_t maxiter = 100000;
   std::pair<double,double> ret = boost::math::tools::brent_find_minima(obj,

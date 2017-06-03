@@ -46,3 +46,8 @@ b=foreach (lambda2=5:15,.combine=rbind) %do% {
 }
 ggplot(b)+geom_line(aes(lambda2,dof.r,colour="r"))+geom_line(aes(lambda2,dof.c,colour="c"))
 ggplot(b)+geom_line(aes(lambda2,bic.r,colour="r"))+geom_line(aes(lambda2,bic.c,colour="c"))
+
+
+csig.r = csnorm:::optimize_lambda1_eCprime(matg, csig, constrained=T)
+ret.c = csnorm:::cpp_optimize_lambda1_eCprime(matg, csig@settings$nbins, csig@settings$tol.val, T, 0.05)
+
