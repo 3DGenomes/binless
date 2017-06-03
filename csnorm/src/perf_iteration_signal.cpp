@@ -5,6 +5,7 @@ using namespace Rcpp;
 #include <algorithm>
 
 #include "perf_iteration_signal.hpp"
+#include "util.hpp" //SQUARE
 #include "gfl_c.h" //cts_to_signal_mat_core
 #include "graph_fl.h" //graph_fused_lasso_weight_warm
 #include "graph_trails.hpp" //boost_build_patch_graph_components
@@ -49,16 +50,6 @@ DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion, s
   return DataFrame::create(_["bin1"]=bin1_i, _["bin2"]=bin2_i, _["phihat"]=phihat_i,
                            _["phihat.var"]=phihat_var_i, _["ncounts"]=ncounts_i, _["weight"]=weight_i,
                            _["diag.idx"]=didx_i);
-}
-
-std::vector<double> soft_threshold(const std::vector<double>& beta, double eCprime, double lam1) {
-  std::vector<double> phi;
-  phi.reserve(beta.size());
-  for (std::vector<double>::const_iterator it = beta.begin(); it != beta.end(); ++it) {
-    double val = *it - eCprime;
-    phi.push_back((val > 0) ? std::max(0., val - lam1) : std::min(0., val + lam1));
-  }
-  return phi;
 }
 
 List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins,
@@ -152,5 +143,4 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
   return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["beta"]=ret["beta"], _["alpha"]=ret["alpha"],
                       _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat);
 }
-
 
