@@ -26,8 +26,8 @@ NumericVector get_patch_values(NumericVector value, IntegerVector patchno);
 
 NumericVector get_minimum_diagonal_values(NumericVector value, IntegerVector diag_idx);
 
-NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, double tol_val, bool constrained=true,
-                                           double lambda1_min=0.05);
+NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, double tol_val, bool constrained,
+                                           double lambda1_min);
 
 
 #endif
