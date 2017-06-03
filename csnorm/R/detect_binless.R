@@ -78,7 +78,7 @@ gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
 
 #' compute BIC for a given value of lambda1, lambda2 and eCprime (performance iteration, persistent state)
 #' @keywords internal
-gfl_BIC = function(csig, lambda1, lambda2, eCprime) {
+gfl_BIC = function(csig, lambda2, lambda1.min=0.05) {
   stopifnot(class(csig)!="CSbdiff")
   #state = perf.c[c("z","u","phi.ref","beta","alpha")]
   #submat = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta)]
@@ -96,9 +96,9 @@ gfl_BIC = function(csig, lambda1, lambda2, eCprime) {
   nperf=csig@settings$nperf
   maxsteps=csig@settings$maxsteps
   perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                    trails$breakpoints, lambda1, lambda2, eCprime,
+                                    trails$breakpoints, lambda2,
                                     state$alpha, inflate, maxsteps, tol.val, diag.rm,
-                                    state$z, state$u, state$beta)
+                                    state$z, state$u, state$beta, lambda1.min)
   return(perf.c)
 }
 
@@ -159,7 +159,7 @@ optimize_lambda1_only = function(matg, csig, lambda1.min=0.05, positive=F, const
 #' @keywords internal
 optimize_lambda2 = function(csig, minlambda=0.1, maxlambda=100) {
   obj = function(x) {
-    csig@state <<- csnorm:::gfl_BIC(csig, lambda1=0, lambda2=10^(x), eCprime=0)
+    csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x))
     return(csig@state$BIC)
   }
   #ctsg=copy(ctsg.old)
@@ -174,7 +174,8 @@ optimize_lambda2 = function(csig, minlambda=0.1, maxlambda=100) {
     cat("   Warning: lambda2 too close to lower boundary.")
     lambda2=0
   }
-  csig@par$lambda2=lambda2
+  retvals = as.list(csnorm:::gfl_BIC(csig, lambda2))[c("lambda2","lambda1","eCprime","BIC","dof")]
+  csig@par=modifyList(csig@par,retvals)
   return(csig)
 }
 
@@ -211,16 +212,14 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
 csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, ctsg.ref=NULL, lambda1.min=0.05) {
+  stopifnot(positive==T & fixed==F)
   csig = csnorm:::optimize_lambda2(csig)
   #compute values for lambda1=0 and eCprime=0
   matg = csnorm:::gfl_get_matrix(csig, 0, csig@par$lambda2, 0)
   matg[,value.ori:=value]
   #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=value))+scale_fill_gradient2()
   #get best lambda1 and set eCprime to lower bound
-  if (fixed==F) {
-    csig@par=modifyList(csig@par,as.list(csnorm:::cpp_optimize_lambda1_eCprime(matg, csig@settings$nbins,
-                                                                               csig@settings$tol.val, constrained, lambda1.min)))
-  } else {
+  if (fixed==T) {
     csig = csnorm:::optimize_lambda1_only(matg, csig, constrained=constrained, positive=positive)
   }
   csig@par$name=csig@cts[,name[1]]

@@ -9,6 +9,7 @@ using namespace Rcpp;
 #include "gfl_c.h" //cts_to_signal_mat_core
 #include "graph_fl.h" //graph_fused_lasso_weight_warm
 #include "graph_trails.hpp" //boost_build_patch_graph_components
+#include "optimize_lambda1_eCprime.hpp" //cpp_optimize_lambda1_eCprime
 
 DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion, std::vector<double>& phi,
                             double eCprime, int diag_rm)
@@ -100,16 +101,81 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res);
 }
 
+List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion, int nouter, int nbins,
+                           int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
+                           double lam2, double alpha, double inflate, int ninner, double converge,
+                           int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector beta_i,
+                           double lambda1_min)
+{
+  const int N = nbins*(nbins+1)/2; //size of fused lasso problem
+  const bool constrained = true; //for signal step, constraint is always active
+  double eCprime = 0;
+  double lam1 = lambda1_min;
+  std::vector<int> trails_r = as<std::vector<int> >(trails_i);
+  std::vector<int> breakpoints_r = as<std::vector<int> >(breakpoints_i);
+  std::vector<double> z_r = as<std::vector<double> >(z_i);
+  std::vector<double> u_r = as<std::vector<double> >(u_i);
+  std::vector<double> beta_r = as<std::vector<double> >(beta_i); //2d fused lasso before soft-thresholding
+  std::vector<double> phi_r = soft_threshold(beta_r, eCprime, lam1); //sparse fused lasso soft-thresholds values
+  std::vector<double> phi_old = phi_r;
+  
+  int step;
+  int res=0;
+  printf(" Perf iteration: start with lam2=%f alpha=%f phi[0]=%f z[0]=%f u[0]=%f lam1=%f eCprime=%f\n",
+         lam2, alpha, phi_r[0], z_r[0], u_r[0], lam1, eCprime);
+  for (step=1; step<=nouter; ++step) {
+    //compute weights
+    const DataFrame mat = cts_to_signal_mat(cts, nbins, dispersion, phi_r, eCprime, diag_rm);
+    std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
+    std::vector<double> w_r = Rcpp::as<std::vector<double> >(mat["weight"]);
+    
+    //compute fused lasso solution
+    int res_old=res;
+    res += graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails, &trails_r[0], &breakpoints_r[0],
+                                          lam2, &alpha, inflate, ninner, converge,
+                                          &beta_r[0], &z_r[0], &u_r[0]);
+    
+    //optimize eCprime and lambda1
+    DataFrame newmat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                         _["bin2"]=mat["bin2"],
+                                         _["phihat"]=mat["phihat"],
+                                         _["ncounts"]=mat["ncounts"],
+                                         _["diag.idx"]=mat["diag.idx"],
+                                         _["weight"]=mat["weight"],
+                                         _["beta"]=beta_r,
+                                         _["value"]=beta_r);
+    NumericVector opt = cpp_optimize_lambda1_eCprime(newmat, nbins, converge*20, constrained, lambda1_min);
+    lam1 = opt["lambda1"];
+    eCprime = opt["eCprime"];
+    
+    //soft-threshold it at the selected parameters
+    phi_r = soft_threshold(beta_r, eCprime, lam1);
+    
+    //check convergence
+    double maxval = std::abs(phi_r[0]-phi_old[0]);
+    for (int i=1; i<N; ++i) maxval = std::max(std::abs(phi_r[i]-phi_old[i]), maxval);
+    printf(" Iteration %d with alpha=%f reached maxval=%.5e after %d steps (phi[0]=%f z[0]=%f u[0]=%f lam1=%f eCprime=%f)\n",
+           step,alpha,maxval,res-res_old,phi_r[0],z_r[0], u_r[0], lam1, eCprime);
+    if (maxval<converge) break;
+    phi_old = phi_r;
+  }
+  printf(" Perf iteration: end   with lam2=%f alpha=%f phi[0]=%f z[0]=%f u[0]=%f lam1=%f eCprime=%f nouter=%d ninner=%d\n",
+         lam2, alpha, phi_r[0], z_r[0], u_r[0], lam1, eCprime, step, res);
+  return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha), _["phi"]=wrap(phi_r),
+                      _["mat"]=cts_to_signal_mat(cts, nbins, dispersion, phi_r, eCprime, diag_rm),
+                      _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res,
+                      _["eCprime"]=eCprime, _["lambda1"]=lam1);
+}
+
 List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins,
                      int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
-                     double lam1, double lam2,  double eCprime,
-                     double alpha, double inflate, int ninner, double tol_val,
-                     int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector phi_i) {
+                     double lam2,  double alpha, double inflate, int ninner, double tol_val,
+                     int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector phi_i, double lambda1_min) {
   
   //perf iteration for this set of values
-  List ret = wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
-                                   lam1, lam2, eCprime, alpha, inflate, ninner, tol_val/20., diag_rm,
-                                   z_i, u_i, phi_i);
+  List ret = wgfl_signal_perf_opt_lambda1_eCprime(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
+                                   lam2, alpha, inflate, ninner, tol_val/20., diag_rm,
+                                   z_i, u_i, phi_i, lambda1_min);
   
   //identify patches
   DataFrame retmat = wrap(ret["mat"]);
@@ -131,6 +197,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
   NumericVector weight = submat["weight"];
   NumericVector phihat = submat["valuehat"];
   NumericVector ncounts = submat["ncounts"];
+  const double eCprime = ret["eCprime"];
   const double BIC = sum(weight * SQUARE(phihat-(phi + eCprime))) + log(sum(ncounts))*dof;
   
   DataFrame finalmat = DataFrame::create(_["bin1"]=retmat["bin1"],
@@ -141,6 +208,6 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                                        _["value"]=ret["phi"],
                                        _["patchno"]=patchno);
   return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["beta"]=ret["beta"], _["alpha"]=ret["alpha"],
-                      _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat);
+                      _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat, _["eCprime"]=ret["eCprime"], _["lambda1"]=ret["lambda1"]);
 }
 
