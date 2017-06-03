@@ -55,8 +55,8 @@ NumericVector get_minimum_diagonal_values(NumericVector value, IntegerVector dia
 NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, double tol_val, bool constrained, double lambda1_min) {
   //extract vectors
   NumericVector weight = mat["weight"];
-  NumericVector phihat = mat["valuehat"];
-  NumericVector phi = mat["value"];
+  NumericVector phihat = mat["phihat"];
+  NumericVector phi = mat["phi"];
   NumericVector ncounts = mat["ncounts"];
   IntegerVector diag_idx = mat["diag.idx"];
   //get patch nos and sorted values
