@@ -121,8 +121,8 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
   
   int step;
   int res=0;
-  printf(" Perf iteration: start with lam2=%f alpha=%f phi[0]=%f z[0]=%f u[0]=%f lam1=%f eCprime=%f\n",
-         lam2, alpha, phi_r[0], z_r[0], u_r[0], lam1, eCprime);
+  Rcout << " Perf iteration: start with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
+        << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime << std::endl;
   for (step=1; step<=nouter; ++step) {
     //compute weights
     const DataFrame mat = cts_to_signal_mat(cts, nbins, dispersion, phi_r, eCprime, diag_rm);
@@ -154,13 +154,15 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
     //check convergence
     double maxval = std::abs(phi_r[0]-phi_old[0]);
     for (int i=1; i<N; ++i) maxval = std::max(std::abs(phi_r[i]-phi_old[i]), maxval);
-    printf(" Iteration %d with alpha=%f reached maxval=%.5e after %d steps (phi[0]=%f z[0]=%f u[0]=%f lam1=%f eCprime=%f)\n",
-           step,alpha,maxval,res-res_old,phi_r[0],z_r[0], u_r[0], lam1, eCprime);
+    Rcout << " Iteration " << step << " with lam2= " << lam2 << " alpha= " << alpha << " reached maxval= " << maxval
+          << " after " << (res-res_old) << " steps (phi[0]= " << phi_r[0]
+          << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime  << ")"<< std::endl;
     if (maxval<converge) break;
     phi_old = phi_r;
   }
-  printf(" Perf iteration: end   with lam2=%f alpha=%f phi[0]=%f z[0]=%f u[0]=%f lam1=%f eCprime=%f nouter=%d ninner=%d\n",
-         lam2, alpha, phi_r[0], z_r[0], u_r[0], lam1, eCprime, step, res);
+  Rcout << " Perf iteration: end   with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
+        << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
+        << " nouter= " << step << " ninner= " << res << std::endl;
   return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha), _["phi"]=wrap(phi_r),
                       _["mat"]=cts_to_signal_mat(cts, nbins, dispersion, phi_r, eCprime, diag_rm),
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res,
