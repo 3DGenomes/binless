@@ -53,9 +53,10 @@ NumericVector get_minimum_diagonal_values(NumericVector value, IntegerVector dia
 }
 
 NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1_min, double lam1_max,
-                                        NumericVector patchvals, double tol_val) {
+                                        NumericVector patchvals, double tol_val, double lam1) {
   NumericVector lambdavals = (patchvals - patchvals(0) + tol_val)/2.;
   NumericVector candidates = lambdavals[lambdavals>=lam1_min & lambdavals<=lam1_max];
+  if (candidates.size()==0) return obj.get(lam1);
   NumericVector best, val;
   for (int i=0; i<candidates.size(); ++i) {
     val = obj.get(candidates[i]);
@@ -104,6 +105,6 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, doubl
   //now compute the minimum among the n closest candidates (brent can get stuck in local minima)
   double lam1=pow(10,ret.first);
   NumericVector retval = refine_minimum(obj, std::max(lam1*(1-percent_closest/100.),lambda1_min), lam1*(1+percent_closest/100.),
-                                        patchvals, tol_val);
+                                        patchvals, tol_val, lam1);
   return retval;
 }

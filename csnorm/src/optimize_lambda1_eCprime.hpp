@@ -27,7 +27,7 @@ NumericVector get_patch_values(NumericVector value, IntegerVector patchno);
 NumericVector get_minimum_diagonal_values(NumericVector value, IntegerVector diag_idx);
 
 NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1_min, double lam1_max,
-                                        NumericVector patchvals, double tol_val);
+                                        NumericVector patchvals, double tol_val, double lam1);
 
 NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, double tol_val, bool constrained,
                                            double lambda1_min, double percent_closest);
