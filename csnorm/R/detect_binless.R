@@ -78,7 +78,7 @@ gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
 
 #' compute BIC for a given value of lambda1, lambda2 and eCprime (performance iteration, persistent state)
 #' @keywords internal
-gfl_BIC = function(csig, lambda2, lambda1.min=0.05, percent.closest=50) {
+gfl_BIC = function(csig, lambda2, lambda1.min=0, percent.closest=50) {
   stopifnot(class(csig)!="CSbdiff")
   #state = perf.c[c("z","u","phi.ref","beta","alpha")]
   #submat = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta)]
@@ -105,7 +105,7 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0.05, percent.closest=50) {
 #' cross-validate lambda1 and assume eCprime=0
 #' 
 #' @keywords internal
-optimize_lambda1_only = function(matg, csig, lambda1.min=0.05, positive=F, constrained=T) {
+optimize_lambda1_only = function(matg, csig, lambda1.min=0, positive=F, constrained=T) {
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   #get the number of patches to compute degrees of freedom
   cl = csnorm:::boost_build_patch_graph_components(csig@settings$nbins, matg, csig@settings$tol.val)
@@ -211,7 +211,7 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, ctsg.ref=NULL, lambda1.min=0.05) {
+csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, ctsg.ref=NULL, lambda1.min=0) {
   stopifnot(positive==T & fixed==F)
   csig = csnorm:::optimize_lambda2(csig)
   #compute values for lambda1=0 and eCprime=0
