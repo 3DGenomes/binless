@@ -102,7 +102,7 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, doubl
   if (maxval-minval <= 2*lambda1_min) return obj.get(lambda1_min, "minimum");
   //optimize
   int bits = -8*std::log10(tol_val)+1;
-  boost::uintmax_t maxiter = 100000;
+  boost::uintmax_t maxiter = 1000;
   Rcout << " Will look for minimum between " << std::max(lambda1_min,tol_val/2) << " and " << (maxval-minval) << std::endl;
   std::pair<double,double> ret = boost::math::tools::brent_find_minima(obj,
                                                    std::log10(std::max(lambda1_min,tol_val/2)),

@@ -284,7 +284,7 @@ prepare_signal_matrix = function(cs, csg, resolution, tol.val) {
                 dispersion = csg@par$alpha,
                 tol.val = tol.val,
                 inflate=2,
-                nperf=1000,
+                nperf=100,
                 maxsteps=100000)
   cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
   csi=new("CSbsig", mat=mat, trails=trails, cts=cts, settings=settings)

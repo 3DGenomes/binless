@@ -160,6 +160,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
     if (maxval<converge) break;
     phi_old = phi_r;
   }
+  if (step==nouter) Rcout << " warning: reached maximum number of outer iterations in wgfl_signal_perf_opt_lambda1_eCprime " << std::endl;
   Rcout << " Perf iteration: end   with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
         << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
         << " nouter= " << step << " ninner= " << res << std::endl;
