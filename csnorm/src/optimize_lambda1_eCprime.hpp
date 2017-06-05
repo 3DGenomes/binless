@@ -4,7 +4,6 @@
 #include <Rcpp.h>
 using namespace Rcpp;
 #include <vector>
-#include <string>
 
 //objective functor to find lambda1 and eCprime
 struct obj_lambda1_eCprime {
@@ -15,7 +14,7 @@ struct obj_lambda1_eCprime {
   
   double operator()(double const& x) const;
   
-  NumericVector get(double const& lambda1, const std::string& msg) const;
+  NumericVector get(double const& lambda1) const;
   
   double minval_, maxval_, valrange_, tol_val_, lsnc_;
   bool constrained_;
