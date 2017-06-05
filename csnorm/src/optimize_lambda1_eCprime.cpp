@@ -3,6 +3,7 @@ using namespace Rcpp;
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <string>
 
 #include "optimize_lambda1_eCprime.hpp"
 #include "util.hpp" //soft_threshold and SQUARE
@@ -17,9 +18,9 @@ obj_lambda1_eCprime::obj_lambda1_eCprime(double minval, double maxval, double to
                       patchno_(patchno), forbidden_vals_(forbidden_vals),
                       value_(value), weight_(weight), valuehat_(valuehat) {}
   
-double obj_lambda1_eCprime::operator()(double const& x) const { return get(std::pow(10,x))["BIC"]; }
+double obj_lambda1_eCprime::operator()(double const& x) const { return get(std::pow(10,x), "optimizer")["BIC"]; }
   
-NumericVector obj_lambda1_eCprime::get(double const& lambda1) const {
+NumericVector obj_lambda1_eCprime::get(double const& lambda1, const std::string& msg) const {
     double eCprime = (valrange_ < (2*lambda1+tol_val_)) ? (maxval_+minval_)/2. : lambda1+minval_-tol_val_;
     if (constrained_) {
       if (is_true(any(abs(eCprime-forbidden_vals_)>lambda1+tol_val_)))
@@ -31,6 +32,7 @@ NumericVector obj_lambda1_eCprime::get(double const& lambda1) const {
     IntegerVector selected = patchno_[abs(soft)>tol_val_/2];
     const int dof = unique(selected).size();
     const double BIC = sum(weight_ * SQUARE(valuehat_ - (soft + eCprime))) + lsnc_*dof;
+    Rcout << "OBJ " << msg << " eCprime= " << eCprime << " lambda1= " << lambda1 << " BIC= " << BIC << " dof= " << dof << std::endl;
     return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
                                  _["BIC"]=BIC, _["dof"]=dof);
 }
@@ -56,10 +58,11 @@ NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1_min, do
                                         NumericVector patchvals, double tol_val, double lam1) {
   NumericVector lambdavals = (patchvals - patchvals(0) + tol_val)/2.;
   NumericVector candidates = lambdavals[lambdavals>=lam1_min & lambdavals<=lam1_max];
-  if (candidates.size()==0) return obj.get(lam1);
+  if (candidates.size()==0) return obj.get(lam1, "refine");
   NumericVector best, val;
+  Rcout << " refine minimum at " << candidates.size() << " values between " << lam1_min << " and " << lam1_max << std::endl;
   for (int i=0; i<candidates.size(); ++i) {
-    val = obj.get(candidates[i]);
+    val = obj.get(candidates[i], "refine");
     if (i==0) best=val;
     if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
   }
@@ -94,17 +97,22 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, doubl
   //create functor
   obj_lambda1_eCprime obj(minval, maxval, tol_val, constrained, patchno, forbidden_vals,
                           beta, weight, phihat, ncounts);
+  //grid values
+  for (int i=0; i<100; ++i) obj.get(0.1+i/99.*0.1, "grid");
   //treat second border case
-  if (maxval-minval <= 2*lambda1_min) return obj.get(lambda1_min);
+  if (maxval-minval <= 2*lambda1_min) return obj.get(lambda1_min, "minimum");
   //optimize
   int bits = -8*std::log10(tol_val)+1;
   boost::uintmax_t maxiter = 1000;
+  Rcout << " Will look for minimum between " << std::max(lambda1_min,tol_val/2) << " and " << (maxval-minval) << std::endl;
   std::pair<double,double> ret = boost::math::tools::brent_find_minima(obj,
                                                    std::log10(std::max(lambda1_min,tol_val/2)),
                                                    std::log10(maxval-minval), bits, maxiter);
   //now compute the minimum among the n closest candidates (brent can get stuck in local minima)
   double lam1=pow(10,ret.first);
+  obj.get(lam1, "minimum");
   NumericVector retval = refine_minimum(obj, std::max(lam1*(1-percent_closest/100.),lambda1_min), lam1*(1+percent_closest/100.),
                                         patchvals, tol_val, lam1);
+  obj.get(as<double>(retval["lambda1"]), "final");
   return retval;
 }
