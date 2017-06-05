@@ -160,7 +160,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
     if (maxval<converge) break;
     phi_old = phi_r;
   }
-  if (step==nouter) Rcout << " warning: reached maximum number of outer iterations in wgfl_signal_perf_opt_lambda1_eCprime " << std::endl;
+  if (step==nouter+1) Rcout << " warning: reached maximum number of outer iterations in wgfl_signal_perf_opt_lambda1_eCprime " << std::endl;
   Rcout << " Perf iteration: end   with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
         << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
         << " nouter= " << step << " ninner= " << res << std::endl;
@@ -180,6 +180,16 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
   List ret = wgfl_signal_perf_opt_lambda1_eCprime(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
                                    lam2, alpha, inflate, ninner, tol_val/20., diag_rm,
                                    z_i, u_i, phi_i, lambda1_min, percent_closest);
+  //redo iteration if warm start did not work
+  if (as<int>(ret["nouter"])>nouter) {
+    Rcout << " warning: performing cold start due to failed warm start" <<std::endl;
+    z_i = NumericVector(z_i.size(),0);
+    u_i = NumericVector(u_i.size(),0);
+    phi_i = NumericVector(phi_i.size(),0);
+    ret = wgfl_signal_perf_opt_lambda1_eCprime(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
+                                               lam2, alpha, inflate, ninner, tol_val/20., diag_rm,
+                                               z_i, u_i, phi_i, lambda1_min, percent_closest);
+  }
   
   //identify patches
   DataFrame retmat = wrap(ret["mat"]);
