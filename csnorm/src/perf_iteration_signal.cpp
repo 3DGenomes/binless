@@ -105,7 +105,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
                            int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                            double lam2, double alpha, double inflate, int ninner, double converge,
                            int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector beta_i,
-                           double lambda1_min)
+                           double lambda1_min, double percent_closest)
 {
   const int N = nbins*(nbins+1)/2; //size of fused lasso problem
   const bool constrained = true; //for signal step, constraint is always active
@@ -144,7 +144,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
                                          _["weight"]=mat["weight"],
                                          _["beta"]=beta_r,
                                          _["value"]=beta_r);
-    NumericVector opt = cpp_optimize_lambda1_eCprime(newmat, nbins, converge*20, constrained, lambda1_min);
+    NumericVector opt = cpp_optimize_lambda1_eCprime(newmat, nbins, converge*20, constrained, lambda1_min, percent_closest);
     lam1 = opt["lambda1"];
     eCprime = opt["eCprime"];
     
@@ -172,12 +172,13 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
 List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins,
                      int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                      double lam2,  double alpha, double inflate, int ninner, double tol_val,
-                     int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector phi_i, double lambda1_min) {
+                     int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector phi_i,
+                     double lambda1_min, double percent_closest) {
   
   //perf iteration for this set of values
   List ret = wgfl_signal_perf_opt_lambda1_eCprime(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
                                    lam2, alpha, inflate, ninner, tol_val/20., diag_rm,
-                                   z_i, u_i, phi_i, lambda1_min);
+                                   z_i, u_i, phi_i, lambda1_min, percent_closest);
   
   //identify patches
   DataFrame retmat = wrap(ret["mat"]);

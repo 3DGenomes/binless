@@ -78,7 +78,7 @@ gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
 
 #' compute BIC for a given value of lambda1, lambda2 and eCprime (performance iteration, persistent state)
 #' @keywords internal
-gfl_BIC = function(csig, lambda2, lambda1.min=0.05) {
+gfl_BIC = function(csig, lambda2, lambda1.min=0.05, percent.closest=50) {
   stopifnot(class(csig)!="CSbdiff")
   #state = perf.c[c("z","u","phi.ref","beta","alpha")]
   #submat = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta)]
@@ -98,7 +98,7 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0.05) {
   perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                                     trails$breakpoints, lambda2,
                                     state$alpha, inflate, maxsteps, tol.val, diag.rm,
-                                    state$z, state$u, state$beta, lambda1.min)
+                                    state$z, state$u, state$beta, lambda1.min, percent.closest)
   return(perf.c)
 }
 
