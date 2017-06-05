@@ -49,13 +49,12 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
   if (is.null(ctsg.ref)) {
     perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                                               trails$breakpoints, lambda1, lambda2, eCprime,
-                                              state$alpha, inflate, maxsteps, tol.val/20, diag.rm,
-                                              state$z, state$u, state$beta)
+                                              state$alpha, inflate, maxsteps, tol.val/20, diag.rm, state$beta)
   } else {
     stopifnot(lambda1==0 & eCprime==0)
     perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                                             trails$breakpoints, lambda2, state$alpha, inflate, maxsteps, tol.val/20, diag.rm,
-                                            state$z, state$u, state$phi.ref, state$delta)
+                                            state$phi.ref, state$delta)
   }
   return(perf.c)
 }
@@ -80,7 +79,7 @@ gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
 #' @keywords internal
 gfl_BIC = function(csig, lambda2, lambda1.min=0, percent.closest=50) {
   stopifnot(class(csig)!="CSbdiff")
-  #state = perf.c[c("z","u","phi.ref","beta","alpha")]
+  #state = perf.c[c("phi.ref","beta","alpha")]
   #submat = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta)]
   #
   ctsg=csig@cts
@@ -98,7 +97,7 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, percent.closest=50) {
   perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                                     trails$breakpoints, lambda2,
                                     state$alpha, inflate, maxsteps, tol.val, diag.rm,
-                                    state$z, state$u, state$beta, lambda1.min, percent.closest)
+                                    state$beta, lambda1.min, percent.closest)
   return(perf.c)
 }
 
@@ -160,6 +159,8 @@ optimize_lambda1_only = function(matg, csig, lambda1.min=0, positive=F, constrai
 optimize_lambda2 = function(csig, minlambda=0.1, maxlambda=100) {
   obj = function(x) {
     csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x))
+    cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
+        " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
   }
   #ctsg=copy(ctsg.old)
@@ -186,10 +187,9 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
   matg = csig@mat
   trails = csig@trails
   if (diff==F) {
-    state = list(beta=matg[,phi], u=rep(0,length(trails$trails)), z=matg[trails$trails+1,phi], alpha=init.alpha)
+    state = list(beta=matg[,phi], alpha=init.alpha)
   } else {
-    state = list(phi.ref=matg[,phi.ref], beta=matg[,delta], u=rep(0,length(trails$trails)),
-                 z=matg[trails$trails+1,delta], alpha=init.alpha)
+    state = list(phi.ref=matg[,phi.ref], beta=matg[,delta], alpha=init.alpha)
   }
   return(state)
 }

@@ -57,17 +57,19 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
                            int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                            double lam1, double lam2, double eCprime,
                            double alpha, double inflate, int ninner, double converge,
-                           int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector beta_i)
+                           int diag_rm, NumericVector beta_i)
 {
   const int N = nbins*(nbins+1)/2; //size of fused lasso problem
   std::vector<int> trails_r = as<std::vector<int> >(trails_i);
   std::vector<int> breakpoints_r = as<std::vector<int> >(breakpoints_i);
-  std::vector<double> z_r = as<std::vector<double> >(z_i);
-  std::vector<double> u_r = as<std::vector<double> >(u_i);
   std::vector<double> beta_r = as<std::vector<double> >(beta_i); //2d fused lasso before soft-thresholding
   std::vector<double> phi_r = soft_threshold(beta_r, eCprime, lam1); //sparse fused lasso soft-thresholds values
   std::vector<double> phi_old = phi_r;
-  
+  std::vector<double> u_r(trails_r.size(),0); //residuals set to zero
+  std::vector<double> z_r;
+  z_r.reserve(trails_r.size());
+  for (int i=0; i<trails_r.size(); ++i) z_r[i] = beta_r[trails_r[i]]; //z set to beta values along trails
+    
   int step;
   int res=0;
   //printf(" Perf iteration: start with lam=%f alpha=%f phi[0]=%f z[0]=%f u[0]=%f\n",
@@ -104,8 +106,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
 List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion, int nouter, int nbins,
                            int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                            double lam2, double alpha, double inflate, int ninner, double converge,
-                           int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector beta_i,
-                           double lambda1_min, double percent_closest)
+                           int diag_rm, NumericVector beta_i, double lambda1_min, double percent_closest)
 {
   const int N = nbins*(nbins+1)/2; //size of fused lasso problem
   const bool constrained = true; //for signal step, constraint is always active
@@ -113,11 +114,13 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
   double lam1 = lambda1_min;
   std::vector<int> trails_r = as<std::vector<int> >(trails_i);
   std::vector<int> breakpoints_r = as<std::vector<int> >(breakpoints_i);
-  std::vector<double> z_r = as<std::vector<double> >(z_i);
-  std::vector<double> u_r = as<std::vector<double> >(u_i);
   std::vector<double> beta_r = as<std::vector<double> >(beta_i); //2d fused lasso before soft-thresholding
   std::vector<double> phi_r = soft_threshold(beta_r, eCprime, lam1); //sparse fused lasso soft-thresholds values
   std::vector<double> phi_old = phi_r;
+  std::vector<double> u_r(trails_r.size(),0); //residuals set to zero
+  std::vector<double> z_r;
+  z_r.reserve(trails_r.size());
+  for (int i=0; i<trails_r.size(); ++i) z_r[i] = beta_r[trails_r[i]]; //z set to beta values along trails
   
   int step;
   int res=0;
@@ -173,22 +176,19 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
 List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins,
                      int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                      double lam2,  double alpha, double inflate, int ninner, double tol_val,
-                     int diag_rm, NumericVector z_i, NumericVector u_i, NumericVector phi_i,
-                     double lambda1_min, double percent_closest) {
+                     int diag_rm, NumericVector phi_i, double lambda1_min, double percent_closest) {
   
   //perf iteration for this set of values
   List ret = wgfl_signal_perf_opt_lambda1_eCprime(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
                                    lam2, alpha, inflate, ninner, tol_val/20., diag_rm,
-                                   z_i, u_i, phi_i, lambda1_min, percent_closest);
+                                   phi_i, lambda1_min, percent_closest);
   //redo iteration if warm start did not work
   if (as<int>(ret["nouter"])>nouter) {
     Rcout << " warning: performing cold start due to failed warm start" <<std::endl;
-    z_i = NumericVector(z_i.size(),0);
-    u_i = NumericVector(u_i.size(),0);
     phi_i = NumericVector(phi_i.size(),0);
     ret = wgfl_signal_perf_opt_lambda1_eCprime(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
                                                lam2, alpha, inflate, ninner, tol_val/20., diag_rm,
-                                               z_i, u_i, phi_i, lambda1_min, percent_closest);
+                                               phi_i, lambda1_min, percent_closest);
   }
   
   //identify patches
