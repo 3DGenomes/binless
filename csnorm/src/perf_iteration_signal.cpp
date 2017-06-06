@@ -70,7 +70,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
   std::vector<double> u_r(trails_r.size(),0); //residuals set to zero
   std::vector<double> z_r;
   z_r.reserve(trails_r.size());
-  for (int i=0; i<trails_r.size(); ++i) z_r[i] = beta_r[trails_r[i]]; //z set to beta values along trails
+  for (int i=0; i<trails_r.size(); ++i) z_r.push_back(beta_r[trails_r[i]]); //z set to beta values along trails
     
   int step;
   int res=0;
@@ -122,7 +122,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
   std::vector<double> u_r(trails_r.size(),0); //residuals set to zero
   std::vector<double> z_r;
   z_r.reserve(trails_r.size());
-  for (int i=0; i<trails_r.size(); ++i) z_r[i] = beta_r[trails_r[i]]; //z set to beta values along trails
+  for (int i=0; i<trails_r.size(); ++i) z_r.push_back(beta_r[trails_r[i]]); //z set to beta values along trails
   
   int step;
   int res=0;
@@ -173,8 +173,9 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
     double maxval = std::abs(phi_r[0]-phi_old[0]);
     for (int i=1; i<N; ++i) maxval = std::max(std::abs(phi_r[i]-phi_old[i]), maxval);
     /*Rcout << " Iteration " << step << " with lam2= " << lam2 << " alpha= " << alpha << " reached maxval= " << maxval
-          << " after " << (res-res_old) << " steps (phi[0]= " << phi_r[0]
-          << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime  << ")"<< std::endl;*/
+          << " after " << (res-res_old) << " steps phi[0]= " << phi_r[0]
+          << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
+          << " sz(z)= " << z_r.size() << " sz(trails_r)= " << trails_r.size() << " sz(trails_i)= " << trails_i.size() << std::endl;*/
     if (maxval<converge) break;
     phi_old = phi_r;
   }
