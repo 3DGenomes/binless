@@ -97,7 +97,7 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50) {
   perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                                     trails$breakpoints, lambda2,
                                     state$alpha, inflate, maxsteps, tol.val, diag.rm,
-                                    state$beta, lambda1.min, refine.num)
+                                    state$lambda1, state$eCprime, state$beta, lambda1.min, refine.num)
   return(perf.c)
 }
 
@@ -187,7 +187,7 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
   matg = csig@mat
   trails = csig@trails
   if (diff==F) {
-    state = list(beta=matg[,phi], alpha=init.alpha)
+    state = list(beta=matg[,phi], alpha=init.alpha, lambda1=0.05, eCprime=0)
   } else {
     state = list(phi.ref=matg[,phi.ref], beta=matg[,delta], alpha=init.alpha)
   }
