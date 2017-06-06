@@ -131,8 +131,8 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
   double maxval=converge+1;
   std::clock_t c_start,c_end;
   double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
-  Rcout << " Perf iteration: start with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
-          << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime << std::endl;
+  /*Rcout << " Perf iteration: start with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
+          << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime << std::endl;*/
   
   while (step<=nouter & maxval>converge) {
     //update weights and dense lasso solution until convergence (or max steps reached)
@@ -191,18 +191,18 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
     //update residual
     maxval = std::abs(phi_r[0]-phi_old[0]);
     for (int i=1; i<N; ++i) maxval = std::max(std::abs(phi_r[i]-phi_old[i]), maxval);
-    Rcout << " Iteration " << step << " with lam2= " << lam2 << " alpha= " << alpha << " reached maxval= " << maxval
+    /*Rcout << " Iteration " << step << " with lam2= " << lam2 << " alpha= " << alpha << " reached maxval= " << maxval
           << " after " << res << " steps phi[0]= " << phi_r[0]
-          << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime << std::endl;
+          << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime << std::endl;*/
     phi_old = phi_r;
     
     //update counter
     step += substep;
   }
   if (step==nouter+1) Rcout << " warning: reached maximum number of outer iterations in wgfl_signal_perf_opt_lambda1_eCprime " << std::endl;
-  Rcout << " Perf iteration: end   with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
+  /*Rcout << " Perf iteration: end   with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
         << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
-        << " nouter= " << step << " ninner= " << res << std::endl;
+        << " nouter= " << step << " ninner= " << res << std::endl;*/
   return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha), _["phi"]=wrap(phi_r),
                       _["mat"]=cts_to_signal_mat(cts, nbins, dispersion, phi_r, eCprime, diag_rm),
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res,
@@ -217,7 +217,8 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int opt
                      double lambda1_min, int refine_num) {
   
   //perf iteration for this set of values
-  List ret = wgfl_signal_perf_opt_lambda1_eCprime(cts, dispersion, nouter, opt_every, nbins, ntrails, trails_i, breakpoints_i,
+  List ret = wgfl_signal_perf_opt_lambda1_eCprime(cts, dispersion, (int)(nouter/10.+1), opt_every, nbins, ntrails,
+                                   trails_i, breakpoints_i,
                                    lam2, alpha, inflate, ninner, tol_val/20., diag_rm, lam1_init, eCprime_init,
                                    beta_i, lambda1_min, refine_num);
   //redo iteration if warm start did not work
