@@ -3,6 +3,7 @@ using namespace Rcpp;
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <ctime>
 
 #include "optimize_lambda1_eCprime.hpp"
 #include "util.hpp" //soft_threshold and SQUARE
@@ -52,23 +53,35 @@ NumericVector get_minimum_diagonal_values(NumericVector value, IntegerVector dia
   return diagvals;
 }
 
-NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1_min, double lam1_max,
-                                        NumericVector patchvals, double tol_val, double lam1) {
+NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1, double lam1_min, int refine_num,
+                             double tol_val, NumericVector patchvals) {
+  //bounds and border case
   NumericVector lambdavals = (patchvals - patchvals(0) + tol_val)/2.;
-  NumericVector candidates = lambdavals[lambdavals>=lam1_min & lambdavals<=lam1_max];
-  if (candidates.size()==0) return obj.get(lam1);
+  lambdavals = lambdavals[lambdavals>=lam1_min];
+  if (lambdavals.size() == 0) return obj.get(lam1);
+  //values < lambda1
   NumericVector best, val;
-  for (int i=0; i<candidates.size(); ++i) {
-    val = obj.get(candidates[i]);
+  NumericVector candidates1 = lambdavals[lambdavals<lam1];
+  int nc1 = candidates1.size();
+  for (int i=0; i<std::min(nc1,refine_num); ++i) {
+    val = obj.get(candidates1[nc1-1-i]);
     if (i==0) best=val;
+    if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
+  }
+  //values >= lambda1
+  NumericVector candidates2 = lambdavals[lambdavals>=lam1];
+  int nc2 = candidates2.size();
+  for (int i=0; i<std::min(nc2,refine_num); ++i) {
+    val = obj.get(candidates2[i]);
     if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
   }
   return(best);
 }
 
 NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, double tol_val, bool constrained,
-                                           double lambda1_min, double percent_closest) {
+                                           double lambda1_min, int refine_num) {
   //extract vectors
+  std::clock_t c_start = std::clock();
   NumericVector weight = mat["weight"];
   NumericVector phihat = mat["phihat"];
   NumericVector beta = mat["beta"];
@@ -95,7 +108,9 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, doubl
   obj_lambda1_eCprime obj(minval, maxval, tol_val, constrained, patchno, forbidden_vals,
                           beta, weight, phihat, ncounts);
   //grid values
+  std::clock_t c_in1 = std::clock();
   for (int i=0; i<100; ++i) obj.get(0.1+i/99.*0.1);
+  std::clock_t c_in2 = std::clock();
   //treat second border case
   if (maxval-minval <= 2*lambda1_min) return obj.get(lambda1_min);
   //optimize
@@ -105,9 +120,13 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, doubl
                                                    std::log10(std::max(lambda1_min,tol_val/2)),
                                                    std::log10(maxval-minval), bits, maxiter);
   //now compute the minimum among the n closest candidates (brent can get stuck in local minima)
+  std::clock_t c_in3 = std::clock();
   double lam1=pow(10,ret.first);
   obj.get(lam1);
-  NumericVector retval = refine_minimum(obj, std::max(lam1*(1-percent_closest/100.),lambda1_min), lam1*(1+percent_closest/100.),
-                                        patchvals, tol_val, lam1);
-  return retval;
+  NumericVector retval = refine_minimum(obj, lam1, lambda1_min, refine_num, tol_val, patchvals);
+  std::clock_t c_in4 = std::clock();
+  return NumericVector::create(_["eCprime"]=retval["eCprime"], _["lambda1"]=retval["lambda1"],
+                               _["BIC"]=retval["BIC"], _["dof"]=retval["dof"],
+                               _["c_init"]=c_in1-c_start, _["c_grid"]=c_in2-c_in1,
+                               _["c_brent"]=c_in3-c_in2, _["c_refine"]=c_in4-c_in3);
 }

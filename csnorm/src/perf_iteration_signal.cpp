@@ -3,6 +3,7 @@ using namespace Rcpp;
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <ctime>
 
 #include "perf_iteration_signal.hpp"
 #include "util.hpp" //SQUARE
@@ -10,6 +11,7 @@ using namespace Rcpp;
 #include "graph_fl.h" //graph_fused_lasso_weight_warm
 #include "graph_trails.hpp" //boost_build_patch_graph_components
 #include "optimize_lambda1_eCprime.hpp" //cpp_optimize_lambda1_eCprime
+
 
 DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion, std::vector<double>& phi,
                             double eCprime, int diag_rm)
@@ -106,7 +108,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
 List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion, int nouter, int nbins,
                            int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                            double lam2, double alpha, double inflate, int ninner, double converge,
-                           int diag_rm, NumericVector beta_i, double lambda1_min, double percent_closest)
+                           int diag_rm, NumericVector beta_i, double lambda1_min, int refine_num)
 {
   const int N = nbins*(nbins+1)/2; //size of fused lasso problem
   const bool constrained = true; //for signal step, constraint is always active
@@ -124,21 +126,29 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
   
   int step;
   int res=0;
+  double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_grid(0), c_brent(0), c_refine(0);
   /*Rcout << " Perf iteration: start with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
           << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime << std::endl;*/
   for (step=1; step<=nouter; ++step) {
     //compute weights
+    std::clock_t c_start = std::clock();
     const DataFrame mat = cts_to_signal_mat(cts, nbins, dispersion, phi_r, eCprime, diag_rm);
     std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
     std::vector<double> w_r = Rcpp::as<std::vector<double> >(mat["weight"]);
+    std::clock_t c_end = std::clock();
+    c_cts += c_end - c_start;
     
     //compute fused lasso solution
+    c_start = std::clock();
     int res_old=res;
     res += graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails, &trails_r[0], &breakpoints_r[0],
                                           lam2, &alpha, inflate, ninner, converge,
                                           &beta_r[0], &z_r[0], &u_r[0]);
+    c_end = std::clock();
+    c_gfl += c_end - c_start;
     
     //optimize eCprime and lambda1
+    c_start = std::clock();
     DataFrame newmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                          _["bin2"]=mat["bin2"],
                                          _["phihat"]=mat["phihat"],
@@ -147,9 +157,15 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
                                          _["weight"]=mat["weight"],
                                          _["beta"]=beta_r,
                                          _["value"]=beta_r);
-    NumericVector opt = cpp_optimize_lambda1_eCprime(newmat, nbins, converge*20, constrained, lambda1_min, percent_closest);
+    NumericVector opt = cpp_optimize_lambda1_eCprime(newmat, nbins, converge*20, constrained, lambda1_min, refine_num);
     lam1 = opt["lambda1"];
     eCprime = opt["eCprime"];
+    c_end = std::clock();
+    c_opt += c_end - c_start;
+    c_init += opt["c_init"];
+    c_grid += opt["c_grid"];
+    c_brent += opt["c_brent"];
+    c_refine += opt["c_refine"];
     
     //soft-threshold it at the selected parameters
     phi_r = soft_threshold(beta_r, eCprime, lam1);
@@ -170,25 +186,27 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
   return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha), _["phi"]=wrap(phi_r),
                       _["mat"]=cts_to_signal_mat(cts, nbins, dispersion, phi_r, eCprime, diag_rm),
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res,
-                      _["eCprime"]=eCprime, _["lambda1"]=lam1);
+                      _["eCprime"]=eCprime, _["lambda1"]=lam1, _["c_cts"]=c_cts, _["c_gfl"]=c_gfl, _["c_opt"]=c_opt,
+                      _["c_init"]=c_init, _["c_grid"]=c_grid,
+                      _["c_brent"]=c_brent, _["c_refine"]=c_refine);
 }
 
 List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins,
                      int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                      double lam2,  double alpha, double inflate, int ninner, double tol_val,
-                     int diag_rm, NumericVector phi_i, double lambda1_min, double percent_closest) {
+                     int diag_rm, NumericVector phi_i, double lambda1_min, int refine_num) {
   
   //perf iteration for this set of values
   List ret = wgfl_signal_perf_opt_lambda1_eCprime(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
                                    lam2, alpha, inflate, ninner, tol_val/20., diag_rm,
-                                   phi_i, lambda1_min, percent_closest);
+                                   phi_i, lambda1_min, refine_num);
   //redo iteration if warm start did not work
   if (as<int>(ret["nouter"])>nouter) {
     Rcout << " warning: performing cold start due to failed warm start" <<std::endl;
     phi_i = NumericVector(phi_i.size(),0);
     ret = wgfl_signal_perf_opt_lambda1_eCprime(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
                                                lam2, alpha, inflate, ninner, tol_val/20., diag_rm,
-                                               phi_i, lambda1_min, percent_closest);
+                                               phi_i, lambda1_min, refine_num);
   }
   
   //identify patches
@@ -222,6 +240,8 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                                        _["value"]=ret["phi"],
                                        _["patchno"]=patchno);
   return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["beta"]=ret["beta"], _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
-                      _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat, _["eCprime"]=ret["eCprime"], _["lambda1"]=ret["lambda1"]);
+                      _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat, _["eCprime"]=ret["eCprime"], _["lambda1"]=ret["lambda1"],
+                      _["c_cts"]=ret["c_cts"], _["c_gfl"]=ret["c_gfl"], _["c_opt"]=ret["c_opt"],
+                      _["c_init"]=ret["c_init"], _["c_grid"]=ret["c_grid"], _["c_brent"]=ret["c_brent"], _["c_refine"]=ret["c_refine"]);
 }
 
