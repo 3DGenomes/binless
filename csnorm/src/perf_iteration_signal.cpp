@@ -192,19 +192,19 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
 List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins,
                      int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                      double lam2,  double alpha, double inflate, int ninner, double tol_val,
-                     int diag_rm, NumericVector phi_i, double lambda1_min, int refine_num) {
+                     int diag_rm, NumericVector beta_i, double lambda1_min, int refine_num) {
   
   //perf iteration for this set of values
   List ret = wgfl_signal_perf_opt_lambda1_eCprime(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
                                    lam2, alpha, inflate, ninner, tol_val/20., diag_rm,
-                                   phi_i, lambda1_min, refine_num);
+                                   beta_i, lambda1_min, refine_num);
   //redo iteration if warm start did not work
   if (as<int>(ret["nouter"])>nouter) {
     Rcout << " warning: performing cold start due to failed warm start" <<std::endl;
-    phi_i = NumericVector(phi_i.size(),0);
+    beta_i = NumericVector(beta_i.size(),0);
     ret = wgfl_signal_perf_opt_lambda1_eCprime(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i,
                                                lam2, alpha, inflate, ninner, tol_val/20., diag_rm,
-                                               phi_i, lambda1_min, refine_num);
+                                               beta_i, lambda1_min, refine_num);
   }
   
   //identify patches
