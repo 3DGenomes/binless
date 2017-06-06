@@ -93,8 +93,9 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50) {
   if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
   inflate=csig@settings$inflate
   nperf=csig@settings$nperf
+  opt.every=csig@settings$opt.every
   maxsteps=csig@settings$maxsteps
-  perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+  perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, opt.every, nbins, trails$ntrails, trails$trails,
                                     trails$breakpoints, lambda2,
                                     state$alpha, inflate, maxsteps, tol.val, diag.rm,
                                     state$lambda1, state$eCprime, state$beta, lambda1.min, refine.num)
@@ -285,6 +286,7 @@ prepare_signal_matrix = function(cs, csg, resolution, tol.val) {
                 tol.val = tol.val,
                 inflate=2,
                 nperf=100,
+                opt.every=10,
                 maxsteps=100000)
   cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
   csi=new("CSbsig", mat=mat, trails=trails, cts=cts, settings=settings)
