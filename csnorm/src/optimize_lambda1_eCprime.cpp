@@ -73,6 +73,7 @@ NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1, double
   int nc2 = candidates2.size();
   for (int i=0; i<std::min(nc2,refine_num); ++i) {
     val = obj.get(candidates2[i]);
+    if (nc1==0) best=val;
     if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
   }
   return(best);
@@ -94,7 +95,8 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, doubl
   //treat border case
   if (as<double>(cl["no"]) == 1)
     return NumericVector::create(_["eCprime"]=patchvals(0), _["lambda1"]=lambda1_min, _["dof"]=0,
-                        _["BIC"]=sum(weight * SQUARE(phihat - (beta + patchvals(0)))) );
+                        _["BIC"]=sum(weight * SQUARE(phihat - (beta + patchvals(0)))),
+                        _["c_init"]=-1, _["c_brent"]=-1, _["c_refine"]=-1);
   double minval = patchvals(0);
   double maxval = patchvals(patchvals.size()-1);
   //if constraint is on, decay and signal must adjust so that 
@@ -109,7 +111,12 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, doubl
                           beta, weight, phihat, ncounts);
   std::clock_t c_in1 = std::clock();
   //treat second border case
-  if (maxval-minval <= 2*lambda1_min) return obj.get(lambda1_min);
+  if (maxval-minval <= 2*lambda1_min) {
+    NumericVector retval = obj.get(lambda1_min);
+    return NumericVector::create(_["eCprime"]=retval["eCprime"], _["lambda1"]=retval["lambda1"],
+                                 _["BIC"]=retval["BIC"], _["dof"]=retval["dof"],
+                                   _["c_init"]=c_in1-c_start, _["c_brent"]=-1, _["c_refine"]=-1);
+  }
   //optimize
   int bits = -8*std::log10(tol_val)+1;
   boost::uintmax_t maxiter = 1000;

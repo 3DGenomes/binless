@@ -140,7 +140,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
     
     //compute fused lasso solution
     c_start = std::clock();
-    int res_old=res;
+    //int res_old=res;
     res += graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails, &trails_r[0], &breakpoints_r[0],
                                           lam2, &alpha, inflate, ninner, converge,
                                           &beta_r[0], &z_r[0], &u_r[0]);
