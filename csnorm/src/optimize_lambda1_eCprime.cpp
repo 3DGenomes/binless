@@ -107,10 +107,7 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, doubl
   //create functor
   obj_lambda1_eCprime obj(minval, maxval, tol_val, constrained, patchno, forbidden_vals,
                           beta, weight, phihat, ncounts);
-  //grid values
   std::clock_t c_in1 = std::clock();
-  for (int i=0; i<100; ++i) obj.get(0.1+i/99.*0.1);
-  std::clock_t c_in2 = std::clock();
   //treat second border case
   if (maxval-minval <= 2*lambda1_min) return obj.get(lambda1_min);
   //optimize
@@ -120,13 +117,12 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, doubl
                                                    std::log10(std::max(lambda1_min,tol_val/2)),
                                                    std::log10(maxval-minval), bits, maxiter);
   //now compute the minimum among the n closest candidates (brent can get stuck in local minima)
-  std::clock_t c_in3 = std::clock();
+  std::clock_t c_in2 = std::clock();
   double lam1=pow(10,ret.first);
   obj.get(lam1);
   NumericVector retval = refine_minimum(obj, lam1, lambda1_min, refine_num, tol_val, patchvals);
-  std::clock_t c_in4 = std::clock();
+  std::clock_t c_in3 = std::clock();
   return NumericVector::create(_["eCprime"]=retval["eCprime"], _["lambda1"]=retval["lambda1"],
                                _["BIC"]=retval["BIC"], _["dof"]=retval["dof"],
-                               _["c_init"]=c_in1-c_start, _["c_grid"]=c_in2-c_in1,
-                               _["c_brent"]=c_in3-c_in2, _["c_refine"]=c_in4-c_in3);
+                               _["c_init"]=c_in1-c_start, _["c_brent"]=c_in2-c_in1, _["c_refine"]=c_in3-c_in2);
 }

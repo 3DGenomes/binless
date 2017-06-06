@@ -126,7 +126,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
   
   int step;
   int res=0;
-  double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_grid(0), c_brent(0), c_refine(0);
+  double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
   /*Rcout << " Perf iteration: start with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
           << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime << std::endl;*/
   for (step=1; step<=nouter; ++step) {
@@ -163,7 +163,6 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
     c_end = std::clock();
     c_opt += c_end - c_start;
     c_init += opt["c_init"];
-    c_grid += opt["c_grid"];
     c_brent += opt["c_brent"];
     c_refine += opt["c_refine"];
     
@@ -187,8 +186,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
                       _["mat"]=cts_to_signal_mat(cts, nbins, dispersion, phi_r, eCprime, diag_rm),
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res,
                       _["eCprime"]=eCprime, _["lambda1"]=lam1, _["c_cts"]=c_cts, _["c_gfl"]=c_gfl, _["c_opt"]=c_opt,
-                      _["c_init"]=c_init, _["c_grid"]=c_grid,
-                      _["c_brent"]=c_brent, _["c_refine"]=c_refine);
+                      _["c_init"]=c_init, _["c_brent"]=c_brent, _["c_refine"]=c_refine);
 }
 
 List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins,
@@ -242,6 +240,6 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
   return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["beta"]=ret["beta"], _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
                       _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat, _["eCprime"]=ret["eCprime"], _["lambda1"]=ret["lambda1"],
                       _["c_cts"]=ret["c_cts"], _["c_gfl"]=ret["c_gfl"], _["c_opt"]=ret["c_opt"],
-                      _["c_init"]=ret["c_init"], _["c_grid"]=ret["c_grid"], _["c_brent"]=ret["c_brent"], _["c_refine"]=ret["c_refine"]);
+                      _["c_init"]=ret["c_init"], _["c_brent"]=ret["c_brent"], _["c_refine"]=ret["c_refine"]);
 }
 
