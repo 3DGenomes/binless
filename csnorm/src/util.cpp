@@ -2,6 +2,7 @@
 using namespace Rcpp;
 #include <iostream>
 #include <vector>
+#include "util.hpp"
 
 std::vector<double> soft_threshold(const std::vector<double>& beta, double eCprime, double lam1) {
   std::vector<double> phi;
