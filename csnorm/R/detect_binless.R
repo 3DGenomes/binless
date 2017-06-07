@@ -161,7 +161,6 @@ optimize_lambda1_only = function(matg, csig, lambda1.min=0, positive=F, constrai
 #' @keywords internal
 optimize_lambda2 = function(csig, minlambda=0.1, maxlambda=100) {
   obj = function(x) {
-    csig@state <<- csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
     csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x))
     cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
         " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
@@ -179,7 +178,8 @@ optimize_lambda2 = function(csig, minlambda=0.1, maxlambda=100) {
     cat("   Warning: lambda2 too close to lower boundary.")
     lambda2=0
   }
-  retvals = as.list(csnorm:::gfl_BIC(csig, lambda2))[c("lambda2","lambda1","eCprime","BIC","dof")]
+  csig@state = csnorm:::gfl_BIC(csig, lambda2)
+  retvals = as.list(csig@state)[c("lambda2","lambda1","eCprime","BIC","dof")]
   csig@par=modifyList(csig@par,retvals)
   return(csig)
 }
@@ -218,12 +218,12 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
 csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, ctsg.ref=NULL, lambda1.min=0) {
   stopifnot(positive==T & fixed==F)
   csig = csnorm:::optimize_lambda2(csig)
-  #compute values for lambda1=0 and eCprime=0
-  matg = csnorm:::gfl_get_matrix(csig, 0, csig@par$lambda2, 0)
-  matg[,value.ori:=value]
-  #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=value))+scale_fill_gradient2()
   #get best lambda1 and set eCprime to lower bound
   if (fixed==T) {
+    #compute values for lambda1=0 and eCprime=0
+    matg = csnorm:::gfl_get_matrix(csig, 0, csig@par$lambda2, 0)
+    matg[,value.ori:=value]
+    #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=value))+scale_fill_gradient2()
     csig = csnorm:::optimize_lambda1_only(matg, csig, constrained=constrained, positive=positive)
   }
   csig@par$name=csig@cts[,name[1]]
