@@ -255,5 +255,19 @@ csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=T, simplified
                             ctsg.ref=csig@cts.ref)
 -> lambda1_only
 
+#negative case
+load("tmp_negative_csig.RData")
+lambda2 #1.399259
+a=csnorm:::gfl_BIC(csig, lambda2)
+a$eCprime #0.979505
+matg=csnorm:::gfl_get_matrix(csig, a$lambda1, a$lambda2, a$eCprime)
+print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
+
+
+
+
+
+
+
 
 
