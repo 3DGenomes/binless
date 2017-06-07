@@ -62,9 +62,11 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
 #' compute sparse fused lasso matrix for a given value of lambda1, lambda2 and eCprime (performance iteration)
 #' @keywords internal
 gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
-  #assume lambda1=0 and compute the fused lasso solution, centered around eCprime
-  perf.c = csnorm:::gfl_perf_iteration(csig, lambda1, lambda2, eCprime)
-  #cat("GFL: initial alpha=",alpha,"final alpha=",perf.c$alpha,"nsteps=",perf.c$nsteps,"\n")
+  if (csig@state$lambda1==lambda1 & csig@state$lambda2==lambda2 & csig@state$eCprime==eCprime) {
+    perf.c = csig@state
+  } else {
+    perf.c = csnorm:::gfl_perf_iteration(csig, lambda1, lambda2, eCprime)
+  }
   if (class(csig)!="CSbdiff") {
     matg = as.data.table(perf.c$mat)[,.(bin1,bin2,valuehat=phihat,ncounts,weight,value=perf.c$phi,diag.idx)]
   } else {

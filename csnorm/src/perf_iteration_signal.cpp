@@ -288,12 +288,13 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int opt
   
   DataFrame finalmat = DataFrame::create(_["bin1"]=retmat["bin1"],
                                        _["bin2"]=retmat["bin2"],
-                                       _["valuehat"]=retmat["phihat"],
+                                       _["phihat"]=retmat["phihat"],
                                        _["ncounts"]=retmat["ncounts"],
                                        _["weight"]=retmat["weight"],
-                                       _["value"]=ret["phi"],
+                                       _["diag.idx"]=retmat["diag.idx"],
+                                       _["phi"]=ret["phi"],
                                        _["patchno"]=patchno);
-  return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["beta"]=ret["beta"], _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
+  return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi"]=ret["phi"], _["beta"]=ret["beta"], _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
                       _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat, _["eCprime"]=ret["eCprime"], _["lambda1"]=ret["lambda1"],
                       _["c_cts"]=ret["c_cts"], _["c_gfl"]=ret["c_gfl"], _["c_opt"]=ret["c_opt"],
                       _["c_init"]=ret["c_init"], _["c_brent"]=ret["c_brent"], _["c_refine"]=ret["c_refine"]);
