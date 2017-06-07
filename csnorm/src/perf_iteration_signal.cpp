@@ -116,10 +116,10 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
           << " after " << res << " steps phi[0]= " << phi_r[0]
           << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-    /*Rcout << "eval step "<< step << ": lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
-          << " min(phihat)= " << min(NumericVector(wrap(y_r))) << " max(beta)= "<< max(NumericVector(wrap(y_r)))
+    Rcout << " eval step "<< step << ": lam2= " << lam2 << " lam1= " << lam1 << " eCprime= " << eCprime
           << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
-          << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
+          << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r)))
+          << " min(phihat)= " << min(NumericVector(wrap(y_r))) << " max(phihat)= "<< max(NumericVector(wrap(y_r))) << std::endl;
     
     
   }
@@ -219,10 +219,10 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
           << " after " << res << " steps phi[0]= " << phi_r[0]
           << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-    /*Rcout << "opt step "<< step << ": lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
-          << " min(phihat)= " << min(as<NumericVector>(newmat["phihat"])) << " max(phihat)= "<< max(as<NumericVector>(newmat["phihat"]))
+    Rcout << "opt step "<< step << ": lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
           << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
-          << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
+          << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r)))
+          << " min(phihat)= " << min(as<NumericVector>(newmat["phihat"])) << " max(phihat)= "<< max(as<NumericVector>(newmat["phihat"])) << std::endl;
     
     //update counter
     step += substep;
