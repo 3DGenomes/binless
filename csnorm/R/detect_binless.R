@@ -100,7 +100,7 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50) {
   perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, opt.every, nbins, trails$ntrails, trails$trails,
                                     trails$breakpoints, lambda2,
                                     state$alpha, inflate, maxsteps, tol.val, diag.rm,
-                                    state$lambda1, state$eCprime, state$beta, lambda1.min, refine.num)
+                                    state$beta, lambda1.min, refine.num)
   return(perf.c)
 }
 
