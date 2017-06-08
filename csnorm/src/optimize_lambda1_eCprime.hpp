@@ -16,7 +16,7 @@ struct obj_lambda1_eCprime {
   
   NumericVector get(double const& lambda1) const;
   
-  double minval_, maxval_, valrange_, tol_val_, lsnc_;
+  double minval_, valrange_, tol_val_, lsnc_;
   bool constrained_;
   IntegerVector patchno_;
   NumericVector forbidden_vals_, value_, weight_, valuehat_;

@@ -13,7 +13,7 @@ using namespace Rcpp;
 obj_lambda1_eCprime::obj_lambda1_eCprime(double minval, double maxval, double tol_val,
                       bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                       NumericVector value, NumericVector weight, NumericVector valuehat,
-                      NumericVector ncounts) : minval_(minval), maxval_(maxval), valrange_(maxval-minval),
+                      NumericVector ncounts) : minval_(minval), valrange_(maxval-minval),
                       tol_val_(tol_val), lsnc_(log(sum(ncounts))), constrained_(constrained),
                       patchno_(patchno), forbidden_vals_(forbidden_vals),
                       value_(value), weight_(weight), valuehat_(valuehat) {}
