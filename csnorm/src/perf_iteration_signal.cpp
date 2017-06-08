@@ -82,9 +82,9 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
         << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
         << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
         << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-  Rcout << " eval init: lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
+  /*Rcout << " eval init: lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
         << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
-        << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;
+        << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
   
   
   while (step<=nouter & maxval>converge) {
@@ -116,10 +116,10 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
           << " after " << res << " steps phi[0]= " << phi_r[0]
           << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-    Rcout << " eval step "<< step << ": lam2= " << lam2 << " lam1= " << lam1 << " eCprime= " << eCprime
+    /*Rcout << " eval step "<< step << ": lam2= " << lam2 << " lam1= " << lam1 << " eCprime= " << eCprime
           << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r)))
-          << " min(phihat)= " << min(NumericVector(wrap(y_r))) << " max(phihat)= "<< max(NumericVector(wrap(y_r))) << std::endl;
+          << " min(phihat)= " << min(NumericVector(wrap(y_r))) << " max(phihat)= "<< max(NumericVector(wrap(y_r))) << std::endl;*/
     
     
   }
@@ -129,17 +129,14 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
         << " nouter= " << step << " ninner= " << res
         << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
         << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-  Rcout << " eval final: " << step << "/" << nouter << " lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
+  /*Rcout << " eval final: " << step << "/" << nouter << " lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
         << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
-        << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;
+        << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
   
   return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha), _["phi"]=wrap(phi_r), _["mat"]=mat,
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res,
                       _["eCprime"]=eCprime, _["lambda1"]=lam1, _["c_cts"]=c_cts, _["c_gfl"]=c_gfl);
 }
-
-
-
 
 List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion, int nouter, int opt_every,
                            int nbins, int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
@@ -171,9 +168,9 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
         << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
         << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
         << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-  Rcout << "opt init: lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
+  /*Rcout << "opt init: lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
         << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
-        << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;
+        << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
   while (step<=nouter & maxval>converge) {
     beta_old = beta_r;
     lam1_old = lam1;
@@ -219,10 +216,10 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
           << " after " << res << " steps phi[0]= " << phi_r[0]
           << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-    Rcout << "opt step "<< step << ": lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
+    /*Rcout << "opt step "<< step << ": lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
           << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r)))
-          << " min(phihat)= " << min(as<NumericVector>(newmat["phihat"])) << " max(phihat)= "<< max(as<NumericVector>(newmat["phihat"])) << std::endl;
+          << " min(phihat)= " << min(as<NumericVector>(newmat["phihat"])) << " max(phihat)= "<< max(as<NumericVector>(newmat["phihat"])) << std::endl;*/
     
     //update counter
     step += substep;
@@ -233,9 +230,9 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
         << " nouter= " << step << " ninner= " << res
         << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
         << " min(phi)= " << min(NumericVector(wrap(phi_r))) << "max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-  Rcout << "opt final: " << step << "/" << nouter << " lam2= " << lam2 << " lam1= " << lam1 << " eCprime= " << eCprime
+  /*Rcout << "opt final: " << step << "/" << nouter << " lam2= " << lam2 << " lam1= " << lam1 << " eCprime= " << eCprime
         << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
-        << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;
+        << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
   
   return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha), _["phi"]=wrap(phi_r), _["mat"]=mat,
                       _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res,
@@ -246,22 +243,51 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
 List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int opt_every, int nbins,
                      int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                      double lam2,  double alpha, double inflate, int ninner, double tol_val,
-                     int diag_rm, double lam1_init, double eCprime_init, NumericVector beta_i,
-                     double lambda1_min, int refine_num) {
+                     int diag_rm, NumericVector beta_i, double lambda1_min, int refine_num) {
+  std::clock_t c_start,c_end;
+  double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
+  double lam1=0, eCprime=0;
   
   //perf iteration for this set of values
-  List ret = wgfl_signal_perf_opt_lambda1_eCprime(cts, dispersion, (int)(nouter/10.+1), opt_every, nbins, ntrails,
-                                   trails_i, breakpoints_i,
-                                   lam2, alpha, inflate, ninner, tol_val/20., diag_rm, lam1_init, eCprime_init,
-                                   beta_i, lambda1_min, refine_num);
+  List ret = wgfl_signal_perf_warm(cts, dispersion, (int)(nouter/10.+1), nbins, ntrails, trails_i, breakpoints_i, lam1, lam2, eCprime,
+                                   alpha, inflate, ninner, tol_val/20., diag_rm, beta_i);
+  c_cts += as<double>(ret["c_cts"]);
+  c_gfl += as<double>(ret["c_gfl"]);
   //redo iteration if warm start did not work
   if (as<int>(ret["nouter"])>nouter) {
     Rcout << " warning: performing cold start due to failed warm start" <<std::endl;
     beta_i = NumericVector(beta_i.size(),0);
-    ret = wgfl_signal_perf_opt_lambda1_eCprime(cts, dispersion, nouter, opt_every, nbins, ntrails, trails_i, breakpoints_i,
-                                               lam2, alpha, inflate, ninner, tol_val/20., diag_rm, lambda1_min, 0,
-                                               beta_i, lambda1_min, refine_num);
+    ret = wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i, lam1, lam2, eCprime,
+                                alpha, inflate, ninner, tol_val/20., diag_rm, beta_i);
+    c_cts += as<double>(ret["c_cts"]);
+    c_gfl += as<double>(ret["c_gfl"]);
   }
+  
+  //optimize lambda1 and eC
+  c_start = std::clock();
+  DataFrame mat = as<DataFrame>(ret["mat"]);
+  DataFrame newmat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                       _["bin2"]=mat["bin2"],
+                                       _["phihat"]=mat["phihat"],
+                                       _["ncounts"]=mat["ncounts"],
+                                       _["diag.idx"]=mat["diag.idx"],
+                                       _["weight"]=mat["weight"],
+                                       _["beta"]=ret["beta"],
+                                       _["value"]=ret["beta"]);
+  const bool constrained=true;
+  NumericVector opt = cpp_optimize_lambda1_eCprime(newmat, nbins, tol_val, constrained, lambda1_min, refine_num);
+  lam1 = opt["lambda1"];
+  eCprime = opt["eCprime"];
+  c_end = std::clock();
+  
+  c_opt += c_end - c_start;
+  c_init += opt["c_init"];
+  c_brent += opt["c_brent"];
+  c_refine += opt["c_refine"];
+  
+  //soft-threshold it at the selected parameters
+  std::vector<double> beta_r = as<std::vector<double> >(ret["beta"]);
+  std::vector<double> phi_r = soft_threshold(beta_r, eCprime, lam1);
   
   //identify patches
   DataFrame retmat = wrap(ret["mat"]);
@@ -270,11 +296,11 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int opt
                                        _["valuehat"]=retmat["phihat"],
                                        _["ncounts"]=retmat["ncounts"],
                                        _["weight"]=retmat["weight"],
-                                       _["value"]=ret["phi"]);
+                                       _["value"]=phi_r);
   List patches = boost_build_patch_graph_components(nbins, submat, tol_val);
   
   //count the positive ones and deduce dof
-  NumericVector phi = ret["phi"];
+  NumericVector phi = wrap(phi_r);
   IntegerVector patchno = patches["membership"];
   IntegerVector selected = patchno[abs(phi)>tol_val/2];
   const int dof = unique(selected).size();
@@ -283,7 +309,6 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int opt
   NumericVector weight = submat["weight"];
   NumericVector phihat = submat["valuehat"];
   NumericVector ncounts = submat["ncounts"];
-  const double eCprime = ret["eCprime"];
   const double BIC = sum(weight * SQUARE(phihat-(phi + eCprime))) + log(sum(ncounts))*dof;
   
   DataFrame finalmat = DataFrame::create(_["bin1"]=retmat["bin1"],
@@ -294,9 +319,8 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int opt
                                        _["diag.idx"]=retmat["diag.idx"],
                                        _["phi"]=ret["phi"],
                                        _["patchno"]=patchno);
-  return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi"]=ret["phi"], _["beta"]=ret["beta"], _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
-                      _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat, _["eCprime"]=ret["eCprime"], _["lambda1"]=ret["lambda1"],
-                      _["c_cts"]=ret["c_cts"], _["c_gfl"]=ret["c_gfl"], _["c_opt"]=ret["c_opt"],
-                      _["c_init"]=ret["c_init"], _["c_brent"]=ret["c_brent"], _["c_refine"]=ret["c_refine"]);
+  return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi"]=phi_r, _["beta"]=beta_r, _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
+                      _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat, _["eCprime"]=eCprime, _["lambda1"]=lam1,
+                      _["c_cts"]=c_cts, _["c_gfl"]=c_gfl, _["c_opt"]=c_opt, _["c_init"]=c_init, _["c_brent"]=c_brent, _["c_refine"]=c_refine);
 }
 
