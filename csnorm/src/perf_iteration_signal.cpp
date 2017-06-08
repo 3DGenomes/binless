@@ -224,7 +224,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
     //update counter
     step += substep;
   }
-  if (step>nouter) Rcout << " warning: reached maximum number of outer iterations in wgfl_signal_perf_opt_lambda1_eCprime " << std::endl;
+  //if (step>nouter) Rcout << " warning: reached maximum number of outer iterations in wgfl_signal_perf_opt_lambda1_eCprime " << std::endl;
   /*Rcout << " Perf iteration: end   with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
         << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
         << " nouter= " << step << " ninner= " << res
@@ -256,10 +256,11 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int opt
   c_gfl += as<double>(ret["c_gfl"]);
   //redo iteration if warm start did not work
   if (as<int>(ret["nouter"])>nwarm) {
-    Rcout << " warning: performing cold start due to failed warm start" <<std::endl;
     beta_i = NumericVector(beta_i.size(),0);
+    //Rcout << " warning: warm start failed " << std::endl;
     ret = wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i, lam1, lam2, eCprime,
                                 alpha, inflate, ninner, tol_val/20., diag_rm, beta_i);
+    if (as<int>(ret["nouter"])>nouter) Rcout << " warning: cold start did not converge" <<std::endl;
     c_cts += as<double>(ret["c_cts"]);
     c_gfl += as<double>(ret["c_gfl"]);
   }
