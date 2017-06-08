@@ -22,9 +22,9 @@ obj_lambda1_eCprime::obj_lambda1_eCprime(double minval, double maxval, double to
 double obj_lambda1_eCprime::operator()(double const& x) const { return get(std::pow(10,x), "optimizer")["BIC"]; }
   
 NumericVector obj_lambda1_eCprime::get(double const& lambda1, const std::string& msg) const {
-    double eCprime = (valrange_ < (2*lambda1+tol_val_)) ? (maxval_+minval_)/2. : lambda1+minval_-tol_val_;
+    double eCprime = (valrange_ < 2*lambda1) ? valrange_/2. : lambda1+minval_;
     if (constrained_) {
-      if (is_true(any(abs(eCprime-forbidden_vals_)>lambda1+tol_val_)))
+      if (is_true(any(abs(eCprime-forbidden_vals_)>lambda1+tol_val_/2)))
         return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1,
                                      _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na());
     }
@@ -55,11 +55,10 @@ NumericVector get_minimum_diagonal_values(NumericVector value, IntegerVector dia
   return diagvals;
 }
 
-NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1, double lam1_min, int refine_num,
-                             double tol_val, NumericVector patchvals) {
+NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1, double lam1_min, int refine_num, NumericVector patchvals) {
   //bounds and border case
   Rcout << " refine with lam1= " << lam1 << " and lam1_min= "<< lam1_min << std::endl;
-  NumericVector lambdavals = (patchvals - patchvals(0) + tol_val)/2.;
+  NumericVector lambdavals = (patchvals - patchvals(0))/2.;
   Rcout << " possible values are :" << std::endl;
   for (int i=0; i<lambdavals.size() & lambdavals[i]<0.068; ++i) Rcout << "   lambdavals[" << i << "]=" << lambdavals[i] << std::endl;
   lambdavals = lambdavals[lambdavals>=lam1_min];
@@ -114,7 +113,7 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, doubl
   NumericVector forbidden_vals;
   if (constrained) {
     forbidden_vals = get_minimum_diagonal_values(beta, diag_idx);
-    lmin = std::max(lmin, (max(forbidden_vals)-minval)/2 + tol_val);
+    lmin = std::max(lmin, (max(forbidden_vals)-minval)/2);
   }
   //create functor
   obj_lambda1_eCprime obj(minval, maxval, tol_val, constrained, patchno, forbidden_vals,
@@ -140,7 +139,7 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins, doubl
   std::clock_t c_in2 = std::clock();
   double lam1=pow(10,ret.first);
   obj.get(lam1, "minimum");
-  NumericVector retval = refine_minimum(obj, lam1, lmin, refine_num, tol_val, patchvals);
+  NumericVector retval = refine_minimum(obj, lam1, lmin, refine_num, patchvals);
   Rcout << " found candidate lambda1=" << lam1 << " refined over " << refine_num << " neighbors with lmin= " << lmin
         << " to final value lam1= " << as<double>(retval["lambda1"])  << " eCprime= " << as<double>(retval["eCprime"]) << std::endl;
   std::clock_t c_in3 = std::clock();
