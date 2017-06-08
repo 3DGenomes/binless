@@ -162,8 +162,8 @@ optimize_lambda1_only = function(matg, csig, lambda1.min=0, positive=F, constrai
 optimize_lambda2 = function(csig, minlambda=0.1, maxlambda=100) {
   obj = function(x) {
     csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x))
-    cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
-        " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
+    #cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
+    #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
   }
   #ctsg=copy(ctsg.old)
