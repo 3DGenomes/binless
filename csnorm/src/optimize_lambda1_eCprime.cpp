@@ -6,7 +6,7 @@ using namespace Rcpp;
 #include <ctime>
 
 #include "optimize_lambda1_eCprime.hpp"
-#include "util.hpp" //soft_threshold and SQUARE
+#include "util.hpp"
 #include "graph_trails.hpp" //boost_build_patch_graph_components
 #include <boost/math/tools/minima.hpp> //brent_find_minima
 
@@ -34,23 +34,6 @@ NumericVector obj_lambda1_eCprime::get(double const& lambda1) const {
     const double BIC = sum(weight_ * SQUARE(valuehat_ - (soft + eCprime))) + lsnc_*dof;
     return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
                                  _["BIC"]=BIC, _["dof"]=dof);
-}
-
-NumericVector get_patch_values(NumericVector value, IntegerVector patchno) {
-  //store value for each patch
-  int npatches = max(patchno)+1;
-  NumericVector unique_values(npatches); //patchno starts at 0
-  for (int i=0; i<patchno.size(); ++i) unique_values(patchno(i)) = value(i);
-  std::sort(unique_values.begin(), unique_values.end());
-  return unique_values;
-}
-
-NumericVector get_minimum_diagonal_values(NumericVector value, IntegerVector diag_idx) {
-  //store value for each patch
-  int ndiags = max(diag_idx)+1;
-  NumericVector diagvals(ndiags, max(value)); //diag_idx starts at 0
-  for (int i=0; i<diag_idx.size(); ++i) diagvals(diag_idx(i)) = std::min(diagvals(diag_idx(i)),value(i));
-  return diagvals;
 }
 
 NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1, double lam1_min, int refine_num, NumericVector patchvals) {

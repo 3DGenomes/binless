@@ -14,3 +14,22 @@ std::vector<double> soft_threshold(const std::vector<double>& beta, double eCpri
   return phi;
 }
 
+NumericVector get_patch_values(NumericVector value, IntegerVector patchno) {
+  //store value for each patch
+  int npatches = max(patchno)+1;
+  NumericVector unique_values(npatches); //patchno starts at 0
+  for (int i=0; i<patchno.size(); ++i) unique_values(patchno(i)) = value(i);
+  std::sort(unique_values.begin(), unique_values.end());
+  return unique_values;
+}
+
+NumericVector get_minimum_diagonal_values(NumericVector value, IntegerVector diag_idx) {
+  //store value for each patch
+  int ndiags = max(diag_idx)+1;
+  NumericVector diagvals(ndiags, max(value)); //diag_idx starts at 0
+  for (int i=0; i<diag_idx.size(); ++i) diagvals(diag_idx(i)) = std::min(diagvals(diag_idx(i)),value(i));
+  return diagvals;
+}
+
+
+

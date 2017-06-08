@@ -5,7 +5,7 @@
 using namespace Rcpp;
 #include <vector>
 
-//objective functor to find lambda1 and eCprime
+//objective functor to find lambda1 and eCprime assuming the signal is positive
 struct obj_lambda1_eCprime {
   obj_lambda1_eCprime(double minval, double maxval, double tol_val,
                       bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
@@ -21,10 +21,6 @@ struct obj_lambda1_eCprime {
   IntegerVector patchno_;
   NumericVector forbidden_vals_, value_, weight_, valuehat_;
 };
-
-NumericVector get_patch_values(NumericVector value, IntegerVector patchno);
-
-NumericVector get_minimum_diagonal_values(NumericVector value, IntegerVector diag_idx);
 
 NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1, double lam1_min, int refine_num, NumericVector patchvals);
 
