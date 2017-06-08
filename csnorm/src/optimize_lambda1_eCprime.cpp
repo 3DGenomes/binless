@@ -82,7 +82,7 @@ NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1, double
   for (int i=0; i<std::min(nc2,refine_num); ++i) {
     if (candidates2[i]<0.068) Rcout << "   candidates2[" << i << "]=" << candidates2[i] << std::endl; 
     val = obj.get(candidates2[i],"refine");
-    if (nc1==0) best=val;
+    if (i==0 & nc1==0) best=val;
     if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
   }
   return(best);
