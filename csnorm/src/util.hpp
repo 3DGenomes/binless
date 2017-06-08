@@ -13,5 +13,7 @@ NumericVector get_patch_values(NumericVector value, IntegerVector patchno);
 
 NumericVector get_minimum_diagonal_values(NumericVector value, IntegerVector diag_idx);
 
+NumericVector get_constant_diagonal_values(NumericVector value, IntegerVector diag_idx, double tol_val);
+
 #endif
 
