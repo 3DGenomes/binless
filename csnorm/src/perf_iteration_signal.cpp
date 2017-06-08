@@ -11,6 +11,7 @@ using namespace Rcpp;
 #include "graph_fl.h" //graph_fused_lasso_weight_warm
 #include "graph_trails.hpp" //boost_build_patch_graph_components
 #include "optimize_lambda1_eCprime.hpp" //cpp_optimize_lambda1_eCprime
+#include "optimize_lambda1.hpp" //cpp_optimize_lambda1
 
 
 DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion, std::vector<double>& phi,
@@ -243,11 +244,11 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
 List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int opt_every, int nbins,
                      int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                      double lam2,  double alpha, double inflate, int ninner, double tol_val,
-                     int diag_rm, NumericVector beta_i, double lambda1_min, int refine_num) {
+                     int diag_rm, NumericVector beta_i, double lambda1_min, int refine_num,
+                     bool constrained, bool positive, bool fixed) {
   std::clock_t c_start,c_end;
   double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
   double lam1=0, eCprime=0;
-  
   //perf iteration for this set of values
   int nwarm = (int)(nouter/10.+1);
   List ret = wgfl_signal_perf_warm(cts, dispersion, nwarm, nbins, ntrails, trails_i, breakpoints_i, lam1, lam2, eCprime,
@@ -276,8 +277,14 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int opt
                                        _["weight"]=mat["weight"],
                                        _["beta"]=ret["beta"],
                                        _["value"]=ret["beta"]);
-  const bool constrained=true;
-  NumericVector opt = cpp_optimize_lambda1_eCprime(newmat, nbins, tol_val, constrained, lambda1_min, refine_num);
+  NumericVector opt;
+  if (fixed) { // is eCprime fixed to 0?
+    if (!constrained) stop("expected constrained==T when fixed==T");
+    opt = cpp_optimize_lambda1(newmat, nbins, tol_val, positive, lambda1_min, refine_num);
+  } else {
+    if (!positive) stop("expected positive==T when fixed==F");
+    opt = cpp_optimize_lambda1_eCprime(newmat, nbins, tol_val, constrained, lambda1_min, refine_num);
+  }
   lam1 = opt["lambda1"];
   eCprime = opt["eCprime"];
   c_end = std::clock();
