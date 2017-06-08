@@ -249,12 +249,13 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int opt
   double lam1=0, eCprime=0;
   
   //perf iteration for this set of values
-  List ret = wgfl_signal_perf_warm(cts, dispersion, (int)(nouter/10.+1), nbins, ntrails, trails_i, breakpoints_i, lam1, lam2, eCprime,
+  int nwarm = (int)(nouter/10.+1);
+  List ret = wgfl_signal_perf_warm(cts, dispersion, nwarm, nbins, ntrails, trails_i, breakpoints_i, lam1, lam2, eCprime,
                                    alpha, inflate, ninner, tol_val/20., diag_rm, beta_i);
   c_cts += as<double>(ret["c_cts"]);
   c_gfl += as<double>(ret["c_gfl"]);
   //redo iteration if warm start did not work
-  if (as<int>(ret["nouter"])>nouter) {
+  if (as<int>(ret["nouter"])>nwarm) {
     Rcout << " warning: performing cold start due to failed warm start" <<std::endl;
     beta_i = NumericVector(beta_i.size(),0);
     ret = wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i, lam1, lam2, eCprime,
