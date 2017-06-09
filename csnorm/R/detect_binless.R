@@ -51,10 +51,10 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
                                               trails$breakpoints, lambda1, lambda2, eCprime,
                                               state$alpha, inflate, maxsteps, tol.val/20, diag.rm, state$beta)
   } else {
-    stopifnot(lambda1==0 & eCprime==0)
+    stopifnot(eCprime==0)
     perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                            trails$breakpoints, lambda2, state$alpha, inflate, maxsteps, tol.val/20, diag.rm,
-                                            state$phi.ref, state$delta)
+                                            trails$breakpoints, lambda1, lambda2, state$alpha, inflate, maxsteps, tol.val/20, diag.rm,
+                                            state$phi.ref, state$beta)
   }
   return(perf.c)
 }
