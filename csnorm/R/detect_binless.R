@@ -316,10 +316,9 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #
   if (verbose==T) cat(" Detect patches\n")
   csi@mat = foreach(g=groupnames, .combine=rbind) %dopar% {
-    matg = csi@mat[name==g,.(name,bin1,bin2,value=phi)]
+    matg = mat[name==g,.(name,bin1,bin2,value,phi=value,phihat=valuehat,weight,ncounts,diag.idx)]
     cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
-    matg[,patchno:=factor(cl$membership)]
-    setnames(matg,"value","phi")
+    matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
     matg
   }
   #
@@ -378,10 +377,9 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #
   if (verbose==T) cat(" Detect patches\n")
   csi@mat = foreach(g=groupnames, .combine=rbind) %dopar% {
-    matg = csi@mat[name==g,.(name,bin1,bin2,value=delta)]
+    matg = mat[name==g,.(name,bin1,bin2,value,delta=value,phihat.ref,deltahat=valuehat,weight,ncounts,diag.idx)]
     cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
-    matg[,patchno:=factor(cl$membership)]
-    setnames(matg,"value","delta")
+    matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
     matg
   }
   #store back
