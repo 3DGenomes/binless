@@ -62,7 +62,7 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
 #' compute sparse fused lasso matrix for a given value of lambda1, lambda2 and eCprime (performance iteration)
 #' @keywords internal
 gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
-  if (csig@state$lambda1==lambda1 & csig@state$lambda2==lambda2 & csig@state$eCprime==eCprime) {
+  if (csig@state$lambda1==lambda1 & csig@state$lambda2==lambda2 & (class(csig)=="CSbdiff" | csig@state$eCprime==eCprime)) {
     perf.c = csig@state
   } else {
     perf.c = csnorm:::gfl_perf_iteration(csig, lambda1, lambda2, eCprime)
@@ -80,7 +80,6 @@ gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
 #' compute BIC for a given value of lambda1, lambda2 and eCprime (performance iteration, persistent state)
 #' @keywords internal
 gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, positive=T, fixed=F) {
-  stopifnot(class(csig)!="CSbdiff")
   #state = perf.c[c("phi.ref","beta","alpha")]
   #submat = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta)]
   #
@@ -97,10 +96,19 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
   nperf=csig@settings$nperf
   opt.every=csig@settings$opt.every
   maxsteps=csig@settings$maxsteps
-  perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, opt.every, nbins, trails$ntrails, trails$trails,
-                                    trails$breakpoints, lambda2,
-                                    state$alpha, inflate, maxsteps, tol.val, diag.rm,
-                                    state$beta, lambda1.min, refine.num, constrained, fixed)
+  if (is.null(ctsg.ref)) {
+    perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                                      trails$breakpoints, lambda2,
+                                      state$alpha, inflate, maxsteps, tol.val, diag.rm,
+                                      state$beta, lambda1.min, refine.num, constrained, fixed)
+  } else {
+    stopifnot(eCprime==0)
+    stopifnot(constrained==T) #for now
+    perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                                      trails$breakpoints, lambda2,
+                                      state$alpha, inflate, maxsteps, tol.val, diag.rm,
+                                      state$phi.ref, state$beta, lambda1.min, refine.num, constrained)
+  }
   return(perf.c)
 }
 

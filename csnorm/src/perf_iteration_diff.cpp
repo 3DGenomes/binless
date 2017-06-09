@@ -45,7 +45,22 @@ DataFrame cts_to_diff_mat(const DataFrame cts, const DataFrame ref, int nbins, d
                              _["weight"]=weight, _["diag.idx"]=didx);
 }
 
-
+std::vector<double> compute_phi_ref(const std::vector<double>& delta_r, const std::vector<double>& phihat,
+                                    const std::vector<double>& phihat_var, const std::vector<double>& phihat_ref,
+                                    const std::vector<double>& phihat_var_ref) {
+  const int N = delta_r.size();
+  std::vector<double> phi_ref_r;
+  phi_ref_r.reserve(N);
+  for (int i=0; i<N; ++i) {
+    if (phihat_var_ref[i]==INFINITY && phihat_var[i]==INFINITY) {
+      phi_ref_r.push_back((phihat_ref[i]+phihat[i])/2);
+    } else {
+      phi_ref_r.push_back((phihat_ref[i]/phihat_var_ref[i] + (phihat[i]-delta_r[i])/phihat_var[i])
+                           /(1/phihat_var_ref[i]+1/phihat_var[i]));
+    }
+  }
+  return phi_ref_r;
+}
 
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref, double dispersion, int nouter, int nbins,
                          int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
@@ -106,15 +121,8 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref, double disper
     delta_r = soft_threshold(beta_r, 0, lam1);
     
     //update phi_ref
-    for (int i=0; i<N; ++i) {
-      if (phihat_var_ref[i]==INFINITY && phihat_var[i]==INFINITY) {
-        phi_ref_r[i]=(phihat_ref[i]+phihat[i])/2;
-      } else {
-        phi_ref_r[i] = (phihat_ref[i]/phihat_var_ref[i] + (phihat[i]-delta_r[i])/phihat_var[i])
-        /(1/phihat_var_ref[i]+1/phihat_var[i]);
-      }
-    }
-
+    phi_ref_r = compute_phi_ref(delta_r, phihat, phihat_var, phihat_ref, phihat_var_ref);
+    
     //update residual
     maxval = std::abs(beta_r[0]-beta_old[0]);
     for (int i=1; i<N; ++i) maxval = std::max(std::abs(beta_r[i]-beta_old[i]), maxval);
@@ -145,14 +153,14 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref, double disper
 }
 
 
-/*List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion, int nouter, int nbins,
+List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion, int nouter, int nbins,
                    int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                    double lam2,  double alpha, double inflate, int ninner, double tol_val,
                    int diag_rm, NumericVector phi_ref_i,  NumericVector beta_i, double lambda1_min,
                    int refine_num, bool constrained) {
   std::clock_t c_start,c_end;
   double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
-  double lam1=0, eCprime=0;
+  double lam1=0;
   //perf iteration for this set of values
   int nwarm = (int)(nouter/10.+1);
   List ret = wgfl_diff_perf_warm(cts, ref, dispersion, nwarm, nbins, ntrails, trails_i, breakpoints_i, lam1, lam2,
@@ -163,14 +171,14 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref, double disper
   if (as<int>(ret["nouter"])>nwarm) {
     beta_i = NumericVector(beta_i.size(),0);
     //Rcout << " warning: warm start failed " << std::endl;
-    ret = wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i, lam1, lam2, eCprime,
-                                alpha, inflate, ninner, tol_val/20., diag_rm, beta_i);
+    ret = wgfl_diff_perf_warm(cts, ref, dispersion, nouter, nbins, ntrails, trails_i, breakpoints_i, lam1, lam2,
+                              alpha, inflate, ninner, tol_val/20., diag_rm, phi_ref_i, beta_i);
     if (as<int>(ret["nouter"])>nouter) Rcout << " warning: cold start did not converge" <<std::endl;
     c_cts += as<double>(ret["c_cts"]);
     c_gfl += as<double>(ret["c_gfl"]);
   }
   
-  //optimize lambda1 and eC
+  //optimize lambda1 assuming eCprime=0
   c_start = std::clock();
   DataFrame mat = as<DataFrame>(ret["mat"]);
   DataFrame newmat = DataFrame::create(_["bin1"]=mat["bin1"],
@@ -181,16 +189,10 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref, double disper
                                        _["weight"]=mat["weight"],
                                        _["beta"]=ret["beta"],
                                        _["value"]=ret["beta"]);
-  NumericVector opt;
-  if (fixed) { // is eCprime fixed to 0?
-    if (!constrained) stop("expected constrained==T when fixed==T");
-    const bool positive = true;
-    opt = cpp_optimize_lambda1(newmat, nbins, tol_val, positive, lambda1_min, refine_num);
-  } else {
-    opt = cpp_optimize_lambda1_eCprime(newmat, nbins, tol_val, constrained, lambda1_min, refine_num);
-  }
+  if (!constrained) stop("expected constrained==T when fixed==T");
+  const bool positive = false;
+  NumericVector opt = cpp_optimize_lambda1(newmat, nbins, tol_val, positive, lambda1_min, refine_num);
   lam1 = opt["lambda1"];
-  eCprime = opt["eCprime"];
   c_end = std::clock();
   
   c_opt += c_end - c_start;
@@ -200,42 +202,54 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref, double disper
   
   //soft-threshold it at the selected parameters
   std::vector<double> beta_r = as<std::vector<double> >(ret["beta"]);
-  std::vector<double> phi_r = soft_threshold(beta_r, eCprime, lam1);
+  std::vector<double> delta_r = soft_threshold(beta_r, 0, lam1);
+  
+  //compute phi_ref
+  std::vector<double> phihat_ref_r = Rcpp::as<std::vector<double> >(mat["phihat.ref"]);
+  std::vector<double> phihat_var_ref_r = Rcpp::as<std::vector<double> >(mat["phihat.var.ref"]);
+  std::vector<double> phihat_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
+  std::vector<double> phihat_var_r = Rcpp::as<std::vector<double> >(mat["phihat.var"]);
+  std::vector<double> phi_ref_r = compute_phi_ref(delta_r, phihat_r, phihat_var_r, phihat_ref_r, phihat_var_ref_r);
   
   //identify patches
-  DataFrame retmat = wrap(ret["mat"]);
-  DataFrame submat = DataFrame::create(_["bin1"]=retmat["bin1"],
-                                       _["bin2"]=retmat["bin2"],
-                                       _["valuehat"]=retmat["phihat"],
-                                       _["ncounts"]=retmat["ncounts"],
-                                       _["weight"]=retmat["weight"],
-                                       _["value"]=phi_r);
+  DataFrame submat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                       _["bin2"]=mat["bin2"],
+                                       _["valuehat"]=mat["deltahat"],
+                                       _["ncounts"]=mat["ncounts"],
+                                       _["weight"]=mat["weight"],
+                                       _["value"]=delta_r);
   List patches = boost_build_patch_graph_components(nbins, submat, tol_val);
   
   //count the positive ones and deduce dof
-  NumericVector phi = wrap(phi_r);
+  NumericVector delta = wrap(delta_r);
   IntegerVector patchno = patches["membership"];
-  IntegerVector selected = patchno[abs(phi)>tol_val/2];
+  IntegerVector selected = patchno[abs(delta)>tol_val/2];
   const int dof = unique(selected).size();
   
   //compute BIC
-  NumericVector weight = submat["weight"];
-  NumericVector phihat = submat["valuehat"];
-  NumericVector ncounts = submat["ncounts"];
-  const double BIC = sum(weight * SQUARE(phihat-(phi + eCprime))) + log(sum(ncounts))*dof;
+  NumericVector weight = mat["weight"];
+  NumericVector deltahat = mat["deltahat"];
+  NumericVector phihat_ref = mat["phihat.ref"];
+  NumericVector phi_ref = wrap(phi_ref_r);
+  NumericVector phihat_var_ref = mat["phihat.var.ref"];
+  NumericVector ncounts = mat["ncounts"];
+  const double BIC = sum(weight * SQUARE(deltahat - delta) + SQUARE(phihat_ref - phi_ref)/phihat_var_ref) + log(sum(ncounts))*dof;
   
-  DataFrame finalmat = DataFrame::create(_["bin1"]=retmat["bin1"],
-                                       _["bin2"]=retmat["bin2"],
-                                       _["phihat"]=retmat["phihat"],
-                                       _["ncounts"]=retmat["ncounts"],
-                                       _["weight"]=retmat["weight"],
-                                       _["diag.idx"]=retmat["diag.idx"],
-                                       _["phi"]=ret["phi"],
+  DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                       _["bin2"]=mat["bin2"],
+                                       _["deltahat"]=mat["deltahat"],
+                                       _["weight"]=mat["weight"],
+                                       _["phihat.ref"]=mat["phihat.ref"],
+                                       _["phihat.var.ref"]=mat["phihat.var.ref"],
+                                       _["ncounts"]=mat["ncounts"],
+                                       _["diag.idx"]=mat["diag.idx"],
+                                       _["delta"]=delta,
+                                       _["phi.ref"]=phi_ref,
                                        _["patchno"]=patchno);
-  return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi"]=phi_r, _["beta"]=beta_r, _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
-                      _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat, _["eCprime"]=eCprime, _["lambda1"]=lam1,
+  return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi.ref"]=phi_ref, _["delta"]=delta, _["beta"]=beta_r,
+                      _["alpha"]=ret["alpha"], _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat, _["lambda1"]=lam1, _["eCprime"]=0,
                       _["c_cts"]=c_cts, _["c_gfl"]=c_gfl, _["c_opt"]=c_opt, _["c_init"]=c_init, _["c_brent"]=c_brent, _["c_refine"]=c_refine);
-}*/
+}
 
 
 
