@@ -299,12 +299,11 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
   std::vector<double> phi_r = soft_threshold(beta_r, eCprime, lam1);
   
   //identify patches
-  DataFrame retmat = wrap(ret["mat"]);
-  DataFrame submat = DataFrame::create(_["bin1"]=retmat["bin1"],
-                                       _["bin2"]=retmat["bin2"],
-                                       _["valuehat"]=retmat["phihat"],
-                                       _["ncounts"]=retmat["ncounts"],
-                                       _["weight"]=retmat["weight"],
+  DataFrame submat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                       _["bin2"]=mat["bin2"],
+                                       _["valuehat"]=mat["phihat"],
+                                       _["ncounts"]=mat["ncounts"],
+                                       _["weight"]=mat["weight"],
                                        _["value"]=phi_r);
   List patches = boost_build_patch_graph_components(nbins, submat, tol_val);
   
@@ -320,12 +319,12 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
   NumericVector ncounts = submat["ncounts"];
   const double BIC = sum(weight * SQUARE(phihat-(phi + eCprime))) + log(sum(ncounts))*dof;
   
-  DataFrame finalmat = DataFrame::create(_["bin1"]=retmat["bin1"],
-                                       _["bin2"]=retmat["bin2"],
-                                       _["phihat"]=retmat["phihat"],
-                                       _["ncounts"]=retmat["ncounts"],
-                                       _["weight"]=retmat["weight"],
-                                       _["diag.idx"]=retmat["diag.idx"],
+  DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                       _["bin2"]=mat["bin2"],
+                                       _["phihat"]=mat["phihat"],
+                                       _["ncounts"]=mat["ncounts"],
+                                       _["weight"]=mat["weight"],
+                                       _["diag.idx"]=mat["diag.idx"],
                                        _["phi"]=ret["phi"],
                                        _["patchno"]=patchno);
   return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi"]=phi_r, _["beta"]=beta_r, _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
