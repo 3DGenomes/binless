@@ -8,8 +8,6 @@ using namespace Rcpp;
 DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion, std::vector<double>& phi,
                             double eCprime, int diag_rm);
 
-std::vector<double> soft_threshold(const std::vector<double>& beta, double eCprime, double lam1);
-
 List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins,
                            int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                            double lam1, double lam2,  double eCprime,
