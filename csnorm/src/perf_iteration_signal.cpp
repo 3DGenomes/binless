@@ -241,7 +241,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
                       _["c_init"]=c_init, _["c_brent"]=c_brent, _["c_refine"]=c_refine);
 }
 
-List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int opt_every, int nbins,
+List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins,
                      int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                      double lam2,  double alpha, double inflate, int ninner, double tol_val,
                      int diag_rm, NumericVector beta_i, double lambda1_min, int refine_num,
