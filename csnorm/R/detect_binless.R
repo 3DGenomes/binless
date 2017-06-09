@@ -102,7 +102,6 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
                                       state$alpha, inflate, maxsteps, tol.val, diag.rm,
                                       state$beta, lambda1.min, refine.num, constrained, fixed)
   } else {
-    stopifnot(eCprime==0)
     stopifnot(constrained==T) #for now
     perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                                       trails$breakpoints, lambda2,
