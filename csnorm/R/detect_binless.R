@@ -177,21 +177,20 @@ csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, cts
   return(params)
 }
 
-#' Build grouped signal matrix using normalization data if available
+#' Build (grouped) signal matrix using normalization data if available
 #' @keywords internal
-prepare_signal_matrix = function(cs, csg, resolution, tol.val) {
-  names=csg@names
+get_signal_matrix = function(cs, resolution=cs@settings$base.res, groups=cs@experiments[,.(name,groupname=name)]) {
   #build signal matrix
   if (cs@par$signal[,.N]==0) {
     sbins=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
     signal.bins=unique(cut(c(sbins,head(sbins,n=-1)+resolution/2), sbins,
                            ordered_result=T, right=F, include.lowest=T,dig.lab=12))
-    mat=CJ(name=names[,groupname],bin1=signal.bins,bin2=signal.bins,sorted=F,unique=F)[bin2>=bin1]
+    mat=CJ(name=groups[,groupname],bin1=signal.bins,bin2=signal.bins,sorted=F,unique=F)[bin2>=bin1]
     mat[,phi:=0]
   } else {
     #report phi values for each group
     if (resolution!=cs@settings$base.res) {
-      refmat=names[cs@par$signal[,.(name,bin1,bin2,phi)]][
+      refmat=groups[cs@par$signal[,.(name,bin1,bin2,phi)]][
         !is.na(groupname),.(name=groupname,refbin1=bin1,refbin2=bin2,phi)][
           ,.(phi=mean(phi)),by=c("name","refbin1","refbin2")]
       #merge signal to new binning
@@ -201,7 +200,7 @@ prepare_signal_matrix = function(cs, csg, resolution, tol.val) {
                                         ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                              bin=cut(pos, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)))
       stopifnot(bins[,.N]==length(sbins)-1)
-      mat=CJ(name=names[,groupname],bin1=bins[,unique(bin)],bin2=bins[,unique(bin)],
+      mat=CJ(name=groups[,groupname],bin1=bins[,unique(bin)],bin2=bins[,unique(bin)],
              sorted=F,unique=F)[bin2>=bin1]
       mat=merge(mat,bins,by.x="bin1",by.y="bin",all.y=T)
       mat=merge(mat,bins,by.x="bin2",by.y="bin",all.y=T, suffixes=c("1","2"))
@@ -209,12 +208,19 @@ prepare_signal_matrix = function(cs, csg, resolution, tol.val) {
       mat[is.na(phi),phi:=0]
       mat=mat[,.(name,bin1,bin2,phi)]
     } else {
-      mat=names[cs@par$signal[,.(name,bin1,bin2,phi)]][!is.na(groupname),.(name=groupname,bin1,bin2,phi)]
+      mat=groups[cs@par$signal[,.(name,bin1,bin2,phi)]][!is.na(groupname),.(name=groupname,bin1,bin2,phi)]
     }
     mat=mat[,.(phi=mean(phi)),keyby=c("name","bin1","bin2")]
   }
   #ggplot(cs@par$signal)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()
   #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()
+  return(mat)
+}
+
+#' Prepare grouped signal matrix and settings
+#' @keywords internal
+prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
+  mat = csnorm:::get_signal_matrix(cs, resolution, groups=csg@names)
   #
   #add trail information
   trails = csnorm:::gfl_compute_trails(csg@par$nbins)
@@ -236,8 +242,8 @@ prepare_signal_matrix = function(cs, csg, resolution, tol.val) {
 
 #' Build grouped difference matrix using normalization data if available
 #' @keywords internal
-prepare_difference_matrix = function(cs, csg, resolution, ref, tol.val) {
-  csi = csnorm:::prepare_signal_matrix(cs, csg, resolution, tol.val)
+prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val) {
+  csi = csnorm:::prepare_signal_estimation(cs, csg, resolution, tol.val)
   names=csg@names
   mat = foreach(n=names[groupname!=ref,unique(groupname)],.combine=rbind) %do%
     merge(csi@mat[name==n],csi@mat[name==ref,.(bin1,bin2,phi1=phi)],all=T,by=c("bin1","bin2"))
@@ -274,7 +280,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #
   ### prepare signal estimation
   if (verbose==T) cat("  Prepare for signal estimation\n")
-  csi = csnorm:::prepare_signal_matrix(cs, csg, resolution, tol.val)
+  csi = csnorm:::prepare_signal_estimation(cs, csg, resolution, tol.val)
   #
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
@@ -336,7 +342,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     stop("Refusing to overwrite this already detected interaction")
   if (is.character(ref)) ref=csg@names[as.character(groupname)==ref,unique(groupname)]
   if (verbose==T) cat("  Prepare for difference estimation\n")
-  csi = csnorm:::prepare_difference_matrix(cs, csg, resolution, ref, tol.val)
+  csi = csnorm:::prepare_difference_estimation(cs, csg, resolution, ref, tol.val)
   #
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
