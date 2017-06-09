@@ -245,7 +245,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int opt
                      int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                      double lam2,  double alpha, double inflate, int ninner, double tol_val,
                      int diag_rm, NumericVector beta_i, double lambda1_min, int refine_num,
-                     bool constrained, bool positive, bool fixed) {
+                     bool constrained, bool fixed) {
   std::clock_t c_start,c_end;
   double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
   double lam1=0, eCprime=0;
@@ -280,9 +280,9 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int opt
   NumericVector opt;
   if (fixed) { // is eCprime fixed to 0?
     if (!constrained) stop("expected constrained==T when fixed==T");
+    const bool positive = true;
     opt = cpp_optimize_lambda1(newmat, nbins, tol_val, positive, lambda1_min, refine_num);
   } else {
-    if (!positive) stop("expected positive==T when fixed==F");
     opt = cpp_optimize_lambda1_eCprime(newmat, nbins, tol_val, constrained, lambda1_min, refine_num);
   }
   lam1 = opt["lambda1"];

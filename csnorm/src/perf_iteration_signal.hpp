@@ -25,7 +25,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts, double dispersion
 List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int opt_every, int nbins,
                      int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                      double lam2,  double alpha, double inflate, int ninner, double tol_val,
-                     int diag_rm, NumericVector beta_i, double lambda1_min, int refine_num, bool constrained, bool positive, bool fixed);
+                     int diag_rm, NumericVector beta_i, double lambda1_min, int refine_num, bool constrained, bool fixed);
 
 
 #endif
