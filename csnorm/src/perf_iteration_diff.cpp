@@ -2,6 +2,8 @@
 using namespace Rcpp;
 #include <iostream>
 #include <vector>
+#include <algorithm>
+#include <ctime>
 
 #include "perf_iteration_diff.hpp"
 #include "perf_iteration_signal.hpp" //cts_to_signal_mat
