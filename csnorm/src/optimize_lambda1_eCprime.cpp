@@ -21,7 +21,8 @@ obj_lambda1_eCprime::obj_lambda1_eCprime(double minval, double maxval,
     value_(value), weight_(weight), valuehat_(valuehat) {}
 
 double obj_lambda1_eCprime::operator()(double x) const {
-    return get(std::pow(10,x), "opt")["BIC"];
+    //return get(std::pow(10,x), "opt")["BIC"];
+    return get(std::pow(10,x))["BIC"];
 }
 
 NumericVector obj_lambda1_eCprime::get(double lambda1, std::string msg) const {
@@ -51,13 +52,15 @@ NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1,
     //bounds and border case
     NumericVector lambdavals = (patchvals - patchvals(0))/2.;
     lambdavals = lambdavals[lambdavals>=lam1_min];
-    if (lambdavals.size() == 0) return obj.get(lam1, "refine");
+    //if (lambdavals.size() == 0) return obj.get(lam1, "refine");
+    if (lambdavals.size() == 0) return obj.get(lam1);
     //values < lambda1
     NumericVector best, val;
     NumericVector candidates1 = lambdavals[lambdavals<lam1];
     int nc1 = candidates1.size();
     for (int i=0; i<std::min(nc1,refine_num); ++i) {
-        val = obj.get(candidates1[nc1-1-i], "refine");
+        //val = obj.get(candidates1[nc1-1-i], "refine");
+        val = obj.get(candidates1[nc1-1-i]);
         if (i==0) best=val;
         if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
     }
@@ -65,7 +68,8 @@ NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1,
     NumericVector candidates2 = lambdavals[lambdavals>=lam1];
     int nc2 = candidates2.size();
     for (int i=0; i<std::min(nc2,refine_num); ++i) {
-        val = obj.get(candidates2[i], "refine");
+        //val = obj.get(candidates2[i], "refine");
+        val = obj.get(candidates2[i]);
         if (i==0 & nc1==0) best=val;
         if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
     }
@@ -89,8 +93,8 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     NumericVector patchvals = get_patch_values(beta, patchno);
     //treat border case
     if (as<double>(cl["no"]) == 1) {
-        Rcout << " OBJ final ok lambda1= " << lmin << " eCprime= " << patchvals(0)
-              << " BIC= " << sum(weight * SQUARE(phihat - (beta + patchvals(0)))) << " dof= 0" << std::endl;
+        /*Rcout << " OBJ final ok lambda1= " << lmin << " eCprime= " << patchvals(0)
+                << " BIC= " << sum(weight * SQUARE(phihat - (beta + patchvals(0)))) << " dof= 0" << std::endl;*/
         return NumericVector::create(_["eCprime"]=patchvals(0), _["lambda1"]=lmin,
                                      _["dof"]=0,
                                      _["BIC"]=sum(weight * SQUARE(phihat - (beta + patchvals(0)))),
@@ -105,8 +109,8 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
         forbidden_vals = get_minimum_diagonal_values(beta, diag_idx);
         lmin = std::max(lmin, (max(forbidden_vals)-minval)/2);
     }
-    Rcout << "lmin= " << lmin << " valrange= " << (maxval-minval) << std::endl;
-    for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
+    /*Rcout << "lmin= " << lmin << " valrange= " << (maxval-minval) << std::endl;
+    for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;*/
     //create functor
     obj_lambda1_eCprime obj(minval, maxval, tol_val, constrained, patchno,
                             forbidden_vals,
@@ -114,14 +118,15 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     std::clock_t c_in1 = std::clock();
     //treat second border case
     if (maxval-minval <= 2*lmin) {
-        NumericVector retval = obj.get(lmin, "final");
+        //NumericVector retval = obj.get(lmin, "final");
+        NumericVector retval = obj.get(lmin);
         return NumericVector::create(_["eCprime"]=retval["eCprime"],
                                      _["lambda1"]=retval["lambda1"],
                                      _["BIC"]=retval["BIC"], _["dof"]=retval["dof"],
                                      _["c_init"]=c_in1-c_start, _["c_brent"]=-1, _["c_refine"]=-1);
     }
     //grid
-    for (int i=0; i<1000; ++i) obj.get(0.05+i/999.*2.6, "grid");
+    //for (int i=0; i<1000; ++i) obj.get(1+i/999.*6., "grid");
     //optimize
     int bits = -8*std::log10(tol_val)+1;
     boost::uintmax_t maxiter = 1000;
@@ -131,10 +136,10 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     //now compute the minimum among the n closest candidates (brent can get stuck in local minima)
     std::clock_t c_in2 = std::clock();
     double lam1=pow(10,ret.first);
-    obj.get(lam1,"minimum");
+    //obj.get(lam1,"minimum");
     NumericVector retval = refine_minimum(obj, lam1, lmin, refine_num, patchvals);
     std::clock_t c_in3 = std::clock();
-    obj.get(as<double>(retval["lambda1"]),"final");
+    //obj.get(as<double>(retval["lambda1"]),"final");
     return NumericVector::create(_["eCprime"]=retval["eCprime"],
                                  _["lambda1"]=retval["lambda1"],
                                  _["BIC"]=retval["BIC"], _["dof"]=retval["dof"],
