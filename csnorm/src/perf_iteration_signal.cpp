@@ -143,8 +143,17 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
           << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
 
+    DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                           _["bin2"]=mat["bin2"],
+                                           _["phihat"]=mat["phihat"],
+                                           _["ncounts"]=mat["ncounts"],
+                                           _["weight"]=mat["weight"],
+                                           _["diag.idx"]=mat["diag.idx"],
+                                           _["beta"]=beta_r,
+                                           _["phi"]=phi_r);
+    
     return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha),
-                        _["phi"]=wrap(phi_r), _["mat"]=mat,
+                        _["phi"]=wrap(phi_r), _["mat"]=finalmat,
                         _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res,
                         _["eCprime"]=eCprime, _["lambda1"]=lam1, _["c_cts"]=c_cts, _["c_gfl"]=c_gfl);
 }
