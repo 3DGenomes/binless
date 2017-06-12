@@ -117,12 +117,15 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
 optimize_lambda2 = function(csig, minlambda=0.1, maxlambda=100, constrained=T, positive=T, fixed=F) {
   obj = function(x) {
     csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed)
-    cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
-        " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
+    #cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
+    #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
   }
   #ctsg=copy(ctsg.old)
-  #dt.old = foreach (lam=seq(log10(minlambda),log10(maxlambda),l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
+  #dt = foreach (lam=seq(0.4,10,l=20),.combine=rbind) %do% {
+  #  obj(log10(lam))
+  #  as.data.table(csig@state$mat)[,.(lambda2=lam,lambda1=csig@state$lambda1,eCprime=csig@state$eCprime,bin1,bin2,phihat,phi,beta)]
+  #}
   #ctsg=copy(ctsg.new)
   #dt.new = foreach (lam=seq(log10(minlambda),log10(maxlambda),l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
   #ggplot(rbind(dt.old[,.(x,y,ori="old")],dt.new[,.(x,y,ori="new")]))+geom_line(aes(10^(x),y,colour=ori))#+scale_y_log10()
@@ -173,7 +176,7 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
 csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, ctsg.ref=NULL) {
   csig = csnorm:::optimize_lambda2(csig, constrained=constrained, positive=positive, fixed=fixed)
   csig@par$name=csig@cts[,name[1]]
-  matg=csnorm:::gfl_get_matrix(csig, 0, csig@par$lambda2, 0)
+  #matg=csnorm:::gfl_get_matrix(csig, 0, csig@par$lambda2, 0)
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=abs(value-csig@par$eCprime)<=csig@par$lambda1)))
   #matg=csnorm:::gfl_get_matrix(csig, csig@par$lambda1, csig@par$lambda2, csig@par$eCprime)
