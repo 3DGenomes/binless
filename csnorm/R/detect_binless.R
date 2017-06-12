@@ -280,7 +280,7 @@ prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val) {
 #' @export
 #' 
 #' @examples
-detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=1e-5, verbose=T){
+detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=cs@settings$tol.leg, verbose=T){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
@@ -342,7 +342,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
 #' @export
 #' 
 #' @examples
-detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.val=1e-3, verbose=T){
+detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.val=cs@settings$tol.leg, verbose=T){
   if (verbose==T) cat("Binless difference detection with resolution=",resolution,
                       " group=", group," and ref=",as.character(ref),"\n")
   ### get CSgroup object
