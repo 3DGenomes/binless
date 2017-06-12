@@ -7,6 +7,8 @@ using namespace Rcpp;
 
 #define SQUARE(x) ((x)*(x))
 
+double round(double val, double prec);
+
 std::vector<double> soft_threshold(const std::vector<double>& beta,
                                    double eCprime, double lam1);
 
