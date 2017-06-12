@@ -4,6 +4,7 @@ using namespace Rcpp;
 #include <vector>
 #include <algorithm>
 #include <ctime>
+#include <string>
 
 #include "optimize_lambda1.hpp"
 #include "util.hpp"
@@ -19,11 +20,11 @@ obj_lambda1::obj_lambda1(double minval, double maxval, double tol_val,
     patchno_(patchno), forbidden_vals_(forbidden_vals),
     value_(value), weight_(weight), valuehat_(valuehat) {}
 
-double obj_lambda1::operator()(double const& x) const {
+double obj_lambda1::operator()(double x) const {
     return get(std::pow(10,x))["BIC"];
 }
 
-NumericVector obj_lambda1::get(double const& lambda1) const {
+NumericVector obj_lambda1::get(double lambda1, std::string msg) const {
     const bool constrained = true;
     if (constrained) {
         if (is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2)))
@@ -35,6 +36,8 @@ NumericVector obj_lambda1::get(double const& lambda1) const {
     IntegerVector selected = patchno_[abs(soft)>tol_val_/2];
     const int dof = unique(selected).size();
     const double BIC = sum(weight_ * SQUARE(valuehat_ - soft)) + lsnc_*dof;
+    if (!msg.empty()) Rcout << " OBJ " << msg << " lambda1= " << lambda1 << " eCprime= 0"
+                            << " BIC= " << BIC  << " dof= " << dof << std::endl;
     return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1, _["BIC"]=BIC,
                                  _["dof"]=dof);
 }

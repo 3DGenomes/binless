@@ -12,9 +12,9 @@ struct obj_lambda1 {
                 NumericVector value, NumericVector weight, NumericVector valuehat,
                 NumericVector ncounts);
 
-    double operator()(double const& x) const;
+    double operator()(double x) const;
 
-    NumericVector get(double const& lambda1) const;
+    NumericVector get(double lambda1, std::string mgs = "") const;
 
     double minval_, maxval_, valrange_, tol_val_, lsnc_;
     IntegerVector patchno_;

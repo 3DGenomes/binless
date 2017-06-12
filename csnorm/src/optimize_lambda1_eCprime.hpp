@@ -12,9 +12,9 @@ struct obj_lambda1_eCprime {
                         NumericVector value, NumericVector weight, NumericVector valuehat,
                         NumericVector ncounts);
 
-    double operator()(double const& x) const;
+    double operator()(double x) const;
 
-    NumericVector get(double const& lambda1) const;
+    NumericVector get(double lambda1, std::string msg = "") const;
 
     double minval_, valrange_, tol_val_, lsnc_;
     bool constrained_;
