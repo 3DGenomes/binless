@@ -657,7 +657,7 @@ csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
   #put in triangular form
   cts2 = cts[bin1>bin2]
   setnames(cts2,c("bin1","bin2"),c("bin2","bin1"))
-  cts = rbind(cts[bin1<=bin2],cts2)
+  cts = rbind(cts[bin1<=bin2],cts2)[,.(name,bin1,bin2,count,lmu.nosig,mu,log_decay,weight=weight/2)] #each count appears twice
   rm(cts2)
   stopifnot(cts[,all(bin1<=bin2)])
   setkey(cts,name,bin1,bin2)
@@ -669,7 +669,7 @@ csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
 #' 
 csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   if (verbose==T) cat(" Signal\n")
-  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)[,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   diag.rm = ceiling(cs@settings$dmin/cs@settings$base.res)
   #
   if (verbose==T) cat("  predict\n")
