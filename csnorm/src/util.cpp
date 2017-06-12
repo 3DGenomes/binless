@@ -31,8 +31,10 @@ NumericVector get_minimum_diagonal_values(NumericVector value,
         IntegerVector diag_idx) {
     int ndiags = max(diag_idx)+1;
     NumericVector diagvals(ndiags, max(value)); //diag_idx starts at 0
-    for (int i=0; i<diag_idx.size();
-            ++i) diagvals(diag_idx(i)) = std::min(diagvals(diag_idx(i)),value(i));
+    for (int i=0; i<diag_idx.size(); ++i)
+      diagvals(diag_idx(i)) = std::min(diagvals(diag_idx(i)),value(i));
+    diagvals = unique(diagvals);
+    std::sort(diagvals.begin(), diagvals.end());
     return diagvals;
 }
 
@@ -48,6 +50,8 @@ NumericVector get_constant_diagonal_values(NumericVector value,
     }
     NumericVector diagvals = (diag_max+diag_min)/2.;
     diagvals = diagvals[(diag_max-diag_min)<=tol_val];
+    diagvals = unique(diagvals);
+    std::sort(diagvals.begin(), diagvals.end());
     return diagvals;
 }
 
