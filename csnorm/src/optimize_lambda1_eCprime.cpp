@@ -25,7 +25,7 @@ double obj_lambda1_eCprime::operator()(double x) const {
 }
 
 NumericVector obj_lambda1_eCprime::get(double lambda1, std::string msg) const {
-    double eCprime = (valrange_ < 2*lambda1) ? valrange_/2. : lambda1+minval_;
+    double eCprime = lambda1+minval_;
     if (constrained_) {
         if (is_true(any(abs(eCprime-forbidden_vals_)>lambda1+tol_val_/2))) {
             if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda1= " << lambda1 << " eCprime= " << eCprime
@@ -127,7 +127,7 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     boost::uintmax_t maxiter = 1000;
     std::pair<double,double> ret = boost::math::tools::brent_find_minima(obj,
                                    std::log10(lmin),
-                                   std::log10(maxval-minval), bits, maxiter);
+                                   std::log10((maxval-minval)/2.), bits, maxiter);
     //now compute the minimum among the n closest candidates (brent can get stuck in local minima)
     std::clock_t c_in2 = std::clock();
     double lam1=pow(10,ret.first);
