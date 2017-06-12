@@ -4,6 +4,7 @@ using namespace Rcpp;
 #include <vector>
 #include <algorithm>
 #include <ctime>
+#include <cmath>
 
 #include "perf_iteration_diff.hpp"
 #include "perf_iteration_signal.hpp" //cts_to_signal_mat
@@ -127,6 +128,8 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                                               &trails_r[0], &breakpoints_r[0],
                                               lam2, &alpha, inflate, ninner, converge,
                                               &beta_r[0], &z_r[0], &u_r[0]);
+        //round to precision, for more consistent patch detection
+        for (std::vector<double>::iterator i=beta_r.begin(); i!=beta_r.end(); ++i) *i = std::round( (*i)/converge )*converge;
         c_end = std::clock();
         c_gfl += c_end - c_start;
 
