@@ -2,6 +2,7 @@
 using namespace Rcpp;
 #include <iostream>
 #include <vector>
+#include <algorithm>
 #include "util.hpp"
 
 std::vector<double> soft_threshold(const std::vector<double>& beta,
