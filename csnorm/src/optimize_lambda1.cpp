@@ -97,7 +97,7 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
     //treat border case, assuming constraint is on
     if (as<double>(cl["no"]) == 1)
         return NumericVector::create(_["eCprime"]=0,
-                                     _["lambda1"]=std::abs(patchvals(0)), _["dof"]=0,
+                                     _["lambda1"]=max(abs(patchvals)), _["dof"]=0,
                                      _["BIC"]=sum(weight * SQUARE(phihat)),
                                      _["c_init"]=-1, _["c_brent"]=-1, _["c_refine"]=-1);
     double minval = patchvals(0);

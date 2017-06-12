@@ -95,9 +95,9 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     if (as<double>(cl["no"]) == 1) {
         /*Rcout << " OBJ final ok lambda1= " << lmin << " eCprime= " << patchvals(0)
                 << " BIC= " << sum(weight * SQUARE(phihat - (beta + patchvals(0)))) << " dof= 0" << std::endl;*/
-        return NumericVector::create(_["eCprime"]=patchvals(0), _["lambda1"]=lmin,
+        return NumericVector::create(_["eCprime"]=min(patchvals)+tol_val/2, _["lambda1"]=lmin,
                                      _["dof"]=0,
-                                     _["BIC"]=sum(weight * SQUARE(phihat - (beta + patchvals(0)))),
+                                     _["BIC"]=sum(weight * SQUARE(phihat)),
                                      _["c_init"]=-1, _["c_brent"]=-1, _["c_refine"]=-1);
     }
     double minval = patchvals(0);
