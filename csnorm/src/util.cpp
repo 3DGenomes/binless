@@ -3,12 +3,7 @@ using namespace Rcpp;
 #include <iostream>
 #include <vector>
 #include <algorithm>
-#include <cmath>
 #include "util.hpp"
-
-double round(double val, double prec) {
-    return floor(val/prec+0.5)*prec;
-}
 
 std::vector<double> soft_threshold(const std::vector<double>& beta,
                                    double eCprime, double lam1) {

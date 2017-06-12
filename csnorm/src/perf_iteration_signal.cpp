@@ -112,8 +112,6 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
                                               &trails_r[0], &breakpoints_r[0],
                                               lam2, &alpha, inflate, ninner, converge,
                                               &beta_r[0], &z_r[0], &u_r[0]);
-        //round to precision, for more consistent patch detection
-        for (std::vector<double>::iterator i=beta_r.begin(); i!=beta_r.end(); ++i) *i = round( (*i), converge);
         c_end = std::clock();
         c_gfl += c_end - c_start;
 
