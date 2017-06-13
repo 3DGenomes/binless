@@ -54,14 +54,16 @@ NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1,
     lambdavals = lambdavals[lambdavals>=lam1_min];
     //if (lambdavals.size() == 0) return obj.get(lam1, "refine");
     if (lambdavals.size() == 0) return obj.get(lam1);
-    //values < lambda1
     NumericVector best, val;
+    //evaluate at lower bound, even if there's no patch value
+    //best = obj.get(lam1_min, "refine");
+    best = obj.get(lam1_min);
+    //values < lambda1
     NumericVector candidates1 = lambdavals[lambdavals<lam1];
     int nc1 = candidates1.size();
     for (int i=0; i<std::min(nc1,refine_num); ++i) {
         //val = obj.get(candidates1[nc1-1-i], "refine");
         val = obj.get(candidates1[nc1-1-i]);
-        if (i==0) best=val;
         if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
     }
     //values >= lambda1
@@ -70,7 +72,6 @@ NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1,
     for (int i=0; i<std::min(nc2,refine_num); ++i) {
         //val = obj.get(candidates2[i], "refine");
         val = obj.get(candidates2[i]);
-        if (i==0 & nc1==0) best=val;
         if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
     }
     return(best);
@@ -94,7 +95,7 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     //treat border case
     if (as<double>(cl["no"]) == 1) {
         /*Rcout << " OBJ final ok lambda1= " << lmin << " eCprime= " << patchvals(0)
-                << " BIC= " << sum(weight * SQUARE(phihat - (beta + patchvals(0)))) << " dof= 0" << std::endl;*/
+                << " BIC= " << sum(weight * SQUARE(phihat)) << " dof= 0" << std::endl;*/
         return NumericVector::create(_["eCprime"]=min(patchvals)+tol_val/2, _["lambda1"]=lmin,
                                      _["dof"]=0,
                                      _["BIC"]=sum(weight * SQUARE(phihat)),
@@ -126,7 +127,7 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
                                      _["c_init"]=c_in1-c_start, _["c_brent"]=-1, _["c_refine"]=-1);
     }
     //grid
-    //for (int i=0; i<1000; ++i) obj.get(1+i/999.*6., "grid");
+    //for (int i=0; i<1000; ++i) obj.get(.1+i/999.*.1, "grid");
     //optimize
     int bits = -8*std::log10(tol_val)+1;
     boost::uintmax_t maxiter = 1000;

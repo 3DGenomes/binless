@@ -121,8 +121,9 @@ optimize_lambda2 = function(csig, minlambda=0.1, maxlambda=100, constrained=T, p
     #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
   }
-  #ctsg=copy(ctsg.old)
-  #dt = foreach (lam=seq(0.4,10,l=20),.combine=rbind) %do% {
+  #
+  #csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
+  #dt.1 = foreach (lam=rev(vals),.combine=rbind) %do% {
   #  obj(log10(lam))
   #  as.data.table(csig@state$mat)[,.(lambda2=lam,lambda1=csig@state$lambda1,eCprime=csig@state$eCprime,bin1,bin2,phihat,phi,beta)]
   #}
