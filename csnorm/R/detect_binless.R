@@ -105,10 +105,9 @@ optimize_lambda2 = function(csig, minlambda=0.1, maxlambda=100, constrained=T, p
   #  obj(log10(lam))
   #  as.data.table(csig@state$mat)[,.(lambda2=lam,lambda1=csig@state$lambda1,eCprime=csig@state$eCprime,bin1,bin2,phihat,phi,beta)]
   #}
-  #ctsg=copy(ctsg.new)
-  #dt.new = foreach (lam=seq(log10(minlambda),log10(maxlambda),l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
-  #ggplot(rbind(dt.old[,.(x,y,ori="old")],dt.new[,.(x,y,ori="new")]))+geom_line(aes(10^(x),y,colour=ori))#+scale_y_log10()
-  op=optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=csig@settings$tol.val)
+  #dt.new = foreach (lam=seq(log10(minlambda),log10(maxlambda),l=1000),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
+  op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
+  op<-optimize(obj, c(op$minimum-log10(2),op$minimum+log10(2)))
   lambda2=10^op$minimum
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
   if (lambda2 <= csig@settings$tol.val*10) {
