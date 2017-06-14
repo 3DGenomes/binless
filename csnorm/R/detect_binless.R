@@ -93,7 +93,7 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
 
 #' cross-validate lambda2
 #' @keywords internal
-optimize_lambda2 = function(csig, minlambda=0.1, maxlambda=100, constrained=T, positive=T, fixed=F) {
+optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F) {
   obj = function(x) {
     csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed)
     #cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
@@ -105,10 +105,26 @@ optimize_lambda2 = function(csig, minlambda=0.1, maxlambda=100, constrained=T, p
   #  obj(log10(lam))
   #  as.data.table(csig@state$mat)[,.(lambda2=lam,lambda1=csig@state$lambda1,eCprime=csig@state$eCprime,bin1,bin2,phihat,phi,beta)]
   #}
-  #dt.new = foreach (lam=seq(log10(minlambda),log10(maxlambda),l=1000),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
+  #dt.fix = foreach (lam=seq(log10(0.5),log10(20),l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
+  #ggplot(dt.fix)+geom_line(aes(10^x,y))+geom_point(data=rbind(dt1,dt2),aes(10^x,y))#+xlim(1,3)+ylim(1600,2000)
+  ### optimization in four stages
+  #first, find rough minimum between 0.1 and 100
+  minlambda=0.1
+  maxlambda=100
   op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
-  op<-optimize(obj, c(op$minimum-log10(2),op$minimum+log10(2)))
   lambda2=10^op$minimum
+  #second, grid that minimum +- 5, over 20 points
+  dt1 = foreach (lam=log10(seq(max(minlambda,lambda2 - 5), min(maxlambda,lambda2 + 5), l=20)),
+                 .combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
+  lambda2 = dt1[y==min(y),10^x]
+  #third, grid that minimum +- .5, over 10 points
+  dt2 = foreach (lam=log10(seq(max(minlambda,lambda2 - .5), min(maxlambda,lambda2 + .5), l=10)),
+                .combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
+  lambda2 = dt2[y==min(y),10^x]
+  #fourth, minimize fully around that minimum +- 1
+  op<-optimize(obj, log10(c(max(minlambda,lambda2-.1),min(maxlambda,lambda2+.1))))
+  lambda2=10^op$minimum
+  #finish
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
   if (lambda2 <= csig@settings$tol.val*10) {
     cat("   Warning: lambda2 too close to lower boundary.")
