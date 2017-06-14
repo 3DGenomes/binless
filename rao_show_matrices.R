@@ -24,7 +24,7 @@ for (resolution in c(5000,20000)) {
 }
 
 
-load("data/rao_HiCall_SEMA3C_1M_csnorm_optimized_base10k_bpk30_dfuse20_cpp.RData")
+load("data/rao_HiCall_SEMA3C_1M_csnorm_optimized_base10k_bpk30_dfuse20_cpp_poster.RData")
 sub="SEMA3C_1M"
 
 #various matrices for GM MboI 1
@@ -35,7 +35,10 @@ for (resolution in c(5000,20000)) {
     geom_raster(aes(begin1,begin2,fill=log(observed)))+
     geom_raster(aes(begin2,begin1,fill=log(observed)))+coord_fixed()+
     scale_fill_gradient(low="white", high="black",na.value="white")+
-    theme_void()+theme(legend.title=element_blank(), axis.title=element_blank())
+    scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) +
+    theme_void()+ theme(legend.title=element_blank(), axis.title=element_blank(),
+                        panel.background = element_rect(fill = "white", colour = "black"),
+                        panel.spacing=unit(0,"cm"))
   ggsave(filename=paste0("images/rao_HiCall_GM12878_",sub,"_observed_",resolution/1000,"kb.pdf"), width=10,height=9)
   #
   mat=get_interactions(cs, resolution=resolution, group="all", type="CSbsig")[name=="GM MboI 1"&bin2!=bin2[.N]]
@@ -44,21 +47,30 @@ for (resolution in c(5000,20000)) {
     geom_raster(aes(begin1,begin2,fill=(phihat)))+
     geom_raster(aes(begin2,begin1,fill=(phihat)))+coord_fixed()+
     scale_fill_gradient2(low=muted("blue"),high=muted("red"))+
-    theme_void()+theme(legend.title=element_blank(), axis.title=element_blank())
+    scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) +
+    theme_void()+ theme(legend.title=element_blank(), axis.title=element_blank(),
+                        panel.background = element_rect(fill = "white", colour = "black"),
+                        panel.spacing=unit(0,"cm"))
   ggsave(filename=paste0("images/rao_HiCall_GM12878_",sub,"_phihat_",resolution/1000,"kb.pdf"), width=10,height=9)
   #phihat.sd
   ggplot(mat)+
     geom_raster(aes(begin1,begin2,fill=sqrt(1/weight)))+
     geom_raster(aes(begin2,begin1,fill=sqrt(1/weight)))+coord_fixed()+
     scale_fill_gradient(low="white",high="black", na.value="black")+
-    theme_void()+theme(legend.title=element_blank(), axis.title=element_blank())
+    scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) +
+    theme_void()+ theme(legend.title=element_blank(), axis.title=element_blank(),
+                        panel.background = element_rect(fill = "white", colour = "black"),
+                        panel.spacing=unit(0,"cm"))
   ggsave(filename=paste0("images/rao_HiCall_GM12878_",sub,"_phihat_sd_",resolution/1000,"kb.pdf"), width=10,height=9)
   #binless
   ggplot(mat)+
     geom_raster(aes(begin1,begin2,fill=(phi)))+
     geom_raster(aes(begin2,begin1,fill=(phi)))+coord_fixed()+
     scale_fill_gradient2(low=muted("blue"),high=muted("red"))+
-    theme_void()+theme(legend.title=element_blank(), axis.title=element_blank())
+    scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) +
+    theme_void()+ theme(legend.title=element_blank(), axis.title=element_blank(),
+                        panel.background = element_rect(fill = "white", colour = "black"),
+                        panel.spacing=unit(0,"cm"))
   ggsave(filename=paste0("images/rao_HiCall_GM12878_",sub,"_binless_",resolution/1000,"kb.pdf"), width=10,height=9)
 }
 
@@ -70,7 +82,10 @@ ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=log(observed)))+
   geom_raster(aes(begin2,begin1,fill=log(observed)))+coord_fixed()+
   scale_fill_gradient(low="white", high="black",na.value="white")+
-  theme_void()+theme(legend.title=element_blank(), axis.title=element_blank())
+  scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) +
+  theme_void()+ theme(legend.title=element_blank(), axis.title=element_blank(),
+                      panel.background = element_rect(fill = "white", colour = "black"),
+                      panel.spacing=unit(0,"cm"))
 ggsave(filename=paste0("images/rao_HiCall_IMR90_",sub,"_observed_",resolution/1000,"kb.pdf"), width=10,height=9)
 #
 mat=get_interactions(cs, resolution=resolution, group="all", type="CSbsig")[name!="GM MboI 1"&bin2!=bin2[.N]]
@@ -79,7 +94,10 @@ ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=(phi)))+
   geom_raster(aes(begin2,begin1,fill=(phi)))+coord_fixed()+
   scale_fill_gradient2(low=muted("blue"),high=muted("red"))+
-  theme_void()+theme(legend.title=element_blank(), axis.title=element_blank())
+  scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) +
+  theme_void()+ theme(legend.title=element_blank(), axis.title=element_blank(),
+                      panel.background = element_rect(fill = "white", colour = "black"),
+                      panel.spacing=unit(0,"cm"))
 ggsave(filename=paste0("images/rao_HiCall_IMR90_",sub,"_binless_",resolution/1000,"kb.pdf"), width=10,height=9)
 
 #Binless differences
@@ -88,12 +106,18 @@ ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=(delta)))+
   geom_raster(aes(begin2,begin1,fill=(delta)))+coord_fixed()+
   scale_fill_gradient2(low=muted("blue"),high=muted("red"))+
-  theme_void()+theme(legend.title=element_blank(), axis.title=element_blank())
+  scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) +
+  theme_void()+ theme(legend.title=element_blank(), axis.title=element_blank(),
+                      panel.background = element_rect(fill = "white", colour = "black"),
+                      panel.spacing=unit(0,"cm"))
 ggsave(filename=paste0("images/rao_HiCall_IMR90vsGM_",sub,"_diff_",resolution/1000,"kb.pdf"), width=10,height=9)
 #diff reference
 ggplot(mat)+
   geom_raster(aes(begin1,begin2,fill=pmin(5,pmax(-5,phi.ref))))+
   geom_raster(aes(begin2,begin1,fill=pmin(5,pmax(-5,phi.ref))))+coord_fixed()+
   scale_fill_gradient2(low=muted("blue"),high=muted("red"))+
-  theme_void()+theme(legend.title=element_blank(), axis.title=element_blank())
+  scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) +
+  theme_void()+ theme(legend.title=element_blank(), axis.title=element_blank(),
+                      panel.background = element_rect(fill = "white", colour = "black"),
+                      panel.spacing=unit(0,"cm"))
 ggsave(filename=paste0("images/rao_HiCall_IMR90vsGM_",sub,"_ref_",resolution/1000,"kb.pdf"), width=10,height=9)
