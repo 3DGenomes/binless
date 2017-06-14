@@ -48,9 +48,8 @@ NumericVector refine_minimum(const obj_lambda1& obj, double lam1,
     NumericVector lambdavals;
     if (positive) {
         lambdavals = patchvals[patchvals>=0];
-        lambdavals = lambdavals/2.;
     } else {
-        lambdavals = abs(patchvals/2.);
+        lambdavals = abs(patchvals);
     }
     lambdavals = lambdavals[lambdavals>=lam1_min];
     if (lambdavals.size() == 0) {
