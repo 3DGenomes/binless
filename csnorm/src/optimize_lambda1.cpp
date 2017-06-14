@@ -57,13 +57,14 @@ NumericVector refine_minimum(const obj_lambda1& obj, double lam1,
               std::endl;
         return obj.get(lam1);
     }
-    //values < lambda1
     NumericVector best, val;
+    //evaluate at lower bound, even if there's no patch value
+    best = obj.get(lam1_min);
+    //values < lambda1
     NumericVector candidates1 = lambdavals[lambdavals<lam1];
     int nc1 = candidates1.size();
     for (int i=0; i<std::min(nc1,refine_num); ++i) {
         val = obj.get(candidates1[nc1-1-i]);
-        if (i==0) best=val;
         if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
     }
     //values >= lambda1
