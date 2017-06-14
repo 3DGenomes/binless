@@ -846,7 +846,6 @@ prepare_first_signal_estimation = function(biases, names, base.res) {
   ### build optimization trails
   trails = csnorm:::gfl_compute_trails(signal.mat[,nlevels(bin1)])
   stopifnot(all(signal.mat[,.N,by=name]$N==signal.mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
-  stopifnot(all(length(V(trails$graph))==signal.mat[,.N,by=name]$N))
   return(list(signal=signal.mat,trails=trails,sbins=sbins))
 }
 

@@ -1,33 +1,12 @@
 #' @include csnorm.R
 NULL
 
-#' connectivity on a triangle
-#' @keywords internal
-compute_2d_connectivity_graph = function(nbins, start=1) {
-  stopifnot(start>=1,nbins>=2)
-  if (nbins==2) {
-    ret=graph(c(start,start+1,start+1,start+2), directed=F)
-  } else {
-    upper.row = c(c(start,start+1),
-                  c(sapply((start+1):(start+nbins-2),function(x){c(x,x+1,x,x+nbins-1)},simplify=T)),
-                  c(start+nbins-1,start+2*(nbins-1)))
-    lower.tri = compute_2d_connectivity_graph(nbins-1,start=start+nbins)
-    ret = add.edges(lower.tri,upper.row)
-  }
-  #plot(ret)
-  return(ret)
-}
-
 #' compute trail information for the gfl package, for a triangle trid with nbins rows
 #' @keywords internal
 gfl_compute_trails = function(nbins) {
   chain = csnorm:::boost_triangle_grid_chain(nbins)
   trails = csnorm:::boost_chains_to_trails(chain)
   stopifnot(uniqueN(trails$trails)==nbins*(nbins+1)/2)
-  #store bin graph
-  trails$graph = csnorm:::compute_2d_connectivity_graph(nbins)
-  #plot(trails$graph, vertex.color=factor(V(g)$value), vertex.label=V(g)$count,
-  #     layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
   return(trails)
 }
 
@@ -122,7 +101,6 @@ optimize_lambda2 = function(csig, minlambda=0.1, maxlambda=100, constrained=T, p
     return(csig@state$BIC)
   }
   #
-  #csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
   #dt.1 = foreach (lam=rev(vals),.combine=rbind) %do% {
   #  obj(log10(lam))
   #  as.data.table(csig@state$mat)[,.(lambda2=lam,lambda1=csig@state$lambda1,eCprime=csig@state$eCprime,bin1,bin2,phihat,phi,beta)]
@@ -237,7 +215,6 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
   #add trail information
   trails = csnorm:::gfl_compute_trails(csg@par$nbins)
   stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
-  stopifnot(all(length(V(trails$graph))==mat[,.N,by=name]$N))
   #add other settings
   settings=list(diag.rm = ceiling(csg@par$dmin/resolution),
                 nbins = csg@par$nbins,
