@@ -153,21 +153,17 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
 #' run fused lasso on one dataset contained in matg, fusing 'valuehat' into
 #' 'value'
 #' 
-#' @param matg a data.table containing one dataset
-#' @param trails the trails list at that resolution
+#' @param csig the CSbsig or CSbdiff object to optimize
 #' @param positive boolean. Constrain eCprime in order to force 'value' to be
 #'   positive?
 #' @param fixed boolean. Set eCprime=0 throughout ?
 #' @param constrained boolean. Constrain lambda1 so that any diagonal that contains
 #'   only one big patch be forced to have 'value'=0 ?
-#' @param tol.val numeric. Convergence tolerance on fused value
 #' @param verbose boolean (default TRUE).
-#' @param init.state initial state for lasso, for speedup purposes. Set to NULL if unknown.
-#' @param ctsg.ref if provided, compute fused lasso on differences wrt this dataset
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, ctsg.ref=NULL) {
+csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T) {
   csig = csnorm:::optimize_lambda2(csig, constrained=constrained, positive=positive, fixed=fixed)
   csig@par$name=csig@cts[,name[1]]
   #matg=csnorm:::gfl_get_matrix(csig, 0, csig@par$lambda2, 0)
@@ -356,7 +352,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=T, init.alpha=5)
-    csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=T, verbose=verbose, ctsg.ref=csig@cts.ref)
+    csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=T, verbose=verbose)
   }
   #display param info
   if (verbose==T)
