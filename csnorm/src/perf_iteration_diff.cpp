@@ -27,7 +27,6 @@ DataFrame cts_to_diff_mat(const DataFrame cts, const DataFrame ref, int nbins,
     for (int i=0; i<delta.size(); ++i) phi_oth[i] = phi_ref[i] + delta[i];
     const DataFrame mat_oth = cts_to_signal_mat(cts, nbins, dispersion, phi_oth,
                               eCprime, diag_rm);
-
     IntegerVector bin1 = mat_ref["bin1"];
     IntegerVector bin2 = mat_ref["bin2"];
     NumericVector phihat_ref = mat_ref["phihat"];
@@ -41,7 +40,6 @@ DataFrame cts_to_diff_mat(const DataFrame cts, const DataFrame ref, int nbins,
     NumericVector ncounts = ncounts_ref+ncounts_oth;
     NumericVector weight = 1/deltahat_var;
     NumericVector didx = mat_ref["diag.idx"];
-
     return DataFrame::create(_["bin1"]=bin1, _["bin2"]=bin2,
                              _["phihat"]=phihat, _["phihat.var"]=phihat_var,
                              _["phihat.ref"]=phihat_ref, _["phihat.var.ref"]=phihat_var_ref,
@@ -127,6 +125,9 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                                               &trails_r[0], &breakpoints_r[0],
                                               lam2, &alpha, inflate, ninner, converge,
                                               &beta_r[0], &z_r[0], &u_r[0]);
+        const double beta_max = 50;
+        for (std::vector<double>::iterator it = beta_r.begin(); it != beta_r.end(); ++it)
+          *it = std::min(beta_max, std::max(-beta_max, *it));
         c_end = std::clock();
         c_gfl += c_end - c_start;
 
@@ -136,7 +137,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
         //update phi_ref
         phi_ref_r = compute_phi_ref(delta_r, phihat, phihat_var, phihat_ref,
                                     phihat_var_ref);
-
+        
         //update residual
         maxval = std::abs(beta_r[0]-beta_old[0]);
         for (int i=1; i<N;
@@ -197,7 +198,6 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
         c_cts += as<double>(ret["c_cts"]);
         c_gfl += as<double>(ret["c_gfl"]);
     }
-
     //optimize lambda1 assuming eCprime=0
     c_start = std::clock();
     DataFrame mat = as<DataFrame>(ret["mat"]);
@@ -215,7 +215,6 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                         lambda1_min, refine_num);
     lam1 = opt["lambda1"];
     c_end = std::clock();
-
     c_opt += c_end - c_start;
     c_init += opt["c_init"];
     c_brent += opt["c_brent"];

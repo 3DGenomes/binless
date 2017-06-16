@@ -106,12 +106,15 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
         c_end = std::clock();
         c_cts += c_end - c_start;
 
-        //compute fused lasso solution
+        //compute fused lasso solution, clamped at 50
         c_start = std::clock();
         res += graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails,
                                               &trails_r[0], &breakpoints_r[0],
                                               lam2, &alpha, inflate, ninner, converge,
                                               &beta_r[0], &z_r[0], &u_r[0]);
+        const double beta_max = 50;
+        for (std::vector<double>::iterator it = beta_r.begin(); it != beta_r.end(); ++it)
+          *it = std::min(beta_max, std::max(-beta_max, *it));
         c_end = std::clock();
         c_gfl += c_end - c_start;
 

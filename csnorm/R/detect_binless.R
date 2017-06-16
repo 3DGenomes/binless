@@ -122,6 +122,7 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F) {
   for (i in 1:nrounds) {
     minlambda = max(minlambda,lambda2 - range/2)
     maxlambda = min(maxlambda,lambda2 + range/2)
+    #cat("round ",i,": min=",minlambda," < lambda2=",lambda2, " < max=",maxlambda," range=",range,"\n")
     dt = rbind(dt,foreach (lam=log10(seq(minlambda, maxlambda, l=npoints)),
                    .combine=rbind) %dopar% data.table(x=lam,y=obj(lam),i=paste(i)))
     lambda2 = dt[y==min(y),10^x]
