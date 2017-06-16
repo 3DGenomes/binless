@@ -105,24 +105,33 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F) {
   #  obj(log10(lam))
   #  as.data.table(csig@state$mat)[,.(lambda2=lam,lambda1=csig@state$lambda1,eCprime=csig@state$eCprime,bin1,bin2,phihat,phi,beta)]
   #}
-  #dt.fix = foreach (lam=seq(log10(0.5),log10(20),l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
-  #ggplot(dt.fix)+geom_line(aes(10^x,y))+geom_point(data=rbind(dt1,dt2),aes(10^x,y))#+xlim(1,3)+ylim(1600,2000)
+  #dt.fix2 = foreach (lam=seq(log10(5),log10(10),l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
+  #ggplot(dt.fix)+geom_line(aes(10^x,y,colour=ori))#+geom_point(data=r,aes(10^x,y))#+xlim(1,3)+ylim(1600,2000)
   ### optimization in four stages
   #first, find rough minimum between 0.1 and 100
   minlambda=0.1
   maxlambda=100
   op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
   lambda2=10^op$minimum
-  #second, grid that minimum +- 5, over 20 points
-  dt1 = foreach (lam=log10(seq(max(minlambda,lambda2 - 5), min(maxlambda,lambda2 + 5), l=20)),
-                 .combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
-  lambda2 = dt1[y==min(y),10^x]
-  #third, grid that minimum +- .5, over 10 points
-  dt2 = foreach (lam=log10(seq(max(minlambda,lambda2 - .5), min(maxlambda,lambda2 + .5), l=10)),
-                .combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
-  lambda2 = dt2[y==min(y),10^x]
-  #fourth, minimize fully around that minimum +- 1
-  op<-optimize(obj, log10(c(max(minlambda,lambda2-.1),min(maxlambda,lambda2+.1))))
+  #second, repeated gridding at finer scales
+  range=10
+  npoints=20
+  reduction=3
+  nrounds=3
+  dt=data.table()
+  for (i in 1:nrounds) {
+    minlambda = max(minlambda,lambda2 - range/2)
+    maxlambda = min(maxlambda,lambda2 + range/2)
+    dt = rbind(dt,foreach (lam=log10(seq(minlambda, maxlambda, l=npoints)),
+                   .combine=rbind) %dopar% data.table(x=lam,y=obj(lam),i=paste(i)))
+    lambda2 = dt[y==min(y),10^x]
+    range=range/reduction
+  }
+  #ggplot()+geom_point(aes(10^x,y,colour=i),data=dt)
+  #third, minimize fully around that minimum
+  minlambda = max(minlambda,lambda2 - range/2)
+  maxlambda = min(maxlambda,lambda2 + range/2)
+  op<-optimize(obj, log10(c(minlambda,maxlambda)))
   lambda2=10^op$minimum
   #finish
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
