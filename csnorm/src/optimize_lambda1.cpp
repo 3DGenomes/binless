@@ -28,11 +28,12 @@ double obj_lambda1::operator()(double x) const {
 NumericVector obj_lambda1::get(double lambda1, std::string msg) const {
     const bool constrained = true;
     if (constrained) {
-        if (is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2)))
+        if (is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2))) {
             if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda1= " << lambda1
                                     << " eCprime= 0 BIC= Inf dof= NA" << std::endl;
             return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1,
                                          _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na());
+        }
     }
     std::vector<double> value_r = as<std::vector<double> >(value_);
     NumericVector soft = wrap(soft_threshold(value_r, 0, lambda1));
@@ -117,7 +118,7 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
     if (constrained) {
         if (positive) {
             forbidden_vals = get_minimum_diagonal_values(beta, diag_idx);
-            lmin = std::max(lmin, (max(forbidden_vals)-minval)/2);
+            lmin = std::max(lmin, std::max(std::abs(forbidden_vals(0)), std::abs(forbidden_vals(forbidden_vals.size()-1))));
         } else {
             forbidden_vals = get_constant_diagonal_values(beta, diag_idx, tol_val);
         }

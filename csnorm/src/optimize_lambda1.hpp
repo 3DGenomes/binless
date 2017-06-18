@@ -14,7 +14,7 @@ struct obj_lambda1 {
 
     double operator()(double x) const;
 
-    NumericVector get(double lambda1, std::string mgs = "") const;
+    NumericVector get(double lambda1, std::string msg = "") const;
 
     double minval_, maxval_, valrange_, tol_val_, lsnc_;
     IntegerVector patchno_;
