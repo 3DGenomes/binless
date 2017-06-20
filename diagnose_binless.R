@@ -265,9 +265,40 @@ print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2()
 
 
 
+load("data/rao_HiCall_FOXP1_1.3M_csnorm_optimized_base10k_bpk30_dfuse20_cpp.RData")
+cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+groupnames=cts[,unique(name)]
+g=groupnames[1]
+csig=new("CSbsig", mat=cs@par$signal[name==g], trails=cs@settings$trails, cts=cts[name==g],
+         settings=list(diag.rm=diag.rm, nbins=nbins, dispersion=cs@par$alpha, tol.val=cs@settings$tol.leg,
+                       inflate=2, nperf=500, opt.every=10, maxsteps=100000))
+csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
 
 
+lambda2=0.5133119
+a=csnorm:::gfl_BIC(csig,lambda2=lambda2, constrained=T, positive=T, fixed=F)
+mat=as.data.table(a$mat)
+mat[,summary(beta)]
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=-beta))+scale_fill_gradient2()
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))
 
+minval=mat[,min(beta)]
+test = foreach (eCprime=seq(minval,0,length.out=100), .combine=rbind) %do% {
+  lambda1=-eCprime
+  mat[,soft:=sign(beta-eCprime)*pmax(0,abs(beta-eCprime)-lambda1)+eCprime]
+  mat[,.(eCprime=eCprime, lambda1=lambda1, BIC=sum(weight*(phihat-soft)^2), is.positive=all(soft>=eCprime))]
+}
+ggplot(test)+geom_line(aes(eCprime,BIC,colour=is.positive))
 
-
-
+lvals = foreach(UB=mat[,unique(beta)], .combine=rbind) %dopar% {
+  rm(beta)
+  mat[,.(UB=UB,lbound=(UB-min(beta))/2,lmin=weighted.mean(pmax(beta,UB)-phihat, weight),
+         lsnc=log(sum(ncounts)), nw=sum(weight), nub=uniqueN(c(UB,pmax(beta,UB)))-1)]
+}
+lvals[,c("L","R","Lmod"):=list(nw*(pmax(lmin,lbound)-lmin)^2,lsnc*nub,nw*(lbound-lmin)^2)]
+lvals[,c("BIC","BICmod"):=list(L+R,Lmod+R)]
+setkey(lvals,UB)
+ggplot(melt(lvals[,.(UB,lmin,lbound)],id.vars = "UB"))+geom_line(aes(UB,value,colour=variable))
+ggplot(melt(lvals[,.(UB,L,Lmod)],id.vars = "UB"))+geom_line(aes(UB,value,colour=variable))
+ggplot(melt(lvals[,.(UB,R)],id.vars = "UB"))+geom_line(aes(UB,value,colour=variable))
+ggplot(melt(lvals[,.(UB,BIC,BICmod)],id.vars = "UB"))+geom_line(aes(UB,value,colour=variable))
