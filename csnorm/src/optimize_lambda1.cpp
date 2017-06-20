@@ -131,8 +131,8 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
     std::clock_t c_in1 = std::clock();
     //treat second border case
     if (lmin>lmax) {
-        NumericVector retval = obj.get(lmin, "final");
-        //NumericVector retval = obj.get(lmin);
+        //NumericVector retval = obj.get(lmin, "final");
+        NumericVector retval = obj.get(lmin);
         return NumericVector::create(_["eCprime"]=0, _["lambda1"]=retval["lambda1"],
                                      _["BIC"]=retval["BIC"], _["dof"]=retval["dof"],
                                      _["c_init"]=c_in1-c_start, _["c_brent"]=-1, _["c_refine"]=-1);
