@@ -277,7 +277,8 @@ csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
 
 lambda2=0.5133119
 a=csnorm:::gfl_BIC(csig,lambda2=lambda2, constrained=T, positive=T, fixed=F)
-mat=as.data.table(a$mat)
+a=csnorm:::gfl_get_matrix(csig,0,lambda2,0)
+mat=as.data.table(as.data.table(a))[,.(bin1,bin2,phihat=valuehat,ncounts,weight,beta=value,diag.idx)]
 mat[,summary(beta)]
 ggplot(mat)+geom_raster(aes(bin1,bin2,fill=-beta))+scale_fill_gradient2()
 ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))
@@ -291,14 +292,41 @@ test = foreach (eCprime=seq(minval,0,length.out=100), .combine=rbind) %do% {
 ggplot(test)+geom_line(aes(eCprime,BIC,colour=is.positive))
 
 lvals = foreach(UB=mat[,unique(beta)], .combine=rbind) %dopar% {
-  rm(beta)
-  mat[,.(UB=UB,lbound=(UB-min(beta))/2,lmin=weighted.mean(pmax(beta,UB)-phihat, weight),
-         lsnc=log(sum(ncounts)), nw=sum(weight), nub=uniqueN(c(UB,pmax(beta,UB)))-1)]
+  #rm(beta)
+  lv=mat[,.(UB=UB,lbound=(UB-min(beta))/2,lmin=weighted.mean(pmax(beta,UB)-phihat, weight),
+         lsnc=log(sum(ncounts)), nw=sum(weight))]
+  #b=csnorm:::gfl_BIC_fixed(csig, lambda1=lv[,pmax(lmin,lbound)], lambda2=lambda2, eCprime=UB-lv[,pmax(lmin,lbound)])
+  b=csnorm:::gfl_BIC_fixed(csig, lambda1=lv[,lbound], lambda2=lambda2, eCprime=UB-lv[,lbound])
+  lv[,c("reBIC","relsnc","reR","redof","nub"):=list(b$BIC,log(sum(b$mat$ncounts)),lsnc*b$dof,b$dof,b$dof)]
 }
 lvals[,c("L","R","Lmod"):=list(nw*(pmax(lmin,lbound)-lmin)^2,lsnc*nub,nw*(lbound-lmin)^2)]
 lvals[,c("BIC","BICmod"):=list(L+R,Lmod+R)]
 setkey(lvals,UB)
 ggplot(melt(lvals[,.(UB,lmin,lbound)],id.vars = "UB"))+geom_line(aes(UB,value,colour=variable))
-ggplot(melt(lvals[,.(UB,L,Lmod)],id.vars = "UB"))+geom_line(aes(UB,value,colour=variable))
-ggplot(melt(lvals[,.(UB,R)],id.vars = "UB"))+geom_line(aes(UB,value,colour=variable))
-ggplot(melt(lvals[,.(UB,BIC,BICmod)],id.vars = "UB"))+geom_line(aes(UB,value,colour=variable))
+ggplot(melt(lvals[,.(UB,L,reL=reBIC-reR)],id.vars = "UB"))+geom_line(aes(UB,value,colour=variable))
+ggplot(melt(lvals[,.(UB,R,reR)],id.vars = "UB"))+geom_line(aes(UB,value,colour=variable))
+ggplot(melt(lvals[,.(UB,nub,redof)],id.vars = "UB"))+geom_line(aes(UB,value,colour=variable))
+ggplot(melt(lvals[,.(UB,BIC,reBIC)],id.vars = "UB"))+geom_line(aes(UB,value,colour=variable))#+ylim(0,3000)+geom_line(aes(V5+V7,V9,colour=V1),data=a[V2=="grid"])
+ggplot(lvals[,.(UB,BIC,reBIC)])+geom_line(aes(UB,BIC-reBIC))
+
+log(sum(b$mat$ncounts))
+
+lv=mat[,.(UB=UB,lbound=(UB-min(beta))/2,lmin=weighted.mean(pmax(beta,UB)-phihat, weight),
+          lsnc=log(sum(ncounts)), nw=sum(weight), nub=uniqueN(c(UB,pmax(beta,UB)))-1)]
+lv[,reBIC:=csnorm:::gfl_BIC_fixed(csig, lambda1=lbound, lambda2=lambda2, eCprime=UB-lbound)$BIC]
+lv[,c("L","R","Lmod"):=list(nw*(pmax(lmin,lbound)-lmin)^2,lsnc*nub,nw*(lbound-lmin)^2)]
+lv[,c("BIC","BICmod"):=list(L+R,Lmod+R)]
+lv
+a[V2=="grid",.(UB=V5+V7,BIC=V9,ori=V1,lambda1=V5,eCprime=V7)][UB>0.501&UB<0.503]
+-> BIC or BICmod are wrong, recalculation provides correct values
+
+
+
+a1 = foreach(i=1:a[V2=="grid",.N],.combine=rbind) %dopar% {
+  a[V2=="grid"][i,.(ori=V1,status=V3,lambda1=V5,eCprime=V7,BIC=V9,dof=V11,
+                    reBIC=csnorm:::gfl_BIC_fixed(csig, lambda1=V5, lambda2=lambda2, eCprime=V7)$BIC)]
+}
+ggplot(melt(a1[,.(ori,lambda1,eCprime,BIC,reBIC)],id.vars = c("lambda1","eCprime","ori")))+geom_line(aes(lambda1+eCprime,value,colour=variable))
+
+
+
