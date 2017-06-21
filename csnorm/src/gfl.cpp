@@ -19,6 +19,8 @@ RCPP_MODULE(gfl) {
              "documentation for wgfl_signal_perf_opt_lambda1_eCprime");
     function("wgfl_signal_BIC", &wgfl_signal_BIC,
              "documentation for wgfl_signal_BIC ");
+    function("wgfl_signal_BIC_fixed", &wgfl_signal_BIC_fixed,
+             "documentation for wgfl_signal_BIC_fixed ");
 
     function("cts_to_diff_mat", &cts_to_diff_mat,
              "documentation for cts_to_diff_mat ");

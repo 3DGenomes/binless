@@ -30,6 +30,12 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                      int diag_rm, NumericVector beta_i, double lambda1_min, int refine_num,
                      bool constrained, bool fixed);
 
+List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter,
+                     int nbins,
+                     int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
+                     double lam1, double lam2, double eCprime, double alpha, double inflate, int ninner, double tol_val,
+                     int diag_rm, NumericVector beta_i);
+
 
 #endif
 

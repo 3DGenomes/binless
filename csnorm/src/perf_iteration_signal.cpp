@@ -375,3 +375,73 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                         _["c_brent"]=c_brent, _["c_refine"]=c_refine);
 }
 
+List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter,
+                     int nbins,
+                     int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
+                     double lam1, double lam2, double eCprime, double alpha, double inflate, int ninner, double tol_val,
+                     int diag_rm, NumericVector beta_i) {
+    std::clock_t c_start,c_end;
+    double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
+    //perf iteration for this set of values
+    int nwarm = (int)(nouter/10.+1);
+    List ret = wgfl_signal_perf_warm(cts, dispersion, nwarm, nbins, ntrails,
+                                     trails_i, breakpoints_i, 0, lam2, 0,
+                                     alpha, inflate, ninner, tol_val/20., diag_rm, beta_i);
+    c_cts += as<double>(ret["c_cts"]);
+    c_gfl += as<double>(ret["c_gfl"]);
+    //redo iteration if warm start did not work
+    if (as<int>(ret["nouter"])>nwarm) {
+        beta_i = NumericVector(beta_i.size(),0);
+        //Rcout << " warning: warm start failed " << std::endl;
+        ret = wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, ntrails, trails_i,
+                                    breakpoints_i, lam1, lam2, eCprime,
+                                    alpha, inflate, ninner, tol_val/20., diag_rm, beta_i);
+        if (as<int>(ret["nouter"])>nouter) Rcout <<
+                    " warning: cold start did not converge" <<std::endl;
+        c_cts += as<double>(ret["c_cts"]);
+        c_gfl += as<double>(ret["c_gfl"]);
+    }
+
+    //soft-threshold it at the selected parameters
+    std::vector<double> beta_r = as<std::vector<double> >(ret["beta"]);
+    std::vector<double> phi_r = soft_threshold(beta_r, eCprime, lam1);
+
+    //identify patches
+    DataFrame mat = as<DataFrame>(ret["mat"]);
+    DataFrame submat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                         _["bin2"]=mat["bin2"],
+                                         _["valuehat"]=mat["phihat"],
+                                         _["ncounts"]=mat["ncounts"],
+                                         _["weight"]=mat["weight"],
+                                         _["value"]=phi_r);
+    List patches = boost_build_patch_graph_components(nbins, submat, tol_val);
+
+    //count the positive ones and deduce dof
+    NumericVector phi = wrap(phi_r);
+    IntegerVector patchno = patches["membership"];
+    IntegerVector selected = patchno[abs(phi)>tol_val/2];
+    const int dof = unique(selected).size();
+
+    //compute BIC
+    NumericVector weight = submat["weight"];
+    NumericVector phihat = submat["valuehat"];
+    NumericVector ncounts = submat["ncounts"];
+    const double BIC = sum(weight * SQUARE(phihat-(phi + eCprime))) + log(sum(
+                           ncounts))*dof;
+
+    DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                           _["bin2"]=mat["bin2"],
+                                           _["phihat"]=mat["phihat"],
+                                           _["ncounts"]=mat["ncounts"],
+                                           _["weight"]=mat["weight"],
+                                           _["diag.idx"]=mat["diag.idx"],
+                                           _["beta"]=beta_r,
+                                           _["phi"]=phi_r,
+                                           _["patchno"]=patchno);
+    return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi"]=phi_r,
+                        _["beta"]=beta_r, _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
+                        _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat, _["eCprime"]=eCprime,
+                        _["lambda1"]=lam1,
+                        _["c_cts"]=c_cts, _["c_gfl"]=c_gfl);
+}
+
