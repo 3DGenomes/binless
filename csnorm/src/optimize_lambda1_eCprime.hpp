@@ -23,7 +23,7 @@ struct obj_lambda1_eCprime {
 };
 
 NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1,
-                             double lam1_min, int refine_num, NumericVector patchvals);
+                             double lam1_min, double lam1_max, int refine_num, NumericVector patchvals);
 
 NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
         double tol_val, bool constrained,
