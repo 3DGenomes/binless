@@ -97,7 +97,8 @@ csnorm_gauss_common_muhat_mean = function(cs, zeros, sbins) {
   cts=rbind(cpos,czero)
   ### add signal
   if (cs@par$signal[,.N]>0) {
-    signal=rbind(cs@par$signal[,.(name,bin1,bin2,phi)],cs@par$signal[bin1!=bin2,.(name,bin1=bin2,bin2=bin1,phi)])
+    signal = csnorm:::get_signal_matrix(cs, resolution = sbins[2]-sbins[1], groups=cs@experiments[,.(name,groupname=name)])
+    signal=rbind(signal[,.(name,bin1,bin2,phi)],signal[bin1!=bin2,.(name,bin1=bin2,bin2=bin1,phi)])
     cts=signal[cts,,on=c("name","bin1","bin2")]
     cts[,mu:=exp(lmu.nosig+phi)]
   } else {
@@ -656,7 +657,7 @@ csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
   #put in triangular form
   cts2 = cts[bin1>bin2]
   setnames(cts2,c("bin1","bin2"),c("bin2","bin1"))
-  cts = rbind(cts[bin1<=bin2],cts2)
+  cts = rbind(cts[bin1<=bin2],cts2)[,.(name,bin1,bin2,count,lmu.nosig,mu,log_decay,weight=weight/2)] #each count appears twice
   rm(cts2)
   stopifnot(cts[,all(bin1<=bin2)])
   setkey(cts,name,bin1,bin2)
@@ -668,7 +669,7 @@ csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
 #' 
 csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   if (verbose==T) cat(" Signal\n")
-  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)[,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   diag.rm = ceiling(cs@settings$dmin/cs@settings$base.res)
   #
   if (verbose==T) cat("  predict\n")
@@ -688,7 +689,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   params = foreach(g=groupnames, .combine=rbind) %dopar% {
     csig=new("CSbsig", mat=cs@par$signal[name==g], trails=cs@settings$trails, cts=cts[name==g],
              settings=list(diag.rm=diag.rm, nbins=nbins, dispersion=cs@par$alpha, tol.val=cs@settings$tol.leg,
-                           inflate=2, nperf=1000, maxsteps=100000))
+                           inflate=2, nperf=500, opt.every=10, maxsteps=100000))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose)
   }
@@ -833,7 +834,7 @@ subsample_counts = function(cs, ncounts, dset=NA) {
 
 #' Prepare for concurrent signal estimation 
 #' @keywords internal
-prepare_signal_estimation = function(biases, names, base.res) {
+prepare_first_signal_estimation = function(biases, names, base.res) {
   ### build matrix
   #create an empty matrix containing all cells, even those with no cut-site intersection
   sbins=seq(biases[,min(pos)-1],biases[,max(pos)+1+base.res],base.res)
@@ -845,7 +846,6 @@ prepare_signal_estimation = function(biases, names, base.res) {
   ### build optimization trails
   trails = csnorm:::gfl_compute_trails(signal.mat[,nlevels(bin1)])
   stopifnot(all(signal.mat[,.N,by=name]$N==signal.mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
-  stopifnot(all(length(V(trails$graph))==signal.mat[,.N,by=name]$N))
   return(list(signal=signal.mat,trails=trails,sbins=sbins))
 }
 
@@ -939,7 +939,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     #prepare signal matrix and trails
     if (fit.signal==T) {
       if(verbose==T) cat("Preparing for signal estimation\n")
-      stuff = csnorm:::prepare_signal_estimation(cs@biases, cs@experiments[,name], base.res)
+      stuff = csnorm:::prepare_first_signal_estimation(cs@biases, cs@experiments[,name], base.res)
       cs@par$signal=stuff$signal
       cs@settings$sbins=stuff$sbins
       cs@settings$trails=stuff$trails
@@ -989,7 +989,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
       if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
     }
     #fit signal using sparse fused lasso
-    if (fit.signal==T) {
+    if (fit.signal==T & i > 1) {
       update.exposures=F
       a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=fit.decay, ncores=ncores))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])

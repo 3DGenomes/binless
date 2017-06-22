@@ -97,7 +97,7 @@ ggplot(signals[step>=step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster
 matdiff=merge(signals[step>step[1],.(name,step,bin1,bin2,phi)],
               signals[step<step[.N],.(name,step=step+1,bin1,bin2,phi)],
               by=c("name","step","bin1","bin2"))[,.(name,step,bin1,bin2,diff=phi.x-phi.y)]
-ggplot(matdiff[step>30])+geom_raster(aes(bin1,bin2,fill=-diff))+geom_raster(aes(bin2,bin1,fill=-(diff)))+
+ggplot(matdiff[step>3])+geom_raster(aes(bin1,bin2,fill=-diff))+geom_raster(aes(bin2,bin1,fill=-(diff)))+
   scale_fill_gradient2()+facet_wrap(~step)+coord_fixed()
 
 
@@ -254,6 +254,20 @@ csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=T, simplified
 csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=T, simplified=F, verbose=verbose,
                             ctsg.ref=csig@cts.ref)
 -> lambda1_only
+
+#negative case
+load("tmp_negative_csig.RData")
+lambda2 #1.399259
+a=csnorm:::gfl_BIC(csig, lambda2)
+a$eCprime #0.979505
+matg=csnorm:::gfl_get_matrix(csig, a$lambda1, a$lambda2, a$eCprime)
+print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
+
+
+
+
+
+
 
 
 

@@ -1,4 +1,5 @@
 #include <math.h>
+//#include <stdio.h>
 #include "gfl_c.h"
 
 void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
@@ -22,7 +23,8 @@ void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
     ncounts[pos] += weight[i];
     phihat_var[pos] += w2v;
     phihat[pos] += (z+phi[pos])*w2v;
-    //if (b1==31&b2==31) printf("mu=%f z=%f var=%f w2v=%f pos=%d\n",mu,z,var,w2v,pos);
+    /*if (pos==108) printf("count=%f lmu_nosig=%f phi=%f mu=%f z=%f var=%f w2v=%f pos=%d\n",
+        count[i], lmu_nosig[i], phi[pos], mu,z,var,w2v,pos);*/
   }
   
   //finish mat
