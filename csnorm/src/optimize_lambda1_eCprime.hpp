@@ -14,16 +14,13 @@ struct obj_lambda1_eCprime {
 
     double operator()(double x) const;
 
-    NumericVector get(double lambda1, std::string msg = "") const;
+    NumericVector get(double val, std::string msg = "") const;
 
     double minval_, valrange_, tol_val_, lsnc_;
     bool constrained_;
     IntegerVector patchno_;
     NumericVector forbidden_vals_, value_, weight_, valuehat_;
 };
-
-NumericVector refine_minimum(const obj_lambda1_eCprime& obj, double lam1,
-                             double lam1_min, double lam1_max, int refine_num, NumericVector patchvals);
 
 NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
         double tol_val, bool constrained,
