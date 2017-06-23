@@ -30,44 +30,70 @@ NumericVector obj_lambda1_eCprime::get(double val, std::string msg) const {
     //split data in two groups
     LogicalVector grp1 = value_ <= val;
     double b1,b2, xk, xkp1;
-    if (is_true(all(!grp1))) {
-        //grp1 is empty, UB <= xmin
-        b1 = 0;
-        xk = -std::numeric_limits<double>::infinity();
-        xkp1 = min(value_);
-    } else {
-        NumericVector w1 = weight_[grp1];
-        NumericVector betahat1 = valuehat_[grp1];
-        b1 = sum(w1*betahat1)/sum(w1);
-    }
-    if (is_true(all(grp1))) {
-        //grp2 is empty, UB > xmax
-        b2 = 0;
-        xk = max(value_);
-        xkp1 = std::numeric_limits<double>::infinity();
-    } else {
+    double a,b,UB,LB;
+    bool grp1only = is_true(all(grp1)), grp2only = is_true(all(!grp1));
+    double xmin = min(value_), xmax = max(value_);
+    
+    //compute UB and LB
+    if ((!grp1only) && (!grp2only)) {//non-degenerate case
+      NumericVector w1 = weight_[grp1];
+      NumericVector betahat1 = valuehat_[grp1];
+      NumericVector w2 = weight_[!grp1];
+      NumericVector betahat2 = valuehat_[!grp1];
+      NumericVector x1 = value_[grp1];
+      NumericVector x2 = value_[!grp1];
+      b1 = sum(w1*betahat1)/sum(w1);
+      b2 = sum(w2*(x2-betahat2))/sum(w2);
+      xk = max(x1);
+      xkp1 = min(x2);
+      //compute unconstrained minimum for UB and LB
+      a = b1 + b2;
+      b = b1 - b2;
+      //compute optimal UB and LB
+      UB = std::max(std::min(xkp1, a), xk);
+      LB = std::min(b, xmin);
+      
+    } else if (grp1only) {//grp2 is empty, UB > xmax
+      NumericVector w1 = weight_[grp1];
+      NumericVector betahat1 = valuehat_[grp1];
+      b1 = sum(w1*betahat1)/sum(w1);
+      b2 = 0;
+      xk = xmax;
+      xkp1 = std::numeric_limits<double>::infinity();
+      //compute unconstrained minimum for UB and LB
+      a = b1 + b2;
+      b = b1 - b2;
+      //compute optimal UB and LB
+      if (b1 >= (xmin+xmax)/2.) {
+        LB = xmin; //or any value < xmin
+        UB = 2*b1 - LB;
+      } else {
+        UB = xmax; //or any value > xmax
+        LB = 2*b1 - UB;
+      }
+      
+    } else {//grp1 is empty, UB <= xmin
         NumericVector w2 = weight_[!grp1];
         NumericVector betahat2 = valuehat_[!grp1];
         NumericVector x2 = value_[!grp1];
+        b1 = 0;
         b2 = sum(w2*(x2-betahat2))/sum(w2);
+        xk = -std::numeric_limits<double>::infinity();
+        xkp1 = xmin;
+        //compute unconstrained minimum for UB and LB
+        a = b1 + b2;
+        b = b1 - b2;
+        //compute optimal UB and LB
+        UB = xmin;
+        if (b2<tol_val_) Rcout << " warning: b2= " << b2 << " is negative, setting UB=LB" << std::endl;
+        LB = UB - 2*(std::max(b2,0.)+tol_val_);
     }
-    NumericVector x1 = value_[grp1];
-    if (is_false(all(grp1)) && is_false(all(!grp1))) {
-      NumericVector x2 = value_[!grp1];
-      xk = max(x1);
-      xkp1 = min(x2);
-    }
-    double xmin = min(value_);
-    //compute unconstrained minimum for UB and LB
-    double a = b1 + b2;
-    double b = b1 - b2;
-    //compute optimal UB and LB
-    double UB = std::max(std::min(xkp1, a), xk);
-    double LB = std::min(b, xmin);
+    
     //compute eCprime, lambda1
     double eCprime = (UB+LB)/2;
     double lambda1 = (UB-LB)/2;
-    //Rcout << "EVAL at val= " << val << " LB= " << LB << " UB= " << UB << " b1= " << b1 << " b2= " << b2 << " xmin= " << xmin << " xk= " << xk << " xkp1= " << xkp1 << std::endl; 
+    Rcout << "EVAL at val= " << val << " LB= " << LB << " UB= " << UB << " b1= " << b1 << " b2= " << b2
+          << " xmin= " << xmin << " xk= " << xk << " xkp1= " << xkp1 << " a= " << a << " b= " << b << std::endl; 
     //check if solution is feasible
     if (constrained_) {
         if ( is_true(any( (forbidden_vals_>UB+tol_val_/2) | (forbidden_vals_<LB-tol_val_/2) )) ) {
@@ -132,15 +158,14 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     //loop over patch values
     std::clock_t c_in1 = std::clock();
-    List val,best;
-    best = obj.get(patchvals(0) - 2*tol_val, "opt"); //ensures  query is < xmin
+    Rcout << " UB < xmin= " << patchvals(0) << std::endl;
+    NumericVector best = obj.get(patchvals(0) - 2*tol_val, "opt"); //query is < xmin
     for (int i=0; i<patchvals.size(); ++i) {
       if (patchvals(i) <= max(forbidden_vals)) continue;
-      val = obj.get(patchvals(i) + 2*tol_val, "opt");
+      Rcout << " UB > x= " << patchvals(i) << std::endl;
+      NumericVector val = obj.get(patchvals(i) + 2*tol_val, "opt");
       if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
     }
-    val = obj.get(patchvals(patchvals.size()-1) + 2*tol_val, "opt"); //ensures  query is > xmax
-    if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
     std::clock_t c_in2 = std::clock();
     //finalize
     obj.get(as<double>(best["UB"])+2*tol_val,"final");

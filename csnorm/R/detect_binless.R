@@ -127,15 +127,16 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F) {
     return(csig@state$BIC)
   }
   #
-  #dt.1 = foreach (lam=rev(vals),.combine=rbind) %do% {
+  #dt.free = foreach (lam=10^(seq(-1,1,length.out=100)),.combine=rbind) %do% {
   #  obj(log10(lam))
   #  as.data.table(csig@state$mat)[,.(lambda2=lam,lambda1=csig@state$lambda1,eCprime=csig@state$eCprime,bin1,bin2,phihat,phi,beta)]
   #}
-  #dt = foreach (lam=seq(0.01,20,l=1000),.combine=rbind) %dopar% {
-  #  csig@state <<- csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed)
+  #dt.fix = foreach (lam=10^(seq(-1,1,length.out=100)),.combine=rbind) %dopar% {
+  #  csig@state <<- csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=T)
   #  as.data.table(csig@state[c("lambda2","lambda1","eCprime","dof","BIC")])
   #}
-  #ggplot(dt.fix)+geom_line(aes(10^x,y,colour=ori))#+geom_point(data=r,aes(10^x,y))#+xlim(1,3)+ylim(1600,2000)
+  #dt=rbindlist(list(free=dt.free,fix=dt.fix), use=T, idcol="ori")
+  #ggplot(dt)+geom_line(aes(lambda2,BIC,colour=ori))#+geom_point(data=r,aes(10^x,y))#+xlim(1,3)+ylim(1600,2000)
   ### optimization in four stages
   #first, find rough minimum between 0.1 and 100
   minlambda=0.1

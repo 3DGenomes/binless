@@ -328,5 +328,12 @@ a1 = foreach(i=1:a[V2=="grid",.N],.combine=rbind) %dopar% {
 }
 ggplot(melt(a1[,.(ori,lambda1,eCprime,BIC,reBIC)],id.vars = c("lambda1","eCprime","ori")))+geom_line(aes(lambda1+eCprime,value,colour=variable))
 
+ggplot()+geom_line(data=a[V2=="grid"],aes(V5,V7,colour=V1))
 
 
+UB=0.398938
+#LB=-0.15
+a = foreach (LB=seq(-0.5,0,length.out=100),.combine=rbind) %do% {
+  as.data.table(csnorm:::gfl_BIC_fixed(csig,lambda1=(UB-LB)/2,lambda2=2,eCprime=(UB+LB)/2)[c("lambda1","lambda2","eCprime","BIC","dof")])
+}
+ggplot(a)+geom_line(aes(UB-2*lambda1,BIC))

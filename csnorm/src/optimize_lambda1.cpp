@@ -30,7 +30,8 @@ NumericVector obj_lambda1::get(double lambda1, std::string msg) const {
     if (constrained) {
         if (is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2))) {
             if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda1= " << lambda1
-                                    << " eCprime= 0 BIC= Inf dof= NA" << std::endl;
+                                    << " eCprime= 0 BIC= Inf dof= NA"
+                                    << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;
             return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1,
                                          _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na());
         }
@@ -41,7 +42,8 @@ NumericVector obj_lambda1::get(double lambda1, std::string msg) const {
     const int dof = unique(selected).size();
     const double BIC = sum(weight_ * SQUARE(valuehat_ - soft)) + lsnc_*dof;
     if (!msg.empty()) Rcout << " OBJ " << msg << " ok lambda1= " << lambda1 << " eCprime= 0"
-                            << " BIC= " << BIC  << " dof= " << dof << std::endl;
+                            << " BIC= " << BIC  << " dof= " << dof
+                            << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;
     return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1, _["BIC"]=BIC,
                                  _["dof"]=dof);
 }
@@ -123,8 +125,8 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
             forbidden_vals = get_constant_diagonal_values(beta, diag_idx, tol_val);
         }
     }
-    Rcout << "lmin= " << lmin << " valrange= " << (maxval-minval) << std::endl;
-    for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
+    Rcout << "lmin= " << lmin << " lmax= " << lmax << " minval= " << minval << " maxval= " << maxval
+          << " fv[0]= " << forbidden_vals[0] << " fv[last]= " << forbidden_vals[forbidden_vals.size()-1] << std::endl;
     //create functor
     obj_lambda1 obj(minval, maxval, tol_val, patchno, forbidden_vals,
                     beta, weight, phihat, ncounts);
@@ -138,7 +140,7 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
                                      _["c_init"]=c_in1-c_start, _["c_brent"]=-1, _["c_refine"]=-1);
     }
     //grid
-    for (int i=0; i<1000; ++i) obj.get(0+i/999.*1, "grid");
+    //for (int i=0; i<1000; ++i) obj.get(0+i/999.*1, "grid");
     //optimize
     int bits = -8*std::log10(tol_val)+1;
     boost::uintmax_t maxiter = 1000;
