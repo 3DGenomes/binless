@@ -21,8 +21,8 @@ obj_lambda1_eCprime::obj_lambda1_eCprime(double minval, double maxval,
     value_(value), weight_(weight), valuehat_(valuehat) {}
 
 double obj_lambda1_eCprime::operator()(double val) const {
-    return get(val, "opt")["BIC"];
-    //return get(val)["BIC"];
+    //return get(val, "opt")["BIC"];
+    return get(val)["BIC"];
 }
 
 //take val as a starting point for optimization of UB and LB at constant dof
@@ -85,15 +85,15 @@ NumericVector obj_lambda1_eCprime::get(double val, std::string msg) const {
         b = b1 - b2;
         //compute optimal UB and LB
         UB = xmin;
-        if (b2<tol_val_) Rcout << " warning: b2= " << b2 << " is negative, setting UB=LB" << std::endl;
+        if (b2<-tol_val_) Rcout << " warning: b2= " << b2 << " is negative, setting UB=LB" << std::endl;
         LB = UB - 2*(std::max(b2,0.)+tol_val_);
     }
     
     //compute eCprime, lambda1
     double eCprime = (UB+LB)/2;
     double lambda1 = (UB-LB)/2;
-    Rcout << "EVAL at val= " << val << " LB= " << LB << " UB= " << UB << " b1= " << b1 << " b2= " << b2
-          << " xmin= " << xmin << " xk= " << xk << " xkp1= " << xkp1 << " a= " << a << " b= " << b << std::endl; 
+    /*Rcout << "EVAL at val= " << val << " LB= " << LB << " UB= " << UB << " b1= " << b1 << " b2= " << b2
+            << " xmin= " << xmin << " xk= " << xk << " xkp1= " << xkp1 << " a= " << a << " b= " << b << std::endl; */
     //check if solution is feasible
     if (constrained_) {
         if ( is_true(any( (forbidden_vals_>UB+tol_val_/2) | (forbidden_vals_<LB-tol_val_/2) )) ) {
@@ -135,8 +135,8 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     NumericVector patchvals = get_patch_values(beta, patchno);
     //treat border case
     if (as<double>(cl["no"]) == 1) {
-        Rcout << " OBJ final ok lambda1= " << lmin << " eCprime= " << patchvals(0)
-                << " BIC= " << sum(weight * SQUARE(phihat)) << " dof= 0" << std::endl;
+        /*Rcout << " OBJ final ok lambda1= " << lmin << " eCprime= " << patchvals(0)
+                << " BIC= " << sum(weight * SQUARE(phihat)) << " dof= 0" << std::endl;*/
         return NumericVector::create(_["eCprime"]=min(patchvals)+tol_val/2, _["lambda1"]=lmin,
                                      _["dof"]=0,
                                      _["BIC"]=sum(weight * SQUARE(phihat)),
@@ -158,17 +158,17 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     //loop over patch values
     std::clock_t c_in1 = std::clock();
-    Rcout << " UB < xmin= " << patchvals(0) << std::endl;
-    NumericVector best = obj.get(patchvals(0) - 2*tol_val, "opt"); //query is < xmin
+    //NumericVector best = obj.get(patchvals(0) - 2*tol_val, "opt"); //query is < xmin
+    NumericVector best = obj.get(patchvals(0) - 2*tol_val); //query is < xmin
     for (int i=0; i<patchvals.size(); ++i) {
       if (patchvals(i) <= max(forbidden_vals)) continue;
-      Rcout << " UB > x= " << patchvals(i) << std::endl;
-      NumericVector val = obj.get(patchvals(i) + 2*tol_val, "opt");
+      //NumericVector val = obj.get(patchvals(i) + 2*tol_val, "opt");
+      NumericVector val = obj.get(patchvals(i) + 2*tol_val);
       if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
     }
     std::clock_t c_in2 = std::clock();
     //finalize
-    obj.get(as<double>(best["UB"])+2*tol_val,"final");
+    //obj.get(as<double>(best["UB"])+2*tol_val,"final");
     return NumericVector::create(_["eCprime"]=best["eCprime"], _["lambda1"]=best["lambda1"],
                                  _["UB"]=best["UB"], _["LB"]=best["LB"],
                                  _["BIC"]=best["BIC"], _["dof"]=best["dof"],
