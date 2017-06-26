@@ -244,7 +244,7 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     decay_out$eC = c(decay_out$eC,eC)
     decay_out$lambda_diag = c(decay_out$lambda_diag,lambda_diag)
     
-    decay_out$value = sum(dnorm(kappa_hat, mean = as.array(decay_out$log_mean_counts), sd = as.array(sdl), log = TRUE))
+    decay_out$value = decay_out$value + sum(dnorm(kappa_hat, mean = as.array(decay_out$log_mean_counts), sd = as.array(sdl), log = TRUE))
     
   }
   decay_out$eC=as.array(decay_out$eC)
@@ -445,7 +445,7 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       D = bdiag(lambda_iota*D1,lambda_rho*D1)
       DtD = crossprod(D)
       if (maxiter==0) {
-        cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD, LDL=F, super=NA) 
+        cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD, LDL=F, super=NA,Imult=1e-20) 
         stopifnot(!isLDL(cholA)) #do LLt cholesky so we can use crossprod for Gamma_v
       } else {
         cholA = update(cholA,tmp_X_S_m2_X + Krow^2*DtD)
@@ -522,6 +522,7 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
         log_mean_DR = c(log_mean_DR,log_mean[(SD+(2*SDd+1)):(SD+(3*SDd))])
         log_mean_cleft  = c(log_mean_cleft,log_mean[(SD+(3*SDd+1)):(SD+(4*SDd))])
         log_mean_cright = c(log_mean_cright,log_mean[(SD+(4*SDd+1)):(SD+(5*SDd))])
+        
         SD = SD + 5*SDd
       }
     }
@@ -549,9 +550,7 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     genomic_out$beta_iota_diff = as.matrix(genomic_out$beta_iota_diff)
     genomic_out$beta_rho_diff = as.matrix(genomic_out$beta_rho_diff)
     
-    means = cbind(genomic_out$log_mean_RJ,genomic_out$log_mean_DL,genomic_out$log_mean_DR,genomic_out$log_mean_cleft,genomic_out$log_mean_cright)
-    mus = cbind(sd_RJ,sd_DL,sd_DR,sd_L,sd_R)
-    genomic_out$value = sum(dnorm(etas, mean = as.array(means), sd = as.array(mus), log = TRUE))
+    genomic_out$value = genomic_out$value+sum(dnorm(etas, mean = as.array(log_mean), sd = as.array(sds), log = TRUE))
   }
   
   #make nice output table
