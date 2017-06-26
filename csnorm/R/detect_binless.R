@@ -127,7 +127,7 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F) {
     return(csig@state$BIC)
   }
   #
-  #dt.free = foreach (lam=10^(seq(-1,1,length.out=100)),.combine=rbind) %do% {
+  #dt.free = foreach (lam=10^(seq(1.1,1.3,length.out=100)),.combine=rbind) %do% {
   #  obj(log10(lam))
   #  as.data.table(csig@state$mat)[,.(lambda2=lam,lambda1=csig@state$lambda1,eCprime=csig@state$eCprime,bin1,bin2,phihat,phi,beta)]
   #}
@@ -138,8 +138,8 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F) {
   #dt=rbindlist(list(free=dt.free,fix=dt.fix), use=T, idcol="ori")
   #ggplot(dt)+geom_line(aes(lambda2,BIC,colour=ori))#+geom_point(data=r,aes(10^x,y))#+xlim(1,3)+ylim(1600,2000)
   ### optimization in four stages
-  #first, find rough minimum between 0.1 and 100
-  minlambda=0.1
+  #first, find rough minimum between 1 and 100
+  minlambda=1
   maxlambda=100
   op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
   lambda2=10^op$minimum
@@ -162,6 +162,7 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F) {
   #third, minimize fully around that minimum
   minlambda = max(minlambda,lambda2 - range/2)
   maxlambda = min(maxlambda,lambda2 + range/2)
+  #cat("final round : min=",minlambda," < lambda2=",lambda2, " < max=",maxlambda," range=",range,"\n")
   op<-optimize(obj, log10(c(minlambda,maxlambda)))
   lambda2=10^op$minimum
   #finish
