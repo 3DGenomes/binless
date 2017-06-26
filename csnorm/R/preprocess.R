@@ -215,7 +215,7 @@ plot_raw = function(dt, b1, e1, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
 #'   fragment. Fragments above this threshold will be categorized as "other".
 #' @param dangling.L,dangling.R vectors of integers. Offset from cut site for
 #'   reads to be considered dangling ends (Left or Right respectively)
-#' @param read.len integer. The length of a full read, used for dangling ends (temporary)
+#' @param read.len integer vector. The length of a full read, used for dangling ends (temporary)
 #'   
 #' @return The same data.table, with an additional "category" column
 #' @keywords internal
@@ -234,12 +234,12 @@ categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0), dangling.R
   sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & re.dn1 == re.dn2, category:="random"]
   cat("Rejoined\n")
   sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & re.dn1 <= re.up2, category:="rejoined"]
-  sub[category=="rejoined" & (length1 != read.len | length2 != read.len), category:="random"]
+  sub[category=="rejoined" & ( !(length1 %in% read.len) | !(length2 %in% read.len) ), category:="random"]
   cat("Self Circle\n")
   sub[re.dn1 == re.dn2 & strand1==0 & strand2==1 & rbegin1 - re.up1 < maxlen & re.dn2 - rbegin2 < maxlen, category:="self circle"]
   cat("Dangling L/R\n")
-  sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & ((rbegin1 - re.closest1) %in% dangling.L) & length1==read.len, category:="dangling L"]
-  sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & ((rbegin2 - re.closest2) %in% dangling.R) & length2==read.len, category:="dangling R"]
+  sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & ((rbegin1 - re.closest1) %in% dangling.L) & length1 %in% read.len, category:="dangling L"]
+  sub[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & ((rbegin2 - re.closest2) %in% dangling.R) & length2 %in% read.len, category:="dangling R"]
   return(sub)
 }
 
@@ -455,6 +455,7 @@ generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1
 #' @param maxlen how many bases to plot off-diagonal
 #' @param skip.fbm boolean. If TRUE (default), skip fragment-based IDs, 
 #'   containing # and ~. Otherwise keep them.
+#' @param read.len length of reads admissible for dangling end candidates
 #' @inheritParams read_tsv
 #'   
 #' @return Two plots, pdangling to determine dangling.L and dangling.R, and
@@ -471,9 +472,9 @@ examine_dataset = function(infile, window=15, maxlen=1000, skip.fbm=T, read.len=
   }
   if (skip.fbm == T) data = data[!grepl("[#~]",id)]
   #dangling
-  dleft=data[abs(rbegin1-re.closest1)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0&length1==read.len,
+  dleft=data[abs(rbegin1-re.closest1)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0&length1%in%read.len,
              .(dist=rbegin1-re.closest1,cat="left")]
-  dright=data[abs(rbegin2-re.closest2)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0&length2==read.len,
+  dright=data[abs(rbegin2-re.closest2)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0&length2%in%read.len,
               .(dist=rbegin2-re.closest2,cat="right")]
   pdangling=ggplot(rbind(dleft,dright))+
     geom_histogram(aes(dist),binwidth=1)+scale_x_continuous(breaks=-window:window)+facet_grid(~cat)+
