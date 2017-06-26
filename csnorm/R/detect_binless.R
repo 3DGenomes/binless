@@ -57,7 +57,7 @@ gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
   return(matg)
 }
 
-#' compute BIC for a given value of lambda1, lambda2 and eCprime (performance iteration, persistent state)
+#' compute BIC for a given value of lambda2, optimizing lambda1 and eCprime (performance iteration, persistent state)
 #' @keywords internal
 gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, positive=T, fixed=F) {
   #state = perf.c[c("phi.ref","beta","alpha")]
@@ -91,6 +91,32 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
   return(perf.c)
 }
 
+#' compute BIC for a given value of lambda1, lambda2 and eCprime (performance iteration, persistent state)
+#' @keywords internal
+gfl_BIC_fixed = function(csig, lambda1, lambda2, eCprime) {
+  #state = perf.c[c("phi.ref","beta","alpha")]
+  #submat = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta)]
+  #
+  ctsg=csig@cts
+  nbins=csig@settings$nbins
+  dispersion=csig@settings$dispersion
+  diag.rm=csig@settings$diag.rm
+  trails=csig@trails
+  tol.val=csig@settings$tol.val
+  state=csig@state
+  stopifnot(length(state)>0) #warm start only
+  stopifnot(class(csig)=="CSbsig")
+  inflate=csig@settings$inflate
+  nperf=csig@settings$nperf
+  opt.every=csig@settings$opt.every
+  maxsteps=csig@settings$maxsteps
+  perf.c = csnorm:::wgfl_signal_BIC_fixed(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                                      trails$breakpoints, lambda1, lambda2, eCprime,
+                                      state$alpha, inflate, maxsteps, tol.val, diag.rm,
+                                      state$beta)
+  return(perf.c)
+}
+
 #' cross-validate lambda2
 #' @keywords internal
 optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F) {
@@ -101,12 +127,16 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F) {
     return(csig@state$BIC)
   }
   #
-  #dt.1 = foreach (lam=rev(vals),.combine=rbind) %do% {
+  #dt.free = foreach (lam=10^(seq(-1,1,length.out=100)),.combine=rbind) %do% {
   #  obj(log10(lam))
   #  as.data.table(csig@state$mat)[,.(lambda2=lam,lambda1=csig@state$lambda1,eCprime=csig@state$eCprime,bin1,bin2,phihat,phi,beta)]
   #}
-  #dt.fix2 = foreach (lam=seq(log10(5),log10(10),l=100),.combine=rbind) %dopar% data.table(x=lam,y=obj(lam))
-  #ggplot(dt.fix)+geom_line(aes(10^x,y,colour=ori))#+geom_point(data=r,aes(10^x,y))#+xlim(1,3)+ylim(1600,2000)
+  #dt.fix = foreach (lam=10^(seq(-1,1,length.out=100)),.combine=rbind) %dopar% {
+  #  csig@state <<- csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=T)
+  #  as.data.table(csig@state[c("lambda2","lambda1","eCprime","dof","BIC")])
+  #}
+  #dt=rbindlist(list(free=dt.free,fix=dt.fix), use=T, idcol="ori")
+  #ggplot(dt)+geom_line(aes(lambda2,BIC,colour=ori))#+geom_point(data=r,aes(10^x,y))#+xlim(1,3)+ylim(1600,2000)
   ### optimization in four stages
   #first, find rough minimum between 0.1 and 100
   minlambda=0.1
