@@ -450,7 +450,7 @@ generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1
 
 #' Diagnostic plots to determine dangling.L, dangling.R and maxlen arguments
 #' 
-#' @param infile A tadbit .tsv file
+#' @param infile A tadbit .tsv file as character string, or a data.table returned by read.tsv
 #' @param window how many bases to plot around cut site
 #' @param maxlen how many bases to plot off-diagonal
 #' @param skip.fbm boolean. If TRUE (default), skip fragment-based IDs, 
@@ -464,7 +464,11 @@ generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1
 #' 
 #' @examples
 examine_dataset = function(infile, window=15, maxlen=1000, skip.fbm=T, read.len=40, skip=0L, nrows=-1L, locus=NULL) {
-  data=read_tsv(infile, skip=skip, nrows=nrows, locus=locus)
+  if (is.character(infile)) {
+    data=read_tsv(infile, skip=skip, nrows=nrows, locus=locus)
+  } else {
+    data=infile
+  }
   if (skip.fbm == T) data = data[!grepl("[#~]",id)]
   #dangling
   dleft=data[abs(rbegin1-re.closest1)<=window&abs(rbegin2-rbegin1)<maxlen&strand1==1&strand2==0&length1==read.len,
