@@ -149,7 +149,9 @@ plot_binned = function(dt, resolution, b1, e1, b2=NULL, e2=NULL, diagonal=F, rsi
 #' @export
 #'
 #' @examples
-plot_raw = function(dt, b1, e1, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
+plot_raw = function(dt, b1=NULL, e1=NULL, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
+  if (is.null(b1)) b1 = dt[,min(rbegin1)]
+  if (is.null(e1)) e1 = dt[,max(rend2)]
   faceted = (!is.null(b2)) & (!is.null(e2)) & b2>=e1 & diagonal==T #show 3 viewpoints simultaneously
   if (length(faceted)!=1) faceted=F #happens if b2 is NULL
   #get subset of data, add facet info
