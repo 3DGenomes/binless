@@ -179,6 +179,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     std::clock_t c_start,c_end;
     double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
     double lam1=0;
+    bool converged = true;
     //perf iteration for this set of values
     int nwarm = (int)(nouter/10.+1);
     List ret = wgfl_diff_perf_warm(cts, ref, dispersion, nwarm, nbins, ntrails,
@@ -193,8 +194,10 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
         ret = wgfl_diff_perf_warm(cts, ref, dispersion, nouter, nbins, ntrails,
                                   trails_i, breakpoints_i, lam1, lam2,
                                   alpha, inflate, ninner, tol_val/20., diag_rm, phi_ref_i, beta_i);
-        if (as<int>(ret["nouter"])>nouter) Rcout <<
-                    " warning: cold start did not converge" <<std::endl;
+        if (as<int>(ret["nouter"])>nouter) {
+          //Rcout << " warning: cold start did not converge" <<std::endl;
+          converged = false;
+        }
         c_cts += as<double>(ret["c_cts"]);
         c_gfl += as<double>(ret["c_gfl"]);
     }
@@ -277,7 +280,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                         _["alpha"]=ret["alpha"], _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC,
                         _["mat"]=finalmat, _["lambda1"]=lam1, _["eCprime"]=0,
                         _["c_cts"]=c_cts, _["c_gfl"]=c_gfl, _["c_opt"]=c_opt, _["c_init"]=c_init,
-                        _["c_brent"]=c_brent, _["c_refine"]=c_refine);
+                        _["c_brent"]=c_brent, _["c_refine"]=c_refine, _["converged"]=converged);
 }
 
 
