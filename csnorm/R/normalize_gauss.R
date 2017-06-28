@@ -711,8 +711,8 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
   return(cs)
 }
 
-#' Single-cpu simplified fitting for exposures and dispersion
-#' @keywords internal
+#' Check whether a normalization has converged
+#' @export
 #' 
 has_converged = function(cs, laststep=NULL) {
   params=cs@diagnostics$params
