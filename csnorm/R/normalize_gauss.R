@@ -668,7 +668,7 @@ csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
+csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.threshold=T) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   diag.rm = ceiling(cs@settings$dmin/cs@settings$base.res)
@@ -692,7 +692,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
              settings=list(diag.rm=diag.rm, nbins=nbins, dispersion=cs@par$alpha, tol.val=cs@settings$tol.leg,
                            inflate=2, nperf=500, opt.every=10, maxsteps=100000))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
-    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose)
+    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose, signif.threshold=signif.threshold)
   }
   #compute matrix at new params
   mat = rbindlist(params[,mat])
@@ -713,8 +713,8 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=ncores) {
   return(cs)
 }
 
-#' Single-cpu simplified fitting for exposures and dispersion
-#' @keywords internal
+#' Check whether a normalization has converged
+#' @export
 #' 
 has_converged = function(cs, laststep=NULL) {
   params=cs@diagnostics$params
@@ -738,13 +738,8 @@ has_converged = function(cs, laststep=NULL) {
   conv.ldiag = getdiff("lambda_diag",fn=log10)
   conv.liota = getdiff("lambda_iota",fn=log10)
   conv.lrho = getdiff("lambda_rho",fn=log10)
-  if(is.null(params$lambda1)) {
-    conv.l1 = 0
-    conv.l2 = 0
-  } else {
-    conv.l1 = getdiff("lambda1",fn=log10)
-    conv.l2 = getdiff("lambda2",fn=log10)
-  }
+  conv.l1 = getdiff("lambda1",fn=function(x){y=x;y[x>0]=log10(y[x>0]);y})
+  conv.l2 = getdiff("lambda2",fn=log10)
   conv.param = all(c(conv.eC,conv.alpha,conv.ldiag,conv.liota,conv.lrho,conv.l1,conv.l2)<cs@settings$tol.obj)
   return(conv.obj | conv.param)
 }
@@ -905,6 +900,7 @@ plot_diagnostics = function(cs, start=1) {
 #' @param tol.obj positive numeric (default 1e-1). Convergence tolerance on changes in the four likelihoods.
 #' @param tol.leg positive numeric (default 1e-5). Convergence tolerance on changes in the likelihood within each leg.
 #' @param ncores positive integer (default 1). Number of cores to use.
+#' @param signif.threshold whether to compute the significant signal (default TRUE) or to avoid soft-thresholding
 #'   
 #' @return A csnorm object
 #' @export
@@ -914,7 +910,7 @@ plot_diagnostics = function(cs, start=1) {
 run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
                      ngibbs = 20, iter=1000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
                      verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
-                     tol.obj=1e-2, tol.leg=1e-4, ncores=1) {
+                     tol.obj=1e-2, tol.leg=1e-4, ncores=1, signif.threshold=T) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -930,7 +926,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     cs@settings = c(cs@settings[c("circularize","dmin","dmax")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
                          iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj,
-                         tol.leg=tol.leg))
+                         tol.leg=tol.leg, signif.threshold=signif.threshold))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
     stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
@@ -997,7 +993,8 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     #fit signal using sparse fused lasso
     if (fit.signal==T & i > 1) {
       update.exposures=F
-      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=fit.decay, ncores=ncores))
+      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=fit.decay,
+                                                       ncores=ncores, signif.threshold=cs@settings$signif.threshold))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
       if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
     }

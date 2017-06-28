@@ -232,7 +232,11 @@ setMethod("show",signature="CSnorm",definition=function(object) {
   } else {
     cat(" Normalized dataset\n")
     cat("  lambda_iota: ",object@par$lambda_iota, "\n  lambda_rho: ",object@par$lambda_rho, "\n  lambda_diag: ",object@par$lambda_diag,"\n")
-    cat("  dispersion: ",object@par$alpha,"\n log likelihood: ", object@par$value, "\n")
+    cat("  dispersion: ",object@par$alpha,"\n  log likelihood: ", object@par$value, "\n")
+    if (cs@diagnostics$params[,.N]>0) {
+      if (has_converged(cs)==T) cat("  Normalization has converged\n") else  cat("  WARNING: Normalization did not converge!\n")
+    }
+    #
     ngroups=length(object@groups)
     if (ngroups==0) {
       cat(" No groupings available")

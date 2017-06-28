@@ -42,4 +42,31 @@ flag:
   81  = 1 + 16 + 64  = "paired-end + this is rev + read1"
   161 = 1 + 32 + 128 = "paired-end + next is rev + read2"
 
+strand:
+  "D00733:206:CB0CFANXX:1:1215:18796:3007 is -> <-"
+  "D00733:206:CB0CFANXX:2:2311:17438:73274 is -> <-"
+  "D00733:209:CB0CBANXX:1:2111:15749:87306 is -> <- (in BAM, read1 > read2)"
+  "D00733:209:CB0CBANXX:2:2205:15446:26245 is -> <-"
+
+tsv file:
+"
+D00733:206:CB0CFANXX:1:1215:18796:3007  chr2    199002287       0       75      199002086       199002357       chr2    199002567       0       75      199002357     199003072
+D00733:206:CB0CFANXX:2:2311:17438:73274 chr2    199002287       0       75      199002086       199002357       chr2    199002731       0       75      199002357     199003072
+D00733:209:CB0CBANXX:1:2111:15749:87306 chr2    199003073       1       54      199003072       199003126       chr2    199003188       1       75      199003126     199003655
+D00733:209:CB0CBANXX:2:2205:15446:26245 chr2    199003073       0       61      199003072       199003126       chr2    199003193       0       75      199003126     199003655
+"
+  
+"
+In D00733:206:CB0CFANXX:1:1215:18796:3007:
+ - strand1 should be 1 because bit 16 of flag (97) is 0, indicating fwd
+
+In D00733:206:CB0CFANXX:2:2311:17438:73274:
+ - strand1 should be 1 because bit 16 of flag (97) is 0, indicating fwd
+
+In D00733:209:CB0CBANXX:1:2111:15749:87306:
+ - strand2 should be 0 because bit 16 of flag (81) is 1, indicating rev
+
+In D00733:209:CB0CBANXX:2:2205:15446:26245:
+ - strand1 should be 1 because bit 16 of flag (97) is 0, indicating fwd
+"
 
