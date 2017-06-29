@@ -15,10 +15,10 @@ obj_lambda1_eCprime::obj_lambda1_eCprime(double minval, double maxval,
         double tol_val,
         bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
         NumericVector value, NumericVector weight, NumericVector valuehat,
-        NumericVector ncounts) : minval_(minval), valrange_(maxval-minval),
+        NumericVector ncounts, double lambda2) : minval_(minval), valrange_(maxval-minval),
     tol_val_(tol_val), lsnc_(log(sum(ncounts))), constrained_(constrained),
     patchno_(patchno), forbidden_vals_(forbidden_vals),
-    value_(value), weight_(weight), valuehat_(valuehat) {}
+    value_(value), weight_(weight), valuehat_(valuehat), lambda2_(lambda2) {}
 
 double obj_lambda1_eCprime::operator()(double val) const {
     //return get(val, "opt")["BIC"];
@@ -97,8 +97,8 @@ NumericVector obj_lambda1_eCprime::get(double val, std::string msg) const {
     //check if solution is feasible
     if (constrained_) {
         if ( is_true(any( (forbidden_vals_>UB+tol_val_/2) | (forbidden_vals_<LB-tol_val_/2) )) ) {
-            if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda1= " << lambda1 << " eCprime= " << eCprime
-                                    << " BIC= Inf dof= NA" << std::endl;
+            if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda2= " << lambda2_ << " lambda1= " << lambda1
+              << " eCprime= " << eCprime << " BIC= Inf dof= NA" << std::endl;
             return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
                                          _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na(),
                                          _["UB"]=UB, _["LB"]=LB);
@@ -111,8 +111,8 @@ NumericVector obj_lambda1_eCprime::get(double val, std::string msg) const {
     const int dof = unique(selected).size();
     const double BIC = sum(weight_ * SQUARE(valuehat_ - (soft + eCprime))) +
                        lsnc_*dof;
-    if (!msg.empty()) Rcout << " OBJ " << msg << " ok lambda1= " << lambda1 << " eCprime= " << eCprime
-                            << " BIC= " << BIC  << " dof= " << dof 
+    if (!msg.empty()) Rcout << " OBJ " << msg << " ok lambda2= " << lambda2_ << " lambda1= " << lambda1
+                            << " eCprime= " << eCprime << " BIC= " << BIC  << " dof= " << dof 
                             << " UB= " << UB  << " LB= " << LB << std::endl;
     return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
                                  _["BIC"]=BIC, _["dof"]=dof, _["UB"]=UB, _["LB"]=LB);
@@ -120,7 +120,7 @@ NumericVector obj_lambda1_eCprime::get(double val, std::string msg) const {
 
 NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
         double tol_val, bool constrained,
-        double lambda1_min, int refine_num) {
+        double lambda1_min, int refine_num, double lambda2) {
     //extract vectors
     double lmin = std::max(lambda1_min,tol_val/2);
     std::clock_t c_start = std::clock();
@@ -145,7 +145,7 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     //create functor
     obj_lambda1_eCprime obj(minval, maxval, tol_val, constrained, patchno,
                             forbidden_vals,
-                            beta, weight, phihat, ncounts);
+                            beta, weight, phihat, ncounts, lambda2);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     //loop over patch values
     std::clock_t c_in1 = std::clock();

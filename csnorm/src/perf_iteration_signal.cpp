@@ -226,7 +226,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts,
                                              _["beta"]=beta_r,
                                              _["value"]=beta_r);
         NumericVector opt = cpp_optimize_lambda1_eCprime(newmat, nbins, converge*20,
-                            constrained, lambda1_min, refine_num);
+                            constrained, lambda1_min, refine_num, lam2);
         lam1 = opt["lambda1"];
         eCprime = opt["eCprime"];
         c_end = std::clock();
@@ -324,7 +324,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                                    refine_num);
     } else {
         opt = cpp_optimize_lambda1_eCprime(newmat, nbins, tol_val, constrained,
-                                           lambda1_min, refine_num);
+                                           lambda1_min, refine_num, lam2);
     }
     lam1 = opt["lambda1"];
     eCprime = opt["eCprime"];
