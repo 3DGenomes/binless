@@ -105,15 +105,24 @@ gfl_BIC_fixed = function(csig, lambda1, lambda2, eCprime) {
   tol.val=csig@settings$tol.val
   state=csig@state
   stopifnot(length(state)>0) #warm start only
-  stopifnot(class(csig)=="CSbsig")
+  if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
   inflate=csig@settings$inflate
   nperf=csig@settings$nperf
   opt.every=csig@settings$opt.every
   maxsteps=csig@settings$maxsteps
-  perf.c = csnorm:::wgfl_signal_BIC_fixed(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                      trails$breakpoints, lambda1, lambda2, eCprime,
-                                      state$alpha, inflate, maxsteps, tol.val, diag.rm,
-                                      state$beta)
+  if (is.null(ctsg.ref)) {
+    perf.c = csnorm:::wgfl_signal_BIC_fixed(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                                            trails$breakpoints, lambda1, lambda2, eCprime,
+                                            state$alpha, inflate, maxsteps, tol.val, diag.rm,
+                                            state$beta)
+  } else {
+    stopifnot(eCprime==0)
+    perf.c = csnorm:::wgfl_diff_BIC_fixed(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                                    trails$breakpoints, lambda1, lambda2,
+                                    state$alpha, inflate, maxsteps, tol.val, diag.rm,
+                                    state$phi.ref, state$beta)
+    
+  }
   return(perf.c)
 }
 
@@ -126,7 +135,6 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.thr
     } else {
       a = csnorm:::gfl_BIC_fixed(csig, 0, lambda2=10^(x), 0)
       if (positive==T) {
-        stopifnot(fixed==F)
         a$eCprime=min(a$beta)
         a$phi=a$beta-min(a$beta)
         a$mat$phi=a$phi
@@ -184,6 +192,7 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.thr
   }
   obj(log10(lambda2))
   retvals = as.list(csig@state)[c("lambda2","lambda1","eCprime","BIC","dof")]
+  if (fixed==T && abs(retvals$eCprime)>csig@settings$tol.val) cat("Warning: fixed = T but eCprime != 0\n") #only when signif.threshold==T
   csig@par=modifyList(csig@par,retvals)
   return(csig)
 }

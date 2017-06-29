@@ -284,6 +284,97 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
 }
 
 
+List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double dispersion,
+                   int nouter, int nbins,
+                   int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
+                   double lam1, double lam2, double alpha, double inflate, int ninner, double tol_val,
+                   int diag_rm, NumericVector phi_ref_i,  NumericVector beta_i) {
+    std::clock_t c_start,c_end;
+    double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
+    bool converged = true;
+    //perf iteration for this set of values
+    int nwarm = (int)(nouter/10.+1);
+    List ret = wgfl_diff_perf_warm(cts, ref, dispersion, nwarm, nbins, ntrails,
+                                   trails_i, breakpoints_i, 0, lam2,
+                                   alpha, inflate, ninner, tol_val/20., diag_rm, phi_ref_i, beta_i);
+    c_cts += as<double>(ret["c_cts"]);
+    c_gfl += as<double>(ret["c_gfl"]);
+    //redo iteration if warm start did not work
+    if (as<int>(ret["nouter"])>nwarm) {
+        beta_i = NumericVector(beta_i.size(),0);
+        //Rcout << " warning: warm start failed " << std::endl;
+        ret = wgfl_diff_perf_warm(cts, ref, dispersion, nouter, nbins, ntrails,
+                                  trails_i, breakpoints_i, 0, lam2,
+                                  alpha, inflate, ninner, tol_val/20., diag_rm, phi_ref_i, beta_i);
+        if (as<int>(ret["nouter"])>nouter) {
+          //Rcout << " warning: cold start did not converge" <<std::endl;
+          converged = false;
+        }
+        c_cts += as<double>(ret["c_cts"]);
+        c_gfl += as<double>(ret["c_gfl"]);
+    }
+
+    //soft-threshold it at the selected parameters
+    std::vector<double> beta_r = as<std::vector<double> >(ret["beta"]);
+    std::vector<double> delta_r = soft_threshold(beta_r, 0, lam1);
+
+    //compute phi_ref
+    DataFrame mat = as<DataFrame>(ret["mat"]);
+    std::vector<double> phihat_ref_r = Rcpp::as<std::vector<double> >
+                                       (mat["phihat.ref"]);
+    std::vector<double> phihat_var_ref_r = Rcpp::as<std::vector<double> >
+                                           (mat["phihat.var.ref"]);
+    std::vector<double> phihat_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
+    std::vector<double> phihat_var_r = Rcpp::as<std::vector<double> >
+                                       (mat["phihat.var"]);
+    std::vector<double> phi_ref_r = compute_phi_ref(delta_r, phihat_r, phihat_var_r,
+                                    phihat_ref_r, phihat_var_ref_r);
+
+    //identify patches
+    DataFrame submat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                         _["bin2"]=mat["bin2"],
+                                         _["valuehat"]=mat["deltahat"],
+                                         _["ncounts"]=mat["ncounts"],
+                                         _["weight"]=mat["weight"],
+                                         _["value"]=delta_r);
+    List patches = boost_build_patch_graph_components(nbins, submat, tol_val);
+
+    //count the positive ones and deduce dof
+    NumericVector delta = wrap(delta_r);
+    IntegerVector patchno = patches["membership"];
+    IntegerVector selected = patchno[abs(delta)>tol_val/2];
+    const int dof = unique(selected).size();
+
+    //compute BIC
+    NumericVector weight = mat["weight"];
+    NumericVector deltahat = mat["deltahat"];
+    NumericVector phihat_ref = mat["phihat.ref"];
+    NumericVector phi_ref = wrap(phi_ref_r);
+    NumericVector phihat_var_ref = mat["phihat.var.ref"];
+    NumericVector ncounts = mat["ncounts"];
+    const double BIC = sum(weight * SQUARE(deltahat - delta) + SQUARE(
+                               phihat_ref - phi_ref)/phihat_var_ref) + log(sum(ncounts))*dof;
+
+    DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                           _["bin2"]=mat["bin2"],
+                                           _["deltahat"]=mat["deltahat"],
+                                           _["weight"]=mat["weight"],
+                                           _["phihat.ref"]=mat["phihat.ref"],
+                                           _["phihat.var.ref"]=mat["phihat.var.ref"],
+                                           _["ncounts"]=mat["ncounts"],
+                                           _["diag.idx"]=mat["diag.idx"],
+                                           _["beta"]=beta_r,
+                                           _["delta"]=delta,
+                                           _["phi.ref"]=phi_ref,
+                                           _["patchno"]=patchno);
+    return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi.ref"]=phi_ref,
+                        _["delta"]=delta, _["beta"]=beta_r,
+                        _["alpha"]=ret["alpha"], _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC,
+                        _["mat"]=finalmat, _["lambda1"]=lam1, _["eCprime"]=0,
+                        _["c_cts"]=c_cts, _["c_gfl"]=c_gfl, _["converged"]=converged);
+}
+
+
 
 
 

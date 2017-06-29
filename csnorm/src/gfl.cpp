@@ -27,7 +27,8 @@ RCPP_MODULE(gfl) {
     function("wgfl_diff_perf_warm", &wgfl_diff_perf_warm,
              "documentation for wgfl_diff_perf_warm ");
     function("wgfl_diff_BIC", &wgfl_diff_BIC, "documentation for wgfl_diff_BIC ");
-
+    function("wgfl_diff_BIC_fixed", &wgfl_diff_BIC_fixed, "documentation for wgfl_diff_BIC_fixed ");
+    
     function("boost_triangle_grid_chain", &boost_triangle_grid_chain,
              "documentation for boost_triangle_grid_chain ");
     function("boost_chains_to_trails", &boost_chains_to_trails,
