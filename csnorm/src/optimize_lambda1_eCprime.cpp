@@ -11,22 +11,22 @@ using namespace Rcpp;
 #include "graph_trails.hpp" //boost_build_patch_graph_components
 #include <boost/math/tools/minima.hpp> //brent_find_minima
 
-obj_lambda1_eCprime::obj_lambda1_eCprime(double minval, double maxval,
+obj_lambda1_eCprime_BIC::obj_lambda1_eCprime_BIC(double minval, double maxval,
         double tol_val,
         bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
         NumericVector value, NumericVector weight, NumericVector valuehat,
         NumericVector ncounts, double lambda2) : minval_(minval), valrange_(maxval-minval),
-    tol_val_(tol_val), lsnc_(log(sum(ncounts))), constrained_(constrained),
+    tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2), constrained_(constrained),
     patchno_(patchno), forbidden_vals_(forbidden_vals),
-    value_(value), weight_(weight), valuehat_(valuehat), lambda2_(lambda2) {}
+    value_(value), weight_(weight), valuehat_(valuehat) {}
 
-double obj_lambda1_eCprime::operator()(double val) const {
+double obj_lambda1_eCprime_BIC::operator()(double val) const {
     //return get(val, "opt")["BIC"];
     return get(val)["BIC"];
 }
 
 //take val as a starting point for optimization of UB and LB at constant dof
-NumericVector obj_lambda1_eCprime::get(double val, std::string msg) const {
+NumericVector obj_lambda1_eCprime_BIC::get(double val, std::string msg) const {
     //split data in two groups
     LogicalVector grp1 = value_ <= val;
     double b1,b2, xk, xkp1;
@@ -120,7 +120,7 @@ NumericVector obj_lambda1_eCprime::get(double val, std::string msg) const {
 
 NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
         double tol_val, bool constrained,
-        double lambda1_min, int refine_num, double lambda2) {
+        double lambda1_min, int refine_num, double lambda2, NumericVector beta_cv) {
     //extract vectors
     double lmin = std::max(lambda1_min,tol_val/2);
     std::clock_t c_start = std::clock();
@@ -143,9 +143,12 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
         lmin = std::max(lmin, (max(forbidden_vals)-minval)/2);
     }
     //create functor
-    obj_lambda1_eCprime obj(minval, maxval, tol_val, constrained, patchno,
+    obj_lambda1_eCprime_BIC obj(minval, maxval, tol_val, constrained, patchno,
                             forbidden_vals,
                             beta, weight, phihat, ncounts, lambda2);
+    /*obj_lambda1_eCprime_CV obj(minval, maxval, tol_val, constrained, patchno,
+                                forbidden_vals,
+                                beta, weight, phihat, ncounts, lambda2, beta_cv);*/
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     //loop over patch values
     std::clock_t c_in1 = std::clock();
