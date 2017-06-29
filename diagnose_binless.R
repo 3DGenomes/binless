@@ -385,3 +385,59 @@ a[,lik:=V11-prior]
 ggplot(melt(a[,.(dset=V1,resolution=V3,lambda2=V5,lambda1=V7,prior,lik,BIC=V11)],id.vars=c("dset","resolution","lambda2")))+
   geom_line(aes(lambda2,value,colour=variable))+facet_grid(dset~resolution)
 
+
+
+mat=foreach (resolution=c(10000,5000), .combine=rbind) %do% {
+  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+  csg=cs@groups[[idx1]]
+  csi = csnorm:::prepare_signal_estimation(cs, csg, resolution, tol.val)
+  g=cs@experiments[1,name]
+  csig = csi
+  csig@cts = csi@cts[name==g]
+  csig@mat = csi@mat[name==g]
+  csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
+  csig@state = csnorm:::gfl_BIC(csig, lambda2=10, constrained=T, positive=T, fixed=T)
+  mat=as.data.table(csig@state$mat)[,.(resolution=resolution,bin1,bin2,phihat,ncounts,weight,beta,phi,patchno)]
+  mat
+}
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=beta))+facet_wrap(~resolution,scales="free")
+
+mat.5=mat[resolution==5000]
+mat.10=mat[resolution==10000]
+
+resolution=5000
+sbins.5=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
+resolution=10000
+sbins.10=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
+pos=head(sbins.5,n=-1)+5000/2
+bins=unique(data.table(refbin=cut(pos, cs@settings$sbins,
+                                  ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+                       bin=cut(pos, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)))
+stopifnot(bins[,.N]==length(sbins)-1)
+mat.5n=merge(bins,mat.5,by.y="bin1",by.x="refbin",all=T)
+mat.5n=merge(bins,mat.5n,by.y="bin2",by.x="refbin",all=T, suffixes=c("2","1"))
+mat.5n[,c("beta","phi","patchno"):=list( weighted.mean(beta,weight),
+                                                 weighted.mean(phi,weight), min(patchno)), keyby=c("bin1","bin2")]
+mat.5n[!complete.cases(mat.5n),c("phihat","beta","phi"):=list(0,0,0)]
+
+mat.10[,resolution:=as.character(resolution)]
+mat.comp=rbind(mat.10n,mat.10)
+ggplot(mat.comp)+geom_raster(aes(bin1,bin2,fill=beta))+facet_wrap(~resolution,scales="free")
+a=dcast(mat.comp,bin1+bin2~resolution,value.var = c("phihat","ncounts","weight","beta","phi","patchno"))
+a[,all.equal(phihat_10000,phihat_5to10)]
+a[,all.equal(ncounts_10000,ncounts_5to10)]
+a[,all.equal(weight_10000,weight_5to10)]
+
+#BIC at 5k
+mat.5n[,.(sumsq=sum(weight*(phihat-phi)^2),prior=(uniqueN(round(phi,3))-1)*log(sum(ncounts)),dof=uniqueN(round(phi,3))-1,lsnc=log(sum(ncounts)))]
+#BIC at 10k
+mat.10n=mat.5n[,.(resolution="5to10",phihat=weighted.mean(phihat,weight),ncounts=sum(ncounts),weight=sum(weight),
+                  beta=weighted.mean(beta,weight), phi=weighted.mean(phi,weight),patchno=min(patchno)),keyby=c("bin1","bin2")]
+mat.10n[!complete.cases(mat.10n),c("phihat","beta","phi"):=list(0,0,0)]
+mat.10n[,.(sumsq=sum(weight*(phihat-phi)^2),prior=(uniqueN(round(phi,3))-1)*log(sum(ncounts)),dof=uniqueN(round(phi,3))-1,lsnc=log(sum(ncounts)))]
+
+ggplot(rbind(mat.5[,.(bin1,bin2,resolution,phihat,ncounts,weight,beta,phi,patchno)],mat.10n))+geom_raster(aes(bin1,bin2,fill=phi))+facet_wrap(~resolution,scales="free")
+mat.5n[unclass(bin1)==12&unclass(bin2)==13]
+mat.10n[unclass(bin1)==12&unclass(bin2)==13]
+
+
