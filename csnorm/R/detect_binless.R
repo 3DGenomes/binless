@@ -347,7 +347,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   if (verbose==T) cat("  Fused lasso\n")
   groupnames=csi@cts[,unique(name)]
   registerDoParallel(cores=ncores)
-  params = foreach(g=groupnames, .combine=rbind) %dopar% {
+  params = foreach(g=groupnames, .combine=rbind) %do% {
     csig = csi
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
@@ -408,7 +408,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   if (verbose==T) cat("  Fused lasso\n")
   groupnames=csi@cts[,unique(name)]
   registerDoParallel(cores=ncores)
-  params = foreach(g=groupnames, .combine=rbind) %dopar% {
+  params = foreach(g=groupnames, .combine=rbind) %do% {
     csig = csi
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
