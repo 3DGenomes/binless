@@ -102,15 +102,6 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
     List cl = boost_build_patch_graph_components(nbins, mat, tol_val);
     IntegerVector patchno = cl["membership"];
     NumericVector patchvals = get_patch_values(beta, patchno);
-    //treat border case, assuming constraint is on
-    if (as<double>(cl["no"]) == 1) {
-        /*Rcout << " OBJ final ok lambda1= " << max(abs(patchvals))
-                << " eCprime= 0 BIC= " << sum(weight * SQUARE(phihat)) << " dof= 0" << std::endl;*/
-        return NumericVector::create(_["eCprime"]=0,
-                                     _["lambda1"]=max(abs(patchvals)), _["dof"]=0,
-                                     _["BIC"]=sum(weight * SQUARE(phihat)),
-                                     _["c_init"]=-1, _["c_brent"]=-1, _["c_refine"]=-1);
-    }
     double minval = patchvals(0);
     double maxval = patchvals(patchvals.size()-1);
     double lmax = std::max(std::abs(maxval),std::abs(minval));

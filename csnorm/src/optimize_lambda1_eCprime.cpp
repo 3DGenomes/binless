@@ -133,15 +133,6 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     List cl = boost_build_patch_graph_components(nbins, mat, tol_val);
     IntegerVector patchno = cl["membership"];
     NumericVector patchvals = get_patch_values(beta, patchno);
-    //treat border case
-    if (as<double>(cl["no"]) == 1) {
-        /*Rcout << " OBJ final ok lambda1= " << lmin << " eCprime= " << patchvals(0)
-                << " BIC= " << sum(weight * SQUARE(phihat)) << " dof= 0" << std::endl;*/
-        return NumericVector::create(_["eCprime"]=min(patchvals)+tol_val/2, _["lambda1"]=lmin,
-                                     _["dof"]=0,
-                                     _["BIC"]=sum(weight * SQUARE(phihat)),
-                                     _["c_init"]=-1, _["c_brent"]=-1, _["c_refine"]=-1);
-    }
     double minval = patchvals(0);
     double maxval = patchvals(patchvals.size()-1);
     //if constraint is on, decay and signal must adjust so that
