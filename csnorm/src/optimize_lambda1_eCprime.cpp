@@ -120,7 +120,7 @@ NumericVector obj_lambda1_eCprime_BIC::get(double val, std::string msg) const {
 
 NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
         double tol_val, bool constrained,
-        double lambda1_min, int refine_num, double lambda2, NumericVector beta_cv) {
+        double lambda1_min, int refine_num, double lambda2) {
     //extract vectors
     double lmin = std::max(lambda1_min,tol_val/2);
     std::clock_t c_start = std::clock();
@@ -146,9 +146,10 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     obj_lambda1_eCprime_BIC obj(minval, maxval, tol_val, constrained, patchno,
                             forbidden_vals,
                             beta, weight, phihat, ncounts, lambda2);
-    /*obj_lambda1_eCprime_CV obj(minval, maxval, tol_val, constrained, patchno,
+    /*NumericVector beta_cv = mat["beta_cv"];
+      obj_lambda1_eCprime_CV obj(minval, maxval, tol_val, constrained, patchno,
                                 forbidden_vals,
-                                beta, weight, phihat, ncounts, lambda2, beta_cv);*/
+                                beta_cv, weight, phihat, ncounts, lambda2);*/
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     //loop over patch values
     std::clock_t c_in1 = std::clock();
