@@ -337,3 +337,51 @@ a = foreach (LB=seq(-0.5,0,length.out=100),.combine=rbind) %do% {
   as.data.table(csnorm:::gfl_BIC_fixed(csig,lambda1=(UB-LB)/2,lambda2=2,eCprime=(UB+LB)/2)[c("lambda1","lambda2","eCprime","BIC","dof")])
 }
 ggplot(a)+geom_line(aes(UB-2*lambda1,BIC))
+
+
+for (resolution in c(5000,10000,20000)) {
+  cat("resolution ", resolution, "\n")
+  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+  csg=cs@groups[[idx1]]
+  csi = csnorm:::prepare_signal_estimation(cs, csg, resolution, 1e-4)
+  groupnames=csi@cts[,unique(name)][1:2]
+  registerDoParallel(cores=4)
+  for(g in groupnames) {
+    cat("dataset ",as.character(g),"\n")
+    csig = csi
+    csig@cts = csi@cts[name==g]
+    csig@mat = csi@mat[name==g]
+    csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
+    obj = function(x) {
+        csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed)
+        cat(as.character(g)," grid ", resolution, " lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
+          " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
+      return(csig@state$BIC)
+    }
+    dt.fix = foreach (lam=10^(seq(0,1,length.out=100)),.combine=rbind) %dopar% {obj(log10(lam))}
+  }
+}
+
+for (resolution in c(5000,10000,20000)) {
+  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+  csg=cs@groups[[idx1]]
+  csi = csnorm:::prepare_signal_estimation(cs, csg, resolution, 1e-4)
+  groupnames=csi@cts[,unique(name)][1:2]
+  registerDoParallel(cores=4)
+  for(g in groupnames) {
+    csig = csi
+    csig@cts = csi@cts[name==g]
+    csig@mat = csi@mat[name==g]
+    csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
+    b = csnorm:::gfl_BIC(csig, lambda2=1, constrained=T, positive=T, fixed=T)
+    cat("resolution",resolution,"dataset",as.character(g),"ncounts",sum(b$mat$ncounts),"\n")
+  }
+}
+
+
+a=fread("test.dat")
+a[,prior:=V13*14.68]
+a[,lik:=V11-prior]
+ggplot(melt(a[,.(dset=V1,resolution=V3,lambda2=V5,lambda1=V7,prior,lik,BIC=V11)],id.vars=c("dset","resolution","lambda2")))+
+  geom_line(aes(lambda2,value,colour=variable))+facet_grid(dset~resolution)
+
