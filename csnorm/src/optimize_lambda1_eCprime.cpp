@@ -11,11 +11,10 @@ using namespace Rcpp;
 #include "graph_trails.hpp" //boost_build_patch_graph_components
 #include <boost/math/tools/minima.hpp> //brent_find_minima
 
-obj_lambda1_eCprime_BIC::obj_lambda1_eCprime_BIC(double minval, double maxval,
-        double tol_val,
+obj_lambda1_eCprime_BIC::obj_lambda1_eCprime_BIC(double tol_val,
         bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
         NumericVector value, NumericVector weight, NumericVector valuehat,
-        NumericVector ncounts, double lambda2) : minval_(minval), valrange_(maxval-minval),
+        NumericVector ncounts, double lambda2) :
     tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2), constrained_(constrained),
     patchno_(patchno), forbidden_vals_(forbidden_vals),
     value_(value), weight_(weight), valuehat_(valuehat) {}
@@ -119,11 +118,10 @@ NumericVector obj_lambda1_eCprime_BIC::get(double val, std::string msg) const {
 }
 
 
-obj_lambda1_eCprime_CV::obj_lambda1_eCprime_CV(double minval, double maxval,
-                                                 double tol_val,
+obj_lambda1_eCprime_CV::obj_lambda1_eCprime_CV(double minval, double tol_val,
                                                  bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                                                  NumericVector value, NumericVector weight, NumericVector valuehat,
-                                                 NumericVector ncounts, double lambda2) : minval_(minval), valrange_(maxval-minval),
+                                                 NumericVector ncounts, double lambda2) : minval_(minval),
                                                  tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2), constrained_(constrained),
                                                  patchno_(patchno), forbidden_vals_(forbidden_vals),
                                                  value_(value), weight_(weight), valuehat_(valuehat) {}
@@ -140,7 +138,7 @@ NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
   double b1,b2, xk, xkp1;
   double a,b,UB,LB;
   bool grp1only = is_true(all(grp1)), grp2only = is_true(all(!grp1));
-  double xmin = min(value_), xmax = max(value_);
+  double xmin = minval_, xmax = max(value_); //here, upper bound for LB is not min(beta_cv) but min(beta)
   
   //compute UB and LB
   if ((!grp1only) && (!grp2only)) {//non-degenerate case
@@ -251,11 +249,11 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
         lmin = std::max(lmin, (max(forbidden_vals)-minval)/2);
     }
     //create functor
-    /*obj_lambda1_eCprime_BIC obj(minval, maxval, tol_val, constrained, patchno,
+    /*obj_lambda1_eCprime_BIC obj(tol_val, constrained, patchno,
                             forbidden_vals,
                             beta, weight, phihat, ncounts, lambda2);*/
     NumericVector beta_cv = mat["beta_cv"];
-    obj_lambda1_eCprime_CV obj(minval, maxval, tol_val, constrained, patchno,
+    obj_lambda1_eCprime_CV obj(minval, tol_val, constrained, patchno,
                                forbidden_vals,
                                beta_cv, weight, phihat, ncounts, lambda2);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
