@@ -138,7 +138,7 @@ NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
   double b1,b2, xk, xkp1;
   double a,b,UB,LB;
   bool grp1only = is_true(all(grp1)), grp2only = is_true(all(!grp1));
-  double xmin = minval_, xmax = max(value_); //here, upper bound for LB is not min(beta_cv) but min(beta)
+  double xmin = min(value_), xmax = max(value_); //here, we assume xmin >= minval_
   
   //compute UB and LB
   if ((!grp1only) && (!grp2only)) {//non-degenerate case
@@ -157,11 +157,11 @@ NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
     b = b1 - b2;
     //compute optimal UB and LB
     UB = std::max(std::min(xkp1, a), xk);
-    LB = std::min(b, xmin);
+    LB = std::min(b, minval_);
     
   } else if (grp1only) {//grp2 is empty, UB > xmax
-    NumericVector w1 = weight_[grp1];
-    NumericVector betahat1 = valuehat_[grp1];
+    NumericVector w1 = weight_;
+    NumericVector betahat1 = valuehat_;
     b1 = sum(w1*betahat1)/sum(w1);
     b2 = 0;
     xk = xmax;
@@ -170,8 +170,8 @@ NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
     a = b1 + b2;
     b = b1 - b2;
     //compute optimal UB and LB
-    if (b1 >= (xmin+xmax)/2.) {
-      LB = xmin; //or any value < xmin
+    if (b1 >= (minval_+xmax)/2.) {
+      LB = minval_; //or any value < minval_
       UB = 2*b1 - LB;
     } else {
       UB = xmax; //or any value > xmax
@@ -179,9 +179,9 @@ NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
     }
     
   } else {//grp1 is empty, UB <= xmin
-    NumericVector w2 = weight_[!grp1];
-    NumericVector betahat2 = valuehat_[!grp1];
-    NumericVector x2 = value_[!grp1];
+    NumericVector w2 = weight_;
+    NumericVector betahat2 = valuehat_;
+    NumericVector x2 = value_;
     b1 = 0;
     b2 = sum(w2*(x2-betahat2))/sum(w2);
     xk = -std::numeric_limits<double>::infinity();
@@ -190,9 +190,14 @@ NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
     a = b1 + b2;
     b = b1 - b2;
     //compute optimal UB and LB
-    UB = xmin;
-    if (b2<-tol_val_) Rcout << " warning: b2= " << b2 << " is negative, setting UB=LB" << std::endl;
-    LB = UB - 2*(std::max(b2,0.)+tol_val_);
+    if (b2 >= (xmin-minval_)/2.) {
+      UB = xmin;
+      LB = UB - 2*b2;
+    } else {
+      LB = minval_;
+      if (b2 < -tol_val_) Rcout << " warning: b2= " << b2 << " is negative, setting UB=LB" << std::endl;
+      UB = LB + 2*(std::max(b2,0.)+tol_val_);
+    }
   }
   
   //compute eCprime, lambda1
