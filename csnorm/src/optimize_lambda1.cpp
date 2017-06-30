@@ -11,21 +11,20 @@ using namespace Rcpp;
 #include "graph_trails.hpp" //boost_build_patch_graph_components
 #include <boost/math/tools/minima.hpp> //brent_find_minima
 
-obj_lambda1::obj_lambda1(double minval, double maxval, double tol_val,
+obj_lambda1_BIC::obj_lambda1_BIC(double tol_val,
                          IntegerVector patchno, NumericVector forbidden_vals,
                          NumericVector value, NumericVector weight, NumericVector valuehat,
-                         NumericVector ncounts) : minval_(minval), maxval_(maxval),
-    valrange_(maxval-minval),
+                         NumericVector ncounts) :
     tol_val_(tol_val), lsnc_(log(sum(ncounts))),
     patchno_(patchno), forbidden_vals_(forbidden_vals),
     value_(value), weight_(weight), valuehat_(valuehat) {}
 
-double obj_lambda1::operator()(double x) const {
+double obj_lambda1_BIC::operator()(double x) const {
     //return get(std::pow(10,x), "opt")["BIC"];
     return get(std::pow(10,x))["BIC"];
 }
 
-NumericVector obj_lambda1::get(double lambda1, std::string msg) const {
+NumericVector obj_lambda1_BIC::get(double lambda1, std::string msg) const {
     const bool constrained = true;
     if (constrained) {
         if (is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2))) {
@@ -48,7 +47,7 @@ NumericVector obj_lambda1::get(double lambda1, std::string msg) const {
                                  _["dof"]=dof);
 }
 
-NumericVector refine_minimum(const obj_lambda1& obj, double lam1,
+NumericVector refine_minimum(const obj_lambda1_BIC& obj, double lam1,
                              double lam1_min, int refine_num, NumericVector patchvals, bool positive) {
     //bounds and border case
     NumericVector lambdavals;
@@ -119,7 +118,7 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
     /*Rcout << "lmin= " << lmin << " lmax= " << lmax << " minval= " << minval << " maxval= " << maxval
             << " fv[0]= " << forbidden_vals[0] << " fv[last]= " << forbidden_vals[forbidden_vals.size()-1] << std::endl;*/
     //create functor
-    obj_lambda1 obj(minval, maxval, tol_val, patchno, forbidden_vals,
+    obj_lambda1_BIC obj(tol_val, patchno, forbidden_vals,
                     beta, weight, phihat, ncounts);
     std::clock_t c_in1 = std::clock();
     //treat second border case
