@@ -245,7 +245,6 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     IntegerVector patchno = cl["membership"];
     NumericVector patchvals = get_patch_values(beta, patchno);
     double minval = patchvals(0);
-    double maxval = patchvals(patchvals.size()-1);
     //if constraint is on, decay and signal must adjust so that
     //there is at least one zero signal value per diagonal idx
     NumericVector forbidden_vals;
