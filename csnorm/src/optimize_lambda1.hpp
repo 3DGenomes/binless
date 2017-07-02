@@ -21,9 +21,6 @@ struct obj_lambda1_BIC {
     NumericVector forbidden_vals_, absval_, value_, weight_, valuehat_;
 };
 
-NumericVector refine_minimum(const obj_lambda1_BIC& obj, double lam1,
-                             double lam1_min, int refine_num, NumericVector patchvals, bool positive);
-
 NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
                                    double tol_val, bool positive,
                                    double lambda1_min, int refine_num);

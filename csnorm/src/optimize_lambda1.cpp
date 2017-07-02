@@ -79,7 +79,8 @@ NumericVector obj_lambda1_BIC::get(double val, std::string msg) const {
                               << " eCprime= 0 BIC= Inf dof= NA"
                               << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;
       return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1,
-                                   _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na());
+                                   _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na(),
+                                   _["UB"]=lambda1, _["LB"]=-lambda1);
   }
     std::vector<double> value_r = as<std::vector<double> >(value_);
     NumericVector soft = wrap(soft_threshold(value_r, 0, lambda1));
@@ -90,46 +91,7 @@ NumericVector obj_lambda1_BIC::get(double val, std::string msg) const {
                             << " BIC= " << BIC  << " dof= " << dof
                             << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;
     return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1, _["BIC"]=BIC,
-                                 _["dof"]=dof);
-}
-
-
-NumericVector refine_minimum(const obj_lambda1_BIC& obj, double lam1,
-                             double lam1_min, int refine_num, NumericVector patchvals, bool positive) {
-    //bounds and border case
-    NumericVector lambdavals;
-    if (positive) {
-        lambdavals = patchvals[patchvals>=0];
-    } else {
-        lambdavals = abs(patchvals);
-    }
-    lambdavals = lambdavals[lambdavals>=lam1_min];
-    if (lambdavals.size() == 0) {
-        Rcout << " warning: lambda1 minimum was found in an interior point" << std::endl;
-        //return obj.get(lam1, "refine");
-        return obj.get(lam1);
-    }
-    NumericVector best, val;
-    //evaluate at lower bound, even if there's no patch value
-    //best = obj.get(lam1_min, "refine");
-    best = obj.get(lam1_min);
-    //values < lambda1
-    NumericVector candidates1 = lambdavals[lambdavals<lam1];
-    int nc1 = candidates1.size();
-    for (int i=0; i<std::min(nc1,refine_num); ++i) {
-        //val = obj.get(candidates1[nc1-1-i], "refine");
-        val = obj.get(candidates1[nc1-1-i]);
-        if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
-    }
-    //values >= lambda1
-    NumericVector candidates2 = lambdavals[lambdavals>=lam1];
-    int nc2 = candidates2.size();
-    for (int i=0; i<std::min(nc2,refine_num); ++i) {
-        //val = obj.get(candidates2[i], "refine");
-        val = obj.get(candidates2[i]);
-        if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
-    }
-    return(best);
+                                 _["dof"]=dof, _["UB"]=UB, _["LB"]=-UB);
 }
 
 NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
@@ -147,10 +109,8 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
     //get patch nos and sorted values
     List cl = boost_build_patch_graph_components(nbins, mat, tol_val);
     IntegerVector patchno = cl["membership"];
-    NumericVector patchvals = get_patch_values(beta, patchno);
-    double minval = patchvals(0);
-    double maxval = patchvals(patchvals.size()-1);
-    double lmax = std::max(std::abs(maxval),std::abs(minval));
+    NumericVector patchvals = abs(get_patch_values(beta, patchno));
+    std::sort(patchvals.begin(),patchvals.end());
     //since constraint is on, decay and signal must adjust so that
     //there is at least one zero signal value per diagonal idx
     NumericVector forbidden_vals;
@@ -162,37 +122,25 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
             forbidden_vals = get_constant_diagonal_values(beta, diag_idx, tol_val);
         }
     }
-    /*Rcout << "lmin= " << lmin << " lmax= " << lmax << " minval= " << minval << " maxval= " << maxval
-            << " fv[0]= " << forbidden_vals[0] << " fv[last]= " << forbidden_vals[forbidden_vals.size()-1] << std::endl;*/
     //create functor
     obj_lambda1_BIC obj(lmin, tol_val, patchno, forbidden_vals,
                     beta, weight, phihat, ncounts);
+    //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
+    //loop over patch values
     std::clock_t c_in1 = std::clock();
-    //treat second border case
-    if (lmin>lmax) {
-        //NumericVector retval = obj.get(lmin, "final");
-        NumericVector retval = obj.get(lmin);
-        return NumericVector::create(_["eCprime"]=0, _["lambda1"]=retval["lambda1"],
-                                     _["BIC"]=retval["BIC"], _["dof"]=retval["dof"],
-                                     _["c_init"]=c_in1-c_start, _["c_brent"]=-1, _["c_refine"]=-1);
+    //NumericVector best = obj.get(patchvals(0) - 2*tol_val, "opt"); //query is < xmin
+    NumericVector best = obj.get(0); //query is < xmin
+    for (int i=0; i<patchvals.size(); ++i) {
+      if (patchvals(i) <= max(forbidden_vals)) continue;
+      //NumericVector val = obj.get(patchvals(i) + 2*tol_val, "opt");
+      NumericVector val = obj.get(patchvals(i) + 2*tol_val);
+      if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
     }
-    //grid
-    //for (int i=0; i<1000; ++i) obj.get(0+i/999.*1, "grid");
-    //optimize
-    int bits = -8*std::log10(tol_val)+1;
-    boost::uintmax_t maxiter = 1000;
-    std::pair<double,double> ret = boost::math::tools::brent_find_minima(obj,
-                                   std::log10(lmin), std::log10(lmax), bits, maxiter);
-    //now compute the minimum among the n closest candidates (brent can get stuck in local minima)
     std::clock_t c_in2 = std::clock();
-    double lam1=pow(10,ret.first);
-    //obj.get(lam1,"minimum");
-    NumericVector retval = refine_minimum(obj, lam1, lmin, refine_num, patchvals,
-                                          positive);
-    std::clock_t c_in3 = std::clock();
-    //obj.get(as<double>(retval["lambda1"]),"final");
-    return NumericVector::create(_["eCprime"]=retval["eCprime"],
-                                 _["lambda1"]=retval["lambda1"],
-                                 _["BIC"]=retval["BIC"], _["dof"]=retval["dof"],
-                                 _["c_init"]=c_in1-c_start, _["c_brent"]=c_in2-c_in1, _["c_refine"]=c_in3-c_in2);
+    //finalize
+    //obj.get(as<double>(best["UB"])+2*tol_val,"final");
+    return NumericVector::create(_["eCprime"]=best["eCprime"], _["lambda1"]=best["lambda1"],
+                                 _["UB"]=best["UB"], _["LB"]=best["LB"],
+                                 _["BIC"]=best["BIC"], _["dof"]=best["dof"],
+                                 _["c_init"]=c_in1-c_start, _["c_brent"]=0, _["c_refine"]=c_in2-c_in1);
 }
