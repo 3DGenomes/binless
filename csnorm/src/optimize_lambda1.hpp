@@ -7,7 +7,23 @@ using namespace Rcpp;
 
 //objective functor to find lambda1 assuming eCprime=0, using BIC
 struct obj_lambda1_BIC {
-    obj_lambda1_BIC(double minUB, double tol_val,
+  obj_lambda1_BIC(double minUB, double tol_val,
+                  IntegerVector patchno, NumericVector forbidden_vals,
+                  NumericVector value, NumericVector weight, NumericVector valuehat,
+                  NumericVector ncounts);
+  
+  double operator()(double x) const;
+  
+  NumericVector get(double val, std::string msg = "") const;
+  
+  double minUB_, minabsval_, maxabsval_, tol_val_, lsnc_;
+  IntegerVector patchno_;
+  NumericVector forbidden_vals_, absval_, value_, weight_, valuehat_;
+};
+
+//objective functor to find lambda1 assuming eCprime=0, using CV
+struct obj_lambda1_CV {
+    obj_lambda1_CV(double minUB, double tol_val,
                 IntegerVector patchno, NumericVector forbidden_vals,
                 NumericVector value, NumericVector weight, NumericVector valuehat,
                 NumericVector ncounts);
