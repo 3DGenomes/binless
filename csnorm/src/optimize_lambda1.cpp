@@ -15,7 +15,7 @@ obj_lambda1_BIC::obj_lambda1_BIC(double minUB, double tol_val,
                          IntegerVector patchno, NumericVector forbidden_vals,
                          NumericVector value, NumericVector weight, NumericVector valuehat,
                          NumericVector ncounts) :
-    minUB_(minUB), minabsval_(min(abs(value_))), maxabsval_(max(abs(value_))),
+    minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(max(abs(value))),
     tol_val_(tol_val), lsnc_(log(sum(ncounts))),
     patchno_(patchno), forbidden_vals_(forbidden_vals),
     absval_(abs(value)), value_(value), weight_(weight), valuehat_(valuehat) {}
@@ -27,6 +27,7 @@ double obj_lambda1_BIC::operator()(double x) const {
 
 NumericVector obj_lambda1_BIC::get(double val, std::string msg) const {
   //split data in two groups and determine constraint values
+  //Rcout << "  GET at " << val << " maxabsval_= " << maxabsval_ << std::endl;
   LogicalVector grp1 = value_ > val, grp2 = value_ < -val;
   double xk,xkp1;
   if (val>maxabsval_) {
@@ -39,9 +40,11 @@ NumericVector obj_lambda1_BIC::get(double val, std::string msg) const {
     xk=max(as<NumericVector>(absval_[absval_<=val]));
     xkp1=min(as<NumericVector>(absval_[absval_>val]));
   }
+  //Rcout << "  xk= " << xk << " xkp1= " << xkp1 << std::endl;
   //determine unconstrained UB
   double UB;
   bool grp1empty = is_true(all(!grp1)), grp2empty = is_true(all(!grp2));
+  //Rcout << "  grp1empty= " << grp1empty << " grp2empty= " << grp2empty << std::endl;
   if (grp1empty && grp2empty) {
     //UB larger than any value
     UB=maxabsval_;
@@ -72,6 +75,7 @@ NumericVector obj_lambda1_BIC::get(double val, std::string msg) const {
   //apply constraint
   UB = std::min(std::max(UB,xk),xkp1);
   if (minUB_ <= xkp1) UB=std::max(minUB_,UB);
+  //Rcout << "  UB= " << UB << " minUB= " << minUB_ << std::endl;
   //check if forbidden
   double lambda1=UB;
   if ( is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2)) || (UB < minUB_) ) {
@@ -126,12 +130,16 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
     obj_lambda1_BIC obj(lmin, tol_val, patchno, forbidden_vals,
                     beta, weight, phihat, ncounts);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
+    //get minimum authorized patch value
+    double minpatch = max(abs(forbidden_vals));
+    /*Rcout << "minpatch= " << minpatch << " npatches= " << patchvals.size() << " npatches.ok= "
+            << as<NumericVector>(patchvals[patchvals>=minpatch]).size() << std::endl;*/
     //loop over patch values
     std::clock_t c_in1 = std::clock();
     //NumericVector best = obj.get(patchvals(0) - 2*tol_val, "opt"); //query is < xmin
     NumericVector best = obj.get(0); //query is < xmin
     for (int i=0; i<patchvals.size(); ++i) {
-      if (patchvals(i) <= max(forbidden_vals)) continue;
+      if (patchvals(i) <= minpatch) continue;
       //NumericVector val = obj.get(patchvals(i) + 2*tol_val, "opt");
       NumericVector val = obj.get(patchvals(i) + 2*tol_val);
       if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
