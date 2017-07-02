@@ -4,8 +4,6 @@ using namespace Rcpp;
 #include "perf_iteration_signal.hpp"
 #include "perf_iteration_diff.hpp"
 #include "graph_trails.hpp"
-#include "optimize_lambda1_eCprime.hpp"
-#include "optimize_lambda1.hpp"
 
 RCPP_MODULE(gfl) {
     using namespace Rcpp ;
@@ -36,11 +34,5 @@ RCPP_MODULE(gfl) {
     function("boost_build_patch_graph_components",
              &boost_build_patch_graph_components,
              "documentation for boost_build_patch_graph_components ");
-
-    function("cpp_optimize_lambda1_eCprime", &cpp_optimize_lambda1_eCprime,
-             "documentation for cpp_optimize_lambda1_eCprime");
-
-    function("cpp_optimize_lambda1", &cpp_optimize_lambda1,
-             "documentation for cpp_optimize_lambda1");
 }
 
