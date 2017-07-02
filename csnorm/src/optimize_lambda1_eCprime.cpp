@@ -251,8 +251,7 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     //there is at least one zero signal value per diagonal idx
     NumericVector forbidden_vals;
     if (constrained) {
-      //forbidden_vals = get_minimum_diagonal_values(beta, diag_idx);
-      forbidden_vals = get_minimum_diagonal_values(beta_cv, diag_idx);
+      forbidden_vals = get_minimum_diagonal_values(beta, diag_idx);
       lmin = std::max(lmin, (max(forbidden_vals)-minval)/2);
     }
     //create functor
