@@ -161,6 +161,53 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
                         _["eCprime"]=eCprime, _["lambda1"]=lam1, _["c_cts"]=c_cts, _["c_gfl"]=c_gfl);
 }
 
+List wgfl_signal_cv(const DataFrame mat, int nbins,
+                    int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
+                    double lam2, double alpha, double inflate, int ninner, double converge, NumericVector beta_i) {
+    const int N = nbins*(nbins+1)/2; //size of fused lasso problem
+    std::vector<int> trails_r = as<std::vector<int> >(trails_i);
+    std::vector<int> breakpoints_r = as<std::vector<int> >(breakpoints_i);
+    std::vector<double> beta_r = as<std::vector<double> >(beta_i);
+    std::vector<double> phihat_r = as<std::vector<double> >(mat["phihat"]);
+    std::vector<double> weight_r = as<std::vector<double> >(mat["weight"]);
+    IntegerVector bin1 = as<IntegerVector>(mat["bin1"]);
+    IntegerVector bin2 = as<IntegerVector>(mat["bin2"]);
+    
+    std::vector<double> u_r(trails_r.size(),0); //residuals set to zero
+    std::vector<double> z_r;
+    z_r.reserve(trails_r.size());
+    for (int i=0; i<trails_r.size(); ++i) {
+        z_r.push_back(beta_r[trails_r[i]]);   //z set to beta values along trails
+    }
+    
+    //build cv groups
+    std::vector<int> cvgroup;
+    const int ngroups=2;
+    for (int i=0; i<N; ++i)
+      cvgroup.push_back( (bin2[i]+bin1[i]*nbins) % ngroups ); // 2 cv groups in checkerboard pattern
+    
+    //Compute fused lasso solutions on each group and report to beta_cv
+    int res=0;
+    std::vector<double> beta_cv(N, -100);
+    for (int g=0; g<ngroups; ++g) {
+      //prepare weights for group g and copy initial values
+      std::vector<double> w_r;
+      for (int i=0; i<N; ++i) w_r.push_back(cvgroup[i]==g ? 0 : weight_r[i]);
+      std::vector<double> values(beta_r);
+      //compute fused lasso solution
+      res += graph_fused_lasso_weight_warm (N, &phihat_r[0], &w_r[0], ntrails,
+                                              &trails_r[0], &breakpoints_r[0],
+                                              lam2, &alpha, inflate, ninner, converge,
+                                              &values[0], &z_r[0], &u_r[0]);
+      //store fused solution at group positions back in beta_cv
+      for (int i=0; i<N; ++i) if (cvgroup[i]==g) beta_cv[i] = values[i];
+    }
+    
+    return List::create(_["beta_cv"]=wrap(beta_cv), _["cv.group"]=wrap(cvgroup),
+                        _["ninner"]=wrap(res));
+}
+
+
 List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts,
         double dispersion, int nouter, int opt_every,
         int nbins, int ntrails, const NumericVector trails_i,
@@ -226,7 +273,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts,
                                              _["beta"]=beta_r,
                                              _["value"]=beta_r);
         NumericVector opt = cpp_optimize_lambda1_eCprime(newmat, nbins, converge*20,
-                            constrained, lambda1_min, refine_num);
+                            constrained, lambda1_min, refine_num, lam2);
         lam1 = opt["lambda1"];
         eCprime = opt["eCprime"];
         c_end = std::clock();
@@ -304,10 +351,15 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
         c_cts += as<double>(ret["c_cts"]);
         c_gfl += as<double>(ret["c_gfl"]);
     }
-
+    
+    //compute CV datasets at optimized weights
+    DataFrame mat = as<DataFrame>(ret["mat"]);
+    List cv_run = wgfl_signal_cv(mat, nbins, ntrails, trails_i, breakpoints_i, lam2,
+                                 alpha, inflate, ninner, tol_val/20., beta_i);
+    NumericVector beta_cv = cv_run["beta_cv"];
+      
     //optimize lambda1 and eC
     c_start = std::clock();
-    DataFrame mat = as<DataFrame>(ret["mat"]);
     DataFrame newmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                          _["bin2"]=mat["bin2"],
                                          _["phihat"]=mat["phihat"],
@@ -315,6 +367,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                                          _["diag.idx"]=mat["diag.idx"],
                                          _["weight"]=mat["weight"],
                                          _["beta"]=ret["beta"],
+                                         _["beta_cv"]=beta_cv,
                                          _["value"]=ret["beta"]);
     NumericVector opt;
     if (fixed) { // is eCprime fixed to 0?
@@ -324,7 +377,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                                    refine_num);
     } else {
         opt = cpp_optimize_lambda1_eCprime(newmat, nbins, tol_val, constrained,
-                                           lambda1_min, refine_num);
+                                           lambda1_min, refine_num, lam2);
     }
     lam1 = opt["lambda1"];
     eCprime = opt["eCprime"];
@@ -368,7 +421,9 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                                            _["weight"]=mat["weight"],
                                            _["diag.idx"]=mat["diag.idx"],
                                            _["beta"]=beta_r,
+                                           _["beta_cv"]=beta_cv,
                                            _["phi"]=phi_r,
+                                           _["cv.group"]=cv_run["cv.group"],
                                            _["patchno"]=patchno);
     return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi"]=phi_r,
                         _["beta"]=beta_r, _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
