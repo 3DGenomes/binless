@@ -240,23 +240,25 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     NumericVector beta = mat["beta"];
     NumericVector ncounts = mat["ncounts"];
     IntegerVector diag_idx = mat["diag.idx"];
+    NumericVector beta_cv = mat["beta_cv"];
     //get patch nos and sorted values
     List cl = boost_build_patch_graph_components(nbins, mat, tol_val);
     IntegerVector patchno = cl["membership"];
-    NumericVector patchvals = get_patch_values(beta, patchno);
-    double minval = patchvals(0);
+    //NumericVector patchvals = get_patch_values(beta, patchno);
+    NumericVector patchvals = get_patch_values(beta_cv, patchno);
+    double minval = min(beta);
     //if constraint is on, decay and signal must adjust so that
     //there is at least one zero signal value per diagonal idx
     NumericVector forbidden_vals;
     if (constrained) {
-        forbidden_vals = get_minimum_diagonal_values(beta, diag_idx);
-        lmin = std::max(lmin, (max(forbidden_vals)-minval)/2);
+      //forbidden_vals = get_minimum_diagonal_values(beta, diag_idx);
+      forbidden_vals = get_minimum_diagonal_values(beta_cv, diag_idx);
+      lmin = std::max(lmin, (max(forbidden_vals)-minval)/2);
     }
     //create functor
     /*obj_lambda1_eCprime_BIC obj(tol_val, constrained, patchno,
                             forbidden_vals,
                             beta, weight, phihat, ncounts, lambda2);*/
-    NumericVector beta_cv = mat["beta_cv"];
     obj_lambda1_eCprime_CV obj(minval, tol_val, constrained, patchno,
                                forbidden_vals,
                                beta_cv, weight, phihat, ncounts, lambda2);
