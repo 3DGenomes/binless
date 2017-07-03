@@ -27,7 +27,7 @@ a=examine_dataset("/scratch/rao/mapped/IMR90_MboI_in_situ/IMR90_MboI_HICall_Peak
 #they contain the respective CSdata objects
 
 registerDoParallel(cores=10)
-foreach (chr=c("chrX","chr1","chr1","chr8","chr3","chr4","chr21","chr21","chr5","chr12","chr21","chr22"),
+foreach (chr=c("chrX","chr1","chr1","chr7","chr3","chr4","chr21","chr21","chr5","chr12","chr21","chr22"),
          name=c("Peak1","SELP","Talk","SEMA3C","FOXP1","PARM1","Comparison","ADAMTS1","ADAMTS2","TBX3","Fig1C","22qter"),
          size=c("450k","150k","2M","1M","1.3M","600k","1.7M","2.3M","450k","1.5M","1M","1.7M")) %do% {
            cat(chr,name,size,"\n")
@@ -38,7 +38,7 @@ foreach (chr=c("chrX","chr1","chr1","chr8","chr3","chr4","chr21","chr21","chr5",
            csd=read_and_prepare(paste0("/scratch/rao/mapped/IMR90_MboI_in_situ/IMR90_MboI_HICall_",name,".tsv"),
                                 paste0("data/rao_HiCall_IMR90_",name,"_",size), "IMR90", "1",
                                 enzyme="MboI", name=paste(name,"IMR90 all"), circularize=-1, dangling.L=c(0),
-                                dangling.R=c(3), maxlen=600, read.len=101, dmin=1000, save.data=T)
+                        csd1        dangling.R=c(3), maxlen=600, read.len=101, dmin=1000, save.data=T)
 }
 
 
