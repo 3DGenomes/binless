@@ -307,15 +307,8 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     IntegerVector selected = patchno[abs(delta)>tol_val/2];
     const int dof = unique(selected).size();
 
-    //compute BIC
-    NumericVector weight = mat["weight"];
-    NumericVector deltahat = mat["deltahat"];
-    NumericVector phihat_ref = mat["phihat.ref"];
-    NumericVector phi_ref = wrap(phi_ref_r);
-    NumericVector phihat_var_ref = mat["phihat.var.ref"];
-    NumericVector ncounts = mat["ncounts"];
-    const double BIC = sum(weight * SQUARE(deltahat - delta) + SQUARE(
-                               phihat_ref - phi_ref)/phihat_var_ref) + log(sum(ncounts))*dof;
+    //retrieve BIC from previous computation
+    const double BIC = opt["BIC"];
 
     DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                            _["bin2"]=mat["bin2"],
@@ -327,9 +320,9 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                            _["diag.idx"]=mat["diag.idx"],
                                            _["beta"]=beta_r,
                                            _["delta"]=delta,
-                                           _["phi.ref"]=phi_ref,
+                                           _["phi.ref"]=phi_ref_r,
                                            _["patchno"]=patchno);
-    return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi.ref"]=phi_ref,
+    return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi.ref"]=phi_ref_r,
                         _["delta"]=delta, _["beta"]=beta_r,
                         _["alpha"]=ret["alpha"], _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC,
                         _["mat"]=finalmat, _["lambda1"]=lam1, _["eCprime"]=0,
