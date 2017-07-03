@@ -562,11 +562,12 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "H
 #'
 fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
   #group cut sites
-  fused=biases[,.(id,pos,newid=cumsum(ifelse(shift(pos,type = "lead")-pos>dfuse,1,0)))]
-  lastid=fused[.N-1,newid]+as.integer(fused[,pos[.N]-pos[.N-1]]>dfuse)
-  fused[.N,newid:=lastid]
+  fused=biases[,.(id,pos,prev.pos=pos-shift(pos,type = "lag"),incr.id=ifelse(pos-shift(pos,type = "lag")>dfuse,1,0))]
+  fused[1,incr.id:=1]
+  fused[,newid:=cumsum(incr.id)]
   setkey(fused,id)
   fused[,newpos:=as.integer(mean(pos)),by=newid]
+  fused[,c("prev.pos","incr.id"):=NULL]
   cat(name, ": fused ", fused[,.N]-fused[,uniqueN(newid)], " cut sites (",
       (1-fused[,uniqueN(newid)]/fused[,.N])*100, " %)\n")
   #transfer new IDs
