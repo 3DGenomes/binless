@@ -12,11 +12,9 @@ setwd("/home/yannick/simulations/cs_norm")
 
 #generate 3 plots to determine dangling.L, dangling.R and maxlen respectively (fread warning can be ignored)
 #with this Rao dataset, we can start with dangling.L=0 dangling.R=3 maxlen=900 read.len=101 and dmin=1000
-a=examine_dataset("/scratch/rao/mapped/GM12878_MboI_in_situ/HICall_both_filled_map_chrX_Peak1.tsv",
+a=examine_dataset("/scratch/rao/mapped/GM12878_MboI_in_situ/GM12878_MboI_HICall_Peak1.tsv",
                   skip=0L,nrows=1000000, skip.fbm=T, read.len=101)
-a=examine_dataset("/scratch/rao/mapped/GM12878_MboI_in_situ/HICall_both_filled_map_chr21_ADAMT.tsv",
-                  skip=0L,nrows=1000000, skip.fbm=T, read.len=101)
-a=examine_dataset("/scratch/rao/mapped/IMR90_MboI_in_situ/HICall_IMR90_both_map_chr21_ADAMT.tsv",
+a=examine_dataset("/scratch/rao/mapped/IMR90_MboI_in_situ/IMR90_MboI_HICall_Peak1.tsv",
                   skip=0L,nrows=1000000, skip.fbm=T, read.len=101)
 
 
@@ -28,23 +26,32 @@ a=examine_dataset("/scratch/rao/mapped/IMR90_MboI_in_situ/HICall_IMR90_both_map_
 #two outputs will be created for a given prefix: prefix_csdata.RData and if save.data==T, prefix_csdata_with_data.RData.
 #they contain the respective CSdata objects
 
-foreach (chr=c("chrX","chr1","chr21","chr1","chr8","chr3","chr4","chr21"),
-         name=c("Peak1","SELP","ADAMT","Talk","SEMA3C","FOXP1","PARM1","Comparison"),
-         size=c("450k","150k","2.3M","2M","1M","1.3M","600k","1.7M")) %do% {
-           csd=read_and_prepare(paste0("/scratch/rao/mapped/GM12878_MboI_in_situ/HICall_both_filled_map_",chr,"_",name,".tsv"),
+registerDoParallel(cores=10)
+foreach (chr=c("chrX","chr1","chr1","chr8","chr3","chr4","chr21","chr21","chr5","chr12","chr21","chr22"),
+         name=c("Peak1","SELP","Talk","SEMA3C","FOXP1","PARM1","Comparison","ADAMTS1","ADAMTS2","TBX3","Fig1C","22qter"),
+         size=c("450k","150k","2M","1M","1.3M","600k","1.7M","2.3M","450k","1.5M","1M","1.7M")) %do% {
+           cat(chr,name,size,"\n")
+           csd=read_and_prepare(paste0("/scratch/rao/mapped/GM12878_MboI_in_situ/GM12878_MboI_HICall_",name,".tsv"),
                                 paste0("data/rao_HiCall_GM12878_",name,"_",size), "GM", "1",
-                                enzyme="MboI", circularize=-1, dangling.L=c(0),
+                                enzyme="MboI", name=paste(name,"GM12878 all"), circularize=-1, dangling.L=c(0),
                                 dangling.R=c(3), maxlen=900, read.len=101, dmin=1000, save.data=T)
-           csd=read_and_prepare(paste0("/scratch/rao/mapped/IMR90_MboI_in_situ/HICall_IMR90_both_map_",chr,"_",name,".tsv"),
-                                paste0("data/rao_HiCall_IMR90_",name,"_",size), "IMR90", "1", enzyme="MboI", circularize=-1, dangling.L=c(0),
+           csd=read_and_prepare(paste0("/scratch/rao/mapped/IMR90_MboI_in_situ/IMR90_MboI_HICall_",name,".tsv"),
+                                paste0("data/rao_HiCall_IMR90_",name,"_",size), "IMR90", "1",
+                                enzyme="MboI", name=paste(name,"IMR90 all"), circularize=-1, dangling.L=c(0),
                                 dangling.R=c(3), maxlen=600, read.len=101, dmin=1000, save.data=T)
-         }
+}
 
 
 #here we plot the raw reads. We need to load the full csdata object, as only the one without the raw reads is returned.
-load("data/rao_HiCall_chrX_450k_csdata_with_data.RData")
+load("data/rao_HiCall_GM12878_SEMA3C_1M_csdata_with_data.RData")
 data=get_raw_reads(csd@data, csd@biases[,min(pos)], csd@biases[,max(pos)])
 plot_binned(data, resolution=10000, b1=csd@biases[,min(pos)], e1=csd@biases[,max(pos)])
+plot_raw(data[rbegin2<min(rbegin1)+10000])
+
+load("data/rao_HiCall_IMR90_SEMA3C_1M_csdata_with_data.RData")
+data2=get_raw_reads(csd@data, csd@biases[,min(pos)], csd@biases[,max(pos)])
+plot_binned(data2, resolution=10000, b1=csd@biases[,min(pos)], e1=csd@biases[,max(pos)])
+plot_raw(data2[rbegin2<min(rbegin1)+10000])
 
 
 #The normalization is performed with a fast approximation to the full model
