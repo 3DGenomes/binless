@@ -407,12 +407,8 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
     IntegerVector selected = patchno[abs(phi)>tol_val/2];
     const int dof = unique(selected).size();
 
-    //compute BIC
-    NumericVector weight = submat["weight"];
-    NumericVector phihat = submat["valuehat"];
-    NumericVector ncounts = submat["ncounts"];
-    const double BIC = sum(weight * SQUARE(phihat-(phi + eCprime))) + log(sum(
-                           ncounts))*dof;
+    //retrieve BIC from previous computation
+    const double BIC = opt["BIC"];
 
     DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                            _["bin2"]=mat["bin2"],
@@ -489,7 +485,7 @@ List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter,
     NumericVector ncounts = submat["ncounts"];
     const double BIC = sum(weight * SQUARE(phihat-(phi + eCprime))) + log(sum(
                            ncounts))*dof;
-
+        
     DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                            _["bin2"]=mat["bin2"],
                                            _["phihat"]=mat["phihat"],
