@@ -224,7 +224,8 @@ NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
     //there is at least one zero signal value per diagonal idx
     NumericVector forbidden_vals;
     if (constrained) {
-      forbidden_vals = get_constant_diagonal_values(beta, diag_idx, tol_val);
+      NumericVector abeta=abs(beta);
+      forbidden_vals = get_minimum_diagonal_values(abeta, diag_idx);
     }
     //create functor
     /*obj_lambda1_diff_BIC obj(lmin, tol_val, patchno, forbidden_vals,

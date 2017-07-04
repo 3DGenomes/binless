@@ -212,7 +212,8 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
           forbidden_vals = get_minimum_diagonal_values(beta, diag_idx);
           lmin = std::max(lmin, std::max(std::abs(forbidden_vals(0)), std::abs(forbidden_vals(forbidden_vals.size()-1))));
         } else {
-          forbidden_vals = get_constant_diagonal_values(beta, diag_idx, tol_val);
+          NumericVector abeta=abs(beta);
+          forbidden_vals = get_minimum_diagonal_values(abeta, diag_idx);
         }
     }
     //create functor
