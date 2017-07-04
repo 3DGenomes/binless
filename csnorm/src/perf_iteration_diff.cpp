@@ -323,6 +323,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                            _["ncounts"]=mat["ncounts"],
                                            _["diag.idx"]=mat["diag.idx"],
                                            _["beta"]=beta_r,
+                                           _["beta_cv"]=beta_cv,
                                            _["delta"]=delta,
                                            _["phi.ref"]=phi_ref_r,
                                            _["patchno"]=patchno);
