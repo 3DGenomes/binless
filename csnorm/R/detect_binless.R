@@ -350,7 +350,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   if (verbose==T) cat("  Fused lasso\n")
   groupnames=csi@cts[,unique(name)]
   registerDoParallel(cores=ncores)
-  params = foreach(g=groupnames, .combine=rbind) %do% {
+  params = foreach(g=groupnames, .combine=rbind) %dopar% {
     csig = csi
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
@@ -364,6 +364,8 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #compute matrix at new params
   mat = rbindlist(params[,mat])
   mat[,phi:=value]
+  #report parameters
+  csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],name=params[,name])
   #
   #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()+facet_wrap(~name)
   #ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
@@ -411,7 +413,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   if (verbose==T) cat("  Fused lasso\n")
   groupnames=csi@cts[,unique(name)]
   registerDoParallel(cores=ncores)
-  params = foreach(g=groupnames, .combine=rbind) %do% {
+  params = foreach(g=groupnames, .combine=rbind) %dopar% {
     csig = csi
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
@@ -425,6 +427,8 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #compute matrix at new params
   mat = rbindlist(params[,mat])
   mat[,delta:=value]
+  #report parameters
+  csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],name=params[,name])
   #
   #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()+facet_wrap(~name)
   #ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
