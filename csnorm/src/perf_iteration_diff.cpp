@@ -55,13 +55,15 @@ std::vector<double> compute_phi_ref(const std::vector<double>& delta_r,
     std::vector<double> phi_ref_r;
     phi_ref_r.reserve(N);
     for (int i=0; i<N; ++i) {
+        double val;
         if (phihat_var_ref[i]==INFINITY && phihat_var[i]==INFINITY) {
-            phi_ref_r.push_back((phihat_ref[i]+phihat[i])/2);
+            val=(phihat_ref[i]+phihat[i])/2;
         } else {
-            phi_ref_r.push_back((phihat_ref[i]/phihat_var_ref[i] + (phihat[i]
-                                 -delta_r[i])/phihat_var[i])
-                                /(1/phihat_var_ref[i]+1/phihat_var[i]));
+            val=(phihat_ref[i]/phihat_var_ref[i] + (phihat[i]-delta_r[i])/phihat_var[i])
+                                /(1/phihat_var_ref[i]+1/phihat_var[i]);
         }
+        val = std::max(val,0.);
+        phi_ref_r.push_back(val);
     }
     return phi_ref_r;
 }
@@ -210,8 +212,23 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
           << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
 
+    
+    DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                           _["bin2"]=mat["bin2"],
+                                           _["phihat"]=mat["phihat"],
+                                           _["phihat.var"]=mat["phihat.var"],
+                                           _["phihat.ref"]=mat["phihat.ref"],
+                                           _["phihat.var.ref"]=mat["phihat.var.ref"],
+                                           _["ncounts"]=mat["ncounts"],
+                                           _["deltahat"]=mat["deltahat"],
+                                           _["weight"]=mat["weight"],
+                                           _["diag.idx"]=mat["diag.idx"],
+                                           _["beta"]=beta_r,
+                                           _["delta"]=delta_r,
+                                           _["phi_ref"]=phi_ref_r);
+    
     return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha),
-                        _["phi.ref"]=wrap(phi_ref_r), _["phi"]=wrap(delta_r), _["mat"]=mat,
+                        _["phi.ref"]=wrap(phi_ref_r), _["delta"]=wrap(delta_r), _["mat"]=finalmat,
                         _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res,
                         _["eCprime"]=0, _["lambda1"]=lam1, _["c_cts"]=c_cts, _["c_gfl"]=c_gfl);
 }
