@@ -128,7 +128,7 @@ gfl_BIC_fixed = function(csig, lambda1, lambda2, eCprime) {
 
 #' cross-validate lambda2
 #' @keywords internal
-optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.threshold=T) {
+optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.threshold=T, simplified=T) {
   obj = function(x) {
     if (signif.threshold==T) {
       csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed)
@@ -160,28 +160,30 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.thr
   #first, find rough minimum between 1 and 100
   minlambda=1
   maxlambda=100
-  op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
-  lambda2=10^op$minimum
-  #second, repeated gridding at finer scales
-  range=10
-  npoints=20
-  reduction=3
-  nrounds=3
-  dt=data.table()
-  for (i in 1:nrounds) {
+  if (simplified != T) {
+    op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
+    lambda2=10^op$minimum
+    #second, repeated gridding at finer scales
+    range=10
+    npoints=20
+    reduction=3
+    nrounds=3
+    dt=data.table()
+    for (i in 1:nrounds) {
+      minlambda = max(minlambda,lambda2 - range/2)
+      maxlambda = min(maxlambda,lambda2 + range/2)
+      #cat("round ",i,": min=",minlambda," < lambda2=",lambda2, " < max=",maxlambda," range=",range,"\n")
+      dt = rbind(dt,foreach (lam=log10(seq(minlambda, maxlambda, l=npoints)),
+                     .combine=rbind) %dopar% data.table(x=lam,y=obj(lam),i=paste(i)))
+      lambda2 = dt[y==min(y),10^x]
+      range=range/reduction
+    }
+    #ggplot()+geom_point(aes(10^x,y,colour=i),data=dt)
+    #third, minimize fully around that minimum
     minlambda = max(minlambda,lambda2 - range/2)
     maxlambda = min(maxlambda,lambda2 + range/2)
-    #cat("round ",i,": min=",minlambda," < lambda2=",lambda2, " < max=",maxlambda," range=",range,"\n")
-    dt = rbind(dt,foreach (lam=log10(seq(minlambda, maxlambda, l=npoints)),
-                   .combine=rbind) %dopar% data.table(x=lam,y=obj(lam),i=paste(i)))
-    lambda2 = dt[y==min(y),10^x]
-    range=range/reduction
+    #cat("final round : min=",minlambda," < lambda2=",lambda2, " < max=",maxlambda," range=",range,"\n")
   }
-  #ggplot()+geom_point(aes(10^x,y,colour=i),data=dt)
-  #third, minimize fully around that minimum
-  minlambda = max(minlambda,lambda2 - range/2)
-  maxlambda = min(maxlambda,lambda2 + range/2)
-  #cat("final round : min=",minlambda," < lambda2=",lambda2, " < max=",maxlambda," range=",range,"\n")
   op<-optimize(obj, log10(c(minlambda,maxlambda)))
   lambda2=10^op$minimum
   #finish
@@ -225,7 +227,8 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
 csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, signif.threshold=T) {
-  csig = csnorm:::optimize_lambda2(csig, constrained=constrained, positive=positive, fixed=fixed, signif.threshold=signif.threshold)
+  csig = csnorm:::optimize_lambda2(csig, constrained=constrained, positive=positive, fixed=fixed,
+                                   signif.threshold=signif.threshold, simplified=T)
   csig@par$name=csig@cts[,name[1]]
   #matg=csnorm:::gfl_get_matrix(csig, 0, csig@par$lambda2, 0)
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
