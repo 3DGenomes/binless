@@ -47,27 +47,6 @@ DataFrame cts_to_diff_mat(const DataFrame cts, const DataFrame ref, int nbins,
                              _["weight"]=weight, _["diag.idx"]=didx);
 }
 
-std::vector<double> compute_phi_ref(const std::vector<double>& delta_r,
-                                    const std::vector<double>& phihat,
-                                    const std::vector<double>& phihat_var, const std::vector<double>& phihat_ref,
-                                    const std::vector<double>& phihat_var_ref) {
-    const int N = delta_r.size();
-    std::vector<double> phi_ref_r;
-    phi_ref_r.reserve(N);
-    for (int i=0; i<N; ++i) {
-        double val;
-        if (phihat_var_ref[i]==INFINITY && phihat_var[i]==INFINITY) {
-            val=(phihat_ref[i]+phihat[i])/2;
-        } else {
-            val=(phihat_ref[i]/phihat_var_ref[i] + (phihat[i]-delta_r[i])/phihat_var[i])
-                                /(1/phihat_var_ref[i]+1/phihat_var[i]);
-        }
-        val = std::max(val,0.);
-        phi_ref_r.push_back(val);
-    }
-    return phi_ref_r;
-}
-
 List wgfl_diff_cv(const DataFrame mat, int nbins,
                     int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                     double lam2, double alpha, double inflate, int ninner, double converge, NumericVector beta_i) {
