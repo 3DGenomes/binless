@@ -70,7 +70,7 @@ List wgfl_diff_cv(const DataFrame mat, int nbins,
   std::vector<int> cvgroup;
   const int ngroups=2;
   for (int i=0; i<N; ++i)
-    cvgroup.push_back( (bin2[i]+bin1[i]*nbins) % ngroups ); // 2 cv groups in checkerboard pattern
+    cvgroup.push_back( (bin2[i]+bin1[i]) % ngroups ); // 2 cv groups in checkerboard pattern
   
   //Compute fused lasso solutions on each group and report to beta_cv
   int res=0;
