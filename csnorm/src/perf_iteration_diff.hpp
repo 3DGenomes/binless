@@ -9,11 +9,6 @@ DataFrame cts_to_diff_mat(const DataFrame cts, const DataFrame ref, int nbins,
                           double dispersion,
                           std::vector<double>& phi_ref, std::vector<double>& delta, int diag_rm);
 
-std::vector<double> compute_phi_ref(const std::vector<double>& delta_r,
-                                    const std::vector<double>& phihat,
-                                    const std::vector<double>& phihat_var, const std::vector<double>& phihat_ref,
-                                    const std::vector<double>& phihat_var_ref);
-
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                          double dispersion, int nouter, int nbins,
                          int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,

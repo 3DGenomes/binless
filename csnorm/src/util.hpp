@@ -18,5 +18,10 @@ NumericVector get_minimum_diagonal_values(NumericVector value,
 NumericVector get_constant_diagonal_values(NumericVector value,
         IntegerVector diag_idx, double tol_val);
 
+std::vector<double> compute_phi_ref(const std::vector<double>& delta_r,
+                                    const std::vector<double>& phihat,
+                                    const std::vector<double>& phihat_var, const std::vector<double>& phihat_ref,
+                                    const std::vector<double>& phihat_var_ref);
+
 #endif
 

@@ -10,7 +10,7 @@ using namespace Rcpp;
 #include "util.hpp" //SQUARE
 #include "graph_fl.h" //graph_fused_lasso_weight_warm
 #include "graph_trails.hpp" //boost_build_patch_graph_components
-#include "optimize_lambda1.hpp" //cpp_optimize_lambda1
+#include "optimize_lambda1_diff.hpp" //cpp_optimize_lambda1
 
 
 
@@ -45,25 +45,6 @@ DataFrame cts_to_diff_mat(const DataFrame cts, const DataFrame ref, int nbins,
                              _["phihat.ref"]=phihat_ref, _["phihat.var.ref"]=phihat_var_ref,
                              _["deltahat"]=deltahat, _["deltahat.var"]=deltahat_var, _["ncounts"]=ncounts,
                              _["weight"]=weight, _["diag.idx"]=didx);
-}
-
-std::vector<double> compute_phi_ref(const std::vector<double>& delta_r,
-                                    const std::vector<double>& phihat,
-                                    const std::vector<double>& phihat_var, const std::vector<double>& phihat_ref,
-                                    const std::vector<double>& phihat_var_ref) {
-    const int N = delta_r.size();
-    std::vector<double> phi_ref_r;
-    phi_ref_r.reserve(N);
-    for (int i=0; i<N; ++i) {
-        if (phihat_var_ref[i]==INFINITY && phihat_var[i]==INFINITY) {
-            phi_ref_r.push_back((phihat_ref[i]+phihat[i])/2);
-        } else {
-            phi_ref_r.push_back((phihat_ref[i]/phihat_var_ref[i] + (phihat[i]
-                                 -delta_r[i])/phihat_var[i])
-                                /(1/phihat_var_ref[i]+1/phihat_var[i]));
-        }
-    }
-    return phi_ref_r;
 }
 
 List wgfl_diff_cv(const DataFrame mat, int nbins,
@@ -161,8 +142,13 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
         std::vector<double> phihat = Rcpp::as<std::vector<double> >(mat["phihat"]);
         std::vector<double> phihat_var = Rcpp::as<std::vector<double> >
                                          (mat["phihat.var"]);
-        std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["deltahat"]);
-        std::vector<double> w_r = Rcpp::as<std::vector<double> >(mat["weight"]);
+        std::vector<double> y_r, w_r;
+        y_r.reserve(N);
+        w_r.reserve(N);
+        for (int i=0; i<N; ++i) {
+            y_r.push_back(phihat[i]-phi_ref_r[i]);
+            w_r.push_back(1/phihat_var[i]);
+        }
         c_end = std::clock();
         c_cts += c_end - c_start;
 
@@ -187,15 +173,16 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
         
         //update residual
         maxval = std::abs(beta_r[0]-beta_old[0]);
-        for (int i=1; i<N;
-                ++i) maxval = std::max(std::abs(beta_r[i]-beta_old[i]), maxval);
+        for (int i=1; i<N; ++i)
+            maxval = std::max(std::abs(beta_r[i]-beta_old[i]), maxval);
         /*Rcout << " Iteration " << step << " with lam2= " << lam2 << " alpha= " << alpha << " reached maxval= " << maxval
               << " after " << res << " steps phi[0]= " << phi_r[0]
               << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
               << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-        /*Rcout << " eval step "<< step << ": lam2= " << lam2 << " lam1= " << lam1 << " eCprime= " << eCprime
+        /*Rcout << " eval step "<< step << ": lam2= " << lam2 << " lam1= " << lam1 << " eCprime= " << 0
               << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
-              << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r)))
+              << " min(phi_ref)= " << min(NumericVector(wrap(phi_ref_r))) << " max(phi_ref)= "<< max(NumericVector(wrap(phi_ref_r)))
+              << " min(phi)= " << min(NumericVector(wrap(delta_r))) << " max(delta)= "<< max(NumericVector(wrap(delta_r)))
               << " min(phihat)= " << min(NumericVector(wrap(y_r))) << " max(phihat)= "<< max(NumericVector(wrap(y_r))) << std::endl;*/
 
 
@@ -210,8 +197,23 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
           << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
 
+    
+    DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                           _["bin2"]=mat["bin2"],
+                                           _["phihat"]=mat["phihat"],
+                                           _["phihat.var"]=mat["phihat.var"],
+                                           _["phihat.ref"]=mat["phihat.ref"],
+                                           _["phihat.var.ref"]=mat["phihat.var.ref"],
+                                           _["ncounts"]=mat["ncounts"],
+                                           _["deltahat"]=mat["deltahat"],
+                                           _["weight"]=mat["weight"],
+                                           _["diag.idx"]=mat["diag.idx"],
+                                           _["beta"]=beta_r,
+                                           _["delta"]=delta_r,
+                                           _["phi_ref"]=phi_ref_r);
+    
     return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha),
-                        _["phi.ref"]=wrap(phi_ref_r), _["phi"]=wrap(delta_r), _["mat"]=mat,
+                        _["phi.ref"]=wrap(phi_ref_r), _["delta"]=wrap(delta_r), _["mat"]=finalmat,
                         _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res,
                         _["eCprime"]=0, _["lambda1"]=lam1, _["c_cts"]=c_cts, _["c_gfl"]=c_gfl);
 }
@@ -260,6 +262,9 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     DataFrame newmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                          _["bin2"]=mat["bin2"],
                                          _["phihat"]=mat["phihat"],
+                                         _["phihat.ref"]=mat["phihat.ref"],
+                                         _["phihat.var"]=mat["phihat.var"],
+                                         _["phihat.var.ref"]=mat["phihat.var.ref"],
                                          _["ncounts"]=mat["ncounts"],
                                          _["diag.idx"]=mat["diag.idx"],
                                          _["weight"]=mat["weight"],
@@ -267,8 +272,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                          _["value"]=ret["beta"],
                                          _["beta_cv"]=beta_cv);
     if (!constrained) stop("expected constrained==T when fixed==T");
-    const bool positive = false;
-    NumericVector opt = cpp_optimize_lambda1(newmat, nbins, tol_val, positive,
+    NumericVector opt = cpp_optimize_lambda1_diff(newmat, nbins, tol_val,
                         lambda1_min, refine_num);
     lam1 = opt["lambda1"];
     c_end = std::clock();
@@ -319,6 +323,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                            _["ncounts"]=mat["ncounts"],
                                            _["diag.idx"]=mat["diag.idx"],
                                            _["beta"]=beta_r,
+                                           _["beta_cv"]=beta_cv,
                                            _["delta"]=delta,
                                            _["phi.ref"]=phi_ref_r,
                                            _["patchno"]=patchno);
