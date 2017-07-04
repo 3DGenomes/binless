@@ -163,8 +163,13 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
         std::vector<double> phihat = Rcpp::as<std::vector<double> >(mat["phihat"]);
         std::vector<double> phihat_var = Rcpp::as<std::vector<double> >
                                          (mat["phihat.var"]);
-        std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["deltahat"]);
-        std::vector<double> w_r = Rcpp::as<std::vector<double> >(mat["weight"]);
+        std::vector<double> y_r, w_r;
+        y_r.reserve(N);
+        w_r.reserve(N);
+        for (int i=0; i<N; ++i) {
+            y_r.push_back(phihat[i]-phi_ref_r[i]);
+            w_r.push_back(1/phihat_var[i]);
+        }
         c_end = std::clock();
         c_cts += c_end - c_start;
 
@@ -189,15 +194,16 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
         
         //update residual
         maxval = std::abs(beta_r[0]-beta_old[0]);
-        for (int i=1; i<N;
-                ++i) maxval = std::max(std::abs(beta_r[i]-beta_old[i]), maxval);
+        for (int i=1; i<N; ++i)
+            maxval = std::max(std::abs(beta_r[i]-beta_old[i]), maxval);
         /*Rcout << " Iteration " << step << " with lam2= " << lam2 << " alpha= " << alpha << " reached maxval= " << maxval
               << " after " << res << " steps phi[0]= " << phi_r[0]
               << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
               << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-        /*Rcout << " eval step "<< step << ": lam2= " << lam2 << " lam1= " << lam1 << " eCprime= " << eCprime
+        /*Rcout << " eval step "<< step << ": lam2= " << lam2 << " lam1= " << lam1 << " eCprime= " << 0
               << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
-              << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r)))
+              << " min(phi_ref)= " << min(NumericVector(wrap(phi_ref_r))) << " max(phi_ref)= "<< max(NumericVector(wrap(phi_ref_r)))
+              << " min(phi)= " << min(NumericVector(wrap(delta_r))) << " max(delta)= "<< max(NumericVector(wrap(delta_r)))
               << " min(phihat)= " << min(NumericVector(wrap(y_r))) << " max(phihat)= "<< max(NumericVector(wrap(y_r))) << std::endl;*/
 
 
