@@ -10,7 +10,7 @@ using namespace Rcpp;
 #include "util.hpp" //SQUARE
 #include "graph_fl.h" //graph_fused_lasso_weight_warm
 #include "graph_trails.hpp" //boost_build_patch_graph_components
-#include "optimize_lambda1.hpp" //cpp_optimize_lambda1
+#include "optimize_lambda1_diff.hpp" //cpp_optimize_lambda1
 
 
 
@@ -262,6 +262,9 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     DataFrame newmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                          _["bin2"]=mat["bin2"],
                                          _["phihat"]=mat["phihat"],
+                                         _["phihat.ref"]=mat["phihat.ref"],
+                                         _["phihat.var"]=mat["phihat.var"],
+                                         _["phihat.var.ref"]=mat["phihat.var.ref"],
                                          _["ncounts"]=mat["ncounts"],
                                          _["diag.idx"]=mat["diag.idx"],
                                          _["weight"]=mat["weight"],
@@ -269,8 +272,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                          _["value"]=ret["beta"],
                                          _["beta_cv"]=beta_cv);
     if (!constrained) stop("expected constrained==T when fixed==T");
-    const bool positive = false;
-    NumericVector opt = cpp_optimize_lambda1(newmat, nbins, tol_val, positive,
+    NumericVector opt = cpp_optimize_lambda1_diff(newmat, nbins, tol_val,
                         lambda1_min, refine_num);
     lam1 = opt["lambda1"];
     c_end = std::clock();
