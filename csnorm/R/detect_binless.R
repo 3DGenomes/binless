@@ -47,10 +47,9 @@ gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
     perf.c = csnorm:::gfl_perf_iteration(csig, lambda1, lambda2, eCprime)
   }
   if (class(csig)!="CSbdiff") {
-    matg = as.data.table(perf.c$mat)[,.(bin1,bin2,valuehat=phihat,ncounts,weight,value=phi,diag.idx)]
+    matg = as.data.table(perf.c$mat)
   } else {
-    matg = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,
-                                        value=delta,phi.ref,diag.idx)]
+    matg = as.data.table(perf.c$mat)
   }
   setkey(matg,bin1,bin2)
   #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=value))+scale_fill_gradient2()
@@ -361,7 +360,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
       cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],"\n")
   #compute matrix at new params
   mat = rbindlist(params[,mat])
-  mat[,phi:=value]
+  mat[,c("value","valuehat"):=list(phi,phihat)]
   #report parameters
   csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],name=params[,name])
   #
@@ -372,7 +371,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #
   if (verbose==T) cat(" Detect patches\n")
   csi@mat = foreach(g=groupnames, .combine=rbind) %dopar% {
-    matg = mat[name==g,.(name,bin1,bin2,value,phi=value,phihat=valuehat,weight,ncounts,diag.idx)]
+    matg = mat[name==g]
     cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
     matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
     matg
@@ -424,7 +423,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
       cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],"\n")
   #compute matrix at new params
   mat = rbindlist(params[,mat])
-  mat[,delta:=value]
+  mat[,c("value","valuehat"):=list(delta,deltahat)]
   #report parameters
   csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],name=params[,name])
   #
@@ -435,7 +434,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #
   if (verbose==T) cat(" Detect patches\n")
   csi@mat = foreach(g=groupnames, .combine=rbind) %dopar% {
-    matg = mat[name==g,.(name,bin1,bin2,value,delta=value,phi.ref,phihat.ref,deltahat=valuehat,weight,ncounts,diag.idx)]
+    matg = mat[name==g]
     cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
     matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
     matg
