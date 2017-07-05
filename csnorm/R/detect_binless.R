@@ -149,8 +149,8 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.thr
   #  obj(log10(lam))
   #  as.data.table(csig@state$mat)[,.(lambda2=lam,lambda1=csig@state$lambda1,eCprime=csig@state$eCprime,bin1,bin2,phihat,phi,beta)]
   #}
-  #dt.fix = foreach (lam=10^(seq(-1,1,length.out=100)),.combine=rbind) %dopar% {
-  #  csig@state <<- csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=T)
+  #dt.fix = foreach (lam=10^(seq(0,1,length.out=100)),.combine=rbind) %dopar% {
+  #  csig@state <<- csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed)
   #  as.data.table(csig@state[c("lambda2","lambda1","eCprime","dof","BIC")])
   #}
   #dt=rbindlist(list(free=dt.free,fix=dt.fix), use=T, idcol="ori")
