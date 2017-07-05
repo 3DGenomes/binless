@@ -195,8 +195,7 @@ NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
       LB = UB - 2*b2;
     } else {
       LB = minval_;
-      if (b2 < -tol_val_) Rcout << " warning: b2= " << b2 << " is negative, setting UB=LB" << std::endl;
-      UB = LB + 2*(std::max(b2,0.)+tol_val_);
+      UB = LB + 2*b2;
     }
   }
   
@@ -206,14 +205,12 @@ NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
   /*Rcout << "EVAL at val= " << val << " LB= " << LB << " UB= " << UB << " b1= " << b1 << " b2= " << b2
           << " xmin= " << xmin << " xk= " << xk << " xkp1= " << xkp1 << " a= " << a << " b= " << b << std::endl; */
   //check if solution is feasible
-  if (constrained_) {
-    if ( is_true(any( (forbidden_vals_>UB+tol_val_/2) | (forbidden_vals_<LB-tol_val_/2) )) ) {
-      if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda2= " << lambda2_ << " lambda1= " << lambda1
-                              << " eCprime= " << eCprime << " CV= Inf dof= NA" << std::endl;
-      return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
-                                   _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na(),
-                                   _["UB"]=UB, _["LB"]=LB);
-    }
+  if ( UB<LB || (constrained_ && is_true(any( (forbidden_vals_>UB+tol_val_/2) | (forbidden_vals_<LB-tol_val_/2) )) ) ) {
+    if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda2= " << lambda2_ << " lambda1= " << lambda1
+                            << " eCprime= " << eCprime << " CV= Inf dof= NA" << std::endl;
+    return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
+                                 _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na(),
+                                 _["UB"]=UB, _["LB"]=LB);
   }
   //compute dof and CV
   std::vector<double> value_r = as<std::vector<double> >(value_);

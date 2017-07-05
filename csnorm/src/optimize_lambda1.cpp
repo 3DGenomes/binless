@@ -161,7 +161,7 @@ NumericVector obj_lambda1_CV::get(double val, std::string msg) const {
   }
   //apply constraint
   UB = std::min(std::max(UB,xk),xkp1);
-  if (minUB_ <= xkp1) UB=std::max(minUB_,UB);
+  if (minUB_ <= xkp1 && minUB_ > xk) UB=std::max(minUB_,UB);
   //Rcout << "  UB= " << UB << " minUB= " << minUB_ << std::endl;
   //check if forbidden
   double lambda1=UB;
