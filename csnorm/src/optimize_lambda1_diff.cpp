@@ -247,6 +247,9 @@ NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
       NumericVector val = obj.get(patchvals(i) + 2*tol_val);
       if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
     }
+    //NumericVector val = obj.get(max(abs(beta)) + 2*tol_val, "opt");
+    NumericVector val = obj.get(max(abs(beta)) + 2*tol_val);
+    if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
     std::clock_t c_in2 = std::clock();
     //finalize
     //obj.get(as<double>(best["UB"])+2*tol_val,"final");
