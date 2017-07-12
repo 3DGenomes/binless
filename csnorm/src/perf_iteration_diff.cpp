@@ -76,12 +76,20 @@ List wgfl_diff_cv(const DataFrame mat, int nbins,
   int res=0;
   std::vector<double> beta_cv(N, -100);
   for (int g=0; g<ngroups; ++g) {
-    //prepare weights for group g and copy initial values
-    std::vector<double> w_r;
-    for (int i=0; i<N; ++i) w_r.push_back(cvgroup[i]==g ? 0 : weight_r[i]);
+    //prepare data and weights for group g and copy initial values
+    std::vector<double> d_r, w_r;
+    for (int i=0; i<N; ++i) {
+      if (cvgroup[i]==g) {
+        d_r.push_back(0); //essential if lam2==0
+        w_r.push_back(0);
+      } else {
+        d_r.push_back(deltahat_r[i]);
+        w_r.push_back(weight_r[i]);
+      }
+    }
     std::vector<double> values(beta_r);
     //compute fused lasso solution
-    res += graph_fused_lasso_weight_warm (N, &deltahat_r[0], &w_r[0], ntrails,
+    res += graph_fused_lasso_weight_warm (N, &d_r[0], &w_r[0], ntrails,
                                           &trails_r[0], &breakpoints_r[0],
                                                                       lam2, &alpha, inflate, ninner, converge,
                                                                       &values[0], &z_r[0], &u_r[0]);
