@@ -868,6 +868,40 @@ plot_diagnostics = function(cs, start=1) {
   return(list(plot=plot,plot2=plot2))
 }
 
+#' Save normalized CS object, discarding everything but
+#' input counts and final normalization parameters
+#' 
+#' @param cs a normalized CSnorm object
+#' @param fname where to save it to
+#'   
+#' @export
+#' 
+#' @examples
+save_stripped = function(cs, fname) {
+  cs@diagnostics=list(params=data.table())
+  cs@zeros=data.table()
+  cs@groups=list()
+  save(cs,file=fname)
+}
+
+#' Load normalized CS object saved with save_stripped,
+#' rebuild zeros data.table
+#' 
+#' @param fname file name
+#' @param ncores number of CPUs to use to reconstruct zeros
+#'   
+#' @return A cs object on which signal detection can be performed
+#'
+#' @export
+#' 
+#' @examples
+load_stripped = function(fname, ncores=1) {
+  load(fname)
+  cs@zeros = csnorm:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
+  return(cs)
+}
+
+
 #' Cut-site normalization (normal approximation)
 #' 
 #' Alternates two approximations to the exact model, fitting the diagonal decay
