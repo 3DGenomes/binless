@@ -896,7 +896,7 @@ save_stripped = function(cs, fname) {
 #' 
 #' @examples
 load_stripped = function(fname, ncores=1) {
-  load(fname)
+  cs=get(load(fname))
   cs@zeros = csnorm:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
   return(cs)
 }
