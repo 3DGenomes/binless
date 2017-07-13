@@ -690,21 +690,12 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
              settings=list(diag.rm=diag.rm, nbins=nbins, dispersion=cs@par$alpha, tol.val=cs@settings$tol.leg,
                            inflate=2, nperf=500, opt.every=10, maxsteps=100000))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
-    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=F, verbose=verbose, signif.threshold=signif.threshold)
+    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose, signif.threshold=signif.threshold)
   }
   #compute matrix at new params
   mat = rbindlist(params[,mat])
-  if (constrained==T) {
-    mat[,minval:=min(phi),by=c("name","diag.idx")]
-    if (mat[minval>cs@settings$tol.leg,.N]>0) {
-      cat("Warning: adjusting signal to enforce decay constraints\n")
-      mat[,phi.ori:=phi]
-      mat[,adjust:=max(minval),by=patchno]
-      mat[,phi:=pmax(0,phi-adjust)]
-    }
-  }
   #store new signal in cs and update eC
-  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi.ori))+
+  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+
   #  scale_fill_gradient2()
   #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
   setkey(mat,name,bin1,bin2)
