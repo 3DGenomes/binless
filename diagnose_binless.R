@@ -463,10 +463,10 @@ csig.p=csig
 csig.p@cts[,lmu.nosig.ori:=lmu.nosig]
 csig.p@cts[,lmu.nosig:=lmu.nosig-0.26]
 
-sink("newtest")
-a.p=csnorm:::gfl_BIC(csig.p, lambda2=10, constrained=T, positive=T, fixed=F)
+sink("test")
+a.p=csnorm:::gfl_BIC(csig.p, lambda2=5, constrained=T, positive=T, fixed=F)
 cat("Negative\n")
-a.n=csnorm:::gfl_BIC(csig.n, lambda2=10, constrained=T, positive=T, fixed=F)
+a.n=csnorm:::gfl_BIC(csig.p, lambda2=5, constrained=F, positive=T, fixed=F)
 sink()
 
 mat.p=as.data.table(a.p$mat)
@@ -475,6 +475,7 @@ mat.n=as.data.table(a.n$mat)
 mat.n[,dset:="E11N"]
 mean(mat.n[,beta]-mat.p[,beta])
 mat=rbind(mat.n,mat.p)
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+facet_wrap(~dset)+scale_fill_gradient2()
 ggplot(mat)+geom_raster(aes(bin1,bin2,fill=beta))+facet_wrap(~dset)+scale_fill_gradient2()
 mat[,minval:=min(beta),by=c("diag.idx","dset")]
 mat[,greyzone:=beta>0.1906227&beta<0.3450843]
@@ -487,10 +488,22 @@ ggplot(mat)+geom_raster(aes(bin1,bin2,fill=beta))+geom_raster(aes(bin2,bin1,fill
 ggplot(mat)+geom_raster(aes(bin1,bin2,fill=pmin(phihat,max(beta))))+geom_raster(aes(bin2,bin1,fill=beta),data=mat[greyzone&is.minval])+facet_wrap(~dset)+scale_fill_gradient2()
 
 a=fread("test2")
-b=a[,.(dset=V2,lambda2=V6,lambda1=V8,eCprime=V10,CV=V12,dof=V14,UB=V16,LB=V18)]
-ggplot(melt(b,id.vars = c("dset","lambda2","lambda1"))[lambda2==lambda2[1]])+geom_line(aes(lambda1,value,colour=dset))+facet_wrap(~variable,scales="free")
+b=a[,.(dset=V2,status=V4,lambda2=V6,lambda1=V8,eCprime=V10,CV=V12,dof=V14,UB=V16,LB=V18)]
+ggplot(melt(b,id.vars = c("dset","lambda2","lambda1","status"))[lambda2==lambda2[1]])+geom_line(aes(lambda1,value,colour=dset,linetype=status))+facet_wrap(~variable,scales="free")
 
 mat.p=as.data.table(a.p$mat)
 
 
+matg = csnorm:::gfl_get_matrix(csig, 0.1, 5, 0)
+ggplot(matg)+geom_raster(aes(bin1,bin2,fill=log(weight)))+scale_fill_gradient2()
 
+newmat=as.data.table(csnorm:::cts_to_signal_mat(csig@cts, csig@settings$nbins, cs@par$alpha,
+                  cs@par$signal[name==g,phi], 0., diag.rm))
+ggplot(cs@par$signal)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()
+ggplot(newmat)+geom_raster(aes(bin1,bin2,fill=log(weight)))+scale_fill_gradient2()
+
+csig@cts[unclass(bin1)==30&unclass(bin2)%in%c(211,212)]
+newmat[unclass(bin1)==30&unclass(bin2)%in%c(211,212)]
+b2=newmat[unclass(bin1)==30&unclass(bin2)%in%c(211,212)][2,bin2]
+cs@biases[name==g&pos>=35533086&pos<35543086]
+cs@counts[name==g&pos1>=33713086&pos1<33723086&pos2>=35533086&pos2<35543086]
