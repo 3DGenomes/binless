@@ -699,11 +699,12 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
     if (mat[minval>cs@settings$tol.leg,.N]>0) {
       cat("Warning: adjusting signal to enforce decay constraints\n")
       mat[,phi.ori:=phi]
-      mat[,phi:=phi-minval]
+      mat[,adjust:=max(minval),by=patchno]
+      mat[,phi:=pmax(0,phi-adjust)]
     }
   }
   #store new signal in cs and update eC
-  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+
+  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi.ori))+
   #  scale_fill_gradient2()
   #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
   setkey(mat,name,bin1,bin2)
