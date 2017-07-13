@@ -441,3 +441,56 @@ mat.5n[unclass(bin1)==12&unclass(bin2)==13]
 mat.10n[unclass(bin1)==12&unclass(bin2)==13]
 
 
+#filion diagnostics
+cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+diag.rm = ceiling(cs@settings$dmin/cs@settings$base.res)
+groupnames=cts[,unique(name)]
+nbins=length(cs@settings$sbins)-1
+registerDoParallel(cores=ncores)
+g=groupnames[1]
+csig=new("CSbsig", mat=cs@par$signal[name==g], trails=cs@settings$trails, cts=cts[name==g],
+                         settings=list(diag.rm=diag.rm, nbins=nbins, dispersion=cs@par$alpha, tol.val=cs@settings$tol.leg,
+                                                                  inflate=2, nperf=500, opt.every=10, maxsteps=100000))
+csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
+csig.n=csig
+g=groupnames[2]
+csig=new("CSbsig", mat=cs@par$signal[name==g], trails=cs@settings$trails, cts=cts[name==g],
+                         settings=list(diag.rm=diag.rm, nbins=nbins, dispersion=cs@par$alpha, tol.val=cs@settings$tol.leg,
+                                                                    inflate=2, nperf=500, opt.every=10, maxsteps=100000))
+csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
+csig.p=csig
+
+csig.p@cts[,lmu.nosig.ori:=lmu.nosig]
+csig.p@cts[,lmu.nosig:=lmu.nosig-0.26]
+
+sink("newtest")
+a.p=csnorm:::gfl_BIC(csig.p, lambda2=10, constrained=T, positive=T, fixed=F)
+cat("Negative\n")
+a.n=csnorm:::gfl_BIC(csig.n, lambda2=10, constrained=T, positive=T, fixed=F)
+sink()
+
+mat.p=as.data.table(a.p$mat)
+mat.p[,dset:="E11P"]
+mat.n=as.data.table(a.n$mat)
+mat.n[,dset:="E11N"]
+mean(mat.n[,beta]-mat.p[,beta])
+mat=rbind(mat.n,mat.p)
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=beta))+facet_wrap(~dset)+scale_fill_gradient2()
+mat[,minval:=min(beta),by=c("diag.idx","dset")]
+mat[,greyzone:=beta>0.1906227&beta<0.3450843]
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=greyzone))+facet_wrap(~dset)
+mat[,is.minval:=abs(beta-minval)<1e-4]
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=is.minval))+facet_wrap(~dset)
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=is.minval&greyzone))+facet_wrap(~dset)
+mat[is.minval&greyzone,max(beta),by=dset]
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=beta))+geom_raster(aes(bin2,bin1,fill=beta),data=mat[greyzone&is.minval])+facet_wrap(~dset)+scale_fill_gradient2()
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=pmin(phihat,max(beta))))+geom_raster(aes(bin2,bin1,fill=beta),data=mat[greyzone&is.minval])+facet_wrap(~dset)+scale_fill_gradient2()
+
+a=fread("test2")
+b=a[,.(dset=V2,lambda2=V6,lambda1=V8,eCprime=V10,CV=V12,dof=V14,UB=V16,LB=V18)]
+ggplot(melt(b,id.vars = c("dset","lambda2","lambda1"))[lambda2==lambda2[1]])+geom_line(aes(lambda1,value,colour=dset))+facet_wrap(~variable,scales="free")
+
+mat.p=as.data.table(a.p$mat)
+
+
+
