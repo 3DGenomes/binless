@@ -14,11 +14,11 @@ if(F) {
   #cut at 1000bp for pclose
   #dL=1 and dR=5
   csd=read_and_prepare(paste0("/scratch/filion/E11N_chr7_137-139M_imperfect.tsv"),
-                       paste0("data/filion_E11N_chr7_2M"), "E11N", "1",
+                       paste0("data/filion_E11N_chr7_1.6M"), "E11N", "1", locus=c("chr7",137200000,138800000),
                        enzyme="MboI", name=paste("E11N"), circularize=-1, dangling.L=c(1),
                        dangling.R=c(5), maxlen=750, read.len=75, dmin=1000, save.data=T)
   csd=read_and_prepare(paste0("/scratch/filion/E11P_chr7_137-139M_imperfect.tsv"),
-                       paste0("data/filion_E11P_chr7_2M"), "E11P", "1",
+                       paste0("data/filion_E11P_chr7_1.6M"), "E11P", "1", locus=c("chr7",137200000,138800000),
                        enzyme="MboI", name=paste("E11P"), circularize=-1, dangling.L=c(1),
                        dangling.R=c(5), maxlen=750, read.len=75, dmin=1000, save.data=T)
   
@@ -34,27 +34,27 @@ ncores=10
 
 setwd("/home/yannick/simulations/cs_norm")
 
-load("data/filion_E11N_chr7_2M_csdata.RData")
+load("data/filion_E11N_chr7_1.6M_csdata.RData")
 csd1=csd
-load("data/filion_E11P_chr7_2M_csdata.RData")
+load("data/filion_E11P_chr7_1.6M_csdata.RData")
 csd2=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none", dfuse=dfuse)
 cs = run_gauss(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
                ngibbs = 5, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
                ncounts = 1000000, ncores=ncores, base.res=10000, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T)
-save(cs,file=paste0("data/filion_E11_chr7_2M_csnorm_optimized.RData"))
+save(cs,file=paste0("data/filion_E11_chr7_1.6M_csnorm_optimized.RData"))
 cs = run_gauss(cs, restart=T, ngibbs = 15, ncores=ncores)
-save(cs,file=paste0("data/filion_E11_chr7_2M_csnorm_optimized.RData"))
+save(cs,file=paste0("data/filion_E11_chr7_1.6M_csnorm_optimized.RData"))
 
 for (resolution in c(20000,10000)) {
   cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
   cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
   cs=detect_binless_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])
-  save(cs,file=paste0("data/filion_E11_chr7_2M_csnorm_optimized.RData"))
+  save(cs,file=paste0("data/filion_E11_chr7_1.6M_csnorm_optimized.RData"))
 }
 
 if (F) {
-  load(paste0("data/filion_E11_chr7_2M_csnorm_optimized.RData"))
+  load(paste0("data/filion_E11_chr7_1.6M_csnorm_optimized.RData"))
   
   csnorm:::has_converged(cs)
   cs@diagnostics$params[,sum(runtime)]/3600
