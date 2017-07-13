@@ -207,7 +207,8 @@ NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
   //check if solution is feasible
   if ( UB<LB || (constrained_ && is_true(any( (forbidden_vals_>UB+tol_val_/2) | (forbidden_vals_<LB-tol_val_/2) )) ) ) {
     if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda2= " << lambda2_ << " lambda1= " << lambda1
-                            << " eCprime= " << eCprime << " CV= Inf dof= NA" << std::endl;
+                            << " eCprime= " << eCprime << " CV= Inf dof= NA"
+                            << " UB= " << UB  << " LB= " << LB << std::endl;
     return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
                                  _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na(),
                                  _["UB"]=UB, _["LB"]=LB);
