@@ -51,7 +51,7 @@ DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion,
     ncounts_i = wrap(ncounts);
     weight_i = 1/phihat_var_i;
     didx_i = bin2_i-bin1_i;
-    dgrp_i = floor(log10(bin2_i-bin1_i+1)*10);
+    dgrp_i = floor(log10(bin2_i-bin1_i+1)*3);
 
 
     return DataFrame::create(_["bin1"]=bin1_i, _["bin2"]=bin2_i,
