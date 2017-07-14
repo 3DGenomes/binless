@@ -156,8 +156,8 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.thr
   #dt=rbindlist(list(free=dt.free,fix=dt.fix), use=T, idcol="ori")
   #ggplot(dt)+geom_line(aes(lambda2,BIC,colour=ori))#+geom_point(data=r,aes(10^x,y))#+xlim(1,3)+ylim(1600,2000)
   ### optimization in four stages
-  #first, find rough minimum between 1 and 100
-  minlambda=1
+  #first, find rough minimum between 10 and 100
+  minlambda=10
   maxlambda=100
   op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
   lambda2=10^op$minimum
@@ -185,10 +185,7 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.thr
   lambda2=10^op$minimum
   #finish
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
-  if (lambda2 <= csig@settings$tol.val*10) {
-    cat("   Warning: lambda2 too close to lower boundary.")
-    lambda2=0
-  }
+  if (lambda2==minlambda) cat("   Warning: lambda2 hit lower boundary.\n")
   obj(log10(lambda2))
   retvals = as.list(csig@state)[c("lambda2","lambda1","eCprime","BIC","dof")]
   if (fixed==T && abs(retvals$eCprime)>csig@settings$tol.val) cat("Warning: fixed = T but eCprime != 0\n") #only when signif.threshold==T
