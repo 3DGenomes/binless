@@ -46,7 +46,7 @@ save(cs,file=paste0("data/filion_E11_chr7_1.6M_csnorm_optimized.RData"))
 cs = run_gauss(cs, restart=T, ngibbs = 15, ncores=ncores)
 save(cs,file=paste0("data/filion_E11_chr7_1.6M_csnorm_optimized.RData"))
 
-for (resolution in c(20000,10000)) {
+for (resolution in c(10000)) {
   cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
   cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
   cs=detect_binless_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])

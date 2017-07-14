@@ -507,3 +507,11 @@ newmat[unclass(bin1)==30&unclass(bin2)%in%c(211,212)]
 b2=newmat[unclass(bin1)==30&unclass(bin2)%in%c(211,212)][2,bin2]
 cs@biases[name==g&pos>=35533086&pos<35543086]
 cs@counts[name==g&pos1>=33713086&pos1<33723086&pos2>=35533086&pos2<35543086]
+
+
+ggplot(cs@par$biases[name==g&pos>75124951&pos<75144951])+
+  geom_pointrange(aes(pos,etahat,ymax=etahat+std,ymin=etahat-std,colour=cat))+geom_line(aes(pos,eta))+facet_grid(cat~.)
+
+
+
+
