@@ -38,8 +38,8 @@ DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion,
                            &phi[0], eCprime, &phihat[0], &phihat_var[0], &ncounts[0], &bin1[0], &bin2[0],
                            diag_rm);
 
-    IntegerVector bin1_i, bin2_i;
-    NumericVector phihat_i, phihat_var_i, ncounts_i, weight_i, didx_i;
+    IntegerVector bin1_i, bin2_i, didx_i, dgrp_i;
+    NumericVector phihat_i, phihat_var_i, ncounts_i, weight_i;
     bin1_i = wrap(bin1);
     bin2_i = wrap(bin2);
     bin1_i.attr("levels") = as<IntegerVector>(cts["bin1"]).attr("levels");
@@ -51,12 +51,13 @@ DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion,
     ncounts_i = wrap(ncounts);
     weight_i = 1/phihat_var_i;
     didx_i = bin2_i-bin1_i;
+    dgrp_i = floor(log10(bin2_i-bin1_i+1)*10);
 
 
     return DataFrame::create(_["bin1"]=bin1_i, _["bin2"]=bin2_i,
                              _["phihat"]=phihat_i,
                              _["phihat.var"]=phihat_var_i, _["ncounts"]=ncounts_i, _["weight"]=weight_i,
-                             _["diag.idx"]=didx_i);
+                             _["diag.idx"]=didx_i, _["diag.grp"]=dgrp_i);
 }
 
 List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
@@ -152,6 +153,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
                                            _["ncounts"]=mat["ncounts"],
                                            _["weight"]=mat["weight"],
                                            _["diag.idx"]=mat["diag.idx"],
+                                           _["diag.grp"]=mat["diag.grp"],
                                            _["beta"]=beta_r,
                                            _["phi"]=phi_r);
     
@@ -277,6 +279,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts,
                                              _["phihat"]=mat["phihat"],
                                              _["ncounts"]=mat["ncounts"],
                                              _["diag.idx"]=mat["diag.idx"],
+                                             _["diag.grp"]=mat["diag.grp"],
                                              _["weight"]=mat["weight"],
                                              _["beta"]=beta_r,
                                              _["value"]=beta_r);
@@ -373,6 +376,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                                          _["phihat"]=mat["phihat"],
                                          _["ncounts"]=mat["ncounts"],
                                          _["diag.idx"]=mat["diag.idx"],
+                                         _["diag.grp"]=mat["diag.grp"],
                                          _["weight"]=mat["weight"],
                                          _["beta"]=ret["beta"],
                                          _["beta_cv"]=beta_cv,
@@ -424,6 +428,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                                            _["ncounts"]=mat["ncounts"],
                                            _["weight"]=mat["weight"],
                                            _["diag.idx"]=mat["diag.idx"],
+                                           _["diag.grp"]=mat["diag.grp"],
                                            _["beta"]=beta_r,
                                            _["beta_cv"]=beta_cv,
                                            _["phi"]=phi_r,
@@ -500,6 +505,7 @@ List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter,
                                            _["ncounts"]=mat["ncounts"],
                                            _["weight"]=mat["weight"],
                                            _["diag.idx"]=mat["diag.idx"],
+                                           _["diag.grp"]=mat["diag.grp"],
                                            _["beta"]=beta_r,
                                            _["phi"]=phi_r,
                                            _["patchno"]=patchno);

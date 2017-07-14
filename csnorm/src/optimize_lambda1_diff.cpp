@@ -213,6 +213,7 @@ NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
     NumericVector beta = mat["beta"];
     NumericVector ncounts = mat["ncounts"];
     IntegerVector diag_idx = mat["diag.idx"];
+    IntegerVector diag_grp = mat["diag.grp"];
     NumericVector beta_cv = mat["beta_cv"];
     //get patch nos and sorted values
     List cl = boost_build_patch_graph_components(nbins, mat, tol_val);
@@ -225,7 +226,7 @@ NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
     NumericVector forbidden_vals;
     if (constrained) {
       NumericVector abeta=abs(beta);
-      forbidden_vals = get_minimum_diagonal_values(abeta, diag_idx);
+      forbidden_vals = get_minimum_diagonal_values(abeta, diag_grp);
     }
     //create functor
     /*obj_lambda1_diff_BIC obj(lmin, tol_val, patchno, forbidden_vals,

@@ -39,12 +39,13 @@ DataFrame cts_to_diff_mat(const DataFrame cts, const DataFrame ref, int nbins,
     NumericVector deltahat_var = phihat_var+phihat_var_ref;
     NumericVector ncounts = ncounts_ref+ncounts_oth;
     NumericVector weight = 1/deltahat_var;
-    NumericVector didx = mat_ref["diag.idx"];
+    IntegerVector didx = mat_ref["diag.idx"];
+    IntegerVector dgrp = mat_ref["diag.grp"];
     return DataFrame::create(_["bin1"]=bin1, _["bin2"]=bin2,
                              _["phihat"]=phihat, _["phihat.var"]=phihat_var,
                              _["phihat.ref"]=phihat_ref, _["phihat.var.ref"]=phihat_var_ref,
                              _["deltahat"]=deltahat, _["deltahat.var"]=deltahat_var, _["ncounts"]=ncounts,
-                             _["weight"]=weight, _["diag.idx"]=didx);
+                             _["weight"]=weight, _["diag.idx"]=didx, _["diag.grp"]=dgrp);
 }
 
 List wgfl_diff_cv(const DataFrame mat, int nbins,
@@ -216,6 +217,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                                            _["deltahat"]=mat["deltahat"],
                                            _["weight"]=mat["weight"],
                                            _["diag.idx"]=mat["diag.idx"],
+                                           _["diag.grp"]=mat["diag.grp"],
                                            _["beta"]=beta_r,
                                            _["delta"]=delta_r,
                                            _["phi_ref"]=phi_ref_r);
@@ -275,6 +277,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                          _["phihat.var.ref"]=mat["phihat.var.ref"],
                                          _["ncounts"]=mat["ncounts"],
                                          _["diag.idx"]=mat["diag.idx"],
+                                         _["diag.grp"]=mat["diag.grp"],
                                          _["weight"]=mat["weight"],
                                          _["beta"]=ret["beta"],
                                          _["value"]=ret["beta"],
@@ -330,6 +333,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                            _["phihat.var.ref"]=mat["phihat.var.ref"],
                                            _["ncounts"]=mat["ncounts"],
                                            _["diag.idx"]=mat["diag.idx"],
+                                           _["diag.grp"]=mat["diag.grp"],
                                            _["beta"]=beta_r,
                                            _["beta_cv"]=beta_cv,
                                            _["delta"]=delta,
@@ -423,6 +427,7 @@ List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double disper
                                            _["phihat.var.ref"]=mat["phihat.var.ref"],
                                            _["ncounts"]=mat["ncounts"],
                                            _["diag.idx"]=mat["diag.idx"],
+                                           _["diag.grp"]=mat["diag.grp"],
                                            _["beta"]=beta_r,
                                            _["delta"]=delta,
                                            _["phi.ref"]=phi_ref,

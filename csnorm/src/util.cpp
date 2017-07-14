@@ -28,11 +28,15 @@ NumericVector get_patch_values(NumericVector value, IntegerVector patchno) {
 
 //return the minimum value encountered along each counter diagonal
 NumericVector get_minimum_diagonal_values(NumericVector value,
-        IntegerVector diag_idx) {
-    int ndiags = max(diag_idx)+1;
+        IntegerVector diag_grp) {
+    int ndiags = max(diag_grp)+1;
+    LogicalVector diagtouch(ndiags, false);
     NumericVector diagvals(ndiags, max(value)); //diag_idx starts at 0
-    for (int i=0; i<diag_idx.size(); ++i)
-      diagvals(diag_idx(i)) = std::min(diagvals(diag_idx(i)),value(i));
+    for (int i=0; i<diag_grp.size(); ++i) {
+      diagvals(diag_grp(i)) = std::min(diagvals(diag_grp(i)),value(i));
+      diagtouch(diag_grp(i)) = true;
+    }
+    diagvals = diagvals[diagtouch];
     diagvals = unique(diagvals);
     std::sort(diagvals.begin(), diagvals.end());
     return diagvals;

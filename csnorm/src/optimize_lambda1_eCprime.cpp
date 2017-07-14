@@ -238,6 +238,7 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     NumericVector beta = mat["beta"];
     NumericVector ncounts = mat["ncounts"];
     IntegerVector diag_idx = mat["diag.idx"];
+    IntegerVector diag_grp = mat["diag.grp"];
     NumericVector beta_cv = mat["beta_cv"];
     //get patch nos and sorted values
     List cl = boost_build_patch_graph_components(nbins, mat, tol_val);
@@ -250,7 +251,7 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     //there is at least one zero signal value per diagonal idx
     NumericVector forbidden_vals;
     if (constrained) {
-      forbidden_vals = get_minimum_diagonal_values(beta, diag_idx);
+      forbidden_vals = get_minimum_diagonal_values(beta, diag_grp);
       lmin = std::max(lmin, (max(forbidden_vals)-minval)/2);
     }
     //create functor
