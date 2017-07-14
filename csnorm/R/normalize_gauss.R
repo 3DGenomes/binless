@@ -475,9 +475,9 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       beta_iota = beta[1:Krow]
       beta_rho = beta[(Krow+1):(2*Krow)]
       
-      nlambda_iota = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_iota)+1e6)
+      nlambda_iota = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_iota)+1e10)
       nlambda_iota = sqrt(as.numeric(nlambda_iota))
-      nlambda_rho = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_rho)+1e6)
+      nlambda_rho = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_rho)+1e10)
       nlambda_rho = sqrt(as.numeric(nlambda_rho))
       
       epsilon = max(abs(lambda_iota-nlambda_iota),abs(lambda_rho-nlambda_rho))
