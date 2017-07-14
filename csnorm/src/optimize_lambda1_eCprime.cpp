@@ -17,7 +17,7 @@ obj_lambda1_eCprime_BIC::obj_lambda1_eCprime_BIC(double tol_val,
         NumericVector ncounts, double lambda2) :
     tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2), constrained_(constrained),
     patchno_(patchno), forbidden_vals_(forbidden_vals),
-    value_(value), weight_(weight), valuehat_(valuehat) {}
+    value_(value), weight_(weight), valuehat_(valuehat) {/*TODO: discard points with weight==0*/}
 
 double obj_lambda1_eCprime_BIC::operator()(double val) const {
     //return get(val, "opt")["BIC"];
@@ -122,9 +122,14 @@ obj_lambda1_eCprime_CV::obj_lambda1_eCprime_CV(double minval, double tol_val,
                                                  bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                                                  NumericVector value, NumericVector weight, NumericVector valuehat,
                                                  NumericVector ncounts, double lambda2) : minval_(minval),
-                                                 tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2), constrained_(constrained),
-                                                 patchno_(patchno), forbidden_vals_(forbidden_vals),
-                                                 value_(value), weight_(weight), valuehat_(valuehat) {}
+                                                 tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2),
+                                                 constrained_(constrained), forbidden_vals_(forbidden_vals) {
+  LogicalVector posweights = weight>0;
+  patchno_ = patchno[posweights];
+  value_ = value[posweights];
+  weight_ = weight[posweights];
+  valuehat_ = valuehat[posweights];
+}
 
 double obj_lambda1_eCprime_CV::operator()(double val) const {
   //return get(val, "opt")["CV"];
@@ -158,7 +163,6 @@ NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
     //compute optimal UB and LB
     UB = std::max(std::min(xkp1, a), xk);
     LB = std::min(b, minval_);
-    
   } else if (grp1only) {//grp2 is empty, UB > xmax
     NumericVector w1 = weight_;
     NumericVector betahat1 = valuehat_;
