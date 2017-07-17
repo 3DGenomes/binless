@@ -337,3 +337,181 @@ a = foreach (LB=seq(-0.5,0,length.out=100),.combine=rbind) %do% {
   as.data.table(csnorm:::gfl_BIC_fixed(csig,lambda1=(UB-LB)/2,lambda2=2,eCprime=(UB+LB)/2)[c("lambda1","lambda2","eCprime","BIC","dof")])
 }
 ggplot(a)+geom_line(aes(UB-2*lambda1,BIC))
+
+
+for (resolution in c(5000,10000,20000)) {
+  cat("resolution ", resolution, "\n")
+  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+  csg=cs@groups[[idx1]]
+  csi = csnorm:::prepare_signal_estimation(cs, csg, resolution, 1e-4)
+  groupnames=csi@cts[,unique(name)][1:2]
+  registerDoParallel(cores=4)
+  for(g in groupnames) {
+    cat("dataset ",as.character(g),"\n")
+    csig = csi
+    csig@cts = csi@cts[name==g]
+    csig@mat = csi@mat[name==g]
+    csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
+    obj = function(x) {
+        csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed)
+        cat(as.character(g)," grid ", resolution, " lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
+          " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
+      return(csig@state$BIC)
+    }
+    dt.fix = foreach (lam=10^(seq(0,1,length.out=100)),.combine=rbind) %dopar% {obj(log10(lam))}
+  }
+}
+
+for (resolution in c(5000,10000,20000)) {
+  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+  csg=cs@groups[[idx1]]
+  csi = csnorm:::prepare_signal_estimation(cs, csg, resolution, 1e-4)
+  groupnames=csi@cts[,unique(name)][1:2]
+  registerDoParallel(cores=4)
+  for(g in groupnames) {
+    csig = csi
+    csig@cts = csi@cts[name==g]
+    csig@mat = csi@mat[name==g]
+    csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
+    b = csnorm:::gfl_BIC(csig, lambda2=1, constrained=T, positive=T, fixed=T)
+    cat("resolution",resolution,"dataset",as.character(g),"ncounts",sum(b$mat$ncounts),"\n")
+  }
+}
+
+
+a=fread("test.dat")
+a[,prior:=V13*14.68]
+a[,lik:=V11-prior]
+ggplot(melt(a[,.(dset=V1,resolution=V3,lambda2=V5,lambda1=V7,prior,lik,BIC=V11)],id.vars=c("dset","resolution","lambda2")))+
+  geom_line(aes(lambda2,value,colour=variable))+facet_grid(dset~resolution)
+
+
+
+mat=foreach (resolution=c(10000,5000), .combine=rbind) %do% {
+  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+  csg=cs@groups[[idx1]]
+  csi = csnorm:::prepare_signal_estimation(cs, csg, resolution, tol.val)
+  g=cs@experiments[1,name]
+  csig = csi
+  csig@cts = csi@cts[name==g]
+  csig@mat = csi@mat[name==g]
+  csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
+  csig@state = csnorm:::gfl_BIC(csig, lambda2=10, constrained=T, positive=T, fixed=T)
+  mat=as.data.table(csig@state$mat)[,.(resolution=resolution,bin1,bin2,phihat,ncounts,weight,beta,phi,patchno)]
+  mat
+}
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=beta))+facet_wrap(~resolution,scales="free")
+
+mat.5=mat[resolution==5000]
+mat.10=mat[resolution==10000]
+
+resolution=5000
+sbins.5=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
+resolution=10000
+sbins.10=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
+pos=head(sbins.5,n=-1)+5000/2
+bins=unique(data.table(refbin=cut(pos, cs@settings$sbins,
+                                  ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+                       bin=cut(pos, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)))
+stopifnot(bins[,.N]==length(sbins)-1)
+mat.5n=merge(bins,mat.5,by.y="bin1",by.x="refbin",all=T)
+mat.5n=merge(bins,mat.5n,by.y="bin2",by.x="refbin",all=T, suffixes=c("2","1"))
+mat.5n[,c("beta","phi","patchno"):=list( weighted.mean(beta,weight),
+                                                 weighted.mean(phi,weight), min(patchno)), keyby=c("bin1","bin2")]
+mat.5n[!complete.cases(mat.5n),c("phihat","beta","phi"):=list(0,0,0)]
+
+mat.10[,resolution:=as.character(resolution)]
+mat.comp=rbind(mat.10n,mat.10)
+ggplot(mat.comp)+geom_raster(aes(bin1,bin2,fill=beta))+facet_wrap(~resolution,scales="free")
+a=dcast(mat.comp,bin1+bin2~resolution,value.var = c("phihat","ncounts","weight","beta","phi","patchno"))
+a[,all.equal(phihat_10000,phihat_5to10)]
+a[,all.equal(ncounts_10000,ncounts_5to10)]
+a[,all.equal(weight_10000,weight_5to10)]
+
+#BIC at 5k
+mat.5n[,.(sumsq=sum(weight*(phihat-phi)^2),prior=(uniqueN(round(phi,3))-1)*log(sum(ncounts)),dof=uniqueN(round(phi,3))-1,lsnc=log(sum(ncounts)))]
+#BIC at 10k
+mat.10n=mat.5n[,.(resolution="5to10",phihat=weighted.mean(phihat,weight),ncounts=sum(ncounts),weight=sum(weight),
+                  beta=weighted.mean(beta,weight), phi=weighted.mean(phi,weight),patchno=min(patchno)),keyby=c("bin1","bin2")]
+mat.10n[!complete.cases(mat.10n),c("phihat","beta","phi"):=list(0,0,0)]
+mat.10n[,.(sumsq=sum(weight*(phihat-phi)^2),prior=(uniqueN(round(phi,3))-1)*log(sum(ncounts)),dof=uniqueN(round(phi,3))-1,lsnc=log(sum(ncounts)))]
+
+ggplot(rbind(mat.5[,.(bin1,bin2,resolution,phihat,ncounts,weight,beta,phi,patchno)],mat.10n))+geom_raster(aes(bin1,bin2,fill=phi))+facet_wrap(~resolution,scales="free")
+mat.5n[unclass(bin1)==12&unclass(bin2)==13]
+mat.10n[unclass(bin1)==12&unclass(bin2)==13]
+
+
+#filion diagnostics
+cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+diag.rm = ceiling(cs@settings$dmin/cs@settings$base.res)
+groupnames=cts[,unique(name)]
+nbins=length(cs@settings$sbins)-1
+registerDoParallel(cores=ncores)
+g=groupnames[1]
+csig=new("CSbsig", mat=cs@par$signal[name==g], trails=cs@settings$trails, cts=cts[name==g],
+                         settings=list(diag.rm=diag.rm, nbins=nbins, dispersion=cs@par$alpha, tol.val=cs@settings$tol.leg,
+                                                                  inflate=2, nperf=500, opt.every=10, maxsteps=100000))
+csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
+csig.n=csig
+g=groupnames[2]
+csig=new("CSbsig", mat=cs@par$signal[name==g], trails=cs@settings$trails, cts=cts[name==g],
+                         settings=list(diag.rm=diag.rm, nbins=nbins, dispersion=cs@par$alpha, tol.val=cs@settings$tol.leg,
+                                                                    inflate=2, nperf=500, opt.every=10, maxsteps=100000))
+csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
+csig.p=csig
+
+csig.p@cts[,lmu.nosig.ori:=lmu.nosig]
+csig.p@cts[,lmu.nosig:=lmu.nosig-0.26]
+
+sink("test")
+a.p=csnorm:::gfl_BIC(csig.p, lambda2=5, constrained=T, positive=T, fixed=F)
+cat("Negative\n")
+a.n=csnorm:::gfl_BIC(csig.p, lambda2=5, constrained=F, positive=T, fixed=F)
+sink()
+
+mat.p=as.data.table(a.p$mat)
+mat.p[,dset:="E11P"]
+mat.n=as.data.table(a.n$mat)
+mat.n[,dset:="E11N"]
+mean(mat.n[,beta]-mat.p[,beta])
+mat=rbind(mat.n,mat.p)
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+facet_wrap(~dset)+scale_fill_gradient2()
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=beta))+facet_wrap(~dset)+scale_fill_gradient2()
+mat[,minval:=min(beta),by=c("diag.idx","dset")]
+mat[,greyzone:=beta>0.1906227&beta<0.3450843]
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=greyzone))+facet_wrap(~dset)
+mat[,is.minval:=abs(beta-minval)<1e-4]
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=is.minval))+facet_wrap(~dset)
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=is.minval&greyzone))+facet_wrap(~dset)
+mat[is.minval&greyzone,max(beta),by=dset]
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=beta))+geom_raster(aes(bin2,bin1,fill=beta),data=mat[greyzone&is.minval])+facet_wrap(~dset)+scale_fill_gradient2()
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=pmin(phihat,max(beta))))+geom_raster(aes(bin2,bin1,fill=beta),data=mat[greyzone&is.minval])+facet_wrap(~dset)+scale_fill_gradient2()
+
+a=fread("test2")
+b=a[,.(dset=V2,status=V4,lambda2=V6,lambda1=V8,eCprime=V10,CV=V12,dof=V14,UB=V16,LB=V18)]
+ggplot(melt(b,id.vars = c("dset","lambda2","lambda1","status"))[lambda2==lambda2[1]])+geom_line(aes(lambda1,value,colour=dset,linetype=status))+facet_wrap(~variable,scales="free")
+
+mat.p=as.data.table(a.p$mat)
+
+
+matg = csnorm:::gfl_get_matrix(csig, 0.1, 5, 0)
+ggplot(matg)+geom_raster(aes(bin1,bin2,fill=log(weight)))+scale_fill_gradient2()
+
+newmat=as.data.table(csnorm:::cts_to_signal_mat(csig@cts, csig@settings$nbins, cs@par$alpha,
+                  cs@par$signal[name==g,phi], 0., diag.rm))
+ggplot(cs@par$signal)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()
+ggplot(newmat)+geom_raster(aes(bin1,bin2,fill=log(weight)))+scale_fill_gradient2()
+
+csig@cts[unclass(bin1)==30&unclass(bin2)%in%c(211,212)]
+newmat[unclass(bin1)==30&unclass(bin2)%in%c(211,212)]
+b2=newmat[unclass(bin1)==30&unclass(bin2)%in%c(211,212)][2,bin2]
+cs@biases[name==g&pos>=35533086&pos<35543086]
+cs@counts[name==g&pos1>=33713086&pos1<33723086&pos2>=35533086&pos2<35543086]
+
+
+ggplot(cs@par$biases[name==g&pos>75124951&pos<75144951])+
+  geom_pointrange(aes(pos,etahat,ymax=etahat+std,ymin=etahat-std,colour=cat))+geom_line(aes(pos,eta))+facet_grid(cat~.)
+
+
+
+

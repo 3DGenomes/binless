@@ -8,65 +8,99 @@ library(scales)
 
 setwd("/home/yannick/simulations/cs_norm")
 
-a=examine_dataset("/scratch/fillon/E6N_hg19e6_chr2_199M-201M.tsv",skip=0,nrows=1e6,skip.fbm=F, read.len=75)
-'a$data[category!="none"]
-   re.closest2 re.closest2.idx re.closest1 re.closest1.idx                                      id    begin1 strand1 length1    re.up1
-1:   199002357              10   199002357              10  D00733:206:CB0CFANXX:1:1215:18796:3007 199002287       0      75 199002086
-2:   199003072              11   199002357              10 D00733:206:CB0CFANXX:2:2311:17438:73274 199002287       0      75 199002086
-3:   199003126              12   199003072              11 D00733:209:CB0CBANXX:1:2111:15749:87306 199003073       1      54 199003072
-4:   199003126              12   199003072              11 D00733:209:CB0CBANXX:2:2205:15446:26245 199003073       0      61 199003072
-re.dn1    begin2 strand2 length2    re.up2    re.dn2   rbegin1     rend1   rbegin2     rend2 category
-1: 199002357 199002567       0      75 199002357 199003072 199002287 199002213 199002567 199002493     test
-2: 199002357 199002731       0      75 199002357 199003072 199002287 199002213 199002731 199002657     test
-3: 199003126 199003188       1      75 199003126 199003655 199003073 199003126 199003188 199003262    test2
-4: 199003126 199003193       0      75 199003126 199003655 199003073 199003013 199003193 199003119    test2
-'
-plot_raw(a$data,b1=a$data[,min(rbegin1)+2000],e1=a$data[,min(rbegin1)+4000])
-
-"
-D00733:206:CB0CFANXX:1:1215:18796:3007    97    chr2    199002287    60    75M    =    199002567    355    TGTAAGACTGGAGGAGGATTCTTGCCTCTCCTCCAGGCAAGCATAAAAAAATCCTTGTACTGTGTTTCACTGATC    CCCCBGGGGGFBGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGFGGGGGGGG    NM:i:0    MD:Z:75    AS:i:75    XS:i:18
-D00733:206:CB0CFANXX:1:1215:18796:3007    145    chr2    199002567    60    75M    =    199002287    -355    GTTCCGTAGGGGCAGGGATGATGTCTGTGCTCACTTTTGTAACCCCCAGAGTCCAGCCTGGTGATTCTCAATGGG    GGGGGGGGGGGGGGGGGGGGGGGGFGGFGGGGGGGGGGGGGGGGGGGGGGGGGFGGGGGGGGDFGGGGEGBBCCC    NM:i:0    MD:Z:75    AS:i:75    XS:i:18
-
-D00733:206:CB0CFANXX:2:2311:17438:73274    97    chr2    199002287    60    75M    =    199002731    519    TGTAAGACTGGAGGAGGATTCTTGCCTCTCCTCCAGGCAAGCATAAAAAAATCCTTGTACTGTGTTTCACTGATC    B@BABGD1CGGGGGGGGGGGGGGGGGGGGGGG>@BG>>EEDGGGG11DG/EFCGGGCG@FBFGGD1FGG>GGE@G    NM:i:0    MD:Z:75    AS:i:75    XS:i:18
-D00733:206:CB0CFANXX:2:2311:17438:73274    145    chr2    199002731    60    75M    =    199002287    -519    TTTGATGTCATGCTCTGGGCAGGGCAGTACAACATGATGAAAAATGTCCTGTGTCCTGCAAGATTTCTGTTAAGT    F1GGD1>F1GGDGFF:GG@DCE1FED@GFCGFGGDDC1FCGFECED:GBGG@DB>FF>GGGGFC1BG@B1BABA?    NM:i:0    MD:Z:75    AS:i:75    XS:i:19
-
-D00733:209:CB0CBANXX:1:2111:15749:87306    81    chr2    199003188    60    75M    =    199003073    -190    ATTTGGGTGGGGACACAGAGCCAAACCATATCACCCTCTAAAATACAAATCAGAATACTTTAGTATATGATATTA    GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGBGGGGGGFGGGGGGGGGGGGGGGGGGGGGGGGGGGGGCCCCB    NM:i:0    MD:Z:75    AS:i:75    XS:i:39
-D00733:209:CB0CBANXX:1:2111:15749:87306    161    chr2    199003073    60    21S54M    =    199003188    190    GGAGGCTGAGATAGAAGGATCGATCTCCTGAGAACTTACTATCACAAGAACAACAAGGAGGAAATCTGCCCCTTT    BBBCCGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGEGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG    NM:i:0    MD:Z:54    AS:i:54    XS:i:33
-
-D00733:209:CB0CBANXX:2:2205:15446:26245    97    chr2    199003073    60    14S61M    =    199003193    195    ATTTTAGTAAGATCGATCTCCTGAGAACTTACTATCACAAGAACAACAAGGAGGAAATCTGCCCCTTTGATCCAT    CCCCCGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG    NM:i:0    MD:Z:61    AS:i:61    XS:i:33
-D00733:209:CB0CBANXX:2:2205:15446:26245    145    chr2    199003193    60    75M    =    199003073    -195    GGTGGGGACACAGAGCCAAACCATATCACCCTCTAAAATACAAATCAGAATACTTTAGTATATGATATTAATTAA    GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGFGGGGGGGGGGGFGGGGGGGGGGGGGGGGCCBCC    NM:i:0    MD:Z:75    AS:i:75    XS:i:20"
-
-flag:
-  97  = 1 + 32 + 64  = "paired-end + next is rev + read1"
-  145 = 1 + 16 + 128 = "paired-end + this is rev + read2"
-  81  = 1 + 16 + 64  = "paired-end + this is rev + read1"
-  161 = 1 + 32 + 128 = "paired-end + next is rev + read2"
-
-strand:
-  "D00733:206:CB0CFANXX:1:1215:18796:3007 is -> <-"
-  "D00733:206:CB0CFANXX:2:2311:17438:73274 is -> <-"
-  "D00733:209:CB0CBANXX:1:2111:15749:87306 is -> <- (in BAM, read1 > read2)"
-  "D00733:209:CB0CBANXX:2:2205:15446:26245 is -> <-"
-
-tsv file:
-"
-D00733:206:CB0CFANXX:1:1215:18796:3007  chr2    199002287       0       75      199002086       199002357       chr2    199002567       0       75      199002357     199003072
-D00733:206:CB0CFANXX:2:2311:17438:73274 chr2    199002287       0       75      199002086       199002357       chr2    199002731       0       75      199002357     199003072
-D00733:209:CB0CBANXX:1:2111:15749:87306 chr2    199003073       1       54      199003072       199003126       chr2    199003188       1       75      199003126     199003655
-D00733:209:CB0CBANXX:2:2205:15446:26245 chr2    199003073       0       61      199003072       199003126       chr2    199003193       0       75      199003126     199003655
-"
+if(F) {
+  a=examine_dataset("/scratch/filion/E11N_chr7_137-139M_imperfect.tsv",skip=0,nrows=1e6,skip.fbm=F, read.len=75)
+  #cut at 750bp for pdiag
+  #cut at 1000bp for pclose
+  #dL=1 and dR=5
+  csd=read_and_prepare(paste0("/scratch/filion/E11N_chr7_137-139M_imperfect.tsv"),
+                       paste0("data/filion_E11N_chr7_1.6M"), "E11N", "1", locus=c("chr7",137200000,138800000),
+                       enzyme="MboI", name=paste("E11N"), circularize=-1, dangling.L=c(1),
+                       dangling.R=c(5), maxlen=750, read.len=75, dmin=1000, save.data=T)
+  csd=read_and_prepare(paste0("/scratch/filion/E11P_chr7_137-139M_imperfect.tsv"),
+                       paste0("data/filion_E11P_chr7_1.6M"), "E11P", "1", locus=c("chr7",137200000,138800000),
+                       enzyme="MboI", name=paste("E11P"), circularize=-1, dangling.L=c(1),
+                       dangling.R=c(5), maxlen=750, read.len=75, dmin=1000, save.data=T)
   
-"
-In D00733:206:CB0CFANXX:1:1215:18796:3007:
- - strand1 should be 1 because bit 16 of flag (97) is 0, indicating fwd
+  load("data/filion_E11P_chr7_2M_csdata_with_data.RData")
+  plot_raw(csd@data,b1=csd@data[,min(rbegin1)+2000],e1=csd@data[,min(rbegin1)+5000])
+}
 
-In D00733:206:CB0CFANXX:2:2311:17438:73274:
- - strand1 should be 1 because bit 16 of flag (97) is 0, indicating fwd
+bpk=50
+dfuse=20 #as.integer(args[2])
+bpd=10 #as.integer(args[4])
+bpb=10 #as.integer(args[5])
+ncores=10
 
-In D00733:209:CB0CBANXX:1:2111:15749:87306:
- - strand2 should be 0 because bit 16 of flag (81) is 1, indicating rev
+setwd("/home/yannick/simulations/cs_norm")
 
-In D00733:209:CB0CBANXX:2:2205:15446:26245:
- - strand1 should be 1 because bit 16 of flag (97) is 0, indicating fwd
-"
+load("data/filion_E11N_chr7_1.6M_csdata.RData")
+csd1=csd
+load("data/filion_E11P_chr7_1.6M_csdata.RData")
+csd2=csd
+cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none", dfuse=dfuse)
+cs = run_gauss(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
+               ngibbs = 5, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
+               ncounts = 1000000, ncores=ncores, base.res=10000, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T)
+save(cs,file=paste0("data/filion_E11_chr7_1.6M_csnorm_optimized.RData"))
+cs = run_gauss(cs, restart=T, ngibbs = 15, ncores=ncores)
+save(cs,file=paste0("data/filion_E11_chr7_1.6M_csnorm_optimized.RData"))
 
+for (resolution in c(10000)) {
+  cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
+  cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
+  cs=detect_binless_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])
+  save(cs,file=paste0("data/filion_E11_chr7_1.6M_csnorm_optimized.RData"))
+}
+
+if (F) {
+  load(paste0("data/filion_E11_chr7_1.6M_csnorm_optimized.RData"))
+  
+  csnorm:::has_converged(cs)
+  cs@diagnostics$params[,sum(runtime)]/3600
+  
+  plot_diagnostics(cs)$plot
+  plot_diagnostics(cs)$plot2
+  
+  signals=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
+    if ("signal" %in% cs@diagnostics$params[step==i,leg]) {
+      sig=copy(cs@diagnostics$params[step==i&leg=="signal",signal][[1]])
+      sig[,step:=i]
+      sig
+    }
+  }
+  
+  ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_wrap(~ step)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
+  ggplot(signals[name==name[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_wrap(~ step)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
+  ggplot(signals[step>=step[.N]-1])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_grid(step~ name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
+  ggplot(signals[step>=step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_wrap(~name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
+  ggplot(signals[step>=step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phihat))+facet_wrap(~name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
+  
+  resolution=10000
+  mat.binned=get_matrices(cs, resolution=resolution, group="all")
+  #observed
+  ggplot(mat.binned)+geom_raster(aes(begin1,begin2,fill=log(observed)))+geom_raster(aes(begin2,begin1,fill=log(observed)))+facet_wrap(~name)+
+    scale_fill_gradient(high="black", low="white", na.value = "white")+coord_fixed()
+  ggsave(filename="images/filion_E11_base10k_observed.pdf",width=20,height=7)
+  
+  mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
+  ggplot(mat)+geom_raster(aes(begin1,begin2,fill=phi))+
+    geom_raster(aes(begin2,begin1,fill=phi))+coord_fixed()+
+    facet_wrap(~name)+scale_fill_gradient(high="black", low="white",na.value = "white")
+  ggsave(filename="images/filion_E11_base10k_binless.pdf",width=20,height=7)
+  ggplot(mat)+geom_raster(aes(begin1,begin2,fill=beta))+
+    geom_raster(aes(begin2,begin1,fill=beta))+coord_fixed()+
+    facet_wrap(~name)+scale_fill_gradient(high="black", low="white",na.value = "white")
+  ggsave(filename="images/filion_E11_base10k_binless_nosignif.pdf",width=20,height=7)
+  
+  write.table(merge(mat.binned[,.(name,begin1,begin2,observed)],
+                    mat[,.(name,begin1,begin2,phi,beta)],by=c("name","begin1","begin2")),
+              file="data/filion_E11_base10k_normalized.txt", row.names=F, quote=F)
+  
+  mat=get_interactions(cs, type="CSbdiff", resolution=resolution, group="all", ref=as.character(cs@experiments[1,name]))
+  ggplot(mat)+geom_raster(aes(begin1,begin2,fill=delta))+coord_fixed()+
+    geom_raster(aes(begin2,begin1,fill=delta))+
+    facet_wrap(~name)+scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"),na.value="white")
+  ggsave(filename="images/filion_E11_base10k_bdiff.pdf",width=15,height=7)
+  
+}

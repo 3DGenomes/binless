@@ -47,10 +47,9 @@ gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
     perf.c = csnorm:::gfl_perf_iteration(csig, lambda1, lambda2, eCprime)
   }
   if (class(csig)!="CSbdiff") {
-    matg = as.data.table(perf.c$mat)[,.(bin1,bin2,valuehat=phihat,ncounts,weight,value=phi,diag.idx)]
+    matg = as.data.table(perf.c$mat)
   } else {
-    matg = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,
-                                        value=delta,phi.ref,diag.idx)]
+    matg = as.data.table(perf.c$mat)
   }
   setkey(matg,bin1,bin2)
   #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=value))+scale_fill_gradient2()
@@ -105,15 +104,24 @@ gfl_BIC_fixed = function(csig, lambda1, lambda2, eCprime) {
   tol.val=csig@settings$tol.val
   state=csig@state
   stopifnot(length(state)>0) #warm start only
-  stopifnot(class(csig)=="CSbsig")
+  if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
   inflate=csig@settings$inflate
   nperf=csig@settings$nperf
   opt.every=csig@settings$opt.every
   maxsteps=csig@settings$maxsteps
-  perf.c = csnorm:::wgfl_signal_BIC_fixed(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                      trails$breakpoints, lambda1, lambda2, eCprime,
-                                      state$alpha, inflate, maxsteps, tol.val, diag.rm,
-                                      state$beta)
+  if (is.null(ctsg.ref)) {
+    perf.c = csnorm:::wgfl_signal_BIC_fixed(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                                            trails$breakpoints, lambda1, lambda2, eCprime,
+                                            state$alpha, inflate, maxsteps, tol.val, diag.rm,
+                                            state$beta)
+  } else {
+    stopifnot(eCprime==0)
+    perf.c = csnorm:::wgfl_diff_BIC_fixed(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
+                                    trails$breakpoints, lambda1, lambda2,
+                                    state$alpha, inflate, maxsteps, tol.val, diag.rm,
+                                    state$phi.ref, state$beta)
+    
+  }
   return(perf.c)
 }
 
@@ -126,7 +134,6 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.thr
     } else {
       a = csnorm:::gfl_BIC_fixed(csig, 0, lambda2=10^(x), 0)
       if (positive==T) {
-        stopifnot(fixed==F)
         a$eCprime=min(a$beta)
         a$phi=a$beta-min(a$beta)
         a$mat$phi=a$phi
@@ -142,15 +149,15 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.thr
   #  obj(log10(lam))
   #  as.data.table(csig@state$mat)[,.(lambda2=lam,lambda1=csig@state$lambda1,eCprime=csig@state$eCprime,bin1,bin2,phihat,phi,beta)]
   #}
-  #dt.fix = foreach (lam=10^(seq(-1,1,length.out=100)),.combine=rbind) %dopar% {
-  #  csig@state <<- csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=T)
+  #dt.fix = foreach (lam=10^(seq(0,1,length.out=100)),.combine=rbind) %dopar% {
+  #  csig@state <<- csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed)
   #  as.data.table(csig@state[c("lambda2","lambda1","eCprime","dof","BIC")])
   #}
   #dt=rbindlist(list(free=dt.free,fix=dt.fix), use=T, idcol="ori")
   #ggplot(dt)+geom_line(aes(lambda2,BIC,colour=ori))#+geom_point(data=r,aes(10^x,y))#+xlim(1,3)+ylim(1600,2000)
   ### optimization in four stages
-  #first, find rough minimum between 1 and 100
-  minlambda=1
+  #first, find rough minimum between 10 and 100
+  minlambda=10
   maxlambda=100
   op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
   lambda2=10^op$minimum
@@ -178,12 +185,10 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.thr
   lambda2=10^op$minimum
   #finish
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
-  if (lambda2 <= csig@settings$tol.val*10) {
-    cat("   Warning: lambda2 too close to lower boundary.")
-    lambda2=0
-  }
+  if (lambda2==minlambda) cat("   Warning: lambda2 hit lower boundary.\n")
   obj(log10(lambda2))
   retvals = as.list(csig@state)[c("lambda2","lambda1","eCprime","BIC","dof")]
+  if (fixed==T && abs(retvals$eCprime)>csig@settings$tol.val) cat("Warning: fixed = T but eCprime != 0\n") #only when signif.threshold==T
   csig@par=modifyList(csig@par,retvals)
   return(csig)
 }
@@ -216,7 +221,8 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
 csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, signif.threshold=T) {
-  csig = csnorm:::optimize_lambda2(csig, constrained=constrained, positive=positive, fixed=fixed, signif.threshold=signif.threshold)
+  csig = csnorm:::optimize_lambda2(csig, constrained=constrained, positive=positive, fixed=fixed,
+                                   signif.threshold=signif.threshold)
   csig@par$name=csig@cts[,name[1]]
   #matg=csnorm:::gfl_get_matrix(csig, 0, csig@par$lambda2, 0)
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
@@ -338,7 +344,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   if (verbose==T) cat("  Fused lasso\n")
   groupnames=csi@cts[,unique(name)]
   registerDoParallel(cores=ncores)
-  params = foreach(g=groupnames, .combine=rbind) %dopar% {
+  params = foreach(g=groupnames, .combine=rbind) %do% {
     csig = csi
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
@@ -351,7 +357,9 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
       cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],"\n")
   #compute matrix at new params
   mat = rbindlist(params[,mat])
-  mat[,phi:=value]
+  mat[,c("value","valuehat"):=list(phi,phihat)]
+  #report parameters
+  csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],name=params[,name])
   #
   #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()+facet_wrap(~name)
   #ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
@@ -360,7 +368,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #
   if (verbose==T) cat(" Detect patches\n")
   csi@mat = foreach(g=groupnames, .combine=rbind) %dopar% {
-    matg = mat[name==g,.(name,bin1,bin2,value,phi=value,phihat=valuehat,weight,ncounts,diag.idx)]
+    matg = mat[name==g]
     cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
     matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
     matg
@@ -399,7 +407,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   if (verbose==T) cat("  Fused lasso\n")
   groupnames=csi@cts[,unique(name)]
   registerDoParallel(cores=ncores)
-  params = foreach(g=groupnames, .combine=rbind) %dopar% {
+  params = foreach(g=groupnames, .combine=rbind) %do% {
     csig = csi
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
@@ -412,7 +420,9 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
       cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],"\n")
   #compute matrix at new params
   mat = rbindlist(params[,mat])
-  mat[,delta:=value]
+  mat[,c("value","valuehat"):=list(delta,deltahat)]
+  #report parameters
+  csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],name=params[,name])
   #
   #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()+facet_wrap(~name)
   #ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
@@ -421,7 +431,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #
   if (verbose==T) cat(" Detect patches\n")
   csi@mat = foreach(g=groupnames, .combine=rbind) %dopar% {
-    matg = mat[name==g,.(name,bin1,bin2,value,delta=value,phi.ref,phihat.ref,deltahat=valuehat,weight,ncounts,diag.idx)]
+    matg = mat[name==g]
     cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
     matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
     matg

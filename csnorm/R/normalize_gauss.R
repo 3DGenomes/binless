@@ -477,9 +477,9 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       beta_iota = beta[1:Krow]
       beta_rho = beta[(Krow+1):(2*Krow)]
       
-      nlambda_iota = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_iota)+1e6)
+      nlambda_iota = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_iota)+1e10)
       nlambda_iota = sqrt(as.numeric(nlambda_iota))
-      nlambda_rho = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_rho)+1e6)
+      nlambda_rho = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_rho)+1e10)
       nlambda_rho = sqrt(as.numeric(nlambda_rho))
       
       epsilon = max(abs(lambda_iota-nlambda_iota),abs(lambda_rho-nlambda_rho))
@@ -687,7 +687,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
   groupnames=cts[,unique(name)]
   nbins=length(cs@settings$sbins)-1
   registerDoParallel(cores=ncores)
-  params = foreach(g=groupnames, .combine=rbind) %dopar% {
+  params = foreach(g=groupnames, .combine=rbind) %do% {
     csig=new("CSbsig", mat=cs@par$signal[name==g], trails=cs@settings$trails, cts=cts[name==g],
              settings=list(diag.rm=diag.rm, nbins=nbins, dispersion=cs@par$alpha, tol.val=cs@settings$tol.leg,
                            inflate=2, nperf=500, opt.every=10, maxsteps=100000))
@@ -697,12 +697,11 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
   #compute matrix at new params
   mat = rbindlist(params[,mat])
   #store new signal in cs and update eC
-  mat[,phi:=value]
   #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+
   #  scale_fill_gradient2()
   #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
   setkey(mat,name,bin1,bin2)
-  cs@par$signal=mat[,.(name,bin1,bin2,phihat=valuehat,weight,ncounts,phi)]
+  cs@par$signal=mat[,.(name,bin1,bin2,phihat,weight,ncounts,phi)]
   params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
   cs@par$eC=as.array(params[,eC+eCprime])
   cs@par$eCprime=as.array(params[,eCprime])
@@ -870,6 +869,40 @@ plot_diagnostics = function(cs, start=1) {
     geom_point(aes(step,value,colour=leg))+facet_wrap(~variable, scales = "free_y")
   return(list(plot=plot,plot2=plot2))
 }
+
+#' Save normalized CS object, discarding everything but
+#' input counts and final normalization parameters
+#' 
+#' @param cs a normalized CSnorm object
+#' @param fname where to save it to
+#'   
+#' @export
+#' 
+#' @examples
+save_stripped = function(cs, fname) {
+  cs@diagnostics=list(params=data.table())
+  cs@zeros=data.table()
+  cs@groups=list()
+  save(cs,file=fname)
+}
+
+#' Load normalized CS object saved with save_stripped,
+#' rebuild zeros data.table
+#' 
+#' @param fname file name
+#' @param ncores number of CPUs to use to reconstruct zeros
+#'   
+#' @return A cs object on which signal detection can be performed
+#'
+#' @export
+#' 
+#' @examples
+load_stripped = function(fname, ncores=1) {
+  cs=get(load(fname))
+  cs@zeros = csnorm:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
+  return(cs)
+}
+
 
 #' Cut-site normalization (normal approximation)
 #' 

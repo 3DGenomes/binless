@@ -6,12 +6,12 @@ using namespace Rcpp;
 #include <ctime>
 #include <string>
 
-#include "optimize_lambda1.hpp"
+#include "optimize_lambda1_diff.hpp"
 #include "util.hpp"
 #include "graph_trails.hpp" //boost_build_patch_graph_components
 #include <boost/math/tools/minima.hpp> //brent_find_minima
 
-obj_lambda1_BIC::obj_lambda1_BIC(double minUB, double tol_val,
+obj_lambda1_diff_BIC::obj_lambda1_diff_BIC(double minUB, double tol_val,
                                  IntegerVector patchno, NumericVector forbidden_vals,
                                  NumericVector value, NumericVector weight, NumericVector valuehat,
                                  NumericVector ncounts) :
@@ -20,12 +20,12 @@ obj_lambda1_BIC::obj_lambda1_BIC(double minUB, double tol_val,
   patchno_(patchno), forbidden_vals_(forbidden_vals),
   absval_(abs(value)), value_(value), weight_(weight), valuehat_(valuehat) {/*TODO: discard points with weight==0*/}
 
-double obj_lambda1_BIC::operator()(double x) const {
+double obj_lambda1_diff_BIC::operator()(double x) const {
   //return get(std::pow(10,x), "opt")["BIC"];
   return get(std::pow(10,x))["BIC"];
 }
 
-NumericVector obj_lambda1_BIC::get(double val, std::string msg) const {
+NumericVector obj_lambda1_diff_BIC::get(double val, std::string msg) const {
   //split data in two groups and determine constraint values
   //Rcout << "  GET at " << val << " maxabsval_= " << maxabsval_ << std::endl;
   LogicalVector grp1 = value_ > val, grp2 = value_ < -val;
@@ -98,21 +98,23 @@ NumericVector obj_lambda1_BIC::get(double val, std::string msg) const {
                                _["dof"]=dof, _["UB"]=UB, _["LB"]=-UB);
 }
 
-obj_lambda1_CV::obj_lambda1_CV(double minUB, double tol_val,
+obj_lambda1_diff_CV::obj_lambda1_diff_CV(double minUB, double tol_val,
                          IntegerVector patchno, NumericVector forbidden_vals,
                          NumericVector value, NumericVector weight, NumericVector valuehat,
+                         NumericVector weight_ref, NumericVector valuehat_ref,
                          NumericVector ncounts) :
     minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(max(abs(value))),
     tol_val_(tol_val), lsnc_(log(sum(ncounts))),
     patchno_(patchno), forbidden_vals_(forbidden_vals),
-    absval_(abs(value)), value_(value), weight_(weight), valuehat_(valuehat) {/*TODO: discard points with weight==0*/}
+    absval_(abs(value)), value_(value), weight_(weight), valuehat_(valuehat),
+    weight_ref_(weight_ref), valuehat_ref_(valuehat_ref) {/*TODO: discard points with weight==0*/}
 
-double obj_lambda1_CV::operator()(double x) const {
+double obj_lambda1_diff_CV::operator()(double x) const {
     //return get(std::pow(10,x), "opt")["BIC"];
     return get(std::pow(10,x))["BIC"];
 }
 
-NumericVector obj_lambda1_CV::get(double val, std::string msg) const {
+NumericVector obj_lambda1_diff_CV::get(double val, std::string msg) const {
   //split data in two groups and determine constraint values
   //Rcout << "  GET at " << val << " maxabsval_= " << maxabsval_ << std::endl;
   LogicalVector grp1 = value_ > val, grp2 = value_ < -val;
@@ -174,10 +176,22 @@ NumericVector obj_lambda1_CV::get(double val, std::string msg) const {
                                    _["UB"]=lambda1, _["LB"]=-lambda1);
   }
     std::vector<double> value_r = as<std::vector<double> >(value_);
-    NumericVector soft = wrap(soft_threshold(value_r, 0, lambda1));
+    std::vector<double> soft_r = soft_threshold(value_r, 0, lambda1);
+    NumericVector soft = wrap(soft_r);
+    std::vector<double> valuehat_r = as<std::vector<double> >(valuehat_);
+    std::vector<double> valuehat_ref_r = as<std::vector<double> >(valuehat_ref_);
+    std::vector<double> var, var_ref;
+    var.reserve(valuehat_r.size());
+    var_ref.reserve(valuehat_r.size());
+    for (int i=0; i<valuehat_r.size(); ++i) {
+      var.push_back(1/weight_(i));
+      var_ref.push_back(1/weight_ref_(i));
+    }
+    NumericVector phi_ref = wrap(compute_phi_ref(soft_r, valuehat_r, var, valuehat_ref_r, var_ref));
+    
     IntegerVector selected = patchno_[abs(soft)>tol_val_/2];
     const int dof = unique(selected).size();
-    const double CV = sum(weight_ * SQUARE(valuehat_ - soft));
+    const double CV = sum(weight_ref_ * SQUARE(valuehat_ref_ - phi_ref) + weight_*SQUARE(valuehat_-(phi_ref+soft)));
     if (!msg.empty()) Rcout << " OBJ " << msg << " ok lambda1= " << lambda1 << " eCprime= 0"
                             << " CV= " << CV  << " dof= " << dof
                             << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;
@@ -185,15 +199,17 @@ NumericVector obj_lambda1_CV::get(double val, std::string msg) const {
                                  _["dof"]=dof, _["UB"]=UB, _["LB"]=-UB);
 }
 
-NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
-                                   double tol_val, bool positive,
+NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
+                                   double tol_val,
                                    double lambda1_min, int refine_num) {
     const bool constrained = true;
     //extract vectors
     double lmin = std::max(lambda1_min,tol_val/2);
     std::clock_t c_start = std::clock();
-    NumericVector weight = mat["weight"];
+    NumericVector weight = 1/as<NumericVector>(mat["phihat.var"]);
+    NumericVector weight_ref = 1/as<NumericVector>(mat["phihat.var.ref"]);
     NumericVector phihat = mat["phihat"];
+    NumericVector phihat_ref = mat["phihat.ref"];
     NumericVector beta = mat["beta"];
     NumericVector ncounts = mat["ncounts"];
     IntegerVector diag_idx = mat["diag.idx"];
@@ -209,19 +225,14 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
     //there is at least one zero signal value per diagonal idx
     NumericVector forbidden_vals;
     if (constrained) {
-        if (positive) {
-          forbidden_vals = get_minimum_diagonal_values(beta, diag_grp);
-          lmin = std::max(lmin, std::max(std::abs(forbidden_vals(0)), std::abs(forbidden_vals(forbidden_vals.size()-1))));
-        } else {
-          NumericVector abeta=abs(beta);
-          forbidden_vals = get_minimum_diagonal_values(abeta, diag_grp);
-        }
+      NumericVector abeta=abs(beta);
+      forbidden_vals = get_minimum_diagonal_values(abeta, diag_grp);
     }
     //create functor
-    /*obj_lambda1_BIC obj(lmin, tol_val, patchno, forbidden_vals,
+    /*obj_lambda1_diff_BIC obj(lmin, tol_val, patchno, forbidden_vals,
                         beta, weight, phihat, ncounts);*/
-    obj_lambda1_CV obj(lmin, tol_val, patchno, forbidden_vals,
-                    beta_cv, weight, phihat, ncounts);
+    obj_lambda1_diff_CV obj(lmin, tol_val, patchno, forbidden_vals,
+                    beta_cv, weight, phihat, weight_ref, phihat_ref, ncounts);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     //get minimum authorized patch value
     double minpatch = max(abs(forbidden_vals));
