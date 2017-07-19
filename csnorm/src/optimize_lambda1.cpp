@@ -181,8 +181,8 @@ NumericVector obj_lambda1_CV::get(double val, std::string msg) const {
                               << " eCprime= 0 CV= Inf dof= NA"
                               << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;
       return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1,
-                                   _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na(),
-                                   _["UB"]=lambda1, _["LB"]=-lambda1);
+                                   _["BIC"]=std::numeric_limits<double>::max(), _["BIC.sd"]=0,
+                                   _["dof"]=NumericVector::get_na(), _["UB"]=lambda1, _["LB"]=-lambda1);
   }
   std::vector<double> value_r = as<std::vector<double> >(value_);
   NumericVector soft = wrap(soft_threshold(value_r, 0, lambda1));

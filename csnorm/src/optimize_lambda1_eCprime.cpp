@@ -220,8 +220,8 @@ NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
                             << " eCprime= " << eCprime << " CV= Inf dof= NA"
                             << " UB= " << UB  << " LB= " << LB << std::endl;
     return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
-                                 _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na(),
-                                 _["UB"]=UB, _["LB"]=LB);
+                                 _["BIC"]=std::numeric_limits<double>::max(), _["BIC.sd"]=0,
+                                 _["dof"]=NumericVector::get_na(), _["UB"]=UB, _["LB"]=LB);
   }
   //compute dof and CV
   std::vector<double> value_r = as<std::vector<double> >(value_);
