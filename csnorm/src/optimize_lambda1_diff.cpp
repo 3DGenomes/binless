@@ -260,21 +260,8 @@ NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     //get minimum authorized patch value
     double minpatch = max(abs(forbidden_vals));
-    /*Rcout << "minpatch= " << minpatch << " npatches= " << patchvals.size() << " npatches.ok= "
-            << as<NumericVector>(patchvals[patchvals>=minpatch]).size() << std::endl;*/
-    //loop over patch values
     std::clock_t c_in1 = std::clock();
-    //NumericVector best = obj.get(patchvals(0) - 2*tol_val, "opt"); //query is < xmin
-    NumericVector best = obj.get(0); //query is < xmin
-    for (int i=0; i<patchvals.size(); ++i) {
-      if (patchvals(i) <= minpatch) continue;
-      //NumericVector val = obj.get(patchvals(i) + 2*tol_val, "opt");
-      NumericVector val = obj.get(patchvals(i) + 2*tol_val);
-      if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
-    }
-    //NumericVector val = obj.get(2*max(abs(beta)) + 2*tol_val, "opt");
-    NumericVector val = obj.get(2*max(abs(beta)) + 2*tol_val);
-    if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
+    NumericVector best = optimize_CV(obj, 0, minpatch, 2*max(abs(beta)) + 2*tol_val, tol_val, patchvals);
     std::clock_t c_in2 = std::clock();
     //finalize
     //obj.get(as<double>(best["UB"])+2*tol_val,"final");
