@@ -204,12 +204,16 @@ NumericVector obj_lambda1_diff_CV::get(double val, std::string msg) const {
     
     IntegerVector selected = patchno_[abs(soft)>tol_val_/2];
     const int dof = unique(selected).size();
+    
     const NumericVector indiv_CV = weight_ref_ * SQUARE(valuehat_ref_ - phi_ref) + weight_*SQUARE(valuehat_-(phi_ref+soft));
-    NumericVector groupwise_CV;
+    NumericVector groupwise_CV, groupwise_weights;
     const int ngroups=2;
-    for (int i=0; i<ngroups; ++i) groupwise_CV.push_back(sum(as<NumericVector>(indiv_CV[cv_grp_==i])));
-    const double CV = sum(groupwise_CV)/indiv_CV.size();
-    const double CV_sd = std::sqrt(sum(SQUARE(groupwise_CV)) - SQUARE(sum(groupwise_CV))/ngroups)/indiv_CV.size();
+    for (int i=0; i<ngroups; ++i) {
+      groupwise_CV.push_back(sum(as<NumericVector>(indiv_CV[cv_grp_==i])));
+      groupwise_weights.push_back(sum(cv_grp_==i));
+    }
+    const double CV = sum(groupwise_weights*groupwise_CV)/sum(groupwise_weights);
+    const double CV_sd = std::sqrt(sum(groupwise_weights*SQUARE(groupwise_CV))/sum(groupwise_weights) - SQUARE(CV));
     
     if (!msg.empty()) Rcout << " OBJ " << msg << " ok lambda1= " << lambda1 << " eCprime= 0"
                             << " CV= " << CV  << " dof= " << dof
