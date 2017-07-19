@@ -284,7 +284,8 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     double minpatch = max(forbidden_vals);
     std::clock_t c_in1 = std::clock();
-    NumericVector best = optimize_CV(obj, patchvals(0) - 2*tol_val, minpatch, maxval + 2*tol_val, tol_val, patchvals);
+    const double k=1;
+    NumericVector best = optimize_CV_kSD(obj, patchvals(0) - 2*tol_val, minpatch, maxval + 2*tol_val, tol_val, patchvals, k);
     std::clock_t c_in2 = std::clock();
     //finalize
     //obj.get(as<double>(best["UB"])+2*tol_val,"final");
