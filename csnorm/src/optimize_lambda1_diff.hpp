@@ -36,8 +36,9 @@ struct obj_lambda1_diff_CV {
 
     double minUB_, minabsval_, maxabsval_, tol_val_, lsnc_;
     NumericVector forbidden_vals_;
-    IntegerVector cv_grp_, patchno_;
+    IntegerVector patchno_;
     NumericVector value_, absval_, weight_, valuehat_, weight_ref_, valuehat_ref_;
+    IntegerVector cv_grp_;
 };
 
 NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,

@@ -109,8 +109,7 @@ obj_lambda1_diff_CV::obj_lambda1_diff_CV(double minUB, double tol_val,
                          NumericVector weight_ref, NumericVector valuehat_ref,
                          NumericVector ncounts, IntegerVector cv_grp) :
     minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(max(abs(value))),
-    tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals),
-    cv_grp_(cv_grp) {
+    tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals) {
   LogicalVector posweights = weight>0;
   patchno_ = patchno[posweights];
   value_ = value[posweights];
@@ -119,6 +118,7 @@ obj_lambda1_diff_CV::obj_lambda1_diff_CV(double minUB, double tol_val,
   valuehat_ = valuehat[posweights];
   weight_ref_ = weight_ref[posweights]; //not quite exact, should use all values
   valuehat_ref_ = valuehat_ref[posweights];
+  cv_grp_ = cv_grp[posweights];
 }
 
 double obj_lambda1_diff_CV::operator()(double x) const {
@@ -207,8 +207,8 @@ NumericVector obj_lambda1_diff_CV::get(double val, std::string msg) const {
     NumericVector groupwise_CV;
     const int ngroups=2;
     for (int i=0; i<ngroups; ++i) groupwise_CV.push_back(sum(as<NumericVector>(indiv_CV[cv_grp_==i])));
-    const double CV = sum(groupwise_CV);
-    const double CV_sd = std::sqrt(sum(SQUARE(groupwise_CV)) - SQUARE(sum(groupwise_CV))/ngroups);
+    const double CV = sum(groupwise_CV)/indiv_CV.size();
+    const double CV_sd = std::sqrt(sum(SQUARE(groupwise_CV)) - SQUARE(sum(groupwise_CV))/ngroups)/indiv_CV.size();
     
     if (!msg.empty()) Rcout << " OBJ " << msg << " ok lambda1= " << lambda1 << " eCprime= 0"
                             << " CV= " << CV  << " dof= " << dof

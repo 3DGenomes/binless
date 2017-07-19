@@ -28,7 +28,7 @@ struct obj_lambda1_eCprime_CV {
     obj_lambda1_eCprime_CV(double minval, double tol_val,
                         bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                         NumericVector value, NumericVector weight, NumericVector valuehat,
-                        NumericVector ncounts, double lambda2);
+                        NumericVector ncounts, double lambda2, IntegerVector cv_grp);
 
     double operator()(double x) const;
 
@@ -39,6 +39,7 @@ struct obj_lambda1_eCprime_CV {
     NumericVector forbidden_vals_;
     IntegerVector patchno_;
     NumericVector value_, weight_, valuehat_;
+    IntegerVector cv_grp_;
 };
 
 NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,

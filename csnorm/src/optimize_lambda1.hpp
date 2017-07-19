@@ -27,7 +27,7 @@ struct obj_lambda1_CV {
     obj_lambda1_CV(double minUB, double tol_val,
                 IntegerVector patchno, NumericVector forbidden_vals,
                 NumericVector value, NumericVector weight, NumericVector valuehat,
-                NumericVector ncounts);
+                NumericVector ncounts, IntegerVector cv_grp);
 
     double operator()(double x) const;
 
@@ -37,6 +37,7 @@ struct obj_lambda1_CV {
     NumericVector forbidden_vals_;
     IntegerVector patchno_;
     NumericVector value_, absval_, weight_, valuehat_;
+    IntegerVector cv_grp_;
 };
 
 NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,

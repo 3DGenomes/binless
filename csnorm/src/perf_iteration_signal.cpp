@@ -367,7 +367,6 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
     DataFrame mat = as<DataFrame>(ret["mat"]);
     List cv_run = wgfl_signal_cv(mat, nbins, ntrails, trails_i, breakpoints_i, lam2,
                                  alpha, inflate, ninner, tol_val/20., beta_i);
-    NumericVector beta_cv = cv_run["beta_cv"];
       
     //optimize lambda1 and eC
     c_start = std::clock();
@@ -379,7 +378,8 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                                          _["diag.grp"]=mat["diag.grp"],
                                          _["weight"]=mat["weight"],
                                          _["beta"]=ret["beta"],
-                                         _["beta_cv"]=beta_cv,
+                                         _["beta_cv"]=cv_run["beta_cv"],
+                                         _["cv.group"]=cv_run["cv.group"],
                                          _["value"]=ret["beta"]);
     NumericVector opt;
     if (fixed) { // is eCprime fixed to 0?
@@ -421,6 +421,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
 
     //retrieve BIC from previous computation
     const double BIC = opt["BIC"];
+    const double BIC_sd = opt["BIC.sd"];
     
     DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                            _["bin2"]=mat["bin2"],
@@ -430,13 +431,14 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                                            _["diag.idx"]=mat["diag.idx"],
                                            _["diag.grp"]=mat["diag.grp"],
                                            _["beta"]=beta_r,
-                                           _["beta_cv"]=beta_cv,
+                                           _["beta_cv"]=cv_run["beta_cv"],
+                                           _["cv.group"]=cv_run["cv.group"],
                                            _["phi"]=phi_r,
                                            _["cv.group"]=cv_run["cv.group"],
                                            _["patchno"]=patchno);
     return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi"]=phi_r,
                         _["beta"]=beta_r, _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
-                        _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat, _["eCprime"]=eCprime,
+                        _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd, _["mat"]=finalmat, _["eCprime"]=eCprime,
                         _["lambda1"]=lam1,
                         _["c_cts"]=c_cts, _["c_gfl"]=c_gfl, _["c_opt"]=c_opt, _["c_init"]=c_init,
                         _["c_brent"]=c_brent, _["c_refine"]=c_refine, _["converged"]=converged);
