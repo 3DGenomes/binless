@@ -265,7 +265,6 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     DataFrame mat = as<DataFrame>(ret["mat"]);
     List cv_run = wgfl_diff_cv(mat, nbins, ntrails, trails_i, breakpoints_i, lam2,
                                alpha, inflate, ninner, tol_val/20., beta_i);
-    NumericVector beta_cv = cv_run["beta_cv"];
     
     //optimize lambda1 assuming eCprime=0
     c_start = std::clock();
@@ -281,7 +280,8 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                          _["weight"]=mat["weight"],
                                          _["beta"]=ret["beta"],
                                          _["value"]=ret["beta"],
-                                         _["beta_cv"]=beta_cv);
+                                         _["beta_cv"]=cv_run["beta_cv"],
+                                         _["cv.group"]=cv_run["cv.group"]);
     if (!constrained) stop("expected constrained==T when fixed==T");
     NumericVector opt = cpp_optimize_lambda1_diff(newmat, nbins, tol_val,
                         lambda1_min, refine_num);
@@ -324,6 +324,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
 
     //retrieve BIC from previous computation
     const double BIC = opt["BIC"];
+    const double BIC_sd = opt["BIC.sd"];
 
     DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                            _["bin2"]=mat["bin2"],
@@ -335,13 +336,14 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                            _["diag.idx"]=mat["diag.idx"],
                                            _["diag.grp"]=mat["diag.grp"],
                                            _["beta"]=beta_r,
-                                           _["beta_cv"]=beta_cv,
+                                           _["beta_cv"]=cv_run["beta_cv"],
+                                           _["cv.group"]=cv_run["cv.group"],
                                            _["delta"]=delta,
                                            _["phi.ref"]=phi_ref_r,
                                            _["patchno"]=patchno);
     return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi.ref"]=phi_ref_r,
                         _["delta"]=delta, _["beta"]=beta_r,
-                        _["alpha"]=ret["alpha"], _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC,
+                        _["alpha"]=ret["alpha"], _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd,
                         _["mat"]=finalmat, _["lambda1"]=lam1, _["eCprime"]=0,
                         _["c_cts"]=c_cts, _["c_gfl"]=c_gfl, _["c_opt"]=c_opt, _["c_init"]=c_init,
                         _["c_brent"]=c_brent, _["c_refine"]=c_refine, _["converged"]=converged);
