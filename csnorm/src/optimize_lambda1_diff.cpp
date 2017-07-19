@@ -108,7 +108,7 @@ obj_lambda1_diff_CV::obj_lambda1_diff_CV(double minUB, double tol_val,
                          NumericVector value, NumericVector weight, NumericVector valuehat,
                          NumericVector weight_ref, NumericVector valuehat_ref,
                          NumericVector ncounts, IntegerVector cv_grp) :
-    minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(max(abs(value))),
+    minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(std::max(max(abs(forbidden_vals)),max(abs(value)))),
     tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals) {
   LogicalVector posweights = weight>0;
   patchno_ = patchno[posweights];
@@ -268,8 +268,8 @@ NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
       NumericVector val = obj.get(patchvals(i) + 2*tol_val);
       if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
     }
-    //NumericVector val = obj.get(max(abs(beta)) + 2*tol_val, "opt");
-    NumericVector val = obj.get(max(abs(beta)) + 2*tol_val);
+    //NumericVector val = obj.get(2*max(abs(beta)) + 2*tol_val, "opt");
+    NumericVector val = obj.get(2*max(abs(beta)) + 2*tol_val);
     if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
     std::clock_t c_in2 = std::clock();
     //finalize

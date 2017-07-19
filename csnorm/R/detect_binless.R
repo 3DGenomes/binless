@@ -197,7 +197,6 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.thr
 #' @keywords internal
 optimize_lambda2_simplified = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, signif.threshold=T) {
   obj = function(x) {
-    cat("eval at ", 10^x,"\n")
     if (signif.threshold==T) {
       csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed)
     } else {
