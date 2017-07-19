@@ -127,7 +127,7 @@ gfl_BIC_fixed = function(csig, lambda1, lambda2, eCprime) {
 
 #' cross-validate lambda2
 #' @keywords internal
-optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.threshold=T) {
+optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, signif.threshold=T) {
   obj = function(x) {
     if (signif.threshold==T) {
       csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed)
@@ -156,8 +156,8 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.thr
   #dt=rbindlist(list(free=dt.free,fix=dt.fix), use=T, idcol="ori")
   #ggplot(dt)+geom_line(aes(lambda2,BIC,colour=ori))#+geom_point(data=r,aes(10^x,y))#+xlim(1,3)+ylim(1600,2000)
   ### optimization in four stages
-  #first, find rough minimum between 10 and 100
-  minlambda=10
+  #first, find rough minimum between 1 and 100
+  minlambda=1
   maxlambda=100
   op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
   lambda2=10^op$minimum
@@ -183,11 +183,23 @@ optimize_lambda2 = function(csig, constrained=T, positive=T, fixed=F, signif.thr
   #cat("final round : min=",minlambda," < lambda2=",lambda2, " < max=",maxlambda," range=",range,"\n")
   op<-optimize(obj, log10(c(minlambda,maxlambda)))
   lambda2=10^op$minimum
+  if (n.SD>0) {
+    #finally, find minimum + SD
+    minlambda=lambda2
+    maxlambda=100
+    optBIC=csig@state$BIC+n.SD*csig@state$BIC.sd
+    obj2 = function(x) {
+      a=obj(x)
+      return(a+2*abs(optBIC-a))
+    }
+    op<-optimize(obj2, c(log10(minlambda),log10(maxlambda)))
+    lambda2=10^op$minimum
+  }
   #finish
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
   if (lambda2==minlambda) cat("   Warning: lambda2 hit lower boundary.\n")
   obj(log10(lambda2))
-  retvals = as.list(csig@state)[c("lambda2","lambda1","eCprime","BIC","dof")]
+  retvals = as.list(csig@state)[c("lambda2","lambda1","eCprime","BIC","BIC.sd","dof")]
   if (fixed==T && abs(retvals$eCprime)>csig@settings$tol.val) cat("Warning: fixed = T but eCprime != 0\n") #only when signif.threshold==T
   csig@par=modifyList(csig@par,retvals)
   return(csig)
@@ -236,7 +248,7 @@ optimize_lambda2_simplified = function(csig, n.SD=1, constrained=T, positive=T, 
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
   if (lambda2==minlambda) cat("   Warning: lambda2 hit lower boundary.\n")
   obj(log10(lambda2))
-  retvals = as.list(csig@state)[c("lambda2","lambda1","eCprime","BIC","dof")]
+  retvals = as.list(csig@state)[c("lambda2","lambda1","eCprime","BIC","BIC.sd","dof")]
   if (fixed==T && abs(retvals$eCprime)>csig@settings$tol.val) cat("Warning: fixed = T but eCprime != 0\n") #only when signif.threshold==T
   csig@par=modifyList(csig@par,retvals)
   return(csig)
@@ -271,7 +283,7 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
 csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, signif.threshold=T) {
-  csig = csnorm:::optimize_lambda2_simplified(csig, constrained=constrained, positive=positive, fixed=fixed,
+  csig = csnorm:::optimize_lambda2(csig, n.SD=1, constrained=constrained, positive=positive, fixed=fixed,
                                    signif.threshold=signif.threshold)
   csig@par$name=csig@cts[,name[1]]
   #matg=csnorm:::gfl_get_matrix(csig, 0, csig@par$lambda2, 0)
