@@ -18,8 +18,9 @@ struct obj_lambda1_eCprime_BIC {
   
   double tol_val_, lsnc_, lambda2_;
   bool constrained_;
+  NumericVector forbidden_vals_;
   IntegerVector patchno_;
-  NumericVector forbidden_vals_, value_, weight_, valuehat_;
+  NumericVector value_, weight_, valuehat_;
 };
 
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using CV

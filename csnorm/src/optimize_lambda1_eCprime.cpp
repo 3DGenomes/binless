@@ -16,8 +16,13 @@ obj_lambda1_eCprime_BIC::obj_lambda1_eCprime_BIC(double tol_val,
         NumericVector value, NumericVector weight, NumericVector valuehat,
         NumericVector ncounts, double lambda2) :
     tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2), constrained_(constrained),
-    patchno_(patchno), forbidden_vals_(forbidden_vals),
-    value_(value), weight_(weight), valuehat_(valuehat) {/*TODO: discard points with weight==0*/}
+    forbidden_vals_(forbidden_vals) {
+  LogicalVector posweights = weight>0;
+  patchno_ = patchno[posweights];
+  value_ = value[posweights];
+  weight_ = weight[posweights];
+  valuehat_ = valuehat[posweights];
+}
 
 double obj_lambda1_eCprime_BIC::operator()(double val) const {
     //return get(val, "opt")["BIC"];

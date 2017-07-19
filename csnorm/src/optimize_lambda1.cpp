@@ -16,9 +16,14 @@ obj_lambda1_BIC::obj_lambda1_BIC(double minUB, double tol_val,
                                  NumericVector value, NumericVector weight, NumericVector valuehat,
                                  NumericVector ncounts) :
   minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(max(abs(value))),
-  tol_val_(tol_val), lsnc_(log(sum(ncounts))),
-  patchno_(patchno), forbidden_vals_(forbidden_vals),
-  absval_(abs(value)), value_(value), weight_(weight), valuehat_(valuehat) {/*TODO: discard points with weight==0*/}
+  tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals) {
+  LogicalVector posweights = weight>0;
+  patchno_ = patchno[posweights];
+  value_ = value[posweights];
+  absval_ = abs(value_);
+  weight_ = weight[posweights];
+  valuehat_ = valuehat[posweights];
+}
 
 double obj_lambda1_BIC::operator()(double x) const {
   //return get(std::pow(10,x), "opt")["BIC"];
@@ -103,9 +108,14 @@ obj_lambda1_CV::obj_lambda1_CV(double minUB, double tol_val,
                          NumericVector value, NumericVector weight, NumericVector valuehat,
                          NumericVector ncounts) :
     minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(max(abs(value))),
-    tol_val_(tol_val), lsnc_(log(sum(ncounts))),
-    patchno_(patchno), forbidden_vals_(forbidden_vals),
-    absval_(abs(value)), value_(value), weight_(weight), valuehat_(valuehat) {/*TODO: discard points with weight==0*/}
+    tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals) {
+  LogicalVector posweights = weight>0;
+  patchno_ = patchno[posweights];
+  value_ = value[posweights];
+  absval_ = abs(value_);
+  weight_ = weight[posweights];
+  valuehat_ = valuehat[posweights];
+}
 
 double obj_lambda1_CV::operator()(double x) const {
     //return get(std::pow(10,x), "opt")["BIC"];
