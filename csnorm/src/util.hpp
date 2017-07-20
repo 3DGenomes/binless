@@ -67,15 +67,19 @@ NumericVector optimize_CV_kSD(Objective obj, double minval, double startval, dou
     }
   }
   //find kSD solution
-  double thresh = best["BIC"]+k*best["BIC.sd"];
-  /*Rcout << " found optimum at " << as<double>(best["BIC"]) << " adding " << (k*as<double>(best["BIC.sd"]))
-          << " thresh= " << thresh << " ret.size()= " << ret.size() << " best_idx= " << best_idx << " " << std::endl;*/
-  unsigned i_opt = best_idx;
-  for (i_opt = best_idx+1; i_opt < ret.size(); ++i_opt) {
-      if (as<double>(ret[i_opt]["BIC"]) > thresh) break;
+  if (k>0) {
+    double thresh = best["BIC"]+k*best["BIC.sd"];
+    /*Rcout << " found optimum at " << as<double>(best["BIC"]) << " adding " << (k*as<double>(best["BIC.sd"]))
+            << " thresh= " << thresh << " ret.size()= " << ret.size() << " best_idx= " << best_idx << " " << std::endl;*/
+    unsigned i_opt = best_idx;
+    for (i_opt = best_idx+1; i_opt < ret.size(); ++i_opt) {
+        if (as<double>(ret[i_opt]["BIC"]) > thresh) break;
+    }
+    if (i_opt >= ret.size()) i_opt = ret.size()-1;
+    return(ret[i_opt]);
+  } else {
+    return(best);
   }
-  if (i_opt >= ret.size()) i_opt = ret.size()-1;
-  return(ret[i_opt]);
 }
 
 #endif

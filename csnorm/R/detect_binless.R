@@ -283,7 +283,8 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
 csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, signif.threshold=T) {
-  csig = csnorm:::optimize_lambda2(csig, n.SD=1, constrained=constrained, positive=positive, fixed=fixed,
+  n.SD=ifelse(fixed==T,1,0)
+  csig = csnorm:::optimize_lambda2(csig, n.SD=n.SD, constrained=constrained, positive=positive, fixed=fixed,
                                    signif.threshold=signif.threshold)
   csig@par$name=csig@cts[,name[1]]
   #matg=csnorm:::gfl_get_matrix(csig, 0, csig@par$lambda2, 0)
