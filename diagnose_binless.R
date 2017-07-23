@@ -513,5 +513,48 @@ ggplot(cs@par$biases[name==g&pos>75124951&pos<75144951])+
   geom_pointrange(aes(pos,etahat,ymax=etahat+std,ymin=etahat-std,colour=cat))+geom_line(aes(pos,eta))+facet_grid(cat~.)
 
 
+mat=foreach (dfuse=c("0","10","20","50"), .combine=rbind) %do% {
+  load(paste0("data/rao_HiCall_Tbx19_700k_csnorm_optimized_base10k_bpk30_dfuse",dfuse,"_cv_nosig.RData"))
+  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+  mat=cts[,.(count=sum(weight*count),mu=sum(exp(lmu.nosig)*weight)),by=c("name","bin1","bin2")]
+  mat[,dfuse:=dfuse]
+  mat
+}
+ggplot(mat)+geom_raster(aes(bin1,bin2,fill=log(count)))+geom_raster(aes(bin2,bin1,fill=log(mu)))+
+  scale_fill_gradient2()+facet_wrap(~dfuse)+coord_fixed()
+
+mat=merge(mat,mat[dfuse=="0",.(name,bin1,bin2,count.ref=count,mu.ref=mu)])
+ggplot(mat[count>0])+geom_raster(aes(bin1,bin2,fill=log(count/count.ref)))+#geom_raster(aes(bin2,bin1,fill=log(mu/mu.ref)))+
+  scale_fill_gradient2()+facet_wrap(~dfuse)+coord_fixed()
+
+
+
+load(paste0("data/rao_HiCall_Tbx19_700k_csnorm_optimized_base10k_bpk30_dfuse20_cvsd.RData"))
+#biases=op$biases
+#biases[,c("log_iota","log_rho"):=list(op$log_iota,op$log_rho)]
+biases=cs@par$biases
+biases[,c("log_iota","log_rho"):=list(cs@par$log_iota,cs@par$log_rho)]
+biases=biases[name==name[1]&pos>=166229759&pos<166259759]
+biases[,bin:=cut(pos,cs@settings$sbins,ordered_result = T, right=F, include.lowest = T, dig.lab=12)]
+biases[,.(sum(log_iota),sum(log_rho)),by=bin]
+ggplot(biases[,.(ct=sum(etahat),mu=sum(eta)),by=bin])+geom_point(aes(bin,ct))+geom_point(aes(bin,mu),colour="red")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggplot(biases[,.(ct=mean(etahat),mu=mean(eta)),by=bin])+geom_point(aes(bin,ct))+geom_point(aes(bin,mu),colour="red")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggplot(biases[,.(ct=mean(etahat/eta)),by=bin])+geom_point(aes(bin,ct))+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(biases)+geom_point(aes(pos,etahat,colour=bin))+geom_line(aes(pos,eta,colour=bin))+facet_grid(cat~.)
+
+
+biases=cs@par$biases
+biases[,bin:=cut(pos,cs@settings$sbins,ordered_result = T, right=F, include.lowest = T, dig.lab=12)]
+biases.chisq=biases[,.(z=sum((etahat-eta)/std),chisq=sum((etahat-eta)^2/std^2)),by=bin]
+ggplot(biases.chisq)+geom_point(aes(bin,chisq))
+ggplot(biases.chisq)+geom_point(aes(bin,z))
+decay.chisq=cs@par$decay[,.(z=sum((kappahat-kappa)/std),chisq=sum((kappahat-kappa)^2/std^2)),by=dbin]
+ggplot(decay.chisq)+geom_point(aes(dbin,chisq))
+ggplot(decay.chisq)+geom_point(aes(dbin,z))
+fitdistr(biases.chisq[,chisq],"normal",list(mu=0))
 
 

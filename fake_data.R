@@ -66,16 +66,16 @@ plot_diagnostics(cs)$plot2
 
 
 #set true signal
-true_sig=cs@counts[,.(name,pos1,pos2,true_phi)]
+true_sig=csd@counts[,.(pos1,pos2,true_phi)]
 true_sig[,bin1:=cut(pos1,cs@settings$sbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
 true_sig[,bin2:=cut(pos2,cs@settings$sbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-true_sig=true_sig[,.(phi=mean(true_phi)),keyby=c("name","bin1","bin2")]
-ggplot(true_sig[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()
-cs@par$signal=true_sig[cs@par$signal[,.(name,bin1,bin2)]]
+true_sig=true_sig[,.(true_phi=mean(true_phi)),keyby=c("bin1","bin2")]
+ggplot(true_sig)+geom_raster(aes(bin1,bin2,fill=true_phi))+scale_fill_gradient2()
+cs@par$signal=merge(cs@par$signal,true_sig,by=c("bin1","bin2"))
 
 #set true biases
-cs@par$log_iota=cs@biases[,true_log_iota]
-cs@par$log_rho=cs@biases[,true_log_rho]
+cs@par$log_iota=csd@biases[,true_log_iota]
+cs@par$log_rho=csd@biases[,true_log_rho]
 #cs@par$eC=as.array(c(-4.3,-6.3,-3.7,-3.1,-4.2))
 #cs@par$eRJ=as.array(rep(3,5))
 #cs@par$eDE=as.array(rep(1,5))
@@ -87,8 +87,18 @@ cts=cs@counts[,.(name,dbin=cut(distance,cs@settings$dbins,ordered_result=T,right
                  true_log_decay)][,.(true_log_decay=mean(true_log_decay)),keyby=c("name","dbin")]
 cs@par$decay=cts[cs@par$decay][,.(name,dbin,distance,kappahat,std,ncounts,kappa,log_decay=true_log_decay)]
 
+biases=cs@par$biases
+biases[,c("log_iota","log_rho"):=list(cs@par$log_iota,cs@par$log_rho),by=cat]
+#biases=merge(biases,csd@biases[,.(id,log_iota=true_log_iota,log_rho=true_log_rho)])
+#biases=merge(biases,csd@biases[,.(id,true_log_iota,true_log_rho)])
+biases=biases[name==name[1]&pos>=166229759&pos<166259759]
+biases[,bin:=cut(pos,cs@settings$sbins,ordered_result = T, right=F, include.lowest = T, dig.lab=12)]
+biases[,.(sum(log_iota),sum(log_rho)),by=bin] #should output zeros but it doesn't
+ggplot(biases[pos<pos[1]+30000])+facet_grid(cat~.)+geom_line(aes(pos,log_rho),colour="black")#+geom_line(aes(pos,true_log_rho),colour="red")
 
+ggplot(biases[pos<pos[1]+30000])+facet_grid(cat~.)+geom_point(aes(pos,etahat))+geom_line(aes(pos,eta))
 
+biases[pos<pos[1]+30000][,.(sum(log_iota),sum(log_rho)),by=bin] 
 
 ggplot(cs@par$decay)+geom_pointrange(aes(distance,kappahat,ymin=kappahat-std,ymax=kappahat+std),alpha=0.1)+
   geom_line(aes(distance,kappa))+facet_wrap(~ name)+scale_x_log10()#+
@@ -98,7 +108,7 @@ ggplot(cs@par$decay[distance<1e4])+geom_pointrange(aes(distance,kappahat,ymin=ka
   geom_line(aes(distance,base_count),colour="red",data=cs@counts[sample(.N,min(.N,100000))][distance<1e4])
 
 ggplot(cs@par$biases[cat=="dangling L"])+geom_point(aes(pos,etahat),alpha=0.1)+
-  geom_line(aes(pos,eta))+facet_wrap(~ name)+xlim(550000,650000)+
+  geom_line(aes(pos,eta))+facet_wrap(~ name)+xlim(550000,650000)#+
   geom_line(aes(pos,true_log_mean_DL),colour="red",data=cs@biases)
 
 ggplot(cs@par$biases[cat=="dangling R"])+geom_point(aes(pos,etahat),alpha=0.1)+
@@ -179,7 +189,7 @@ ggplot(biases[name==name[1]&cat=="contact L"])+geom_point(aes(pos,etahat),alpha=
 
 
 #bias around tad border
-biases=cs@biases[,.(name,id,pos,true_log_rho,true_log_iota)]
+biases=cs@biases[,.(name,id,pos,true_log_rho=csd@biases[,true_log_rho],true_log_iota=csd@biases[,true_log_iota])]
 biases=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
   cbind(biases,cs@diagnostics$params[step==i&leg=="bias",.(step,log_rho=log_rho[[1]],log_iota=log_iota[[1]])])
 }
