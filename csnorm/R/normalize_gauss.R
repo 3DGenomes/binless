@@ -663,13 +663,20 @@ csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
   return(cts)
 }
 
+#get outliers, which should be discarded for signal detection
+#' @keywords internal
+#' 
+get_outliers = function(cs, resolution) {
+  diag.rm = ceiling(cs@settings$dmin/resolution)
+  return(list(diag.rm=diag.rm))
+}
+
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
 csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.threshold=T) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
-  diag.rm = ceiling(cs@settings$dmin/cs@settings$base.res)
   #
   if (verbose==T) cat("  predict\n")
   #ggplot(mat[bin1==bin2])+geom_point(aes(bin1,phi,colour=bin1%in%cs@par$badbins))+facet_wrap(~name)
@@ -687,8 +694,8 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
   registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %do% {
     csig=new("CSbsig", mat=cs@par$signal[name==g], trails=cs@settings$trails, cts=cts[name==g],
-             settings=list(outliers=list(diag.rm=diag.rm), nbins=nbins, dispersion=cs@par$alpha, tol.val=cs@settings$tol.leg,
-                           inflate=2, nperf=500, opt.every=10, maxsteps=100000))
+             settings=list(outliers=get_outliers(cs,cs@settings$base.res), nbins=nbins, dispersion=cs@par$alpha,
+                           tol.val=cs@settings$tol.leg, inflate=2, nperf=500, opt.every=10, maxsteps=100000))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose, signif.threshold=signif.threshold)
   }
