@@ -16,7 +16,7 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
   ctsg=csig@cts
   nbins=csig@settings$nbins
   dispersion=csig@settings$dispersion
-  diag.rm=csig@settings$diag.rm
+  outliers=csig@settings$outliers
   trails=csig@trails
   tol.val=csig@settings$tol.val
   state=csig@state
@@ -28,11 +28,11 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
   if (is.null(ctsg.ref)) {
     perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                                               trails$breakpoints, lambda1, lambda2, eCprime,
-                                              state$alpha, inflate, maxsteps, tol.val/20, diag.rm, state$beta)
+                                              state$alpha, inflate, maxsteps, tol.val/20, outliers, state$beta)
   } else {
     stopifnot(eCprime==0)
     perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                            trails$breakpoints, lambda1, lambda2, state$alpha, inflate, maxsteps, tol.val/20, diag.rm,
+                                            trails$breakpoints, lambda1, lambda2, state$alpha, inflate, maxsteps, tol.val/20, outliers,
                                             state$phi.ref, state$beta)
   }
   return(perf.c)
@@ -65,7 +65,7 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
   ctsg=csig@cts
   nbins=csig@settings$nbins
   dispersion=csig@settings$dispersion
-  diag.rm=csig@settings$diag.rm
+  outliers=csig@settings$outliers
   trails=csig@trails
   tol.val=csig@settings$tol.val
   state=csig@state
@@ -78,13 +78,13 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
   if (is.null(ctsg.ref)) {
     perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                                       trails$breakpoints, lambda2,
-                                      state$alpha, inflate, maxsteps, tol.val, diag.rm,
+                                      state$alpha, inflate, maxsteps, tol.val, outliers,
                                       state$beta, lambda1.min, refine.num, constrained, fixed)
   } else {
     stopifnot(constrained==T) #for now
     perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                                       trails$breakpoints, lambda2,
-                                      state$alpha, inflate, maxsteps, tol.val, diag.rm,
+                                      state$alpha, inflate, maxsteps, tol.val, outliers,
                                       state$phi.ref, state$beta, lambda1.min, refine.num, constrained)
   }
   return(perf.c)
@@ -99,7 +99,7 @@ gfl_BIC_fixed = function(csig, lambda1, lambda2, eCprime) {
   ctsg=csig@cts
   nbins=csig@settings$nbins
   dispersion=csig@settings$dispersion
-  diag.rm=csig@settings$diag.rm
+  outliers=csig@settings$outliers
   trails=csig@trails
   tol.val=csig@settings$tol.val
   state=csig@state
@@ -112,13 +112,13 @@ gfl_BIC_fixed = function(csig, lambda1, lambda2, eCprime) {
   if (is.null(ctsg.ref)) {
     perf.c = csnorm:::wgfl_signal_BIC_fixed(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                                             trails$breakpoints, lambda1, lambda2, eCprime,
-                                            state$alpha, inflate, maxsteps, tol.val, diag.rm,
+                                            state$alpha, inflate, maxsteps, tol.val, outliers,
                                             state$beta)
   } else {
     stopifnot(eCprime==0)
     perf.c = csnorm:::wgfl_diff_BIC_fixed(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
                                     trails$breakpoints, lambda1, lambda2,
-                                    state$alpha, inflate, maxsteps, tol.val, diag.rm,
+                                    state$alpha, inflate, maxsteps, tol.val, outliers,
                                     state$phi.ref, state$beta)
     
   }
@@ -348,7 +348,7 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
   trails = csnorm:::gfl_compute_trails(csg@par$nbins)
   stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
   #add other settings
-  settings=list(diag.rm = ceiling(csg@par$dmin/resolution),
+  settings=list(outliers = list(diag.rm=ceiling(csg@par$dmin/resolution)),
                 nbins = csg@par$nbins,
                 dispersion = csg@par$alpha,
                 tol.val = tol.val,

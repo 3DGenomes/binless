@@ -16,17 +16,17 @@ using namespace Rcpp;
 
 DataFrame cts_to_diff_mat(const DataFrame cts, const DataFrame ref, int nbins,
                           double dispersion,
-                          std::vector<double>& phi_ref, std::vector<double>& delta, int diag_rm) {
+                          std::vector<double>& phi_ref, std::vector<double>& delta, List outliers) {
     //assume eCprime = 0 for difference step
     const double eCprime=0;
     const DataFrame mat_ref = cts_to_signal_mat(ref, nbins, dispersion, phi_ref,
-                              eCprime, diag_rm);
+                              eCprime, outliers);
 
     std::vector<double> phi_oth;
     phi_oth.reserve(delta.size());
     for (int i=0; i<delta.size(); ++i) phi_oth[i] = phi_ref[i] + delta[i];
     const DataFrame mat_oth = cts_to_signal_mat(cts, nbins, dispersion, phi_oth,
-                              eCprime, diag_rm);
+                              eCprime, outliers);
     IntegerVector bin1 = mat_ref["bin1"];
     IntegerVector bin2 = mat_ref["bin2"];
     NumericVector phihat_ref = mat_ref["phihat"];
@@ -108,7 +108,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                          int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                          double lam1, double lam2, double alpha, double inflate, int ninner,
                          double converge,
-                         int diag_rm, NumericVector phi_ref_i, NumericVector beta_i) {
+                         List outliers, NumericVector phi_ref_i, NumericVector beta_i) {
     const int N = nbins*(nbins+1)/2; //size of fused lasso problem
     std::vector<int> trails_r = as<std::vector<int> >(trails_i);
     std::vector<int> breakpoints_r = as<std::vector<int> >(breakpoints_i);
@@ -143,7 +143,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
         step++;
         //compute weights
         c_start = std::clock();
-        mat = cts_to_diff_mat(cts, ref, nbins, dispersion, phi_ref_r, delta_r, diag_rm);
+        mat = cts_to_diff_mat(cts, ref, nbins, dispersion, phi_ref_r, delta_r, outliers);
         std::vector<double> phihat_ref = Rcpp::as<std::vector<double> >
                                          (mat["phihat.ref"]);
         std::vector<double> phihat_var_ref = Rcpp::as<std::vector<double> >
@@ -233,7 +233,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    int nouter, int nbins,
                    int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                    double lam2,  double alpha, double inflate, int ninner, double tol_val,
-                   int diag_rm, NumericVector phi_ref_i,  NumericVector beta_i, double lambda1_min,
+                   List outliers, NumericVector phi_ref_i,  NumericVector beta_i, double lambda1_min,
                    int refine_num, bool constrained) {
     std::clock_t c_start,c_end;
     double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
@@ -243,7 +243,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     int nwarm = (int)(nouter/10.+1);
     List ret = wgfl_diff_perf_warm(cts, ref, dispersion, nwarm, nbins, ntrails,
                                    trails_i, breakpoints_i, lam1, lam2,
-                                   alpha, inflate, ninner, tol_val/20., diag_rm, phi_ref_i, beta_i);
+                                   alpha, inflate, ninner, tol_val/20., outliers, phi_ref_i, beta_i);
     c_cts += as<double>(ret["c_cts"]);
     c_gfl += as<double>(ret["c_gfl"]);
     //redo iteration if warm start did not work
@@ -252,7 +252,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
         //Rcout << " warning: warm start failed " << std::endl;
         ret = wgfl_diff_perf_warm(cts, ref, dispersion, nouter, nbins, ntrails,
                                   trails_i, breakpoints_i, lam1, lam2,
-                                  alpha, inflate, ninner, tol_val/20., diag_rm, phi_ref_i, beta_i);
+                                  alpha, inflate, ninner, tol_val/20., outliers, phi_ref_i, beta_i);
         if (as<int>(ret["nouter"])>nouter) {
           //Rcout << " warning: cold start did not converge" <<std::endl;
           converged = false;
@@ -354,7 +354,7 @@ List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double disper
                    int nouter, int nbins,
                    int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                    double lam1, double lam2, double alpha, double inflate, int ninner, double tol_val,
-                   int diag_rm, NumericVector phi_ref_i,  NumericVector beta_i) {
+                   List outliers, NumericVector phi_ref_i,  NumericVector beta_i) {
     std::clock_t c_start,c_end;
     double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
     bool converged = true;
@@ -362,7 +362,7 @@ List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double disper
     int nwarm = (int)(nouter/10.+1);
     List ret = wgfl_diff_perf_warm(cts, ref, dispersion, nwarm, nbins, ntrails,
                                    trails_i, breakpoints_i, 0, lam2,
-                                   alpha, inflate, ninner, tol_val/20., diag_rm, phi_ref_i, beta_i);
+                                   alpha, inflate, ninner, tol_val/20., outliers, phi_ref_i, beta_i);
     c_cts += as<double>(ret["c_cts"]);
     c_gfl += as<double>(ret["c_gfl"]);
     //redo iteration if warm start did not work
@@ -371,7 +371,7 @@ List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double disper
         //Rcout << " warning: warm start failed " << std::endl;
         ret = wgfl_diff_perf_warm(cts, ref, dispersion, nouter, nbins, ntrails,
                                   trails_i, breakpoints_i, 0, lam2,
-                                  alpha, inflate, ninner, tol_val/20., diag_rm, phi_ref_i, beta_i);
+                                  alpha, inflate, ninner, tol_val/20., outliers, phi_ref_i, beta_i);
         if (as<int>(ret["nouter"])>nouter) {
           //Rcout << " warning: cold start did not converge" <<std::endl;
           converged = false;
