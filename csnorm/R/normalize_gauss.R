@@ -668,8 +668,10 @@ csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
 #' 
 get_outliers = function(cs, sbins) {
   resolution=sbins[2]-sbins[1]
+  begins=sbins[1:(length(sbins)-1)]
   diag.rm = ceiling(cs@settings$dmin/resolution)
-  return(list(diag.rm=diag.rm))
+  bad.diagonals=0:min(diag.rm,length(begins)-1)
+  return(list(bad.diagonals=bad.diagonals))
 }
 
 #' fit signal using sparse fused lasso

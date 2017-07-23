@@ -4,6 +4,7 @@ using namespace Rcpp;
 #include <vector>
 #include <algorithm>
 #include <ctime>
+#include <set>
 
 #include "perf_iteration_signal.hpp"
 #include "util.hpp" //SQUARE
@@ -13,6 +14,17 @@ using namespace Rcpp;
 #include "optimize_lambda1_eCprime.hpp" //cpp_optimize_lambda1_eCprime
 #include "optimize_lambda1.hpp" //cpp_optimize_lambda1
 
+void remove_outliers(const std::vector<int>& bin1, const std::vector<int>& bin2, std::vector<double>& phihat_var, List outliers) {
+  //remove bad diagonals
+  const std::vector<int> bad_diags = as<std::vector<int> >(outliers["bad.diagonals"]);
+  const std::set<int> bad_diags_set(bad_diags.begin(), bad_diags.end());
+  unsigned nbetas = phihat_var.size();
+  for (unsigned i=0; i<nbetas; ++i) {
+    int diag_idx = bin2[i]-bin1[i];
+    std::set<int>::iterator it = bad_diags_set.find(diag_idx);
+    if (it != bad_diags_set.end()) phihat_var[i] = INFINITY;
+  }
+}
 
 DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion,
                             std::vector<double>& phi,
@@ -24,8 +36,7 @@ DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion,
     std::vector<double> count = as<std::vector<double> >(cts["count"]);
     std::vector<double> lmu_nosig = as<std::vector<double> >(cts["lmu.nosig"]);
     std::vector<double> weight = as<std::vector<double> >(cts["weight"]);
-    int diag_rm = as<int>(outliers["diag.rm"]);
-
+    
     //outputs
     int nbetas = nbins*(nbins+1)/2; //size of fused lasso problem
     std::vector<double> phihat(nbetas, 0); //vectorized form
@@ -39,7 +50,7 @@ DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion,
                            &weight[0], nbins, dispersion,
                            &phi[0], eCprime, &phihat[0], &phihat_var[0], &ncounts[0], &bin1[0], &bin2[0]);
     //remove outliers
-    for (unsigned i=0; i<nbetas; ++i) if (bin2[i]-bin1[i] <= diag_rm) phihat_var[i] = INFINITY;
+    remove_outliers(bin1, bin2, phihat_var, outliers);
                            
     IntegerVector bin1_i, bin2_i, didx_i, dgrp_i;
     NumericVector phihat_i, phihat_var_i, ncounts_i, weight_i;
