@@ -667,6 +667,14 @@ csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
 #' @keywords internal
 #' 
 get_outliers = function(cs, cts) {
+  #biases
+  bad.biases=rbind(cts[,.(bin1,bin2,weight,var,z)],cts[,.(bin1=bin2,bin2=bin1,weight,var,z)])[
+    ,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=bin1]
+  bad.biases[,z:=scale(z)]
+  bad.biases[,is.out:=-abs(z)<qnorm(cs@settings$qmin)]
+  #ggplot(bad.biases)+geom_point(aes(bin1,z,colour=is.out))
+  bad.rows=bad.biases[is.out==T,bin1]
+  if (bad.biases[,sum(is.out)/.N>0.1]) cat(" Warning: removing ",bad.biases[,100*sum(is.out)/.N],"% of all rows!\n")
   #decay
   cts[,diag.idx:=unclass(bin2)-unclass(bin1)]
   bad.decays=cts[,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=diag.idx]
@@ -675,7 +683,7 @@ get_outliers = function(cs, cts) {
   #ggplot(bad.decays)+geom_point(aes(diag.idx,z,colour=is.out))
   bad.diagonals=bad.decays[is.out==T,diag.idx]
   if (bad.decays[,sum(is.out)/.N>0.1]) cat(" Warning: removing ",bad.decays[,100*sum(is.out)/.N],"% of all counter diagonals!\n")
-  return(list(bad.diagonals=bad.diagonals))
+  return(list(bad.diagonals=bad.diagonals,bad.rows=bad.rows))
 }
 
 #' fit signal using sparse fused lasso

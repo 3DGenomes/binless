@@ -15,14 +15,21 @@ using namespace Rcpp;
 #include "optimize_lambda1.hpp" //cpp_optimize_lambda1
 
 void remove_outliers(const std::vector<int>& bin1, const std::vector<int>& bin2, std::vector<double>& phihat_var, List outliers) {
+  unsigned nbetas = phihat_var.size();
+  //remove bad rows
+  const std::vector<int> bad_rows = as<std::vector<int> >(outliers["bad.rows"]);
+  const std::set<int> bad_rows_set(bad_rows.begin(), bad_rows.end());
+  for (unsigned i=0; i<nbetas; ++i) {
+    if ( (bad_rows_set.find(bin1[i]) != bad_rows_set.end()) ||
+         (bin2[i]!=bin1[i] && (bad_rows_set.find(bin2[i]) != bad_rows_set.end()) )
+       ) { phihat_var[i] = INFINITY; }
+  }
   //remove bad diagonals
   const std::vector<int> bad_diags = as<std::vector<int> >(outliers["bad.diagonals"]);
   const std::set<int> bad_diags_set(bad_diags.begin(), bad_diags.end());
-  unsigned nbetas = phihat_var.size();
   for (unsigned i=0; i<nbetas; ++i) {
     int diag_idx = bin2[i]-bin1[i];
-    std::set<int>::iterator it = bad_diags_set.find(diag_idx);
-    if (it != bad_diags_set.end()) phihat_var[i] = INFINITY;
+    if (bad_diags_set.find(diag_idx) != bad_diags_set.end()) phihat_var[i] = INFINITY;
   }
 }
 
