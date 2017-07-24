@@ -348,7 +348,7 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
   trails = csnorm:::gfl_compute_trails(csg@par$nbins)
   stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
   #add other settings
-  settings=list(outliers = get_outliers(cs, csg@par$sbins),
+  settings=list(outliers = get_outliers(cs, csg@cts),
                 nbins = csg@par$nbins,
                 dispersion = csg@par$alpha,
                 tol.val = tol.val,

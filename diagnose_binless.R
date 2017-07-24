@@ -549,10 +549,10 @@ ggplot(biases)+geom_point(aes(pos,etahat,colour=bin))+geom_line(aes(pos,eta,colo
 
 biases=cs@par$biases
 biases[,bin:=cut(pos,cs@settings$sbins,ordered_result = T, right=F, include.lowest = T, dig.lab=12)]
-biases.chisq=biases[,.(z=sum((etahat-eta)/std),chisq=sum((etahat-eta)^2/std^2)),by=bin]
+biases.chisq=biases[,.(z=mean((etahat-eta)/std),chisq=mean((etahat-eta)^2/std^2)),by=bin]
 ggplot(biases.chisq)+geom_point(aes(bin,chisq))
 ggplot(biases.chisq)+geom_point(aes(bin,z))
-decay.chisq=cs@par$decay[,.(z=sum((kappahat-kappa)/std),chisq=sum((kappahat-kappa)^2/std^2)),by=dbin]
+decay.chisq=cs@par$decay[,.(z=sum((kappahat-kappa)/std),chisq=mean((kappahat-kappa)^2/std^2)),by=dbin]
 ggplot(decay.chisq)+geom_point(aes(dbin,chisq))
 ggplot(decay.chisq)+geom_point(aes(dbin,z))
 fitdistr(biases.chisq[,chisq],"normal",list(mu=0))

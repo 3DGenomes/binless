@@ -656,7 +656,7 @@ csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
   #put in triangular form
   cts2 = cts[bin1>bin2]
   setnames(cts2,c("bin1","bin2"),c("bin2","bin1"))
-  cts = rbind(cts[bin1<=bin2],cts2)[,.(name,bin1,bin2,count,lmu.nosig,mu,log_decay,weight=weight/2)] #each count appears twice
+  cts = rbind(cts[bin1<=bin2],cts2)[,.(name,bin1,bin2,count,lmu.nosig,z,mu,var,log_decay,weight=weight/2)] #each count appears twice
   rm(cts2)
   stopifnot(cts[,all(bin1<=bin2)])
   setkey(cts,name,bin1,bin2)
@@ -666,11 +666,15 @@ csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
 #get outliers, which should be discarded for signal detection
 #' @keywords internal
 #' 
-get_outliers = function(cs, sbins) {
-  resolution=sbins[2]-sbins[1]
-  begins=sbins[1:(length(sbins)-1)]
-  diag.rm = ceiling(cs@settings$dmin/resolution)
-  bad.diagonals=0:min(diag.rm,length(begins)-1)
+get_outliers = function(cs, cts) {
+  #decay
+  cts[,diag.idx:=unclass(bin2)-unclass(bin1)]
+  bad.decays=cts[,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=diag.idx]
+  bad.decays[,z:=scale(z)]
+  bad.decays[,is.out:=-abs(z)<qnorm(cs@settings$qmin)]
+  #ggplot(bad.decays)+geom_point(aes(diag.idx,z,colour=is.out))
+  bad.diagonals=bad.decays[is.out==T,diag.idx]
+  if (bad.decays[,sum(is.out)/.N>0.1]) cat(" Warning: removing ",bad.decays[,100*sum(is.out)/.N],"% of all counter diagonals!\n")
   return(list(bad.diagonals=bad.diagonals))
 }
 
@@ -680,6 +684,7 @@ get_outliers = function(cs, sbins) {
 csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.threshold=T) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+  outliers = get_outliers(cs,cts)
   #
   if (verbose==T) cat("  predict\n")
   #ggplot(mat[bin1==bin2])+geom_point(aes(bin1,phi,colour=bin1%in%cs@par$badbins))+facet_wrap(~name)
@@ -697,7 +702,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
   registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %do% {
     csig=new("CSbsig", mat=cs@par$signal[name==g], trails=cs@settings$trails, cts=cts[name==g],
-             settings=list(outliers=get_outliers(cs,cs@settings$sbins), nbins=nbins, dispersion=cs@par$alpha,
+             settings=list(outliers=outliers, nbins=nbins, dispersion=cs@par$alpha,
                            tol.val=cs@settings$tol.leg, inflate=2, nperf=500, opt.every=10, maxsteps=100000))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose, signif.threshold=signif.threshold)
@@ -964,7 +969,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     cs@par=list() #in case we have a weird object
     cs@groups=list()
     #add settings
-    cs@settings = c(cs@settings[c("circularize","dmin","dmax")],
+    cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
                          iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj,
                          tol.leg=tol.leg, signif.threshold=signif.threshold))
