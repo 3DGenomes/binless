@@ -666,7 +666,7 @@ csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
 #get outliers, which should be discarded for signal detection
 #' @keywords internal
 #' 
-get_outliers = function(cs, cts) {
+get_outliers = function(cs, cts, resolution) {
   #biases
   bad.biases=rbind(cts[,.(bin1,bin2,weight,var,z)],cts[,.(bin1=bin2,bin2=bin1,weight,var,z)])[
     ,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=bin1]
@@ -680,6 +680,8 @@ get_outliers = function(cs, cts) {
   bad.decays=cts[,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=diag.idx]
   bad.decays[,z:=scale(z)]
   bad.decays[,is.out:=-abs(z)<qnorm(cs@settings$qmin)]
+  diag.rm = ceiling(cs@settings$dmin/resolution)
+  bad.decays[diag.idx<=diag.rm,is.out:=T]
   #ggplot(bad.decays)+geom_point(aes(diag.idx,z,colour=is.out))
   bad.diagonals=bad.decays[is.out==T,diag.idx]
   if (bad.decays[,sum(is.out)/.N>0.1]) cat(" Warning: removing ",bad.decays[,100*sum(is.out)/.N],"% of all counter diagonals!\n")
@@ -692,7 +694,7 @@ get_outliers = function(cs, cts) {
 csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.threshold=T) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
-  outliers = get_outliers(cs,cts)
+  outliers = get_outliers(cs, cts, cs@settings$base.res)
   #
   if (verbose==T) cat("  predict\n")
   #ggplot(mat[bin1==bin2])+geom_point(aes(bin1,phi,colour=bin1%in%cs@par$badbins))+facet_wrap(~name)
