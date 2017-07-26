@@ -4,6 +4,7 @@ using namespace Rcpp;
 #include <vector>
 #include <algorithm>
 #include <ctime>
+#include <set>
 
 #include "perf_iteration_signal.hpp"
 #include "util.hpp" //SQUARE
@@ -13,10 +14,28 @@ using namespace Rcpp;
 #include "optimize_lambda1_eCprime.hpp" //cpp_optimize_lambda1_eCprime
 #include "optimize_lambda1.hpp" //cpp_optimize_lambda1
 
+void remove_outliers(const std::vector<int>& bin1, const std::vector<int>& bin2, std::vector<double>& phihat_var, List outliers) {
+  unsigned nbetas = phihat_var.size();
+  //remove bad rows
+  const std::vector<int> bad_rows = as<std::vector<int> >(outliers["bad.rows"]);
+  const std::set<int> bad_rows_set(bad_rows.begin(), bad_rows.end());
+  for (unsigned i=0; i<nbetas; ++i) {
+    if ( (bad_rows_set.find(bin1[i]) != bad_rows_set.end()) ||
+         (bin2[i]!=bin1[i] && (bad_rows_set.find(bin2[i]) != bad_rows_set.end()) )
+       ) { phihat_var[i] = INFINITY; }
+  }
+  //remove bad diagonals
+  const std::vector<int> bad_diags = as<std::vector<int> >(outliers["bad.diagonals"]);
+  const std::set<int> bad_diags_set(bad_diags.begin(), bad_diags.end());
+  for (unsigned i=0; i<nbetas; ++i) {
+    int diag_idx = bin2[i]-bin1[i];
+    if (bad_diags_set.find(diag_idx) != bad_diags_set.end()) phihat_var[i] = INFINITY;
+  }
+}
 
 DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion,
                             std::vector<double>& phi,
-                            double eCprime, int diag_rm) {
+                            double eCprime, List outliers) {
     //inputs
     int N = cts.nrows();
     std::vector<int> cts_bin1 = as<std::vector<int> >(cts["bin1"]);
@@ -24,7 +43,7 @@ DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion,
     std::vector<double> count = as<std::vector<double> >(cts["count"]);
     std::vector<double> lmu_nosig = as<std::vector<double> >(cts["lmu.nosig"]);
     std::vector<double> weight = as<std::vector<double> >(cts["weight"]);
-
+    
     //outputs
     int nbetas = nbins*(nbins+1)/2; //size of fused lasso problem
     std::vector<double> phihat(nbetas, 0); //vectorized form
@@ -33,11 +52,13 @@ DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion,
     std::vector<int> bin1(nbetas, 0);
     std::vector<int> bin2(nbetas, 0);
 
+    //build mat from cts
     cts_to_signal_mat_core(N, &cts_bin1[0], &cts_bin2[0], &count[0], &lmu_nosig[0],
                            &weight[0], nbins, dispersion,
-                           &phi[0], eCprime, &phihat[0], &phihat_var[0], &ncounts[0], &bin1[0], &bin2[0],
-                           diag_rm);
-
+                           &phi[0], eCprime, &phihat[0], &phihat_var[0], &ncounts[0], &bin1[0], &bin2[0]);
+    //remove outliers
+    remove_outliers(bin1, bin2, phihat_var, outliers);
+                           
     IntegerVector bin1_i, bin2_i, didx_i, dgrp_i;
     NumericVector phihat_i, phihat_var_i, ncounts_i, weight_i;
     bin1_i = wrap(bin1);
@@ -65,7 +86,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
                            int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                            double lam1, double lam2, double eCprime,
                            double alpha, double inflate, int ninner, double converge,
-                           int diag_rm, NumericVector beta_i) {
+                           List outliers, NumericVector beta_i) {
     const int N = nbins*(nbins+1)/2; //size of fused lasso problem
     std::vector<int> trails_r = as<std::vector<int> >(trails_i);
     std::vector<int> breakpoints_r = as<std::vector<int> >(breakpoints_i);
@@ -101,7 +122,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
         step++;
         //compute weights
         c_start = std::clock();
-        mat = cts_to_signal_mat(cts, nbins, dispersion, phi_r, eCprime, diag_rm);
+        mat = cts_to_signal_mat(cts, nbins, dispersion, phi_r, eCprime, outliers);
         std::vector<double> y_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
         std::vector<double> w_r = Rcpp::as<std::vector<double> >(mat["weight"]);
         c_end = std::clock();
@@ -223,7 +244,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts,
         int nbins, int ntrails, const NumericVector trails_i,
         const NumericVector breakpoints_i,
         double lam2, double alpha, double inflate, int ninner, double converge,
-        int diag_rm,  double lam1_init, double eCprime_init, NumericVector beta_i,
+        List outliers,  double lam1_init, double eCprime_init, NumericVector beta_i,
         double lambda1_min, int refine_num) {
     const int N = nbins*(nbins+1)/2; //size of fused lasso problem
     const bool constrained = true; //for signal step, constraint is always active
@@ -264,7 +285,7 @@ List wgfl_signal_perf_opt_lambda1_eCprime(const DataFrame cts,
         NumericVector beta_tmp = wrap(beta_r);
         List ret = wgfl_signal_perf_warm(cts, dispersion, opt_every, nbins, ntrails,
                                          trails_i, breakpoints_i, lam1, lam2, eCprime,
-                                         alpha, inflate, ninner, converge, diag_rm, beta_i);
+                                         alpha, inflate, ninner, converge, outliers, beta_i);
         int substep = ret["nouter"];
         beta_r = as<std::vector<double> >(ret["beta"]);
         phi_r = as<std::vector<double> >(ret["phi"]);
@@ -335,7 +356,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                      int nbins,
                      int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                      double lam2,  double alpha, double inflate, int ninner, double tol_val,
-                     int diag_rm, NumericVector beta_i, double lambda1_min, int refine_num,
+                     List outliers, NumericVector beta_i, double lambda1_min, int refine_num,
                      bool constrained, bool fixed) {
     std::clock_t c_start,c_end;
     double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
@@ -345,7 +366,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
     int nwarm = (int)(nouter/10.+1);
     List ret = wgfl_signal_perf_warm(cts, dispersion, nwarm, nbins, ntrails,
                                      trails_i, breakpoints_i, lam1, lam2, eCprime,
-                                     alpha, inflate, ninner, tol_val/20., diag_rm, beta_i);
+                                     alpha, inflate, ninner, tol_val/20., outliers, beta_i);
     c_cts += as<double>(ret["c_cts"]);
     c_gfl += as<double>(ret["c_gfl"]);
     //redo iteration if warm start did not work
@@ -354,7 +375,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
         //Rcout << " warning: warm start failed " << std::endl;
         ret = wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, ntrails, trails_i,
                                     breakpoints_i, lam1, lam2, eCprime,
-                                    alpha, inflate, ninner, tol_val/20., diag_rm, beta_i);
+                                    alpha, inflate, ninner, tol_val/20., outliers, beta_i);
         if (as<int>(ret["nouter"])>nouter) {
           //Rcout << " warning: cold start did not converge" <<std::endl;
           converged = false;
@@ -367,7 +388,6 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
     DataFrame mat = as<DataFrame>(ret["mat"]);
     List cv_run = wgfl_signal_cv(mat, nbins, ntrails, trails_i, breakpoints_i, lam2,
                                  alpha, inflate, ninner, tol_val/20., beta_i);
-    NumericVector beta_cv = cv_run["beta_cv"];
       
     //optimize lambda1 and eC
     c_start = std::clock();
@@ -379,7 +399,8 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                                          _["diag.grp"]=mat["diag.grp"],
                                          _["weight"]=mat["weight"],
                                          _["beta"]=ret["beta"],
-                                         _["beta_cv"]=beta_cv,
+                                         _["beta_cv"]=cv_run["beta_cv"],
+                                         _["cv.group"]=cv_run["cv.group"],
                                          _["value"]=ret["beta"]);
     NumericVector opt;
     if (fixed) { // is eCprime fixed to 0?
@@ -421,6 +442,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
 
     //retrieve BIC from previous computation
     const double BIC = opt["BIC"];
+    const double BIC_sd = opt["BIC.sd"];
     
     DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                            _["bin2"]=mat["bin2"],
@@ -430,13 +452,14 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                                            _["diag.idx"]=mat["diag.idx"],
                                            _["diag.grp"]=mat["diag.grp"],
                                            _["beta"]=beta_r,
-                                           _["beta_cv"]=beta_cv,
+                                           _["beta_cv"]=cv_run["beta_cv"],
+                                           _["cv.group"]=cv_run["cv.group"],
                                            _["phi"]=phi_r,
                                            _["cv.group"]=cv_run["cv.group"],
                                            _["patchno"]=patchno);
     return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi"]=phi_r,
                         _["beta"]=beta_r, _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
-                        _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat, _["eCprime"]=eCprime,
+                        _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd, _["mat"]=finalmat, _["eCprime"]=eCprime,
                         _["lambda1"]=lam1,
                         _["c_cts"]=c_cts, _["c_gfl"]=c_gfl, _["c_opt"]=c_opt, _["c_init"]=c_init,
                         _["c_brent"]=c_brent, _["c_refine"]=c_refine, _["converged"]=converged);
@@ -446,7 +469,7 @@ List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter,
                      int nbins,
                      int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                      double lam1, double lam2, double eCprime, double alpha, double inflate, int ninner, double tol_val,
-                     int diag_rm, NumericVector beta_i) {
+                     List outliers, NumericVector beta_i) {
     std::clock_t c_start,c_end;
     double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
     bool converged = true;
@@ -454,7 +477,7 @@ List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter,
     int nwarm = (int)(nouter/10.+1);
     List ret = wgfl_signal_perf_warm(cts, dispersion, nwarm, nbins, ntrails,
                                      trails_i, breakpoints_i, 0, lam2, 0,
-                                     alpha, inflate, ninner, tol_val/20., diag_rm, beta_i);
+                                     alpha, inflate, ninner, tol_val/20., outliers, beta_i);
     c_cts += as<double>(ret["c_cts"]);
     c_gfl += as<double>(ret["c_gfl"]);
     //redo iteration if warm start did not work
@@ -463,7 +486,7 @@ List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter,
         //Rcout << " warning: warm start failed " << std::endl;
         ret = wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, ntrails, trails_i,
                                     breakpoints_i, lam1, lam2, eCprime,
-                                    alpha, inflate, ninner, tol_val/20., diag_rm, beta_i);
+                                    alpha, inflate, ninner, tol_val/20., outliers, beta_i);
         if (as<int>(ret["nouter"])>nouter) {
             //Rcout << " warning: cold start did not converge" <<std::endl;
             converged=false;

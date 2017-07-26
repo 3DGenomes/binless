@@ -608,7 +608,7 @@ fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
 #' @export
 #'
 #' @examples
-merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enzyme","condition"), dfuse=20) {
+merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enzyme","condition"), dfuse=5, qmin=0.01) {
   cat("compile table of experiments, sorted by id\n")
   experiments = rbindlist(lapply(datasets, function(x) x@info))
   experiments[,name:=ordered(name, levels=name)]
@@ -619,6 +619,7 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
   settings=datasets[[1]]@settings[c("dmin","circularize")]
   settings$dmax=max(sapply(datasets, function(x) x@settings$dmax))
   settings$dfuse=dfuse
+  settings$qmin=qmin
   #
   filtered = lapply(datasets, function(csd){fuse_close_cut_sites(csd@biases, csd@counts, dfuse,
                                                                  csd@info$name, csd@settings$circularize)})

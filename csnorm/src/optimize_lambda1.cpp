@@ -16,9 +16,14 @@ obj_lambda1_BIC::obj_lambda1_BIC(double minUB, double tol_val,
                                  NumericVector value, NumericVector weight, NumericVector valuehat,
                                  NumericVector ncounts) :
   minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(max(abs(value))),
-  tol_val_(tol_val), lsnc_(log(sum(ncounts))),
-  patchno_(patchno), forbidden_vals_(forbidden_vals),
-  absval_(abs(value)), value_(value), weight_(weight), valuehat_(valuehat) {/*TODO: discard points with weight==0*/}
+  tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals) {
+  LogicalVector posweights = weight>0;
+  patchno_ = patchno[posweights];
+  value_ = value[posweights];
+  absval_ = abs(value_);
+  weight_ = weight[posweights];
+  valuehat_ = valuehat[posweights];
+}
 
 double obj_lambda1_BIC::operator()(double x) const {
   //return get(std::pow(10,x), "opt")["BIC"];
@@ -101,11 +106,17 @@ NumericVector obj_lambda1_BIC::get(double val, std::string msg) const {
 obj_lambda1_CV::obj_lambda1_CV(double minUB, double tol_val,
                          IntegerVector patchno, NumericVector forbidden_vals,
                          NumericVector value, NumericVector weight, NumericVector valuehat,
-                         NumericVector ncounts) :
+                         NumericVector ncounts, IntegerVector cv_grp) :
     minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(max(abs(value))),
-    tol_val_(tol_val), lsnc_(log(sum(ncounts))),
-    patchno_(patchno), forbidden_vals_(forbidden_vals),
-    absval_(abs(value)), value_(value), weight_(weight), valuehat_(valuehat) {/*TODO: discard points with weight==0*/}
+    tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals) {
+  LogicalVector posweights = weight>0;
+  patchno_ = patchno[posweights];
+  value_ = value[posweights];
+  absval_ = abs(value_);
+  weight_ = weight[posweights];
+  valuehat_ = valuehat[posweights];
+  cv_grp_ = cv_grp[posweights];
+}
 
 double obj_lambda1_CV::operator()(double x) const {
     //return get(std::pow(10,x), "opt")["BIC"];
@@ -170,19 +181,29 @@ NumericVector obj_lambda1_CV::get(double val, std::string msg) const {
                               << " eCprime= 0 CV= Inf dof= NA"
                               << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;
       return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1,
-                                   _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na(),
-                                   _["UB"]=lambda1, _["LB"]=-lambda1);
+                                   _["BIC"]=std::numeric_limits<double>::max(), _["BIC.sd"]=0,
+                                   _["dof"]=NumericVector::get_na(), _["UB"]=lambda1, _["LB"]=-lambda1);
   }
-    std::vector<double> value_r = as<std::vector<double> >(value_);
-    NumericVector soft = wrap(soft_threshold(value_r, 0, lambda1));
-    IntegerVector selected = patchno_[abs(soft)>tol_val_/2];
-    const int dof = unique(selected).size();
-    const double CV = sum(weight_ * SQUARE(valuehat_ - soft));
-    if (!msg.empty()) Rcout << " OBJ " << msg << " ok lambda1= " << lambda1 << " eCprime= 0"
-                            << " CV= " << CV  << " dof= " << dof
-                            << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;
-    return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1, _["BIC"]=CV,
-                                 _["dof"]=dof, _["UB"]=UB, _["LB"]=-UB);
+  std::vector<double> value_r = as<std::vector<double> >(value_);
+  NumericVector soft = wrap(soft_threshold(value_r, 0, lambda1));
+  IntegerVector selected = patchno_[abs(soft)>tol_val_/2];
+  const int dof = unique(selected).size();
+ 
+  const NumericVector indiv_CV = weight_ * SQUARE(valuehat_ - soft);
+  NumericVector groupwise_CV, groupwise_weights;
+  const int ngroups=2;
+  for (int i=0; i<ngroups; ++i) {
+    groupwise_CV.push_back(sum(as<NumericVector>(indiv_CV[cv_grp_==i])));
+    groupwise_weights.push_back(sum(cv_grp_==i));
+  }
+  const double CV = sum(groupwise_weights*groupwise_CV)/sum(groupwise_weights);
+  const double CV_sd = std::sqrt(sum(groupwise_weights*SQUARE(groupwise_CV))/sum(groupwise_weights) - SQUARE(CV));
+
+  if (!msg.empty()) Rcout << " OBJ " << msg << " ok lambda1= " << lambda1 << " eCprime= 0"
+                          << " CV= " << CV  << " dof= " << dof
+                          << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;
+  return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1, _["BIC"]=CV, _["BIC.sd"]=CV_sd,
+                               _["dof"]=dof, _["UB"]=UB, _["LB"]=-UB);
 }
 
 NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
@@ -199,6 +220,7 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
     IntegerVector diag_idx = mat["diag.idx"];
     IntegerVector diag_grp = mat["diag.grp"];
     NumericVector beta_cv = mat["beta_cv"];
+    IntegerVector cv_grp = mat["cv.group"];
     //get patch nos and sorted values
     List cl = boost_build_patch_graph_components(nbins, mat, tol_val);
     IntegerVector patchno = cl["membership"];
@@ -221,30 +243,18 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
     /*obj_lambda1_BIC obj(lmin, tol_val, patchno, forbidden_vals,
                         beta, weight, phihat, ncounts);*/
     obj_lambda1_CV obj(lmin, tol_val, patchno, forbidden_vals,
-                    beta_cv, weight, phihat, ncounts);
+                    beta_cv, weight, phihat, ncounts, cv_grp);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     //get minimum authorized patch value
     double minpatch = max(abs(forbidden_vals));
-    /*Rcout << "minpatch= " << minpatch << " npatches= " << patchvals.size() << " npatches.ok= "
-            << as<NumericVector>(patchvals[patchvals>=minpatch]).size() << std::endl;*/
-    //loop over patch values
     std::clock_t c_in1 = std::clock();
-    //NumericVector best = obj.get(patchvals(0) - 2*tol_val, "opt"); //query is < xmin
-    NumericVector best = obj.get(0); //query is < xmin
-    for (int i=0; i<patchvals.size(); ++i) {
-      if (patchvals(i) <= minpatch) continue;
-      //NumericVector val = obj.get(patchvals(i) + 2*tol_val, "opt");
-      NumericVector val = obj.get(patchvals(i) + 2*tol_val);
-      if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
-    }
-    //NumericVector val = obj.get(max(abs(beta)) + 2*tol_val, "opt");
-    NumericVector val = obj.get(max(abs(beta)) + 2*tol_val);
-    if (as<double>(val["BIC"]) < as<double>(best["BIC"])) best=val;
+    const double k=1;
+    NumericVector best = optimize_CV_kSD(obj, 0, minpatch, max(abs(beta)) + 2*tol_val, tol_val, patchvals, k);
     std::clock_t c_in2 = std::clock();
     //finalize
     //obj.get(as<double>(best["UB"])+2*tol_val,"final");
     return NumericVector::create(_["eCprime"]=best["eCprime"], _["lambda1"]=best["lambda1"],
                                  _["UB"]=best["UB"], _["LB"]=best["LB"],
-                                 _["BIC"]=best["BIC"], _["dof"]=best["dof"],
+                                 _["BIC"]=best["BIC"], _["BIC.sd"]=best["BIC.sd"], _["dof"]=best["dof"],
                                  _["c_init"]=c_in1-c_start, _["c_brent"]=0, _["c_refine"]=c_in2-c_in1);
 }

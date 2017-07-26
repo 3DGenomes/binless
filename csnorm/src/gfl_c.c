@@ -5,7 +5,7 @@
 void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
         double* lmu_nosig, double* weight, int nbins, double dispersion,
         double* phi, double eCprime, double* phihat, double* phihat_var, double* ncounts,
-        int* bin1, int* bin2, int diag_rm)
+        int* bin1, int* bin2)
 {
   //walk through cts
   int nbetas = nbins*(nbins+1)/2; //size of fused lasso problem
@@ -23,8 +23,6 @@ void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
     ncounts[pos] += weight[i];
     phihat_var[pos] += w2v;
     phihat[pos] += (z+phi[pos])*w2v;
-    /*if (pos==108) printf("count=%f lmu_nosig=%f phi=%f mu=%f z=%f var=%f w2v=%f pos=%d\n",
-        count[i], lmu_nosig[i], phi[pos], mu,z,var,w2v,pos);*/
   }
   
   //finish mat
@@ -40,8 +38,6 @@ void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
     bin1[i] = b1;
     bin2[i] = b2++;
     if (b2 > nbins) b2 = ++b1;
-    if (bin2[i]-bin1[i] <= diag_rm) phihat_var[i] = INFINITY;
-    //if (bin1[i]==31 & bin2[i]==31) printf("phihat=%f phihat.var=%f i=%d\n",phihat[i],phihat_var[i],i);
   }
 }
 

@@ -5,16 +5,19 @@
 using namespace Rcpp;
 #include <vector>
 
+void remove_outliers(const std::vector<int>& bin1, const std::vector<int>& bin2,
+                     std::vector<double>& phihat_var, List outliers);
+
 DataFrame cts_to_diff_mat(const DataFrame cts, const DataFrame ref, int nbins,
                           double dispersion,
-                          std::vector<double>& phi_ref, std::vector<double>& delta, int diag_rm);
+                          std::vector<double>& phi_ref, std::vector<double>& delta, List outliers);
 
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                          double dispersion, int nouter, int nbins,
                          int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                          double lam1, double lam2, double alpha, double inflate, int ninner,
                          double converge,
-                         int diag_rm, NumericVector phi_ref_i, NumericVector beta_i);
+                         List outliers, NumericVector phi_ref_i, NumericVector beta_i);
 
 List wgfl_diff_cv(const DataFrame mat, int nbins,
                     int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
@@ -24,14 +27,14 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    int nouter, int nbins,
                    int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                    double lam2,  double alpha, double inflate, int ninner, double tol_val,
-                   int diag_rm, NumericVector phi_ref_i, NumericVector beta_i, double lambda1_min,
+                   List outliers, NumericVector phi_ref_i, NumericVector beta_i, double lambda1_min,
                    int refine_num, bool constrained);
 
 List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double dispersion,
                    int nouter, int nbins,
                    int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                    double lam1, double lam2,  double alpha, double inflate, int ninner, double tol_val,
-                   int diag_rm, NumericVector phi_ref_i, NumericVector beta_i);
+                   List outliers, NumericVector phi_ref_i, NumericVector beta_i);
 
 #endif
 
