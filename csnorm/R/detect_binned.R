@@ -45,11 +45,11 @@ detect_binned_interactions = function(cs, resolution, group, threshold=0.95, nco
   ### put in matrix form
   mat = cts[,.(K=exp(dnorm(phihat[1],mean=0,sd=sqrt(sigmasq[1]+prior.sd^2), log=T)-
                        dnorm(phihat[1],mean=0,sd=sqrt(sigmasq[1]), log=T)),
-               signal.signif=signal[1],
-               signal.signif.sd=sqrt(1/(1/sigmasq[1]+1/prior.sd^2))*signal[1],
+               signal=signal[1],
+               signal.sd=sqrt(1/(1/sigmasq[1]+1/prior.sd^2))*signal[1],
                binned=sum(count)),keyby=c("name","bin1","bin2")]
-  mat[,direction:=ifelse(signal.signif>=1,"enriched","depleted")]
-  mat[binned==0,c("signal.signif","signal.signif.sd","K","direction"):=list(0,NA,0,"depleted")]
+  mat[,direction:=ifelse(signal>=1,"enriched","depleted")]
+  mat[binned==0,c("signal","signal.sd","K","direction"):=list(0,NA,0,"depleted")]
   mat[,prob.gt.expected:=K/(1+K)]
   mat[,c("K","binned"):=list(NULL,NULL)]
   mat[,is.significant:=prob.gt.expected > threshold]
