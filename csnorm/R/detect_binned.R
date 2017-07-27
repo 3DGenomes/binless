@@ -31,10 +31,10 @@ detect_binned_interactions = function(cs, resolution, group, threshold=0.95, nco
   #
   ### interaction detection
   if (verbose==T) cat("   Interaction detection\n")
-  cts[,signal:=1]
+  cts[,c("signal","mu.nosig"):=list(1,exp(lmu.nosig))]
   for (i in 1:niter) {
-    cts[,c("z","var","signal.old"):=list(count/(signal*mu)-1,
-                                         (1/(signal*mu)+1/csg@par$alpha),signal)]
+    cts[,c("z","var","signal.old"):=list(count/(signal*mu.nosig)-1,
+                                         (1/(signal*mu.nosig)+1/csg@par$alpha),signal)]
     cts[,phihat:=weighted.mean(z+log(signal), weight/var),by=c("name","bin1","bin2")]
     cts[,sigmasq:=1/sum(weight/var),by=c("name","bin1","bin2")]
     cts[,signal:=exp(phihat/(1+sigmasq/prior.sd^2))]
@@ -55,7 +55,7 @@ detect_binned_interactions = function(cs, resolution, group, threshold=0.95, nco
   mat[,is.significant:=prob.gt.expected > threshold]
   #
   ### store back
-  csi=new("CSinter", mat=mat, type="interactions", threshold=threshold, ref="expected")
+  csi=new("CSsig", mat=mat, threshold=threshold)
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
   return(cs)
@@ -90,20 +90,21 @@ detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95,
   #
   if (verbose==T) cat("   Difference detection\n")
   #replicate reference counts for each case
+  cts[,c("mu.nosig"):=list(exp(lmu.nosig))]
   ctsref = foreach(n=cts[name!=ref,unique(name)],.combine=rbind) %do%
-    cts[name==ref,.(name=n,bin1,bin2,count,mu,weight)]
+    cts[name==ref,.(name=n,bin1,bin2,count,mu,weight,mu.nosig)]
   cts=cts[name!=ref]
   #IRLS iteration
   mat=cts[,.(phi.ref=0,delta=0,diffsig=1),by=c("name","bin1","bin2")]
   for (i in 1:niter) {
     ctsref=mat[ctsref]
-    ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu)-1,(1/(exp(phi.ref)*mu)+1/csg@par$alpha))]
+    ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu.nosig)-1,(1/(exp(phi.ref)*mu.nosig)+1/csg@par$alpha))]
     mat=mat[ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
                       sigmasq.ref=1/sum(weight/var)),keyby=c("name","bin1","bin2")]]
     #
     cts=mat[cts]
-    cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu)-1,
-                            (1/(exp(phi.ref+delta)*mu)+1/csg@par$alpha))]
+    cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu.nosig)-1,
+                            (1/(exp(phi.ref+delta)*mu.nosig)+1/csg@par$alpha))]
     mat=mat[cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
                    sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
     mat[,deltahat:=phihat-phihat.ref]
@@ -112,8 +113,8 @@ detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95,
     mat[,diffsig:=exp(delta)]
     if(mat[,all(abs(diffsig-diffsig.old)<tol)]) break
     mat[,phi.ref:=(phihat.ref/sigmasq.ref + (phihat-delta)/sigmasq)/(1/sigmasq.ref+1/sigmasq)]
-    ctsref=ctsref[,.(name,bin1,bin2,count,mu,weight)]
-    cts=cts[,.(name,bin1,bin2,count,mu,weight)]
+    ctsref=ctsref[,.(name,bin1,bin2,count,mu.nosig,weight)]
+    cts=cts[,.(name,bin1,bin2,count,mu.nosig,weight)]
     mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig,diffsig.old)]
   }
   if (i==niter) message("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
@@ -139,7 +140,7 @@ detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95,
   mat[,c("direction","K"):=list(ifelse(difference>=1,"enriched","depleted"),NULL)]
   #
   ### store back
-  csi=new("CSinter", mat=mat, type="differences", threshold=threshold, ref=ref)
+  csi=new("CSdiff", mat=mat, threshold=threshold, ref=as.character(ref))
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
   return(cs)
