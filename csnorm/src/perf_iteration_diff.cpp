@@ -55,8 +55,9 @@ List wgfl_diff_cv(const DataFrame mat, int nbins,
   std::vector<int> trails_r = as<std::vector<int> >(trails_i);
   std::vector<int> breakpoints_r = as<std::vector<int> >(breakpoints_i);
   std::vector<double> beta_r = as<std::vector<double> >(beta_i);
-  std::vector<double> deltahat_r = as<std::vector<double> >(mat["deltahat"]);
-  std::vector<double> weight_r = as<std::vector<double> >(mat["weight"]);
+  std::vector<double> phihat_r = as<std::vector<double> >(mat["phihat"]);
+  std::vector<double> phi_ref_r = as<std::vector<double> >(mat["phi_ref"]);
+  std::vector<double> phihat_var_r = as<std::vector<double> >(mat["phihat.var"]);
   IntegerVector bin1 = as<IntegerVector>(mat["bin1"]);
   IntegerVector bin2 = as<IntegerVector>(mat["bin2"]);
   
@@ -81,19 +82,19 @@ List wgfl_diff_cv(const DataFrame mat, int nbins,
     std::vector<double> d_r, w_r;
     for (int i=0; i<N; ++i) {
       if (cvgroup[i]==g) {
-        d_r.push_back(0); //essential if lam2==0
+        d_r.push_back(1000); //essential if lam2==0
         w_r.push_back(0);
       } else {
-        d_r.push_back(deltahat_r[i]);
-        w_r.push_back(weight_r[i]);
+        d_r.push_back(phihat_r[i]-phi_ref_r[i]);
+        w_r.push_back(1/phihat_var_r[i]);
       }
     }
     std::vector<double> values(beta_r);
     //compute fused lasso solution
     res += graph_fused_lasso_weight_warm (N, &d_r[0], &w_r[0], ntrails,
                                           &trails_r[0], &breakpoints_r[0],
-                                                                      lam2, &alpha, inflate, ninner, converge,
-                                                                      &values[0], &z_r[0], &u_r[0]);
+                                          lam2, &alpha, inflate, ninner, converge,
+                                          &values[0], &z_r[0], &u_r[0]);
     //store fused solution at group positions back in beta_cv
     for (int i=0; i<N; ++i) if (cvgroup[i]==g) beta_cv[i] = values[i];
   }
