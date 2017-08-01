@@ -27,8 +27,8 @@ a=examine_dataset("/scratch/rao/mapped/IMR90_MboI_in_situ/IMR90_MboI_HICall_Peak
 #they contain the respective CSdata objects
 
 registerDoParallel(cores=10)
-foreach (chr=c("chrX","chr1","chr1","chr7","chr3","chr4","chr21","chr21","chr5","chr12","chr21","chr22"),
-         name=c("Peak1","SELP","Talk","SEMA3C","FOXP1","PARM1","Comparison","ADAMTS1","ADAMTS2","TBX3","Fig1C","22qter"),
+foreach (chr=c("chrX","chr1","chr1","chr7","chr3","chr4","chr21","chr21","chr5","chr12","chr21","chr22","chr1"),
+         name=c("Peak1","SELP","Talk","SEMA3C","FOXP1","PARM1","Comparison","ADAMTS1","ADAMTS2","TBX3","Fig1C","22qter","Tbx19"),
          size=c("450k","150k","2M","1M","1.3M","600k","1.7M","2.3M","450k","1.5M","1M","1.7M")) %do% {
            cat(chr,name,size,"\n")
            csd=read_and_prepare(paste0("/scratch/rao/mapped/GM12878_MboI_in_situ/GM12878_MboI_HICall_",name,".tsv"),
