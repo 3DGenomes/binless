@@ -35,10 +35,22 @@ foreach (chr=c("chrX","chr1","chr1","chr7","chr3","chr4","chr21","chr21","chr5",
                                 paste0("data/rao_HiCall_GM12878_",name,"_",size), "GM", "1",
                                 enzyme="MboI", name=paste(name,"GM12878 all"), circularize=-1, dangling.L=c(0),
                                 dangling.R=c(3), maxlen=900, read.len=101, dmin=1000, save.data=T)
+           for (run in c("03","06")) {
+             csd=read_and_prepare(paste0("/scratch/rao/mapped/GM12878_MboI_in_situ/GM12878_MboI_HIC0",run,"_",name,".tsv"),
+                                  paste0("data/rao_HiC0",run,"_GM12878_",name,"_",size), "GM", run,
+                                  enzyme="MboI", name=paste(name,"GM12878",run), circularize=-1, dangling.L=c(0),
+                                  dangling.R=c(3), maxlen=900, read.len=101, dmin=1000, save.data=T)
+           }
            csd=read_and_prepare(paste0("/scratch/rao/mapped/IMR90_MboI_in_situ/IMR90_MboI_HICall_",name,".tsv"),
                                 paste0("data/rao_HiCall_IMR90_",name,"_",size), "IMR90", "1",
                                 enzyme="MboI", name=paste(name,"IMR90 all"), circularize=-1, dangling.L=c(0),
                                 dangling.R=c(3), maxlen=600, read.len=101, dmin=1000, save.data=T)
+           for (run in c("53","55")) {
+             csd=read_and_prepare(paste0("/scratch/rao/mapped/IMR90_MboI_in_situ/IMR90_MboI_HIC0",run,"_",name,".tsv"),
+                                  paste0("data/rao_HiC0",run,"_IMR90_",name,"_",size), "IMR90", run,
+                                  enzyme="MboI", name=paste(name,"IMR90",run), circularize=-1, dangling.L=c(0),
+                                  dangling.R=c(3), maxlen=600, read.len=101, dmin=1000, save.data=T)
+           }
 }
 
 
