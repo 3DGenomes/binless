@@ -96,7 +96,7 @@ csnorm_gauss_common_muhat_mean = function(cs, zeros, sbins) {
   czero = czero[,.(name,id1,pos1,bin1,bin2,dbin,cat,dir,count=0,lmu.nosig,weight=nzero,log_bias,log_decay,eC)]
   cts=rbind(cpos,czero)
   ### add signal
-  if (cs@par$signal[,.N]>0) {
+  if (cs@par$signal[,.N]>0 && all(!is.null(cts$phi))) {
     signal = csnorm:::get_signal_matrix(cs, resolution = sbins[2]-sbins[1], groups=cs@experiments[,.(name,groupname=name)])
     signal=rbind(signal[,.(name,bin1,bin2,phi)],signal[bin1!=bin2,.(name,bin1=bin2,bin2=bin1,phi)])
     cts=signal[cts,,on=c("name","bin1","bin2")]
@@ -754,15 +754,19 @@ has_converged = function(cs, laststep=NULL) {
   #parameter convergence
   getdiff=function(name,fn=identity){merge(params[step==laststep,.(leg,get(name))],
                                params[step==laststep-1,.(leg,get(name))],by="leg")[
-                                 leg==leg[.N],abs(fn(V2.x[[1]])-fn(V2.y[[1]]))]}
+                                 leg==leg[.N],if(is.numeric(V2.y[[1]])){abs(fn(V2.x[[1]])-fn(V2.y[[1]]))}else{fn(V2.x[[1]])}]}
   conv.eC = getdiff("eC")
   conv.alpha = getdiff("alpha")
   conv.ldiag = getdiff("lambda_diag",fn=log10)
   conv.liota = getdiff("lambda_iota",fn=log10)
   conv.lrho = getdiff("lambda_rho",fn=log10)
-  conv.l1 = getdiff("lambda1",fn=function(x){y=x;y[x>0]=log10(y[x>0]);y})
-  conv.l2 = getdiff("lambda2",fn=log10)
-  conv.param = all(c(conv.eC,conv.alpha,conv.ldiag,conv.liota,conv.lrho,conv.l1,conv.l2)<cs@settings$tol.obj)
+  if(!any(cs@par$signal$phi == 0)) {
+    conv.l1 = getdiff("lambda1",fn=function(x){y=x;y[x>0]=log10(y[x>0]);y})
+    conv.l2 = getdiff("lambda2",fn=log10)
+    conv.param = all(c(conv.eC,conv.alpha,conv.ldiag,conv.liota,conv.lrho,conv.l1,conv.l2)<cs@settings$tol.obj)
+  } else {
+    conv.param = all(c(conv.eC,conv.alpha,conv.ldiag,conv.liota,conv.lrho)<cs@settings$tol.obj)
+  }
   return(conv.obj | conv.param)
 }
 
