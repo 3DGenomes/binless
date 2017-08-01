@@ -436,7 +436,12 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
     #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
     matg[,value:=phi]
     matg = csnorm:::detect_binless_patches(matg, csi@settings$nbins, csi@settings$tol.val)
-    matg[,value:=NULL]
+    #mark as legit those patches that don't touch the badly modelled diagonal
+    diag.rm = ceiling(cs@settings$dmin/resolution)
+    matg[,is.legit:=all(diag.idx>diag.rm),by=patchno]
+    matg[is.legit==F,is.maximum:=FALSE]
+    #remove temporaries
+    matg[,c("value","is.minimum","is.legit"):=NULL]
     matg
   }
   #
@@ -502,6 +507,12 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
     matg[,value:=delta]
     matg = csnorm:::detect_binless_patches(matg, csi@settings$nbins, csi@settings$tol.val)
+    #mark as legit those patches that don't touch the badly modelled diagonal
+    diag.rm = ceiling(cs@settings$dmin/resolution)
+    matg[,is.legit:=all(diag.idx>diag.rm),by=patchno]
+    matg[is.legit==F,c("is.maximum","is.minimum"):=list(FALSE,FALSE)]
+    #remove temporaries
+    matg[,c("value","is.legit"):=NULL]
     matg[,value:=NULL]
     matg
   }
