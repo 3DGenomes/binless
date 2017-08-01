@@ -45,7 +45,7 @@ build_patch_graph = function(mat, g, tol.value=1e-3) {
 detect_binless_patches = function(mat, nbins, tol.value=1e-3) {
   if (mat[,uniqueN(name)]>1)
     return(foreach (n=mat[,unique(name)],.combine=rbind) %do%
-             csnorm:::detect_binless_patches(mat[name==n], tol.value=tol.value))
+             csnorm:::detect_binless_patches(mat[name==n], nbins, tol.value=tol.value))
   #
   g = compute_2d_connectivity_graph(nbins)
   stuff = build_patch_graph(mat, g, tol.value=tol.value)
