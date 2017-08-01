@@ -106,11 +106,10 @@ get_nzeros_binning = function(cs, resolution, ncores=1) {
 #' @export
 #'
 #' @examples
-csnorm_predict_binned_matrices_irls = function(cts, dispersion, eCmat=data.table(), ncores=1, niter=100, tol=1e-3, verbose=T) {
+csnorm_predict_binned_matrices_irls = function(cts, dispersion, ncores=1, niter=100, tol=1e-3, verbose=T) {
   #matrices
   if (verbose==T) cat("   Other matrices\n")
-  cts=merge(cts,eCmat,by="name")
-  cts[,c("decay","biases"):=list(exp(log_decay),exp(lmu.nosig-log_decay-eC))]
+  cts[,c("decay","biases"):=list(exp(log_decay),exp(log_bias))]
   mat=cts[,.(ncounts=sum(weight),
              observed=sum(count*weight),
              biasmat=sum(biases*weight)/sum(weight),
@@ -186,9 +185,12 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
     zeros = csnorm:::get_nzeros(cs, sbins, ncores=ncores)
   }
   #
-  #predict means, put in triangular form and add signal column if absent
+  #predict means, put in triangular form, add biases, and add signal column if absent
   if (verbose==T) cat("   Predict means\n")
   cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, zeros, sbins)
+  eCmat = cs@design[,.(name,eC=cs@par$eC)]
+  cts = merge(cts, eCmat, by="name")
+  cts[,log_bias:=lmu.nosig-log_decay-eC]
   if (!("phi" %in% names(cts))) cts[,phi:=0]
   #
   if (verbose==T) cat("   Group\n")
@@ -206,8 +208,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   setkeyv(cts,c("name","bin1","bin2"))
   #
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
-  mat = csnorm_predict_binned_matrices_irls(copy(cts), cs@par$alpha, eCmat=cs@design[,.(name,eC=cs@par$eC)],
-                                            ncores=ncores, niter=niter, tol=tol, verbose=verbose)
+  mat = csnorm_predict_binned_matrices_irls(copy(cts), cs@par$alpha, ncores=ncores, niter=niter, tol=tol, verbose=verbose)
   setkey(mat,name,bin1,bin2)
   #
   if (verbose==T) cat("*** write begin/end positions\n")
