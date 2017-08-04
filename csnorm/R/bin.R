@@ -177,13 +177,8 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   if (verbose==T) cat("   Get zeros per bin\n")
   if (resolution < cs@settings$base.res)
     cat("Warning: resolution is smaller than base.res, results might be inconsistent\n")
-  if (resolution == cs@settings$base.res) {
-    sbins = cs@settings$sbins
-    zeros = cs@zeros
-  } else {
-    sbins = seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
-    zeros = csnorm:::get_nzeros(cs, sbins, ncores=ncores)
-  }
+  sbins = seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
+  zeros = csnorm:::get_nzeros(cs, sbins, ncores=ncores)
   #
   #predict means, put in triangular form, add biases, and add signal column if absent
   if (verbose==T) cat("   Predict means\n")
