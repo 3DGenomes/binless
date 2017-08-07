@@ -347,6 +347,7 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
   #add trail information
   trails = csnorm:::gfl_compute_trails(csg@par$nbins)
   stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
+  diag.rm = ceiling(cs@settings$dmin/resolution)
   #add other settings
   settings=list(outliers = get_outliers(cs, csg@cts, resolution),
                 nbins = csg@par$nbins,
@@ -355,7 +356,9 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
                 inflate=2,
                 nperf=500,
                 opt.every=10,
-                maxsteps=100000)
+                maxsteps=100000,
+                diag.rm = diag.rm,
+                min.patchsize = 4)
   cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
   csi=new("CSbsig", mat=mat, trails=trails, cts=cts, settings=settings)
   return(csi)
@@ -435,7 +438,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
     #cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
     #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
     matg[,value:=phi]
-    matg = csnorm:::detect_binless_patches(matg, csi@settings$nbins, csi@settings$tol.val)
+    matg = csnorm:::detect_binless_patches(matg, csi@settings)
     matg[,value:=NULL]
     matg
   }
@@ -501,7 +504,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     #cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
     #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
     matg[,value:=delta]
-    matg = csnorm:::detect_binless_patches(matg, csi@settings$nbins, csi@settings$tol.val)
+    matg = csnorm:::detect_binless_patches(matg, csi@settings)
     matg[,value:=NULL]
     matg
   }

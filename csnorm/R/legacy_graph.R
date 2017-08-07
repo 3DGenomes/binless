@@ -42,13 +42,14 @@ build_patch_graph = function(mat, g, tol.value=1e-3) {
 
 #' give a patch ID to each patch in a binless matrix, and report local extrema
 #' @keywords internal
-detect_binless_patches = function(mat, nbins, tol.value=1e-3) {
+detect_binless_patches = function(mat, settings) {
   if (mat[,uniqueN(name)]>1)
     return(foreach (n=mat[,unique(name)],.combine=rbind) %do%
-             csnorm:::detect_binless_patches(mat[name==n], nbins, tol.value=tol.value))
+             csnorm:::detect_binless_patches(mat[name==n], settings))
   #
-  g = compute_2d_connectivity_graph(nbins)
-  stuff = build_patch_graph(mat, g, tol.value=tol.value)
+  #create connectivity graph
+  g = compute_2d_connectivity_graph(settings$nbins)
+  stuff = build_patch_graph(mat, g, tol.value=settings$tol.val)
   V(g)$value = mat[,value]
   cl=stuff$components
   #create fused graph
@@ -81,5 +82,10 @@ detect_binless_patches = function(mat, nbins, tol.value=1e-3) {
   mat[,is.minimum:=V(g5)$outdegree==0]
   mat[,is.maximum:=V(g5)$indegree==0]
   mat[,patchno:=factor(cl$membership)]
+  #filter out certain minima/maxima
+  mat[,valid:=.SD[diag.idx>settings$diag.rm,.N>settings$min.patchsize],by=c("patchno","name")]
+  mat[,is.maximum:=ifelse(valid==T,is.maximum,F)]
+  mat[,is.minimum:=ifelse(valid==T,is.minimum,F)]
+  mat[,valid:=NULL]
   return(mat)
 }
