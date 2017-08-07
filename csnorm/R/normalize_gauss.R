@@ -909,7 +909,20 @@ plot_diagnostics = function(cs, start=1) {
 save_stripped = function(cs, fname) {
   cs@diagnostics=list(params=data.table())
   cs@zeros=data.table()
-  cs@groups=list()
+  strip_interaction = function(csi) {
+    if (class(csi) %in% c("CSbsig","CSbdiff")) {
+      csi@state=list()
+      csi@trails=list()
+      csi@cts=data.table()
+    }
+    return(csi)
+  }
+  strip_group = function(csg) {
+    csg@cts=data.table()
+    csg@interactions=lapply(csg@interactions,strip_interaction)
+    return(csg)
+  }
+  cs@groups=lapply(cs@groups,strip_group)
   save(cs,file=fname)
 }
 
