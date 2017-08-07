@@ -11,7 +11,6 @@ NULL
 #' @param threshold on the probability K/(1+K) where K is the Bayes factor
 #' @param niter integer. Maximum number of IRLS iterations
 #' @param tol numeric. Convergence tolerance for IRLS objective
-#' @param prior.sd 
 #' @param verbose boolean.
 #'   
 #' @return the binned matrix with additional information relating to these 
@@ -20,7 +19,7 @@ NULL
 #' 
 #' @examples
 detect_binned_interactions = function(cs, resolution, group, threshold=0.95, ncores=1,
-                                      niter=100, tol=1e-3, prior.sd=5, verbose=T){
+                                      niter=100, tol=1e-3, verbose=T){
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
@@ -32,12 +31,14 @@ detect_binned_interactions = function(cs, resolution, group, threshold=0.95, nco
   ### interaction detection
   if (verbose==T) cat("   Interaction detection\n")
   cts[,c("signal","mu.nosig"):=list(1,exp(lmu.nosig))]
+  prior.sd=1
   for (i in 1:niter) {
     cts[,c("z","var","signal.old"):=list(count/(signal*mu.nosig)-1,
                                          (1/(signal*mu.nosig)+1/csg@par$alpha),signal)]
     cts[,phihat:=weighted.mean(z+log(signal), weight/var),by=c("name","bin1","bin2")]
     cts[,sigmasq:=1/sum(weight/var),by=c("name","bin1","bin2")]
     cts[,signal:=exp(phihat/(1+sigmasq/prior.sd^2))]
+    prior.sd=cts[,.(phi=log(signal[1])),by=c("name","bin1","bin2")][,sqrt(sum(phi^2)/.N)]
     if(cts[,all(abs(signal-signal.old)<tol)]) break
   }
   if (i==niter) cat("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
@@ -73,7 +74,7 @@ detect_binned_interactions = function(cs, resolution, group, threshold=0.95, nco
 #' 
 #' @examples
 detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95, ncores=1,
-                                     niter=100, tol=1e-3, prior.sd=5, verbose=T){
+                                     niter=100, tol=1e-3, verbose=T){
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
@@ -96,6 +97,7 @@ detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95,
   cts=cts[name!=ref]
   #IRLS iteration
   mat=cts[,.(phi.ref=0,delta=0,diffsig=1),by=c("name","bin1","bin2")]
+  prior.sd=1
   for (i in 1:niter) {
     ctsref=mat[ctsref]
     ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu.nosig)-1,(1/(exp(phi.ref)*mu.nosig)+1/csg@par$alpha))]
@@ -109,6 +111,7 @@ detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95,
                    sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
     mat[,deltahat:=phihat-phihat.ref]
     mat[,delta:=deltahat/(1+(sigmasq.ref+sigmasq)/prior.sd^2)]
+    prior.sd=mat[,sqrt(sum(delta^2)/.N)]
     mat[,diffsig.old:=diffsig]
     mat[,diffsig:=exp(delta)]
     if(mat[,all(abs(diffsig-diffsig.old)<tol)]) break
