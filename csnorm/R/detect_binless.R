@@ -524,27 +524,27 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
 #' @export
 #'
 #' @examples
-plot_binless_matrix = function(mat, minima=F, scale=T) {
+plot_binless_matrix = function(mat, minima=F, scale=T, value.name="value") {
   if (length(setdiff(c("begin1","begin2","end1","end2"),names(mat)))>0) {
     mat[,c("begin1","begin2","end1","end2"):=list(unclass(bin1),unclass(bin2),unclass(bin1)+1,unclass(bin2)+1)]
   }
   resolution=mat[bin1==bin1[1]&name==name[1],begin2[2]-begin2[1]]
   a=mat[is.maximum==T]
   a=a[,.SD[,.(begin1=c(begin1,begin1,end1,end1)-resolution/2, begin2=c(begin2,end2,begin2,end2)-resolution/2,
-              patchno, value)][chull(begin1,begin2)], by=c("patchno","name")]
+              patchno, get(value.name))][chull(begin1,begin2)], by=c("patchno","name")]
   if (minima==T) {
     b=mat[is.minimum==T]
     b=b[,.SD[,.(begin1=c(begin1,begin1,end1,end1)-resolution/2, begin2=c(begin2,end2,begin2,end2)-resolution/2,
-                patchno, value)][chull(begin1,begin2)], by=c("patchno","name")]
-    p=ggplot(mat)+geom_raster(aes(begin1,begin2,fill=-(value)))+
-      geom_raster(aes(begin2,begin1,fill=-(value)))+
-      scale_fill_gradient2()+facet_wrap(~name)+
+                patchno, get(value.name))][chull(begin1,begin2)], by=c("patchno","name")]
+    p=ggplot(mat)+geom_raster(aes(begin1,begin2,fill=-(get(value.name))))+
+      geom_raster(aes(begin2,begin1,fill=-(get(value.name))))+
+      scale_fill_gradient2()+facet_wrap(~name)+labs(fill=value.name)+
       geom_polygon(aes(begin2,begin1,group=patchno),colour="blue",fill=NA,data=b)+
       geom_polygon(aes(begin2,begin1,group=patchno),colour="red",fill=NA,data=a)
   } else {
-    p=ggplot(mat)+geom_raster(aes(begin1,begin2,fill=-value))+
-      geom_raster(aes(begin2,begin1,fill=-value))+
-      scale_fill_gradient2()+facet_wrap(~name)+
+    p=ggplot(mat)+geom_raster(aes(begin1,begin2,fill=-get(value.name)))+
+      geom_raster(aes(begin2,begin1,fill=-get(value.name)))+
+      scale_fill_gradient2()+facet_wrap(~name)+labs(fill=value.name)+
       geom_polygon(aes(begin2,begin1,group=patchno),colour="black",fill=NA,data=a)
   }
   if (scale!=T) p=p+guides(fill=F)
