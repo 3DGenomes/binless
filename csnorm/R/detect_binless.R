@@ -127,7 +127,7 @@ gfl_BIC_fixed = function(csig, lambda1, lambda2, eCprime) {
 
 #' cross-validate lambda2
 #' @keywords internal
-optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, signif.threshold=T) {
+optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, signif.threshold=T, ncores=1) {
   obj = function(x) {
     if (signif.threshold==T) {
       csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed)
@@ -167,6 +167,7 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, si
   reduction=3
   nrounds=3
   dt=data.table()
+  registerDoParallel(cores=ncores)
   for (i in 1:nrounds) {
     minlambda = max(minlambda,lambda2 - range/2)
     maxlambda = min(maxlambda,lambda2 + range/2)
@@ -282,10 +283,10 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, signif.threshold=T) {
+csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, signif.threshold=T, ncores=1) {
   n.SD=ifelse(fixed==T,1,0)
   csig = csnorm:::optimize_lambda2(csig, n.SD=n.SD, constrained=constrained, positive=positive, fixed=fixed,
-                                   signif.threshold=signif.threshold)
+                                   signif.threshold=signif.threshold, ncores=ncores)
   csig@par$name=csig@cts[,name[1]]
   #matg=csnorm:::gfl_get_matrix(csig, 0, csig@par$lambda2, 0)
   #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
@@ -409,13 +410,13 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
   groupnames=csi@cts[,unique(name)]
-  registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %do% {
     csig = csi
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
-    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=T, verbose=verbose, signif.threshold=signif.threshold)
+    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=T, verbose=verbose,
+                                signif.threshold=signif.threshold, ncores=ncores)
   }
   #display param info
   if (verbose==T)
@@ -433,7 +434,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
   #
   if (verbose==T) cat(" Detect patches\n")
-  csi@mat = foreach(g=groupnames, .combine=rbind) %dopar% {
+  csi@mat = foreach(g=groupnames, .combine=rbind) %do% {
     matg = mat[name==g]
     #cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
     #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
@@ -475,13 +476,13 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
   groupnames=csi@cts[,unique(name)]
-  registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %do% {
     csig = csi
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=T, init.alpha=5)
-    csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=T, verbose=verbose, signif.threshold=signif.threshold)
+    csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=T, verbose=verbose,
+                                signif.threshold=signif.threshold, ncores=ncores)
   }
   #display param info
   if (verbose==T)
@@ -499,7 +500,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
   #
   if (verbose==T) cat(" Detect patches\n")
-  csi@mat = foreach(g=groupnames, .combine=rbind) %dopar% {
+  csi@mat = foreach(g=groupnames, .combine=rbind) %do% {
     matg = mat[name==g]
     #cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
     #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]

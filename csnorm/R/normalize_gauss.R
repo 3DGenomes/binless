@@ -709,13 +709,13 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
   #perform fused lasso on signal
   groupnames=cts[,unique(name)]
   nbins=length(cs@settings$sbins)-1
-  registerDoParallel(cores=ncores)
   params = foreach(g=groupnames, .combine=rbind) %do% {
     csig=new("CSbsig", mat=cs@par$signal[name==g], trails=cs@settings$trails, cts=cts[name==g],
              settings=list(outliers=outliers, nbins=nbins, dispersion=cs@par$alpha,
                            tol.val=cs@settings$tol.leg, inflate=2, nperf=500, opt.every=10, maxsteps=100000))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
-    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose, signif.threshold=signif.threshold)
+    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose,
+                                signif.threshold=signif.threshold, ncores=ncores)
   }
   #compute matrix at new params
   mat = rbindlist(params[,mat])
@@ -793,9 +793,9 @@ get_nzeros = function(cs, sbins, ncores=1) {
   #looping over IDs avoids building NxN matrix
   biases=cs@biases[,.(name,id,pos)]
   biases[,bin:=cut(pos, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
-  registerDoParallel(cores=ncores)
   chunksize=cs@biases[,ceiling(.N/(10*ncores))]
   nchunks=cs@biases[,ceiling(.N/chunksize)]
+  registerDoParallel(cores=ncores)
   crossings = foreach(chunk=1:nchunks, .combine=rbind) %dopar% {
     bs=biases[((chunk-1)*chunksize+1):min(.N,chunk*chunksize)]
     foreach(i=bs[,id], n=bs[,name], p=bs[,pos], b=bs[,bin], .combine=rbind) %do% {
