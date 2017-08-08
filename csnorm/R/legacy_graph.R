@@ -52,24 +52,29 @@ detect_binless_patches = function(mat, settings) {
   stuff = build_patch_graph(mat, g, tol.value=settings$tol.val)
   V(g)$value = mat[,value]
   cl=stuff$components
+  #report patch numbers, mark valid patches and isolate invalid ones
+  mat[,patchno:=factor(cl$membership)]
+  mat[,valid:=.SD[diag.idx>settings$diag.rm,.N>settings$min.patchsize],by=patchno]
+  g=delete_edges(g,c(incident_edges(g,V(g)[mat[,valid==F]]),recursive=T))
   #create fused graph
   g3 = contract(g, cl$membership, vertex.attr.comb = list(value="min", weight="sum")) %>% simplify()
   #plot(g3, vertex.color=factor(V(g3)$value), vertex.label=V(g3)$weight, vertex.size=10*log(1+V(g3)$weight), layout=layout_as_tree)
   #
   #Add directions from high to low values
-  g4 = as.directed(g3)
+  g4 = as.directed(g3, mode="mutual")
   values_by_edge = t(matrix(get.vertex.attribute(g4,"value",index=get.edges(g4,E(g4))), ncol=2))
   to_rm = E(g4)[values_by_edge[1,]<values_by_edge[2,]]
   g4 = delete_edges(g4, to_rm)
+  #isolate unwanted patches
   #plot(g4, vertex.color=factor(V(g4)$value), vertex.label=V(g4)$weight,
   #     vertex.size=5*V(g4)$weight, edge.arrow.size=0.5, layout=layout_nicely)
   #
   #report in and outdegree to original graph
-  g5 = as.directed(g)
+  g5 = as.directed(g, mode="mutual")
   V(g5)$indegree=degree(g4, v=cl$membership, mode="in")
   V(g5)$outdegree=degree(g4, v=cl$membership, mode="out")
   values_by_edge = t(matrix(get.vertex.attribute(g5,"value",index=get.edges(g5,E(g5))), ncol=2))
-  to_rm = E(g5)[values_by_edge[1,]<=values_by_edge[2,]]
+  to_rm = E(g5)[values_by_edge[1,]<values_by_edge[2,]]
   g5 = delete_edges(g5, to_rm)
   #plot(g5, vertex.color=V(g5)$indegree==0, vertex.label=NA, edge.arrow.size=0.3, vertex.size=3,
   #     mark.groups=patches, layout=as.matrix(mat[,.(as.integer(bin1),as.integer(bin2))]))
@@ -81,9 +86,7 @@ detect_binless_patches = function(mat, settings) {
   stopifnot(length(V(g5))==mat[,.N])
   mat[,is.minimum:=V(g5)$outdegree==0]
   mat[,is.maximum:=V(g5)$indegree==0]
-  mat[,patchno:=factor(cl$membership)]
   #filter out certain minima/maxima
-  mat[,valid:=.SD[diag.idx>settings$diag.rm,.N>settings$min.patchsize],by=c("patchno","name")]
   mat[,is.maximum:=ifelse(valid==T,is.maximum,F)]
   mat[,is.minimum:=ifelse(valid==T,is.minimum,F)]
   mat[,valid:=NULL]
