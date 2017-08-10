@@ -103,6 +103,7 @@ if (F) {
       
       #side-by-side at 5k: signal
       mat=get_interactions(cs, resolution=resolution, group="all", type="CSsig")
+      mat[,is.significant:=prob.gt.expected>1-1e-10]
       ggplot(mat)+
         geom_raster(aes(begin1,begin2,fill=log10(signal)))+
         geom_raster(aes(begin2,begin1,fill=log10(signal)))+coord_fixed()+facet_wrap(~name)+
@@ -115,7 +116,7 @@ if (F) {
       ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binned_signal.png"),width=10,height=10)
       
       #side-by-side at 5k: differences
-      mat=get_interactions(cs, resolution=resolution, group="all", type="CSdiff")
+      mat=get_interactions(cs, resolution=resolution, group="all", type="CSdiff", ref=cs@experiments[1,name])
       ggplot(mat)+
         geom_raster(aes(begin1,begin2,fill=log10(difference)))+
         geom_raster(aes(begin2,begin1,fill=log10(difference)))+coord_fixed()+facet_wrap(~name)+
@@ -126,18 +127,6 @@ if (F) {
                             panel.background = element_rect(fill = "white", colour = "black"),
                             panel.spacing=unit(0,"cm")) + labs(fill="log10 FC")
       ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binned_differences.png"),width=15,height=5)
-      
-      #side-by-side at 5k: binless signal without threshold
-      mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
-      ggplot(mat)+geom_raster(aes(begin1,begin2,fill=beta))+
-        geom_raster(aes(begin2,begin1,fill=beta_cv))+facet_wrap(~name)+
-        scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white")+
-        scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
-        theme_void()+ theme(axis.title=element_blank(),
-                            panel.background = element_rect(fill = "white", colour = "black"),
-                            panel.spacing=unit(0,"cm"))+
-        coord_fixed()+labs(fill="log10 FC")
-      ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binless_signal_nothresh.png"),width=10,height=10)
       
       #side-by-side at 5k: binless signal
       idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
@@ -161,6 +150,18 @@ if (F) {
       ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binless_signal.png"),width=10,height=10)
       
       
+      #side-by-side at 5k: binless signal without threshold
+      mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
+      ggplot(mat)+geom_raster(aes(begin1,begin2,fill=beta))+
+        geom_raster(aes(begin2,begin1,fill=beta_cv))+facet_wrap(~name)+
+        scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white")+
+        scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
+        theme_void()+ theme(axis.title=element_blank(),
+                            panel.background = element_rect(fill = "white", colour = "black"),
+                            panel.spacing=unit(0,"cm"))+
+        coord_fixed()+labs(fill="log10 FC")
+      ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binless_signal_nothresh.png"),width=10,height=10)
+      
       #side-by-side at 5k: binless difference without threshold
       mat=get_interactions(cs, type="CSbdiff", resolution=resolution, group="all", ref=cs@experiments[1,name])
       ggplot(mat)+geom_raster(aes(begin1,begin2,fill=beta))+
@@ -174,19 +175,10 @@ if (F) {
       ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binless_differences_nothresh.png"),width=15,height=5)
       
       #side-by-side at 5k: binless difference
-      idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
-      csg=cs@groups[[idx1]]
-      idx2=get_cs_interaction_idx(csg, type="CSbdiff", raise=T, ref=cs@experiments[1,name])
-      csi=csg@interactions[[idx2]]
-      csi@settings$min.l10FC=0.2
       mat=get_interactions(cs, type="CSbdiff", resolution=resolution, group="all", ref=cs@experiments[1,name])
-      mat[,value:=delta]
-      mat = csnorm:::detect_binless_patches(mat, csi@settings)
-      mat[,value:=NULL]
-      mat[,delta.opt:=ifelse(is.maximum==T | is.minimum==T,NA,delta)]
       ggplot(mat)+geom_raster(aes(begin1,begin2,fill=delta))+
-        geom_raster(aes(begin2,begin1,fill=delta.opt))+facet_wrap(~name)+
-        scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="black") +
+        geom_raster(aes(begin2,begin1,fill=delta))+facet_wrap(~name)+
+        scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white") +
         scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
         theme_void()+ theme(axis.title=element_blank(),
                             panel.background = element_rect(fill = "white", colour = "black"),
