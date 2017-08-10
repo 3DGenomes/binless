@@ -196,54 +196,133 @@ if (F) {
     }
   }
   
-  #get statistics
-  sub="TBX3_1.5M"
-  load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base10k_dfuse",5,"_qmin_",0.01,".RData"))
-  resolution=10000
-  compnames=data.table(t(matrix(cs@experiments[,name][c(c(1,2),c(1,3),c(2,4),c(3,4))],nrow=2)))
+  #get statistics on signal matrices
+  info = foreach(sub=subs, .combine=rbind, .errorhandling="remove") %dopar% {
+    locus=strsplit(sub,"_")[[1]][1]
+    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base10k_dfuse",5,"_qmin_",0.01,"_stripped.RData"))
+    foreach (resolution=c(5000,10000),.combine=rbind , .errorhandling="remove") %do% {
+      data=data.table()
+      
+      #jacard for binned interactions
+      mat=get_interactions(cs, resolution=resolution, group="all", type="CSsig")[!is.na(is.significant)]
+      #number of significant interactions
+      dt=mat[,.(num=sum(is.significant)),by=name][
+        ,.(name=locus,type="binned",resolution=resolution,variable=c("GM1","GM2","IMR1","IMR2"),value=num)]
+      data=rbind(data,dt)
+      #number of significant interactions
+      compnames=data.table(t(matrix(cs@experiments[,name][c(c(1,2),c(1,3),c(2,4),c(3,4))],nrow=2)))
+      dt = foreach (nref=compnames[,V1],n=compnames[,V2],.combine=rbind) %do% {
+        refmat=mat[name==nref,.(bin1,bin2,ref.is=is.significant)]
+        merge(mat[name==n,.(name,bin1,bin2,is=is.significant)],refmat,by=c("bin1","bin2"))[
+          ,.(ref=nref,N=sum(is),refN=sum(ref.is),inter=sum(is==T&ref.is==T),union=sum(is==T|ref.is==T),
+             jacard=sum(is==T&ref.is==T)/sum(is==T|ref.is==T)),by=name]
+      }
+      data=rbind(data,
+                 dt[,.(name=locus,type="binned",resolution=resolution,variable=c("NGM","N1","N2","NIMR"),value=inter)],
+                 dt[,.(name=locus,type="binned",resolution=resolution,variable=c("JGM","J1","J2","JIMR"),value=jacard)])
+      
+      #jacard for binless interactions
+      idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
+      csg=cs@groups[[idx1]]
+      idx2=get_cs_interaction_idx(csg, type="CSbsig", raise=T)
+      csi=csg@interactions[[idx2]]
+      csi@settings$min.l10FC=0.2
+      mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
+      mat[,value:=phi]
+      mat = csnorm:::detect_binless_patches(mat, csi@settings)
+      mat[,value:=NULL]
+      #number of significant interactions, and percentage
+      dt=mat[,.(num=sum(is.maximum)),by=name][
+        ,.(name=locus,type="binless",resolution=resolution,variable=c("GM1","GM2","IMR1","IMR2"),value=num)]
+      data=rbind(data,dt)
+      #number of significant interactions
+      compnames=data.table(t(matrix(cs@experiments[,name][c(c(1,2),c(1,3),c(2,4),c(3,4))],nrow=2)))
+      dt = foreach (nref=compnames[,V1],n=compnames[,V2],.combine=rbind) %do% {
+        refmat=mat[name==nref,.(bin1,bin2,ref.is=is.maximum)]
+        merge(mat[name==n,.(name,bin1,bin2,is=is.maximum)],refmat,by=c("bin1","bin2"))[
+          ,.(ref=nref,N=sum(is),refN=sum(ref.is),inter=sum(is==T&ref.is==T),union=sum(is==T|ref.is==T),
+             jacard=sum(is==T&ref.is==T)/sum(is==T|ref.is==T)),by=name]
+      }
+      data=rbind(data,
+                 dt[,.(name=locus,type="binless",resolution=resolution,variable=c("NGM","N1","N2","NIMR"),value=inter)],
+                 dt[,.(name=locus,type="binless",resolution=resolution,variable=c("JGM","J1","J2","JIMR"),value=jacard)])
+      dcast(data,name+type+resolution~variable,value.var = "value")
+    }
+  }
+
+  dcast(melt(info[type=="binned"],id.vars = c("name","type","resolution"))[
+    ,mean(value,na.rm=T),by=c("type","resolution","variable")],type+resolution~variable,value.var="V1")
+  #enrichment vs detection type
+  enrich=info[,.(name,resolution,type,Jdset=c(JGM,JIMR),Jrep=c(J1,J2))][(Jdset+Jrep)>0]
+  enrich[,.N,by=c("resolution","type")]
+  ggplot(enrich)+geom_boxplot(aes(type,Jdset/Jrep,colour=factor(resolution)))+geom_jitter(aes(type,Jdset/Jrep,colour=factor(resolution)))
+  #jacard values at 5kb
+  ggplot(melt(info[,.(name,type,resolution,JGM+JIMR,J1+J2)],id.vars=c("name","type","resolution"))[!is.na(value)&value>0])+
+           geom_boxplot(aes(type,value,colour=factor(resolution)))+facet_wrap(~variable)
   
-  #jacard for binned interactions
-  mat=get_interactions(cs, resolution=resolution, group="all", type="CSsig")
-  #mat=mat[unclass(bin2)-unclass(bin1)>10]
-  #number of significant interactions, and percentage
-  mat[,.(num=sum(is.significant),pc=sum(is.significant)/.N),by=name]
-  #number of significant interactions
-  compnames=data.table(t(matrix(cs@experiments[,name][c(c(1,2),c(1,3),c(2,4),c(3,4))],nrow=2)))
-  foreach (nref=compnames[,V1],n=compnames[,V2],.combine=rbind) %do% {
-    refmat=mat[name==nref,.(bin1,bin2,ref.is=is.significant)]
-    merge(mat[name==n,.(name,bin1,bin2,is=is.significant)],refmat,by=c("bin1","bin2"))[
-      ,.(ref=nref,N=sum(is),refN=sum(ref.is),inter=sum(is==T&ref.is==T),union=sum(is==T|ref.is==T),
-         jacard=sum(is==T&ref.is==T)/sum(is==T|ref.is==T)),by=name]
+  
+  
+  
+  #get statistics on difference matrices
+  info = foreach(sub=subs, .combine=rbind, .errorhandling="remove") %dopar% {
+    locus=strsplit(sub,"_")[[1]][1]
+    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base10k_dfuse",5,"_qmin_",0.01,"_stripped.RData"))
+    foreach (resolution=c(5000,10000),.combine=rbind , .errorhandling="remove") %do% {
+      data=data.table()
+      
+      #count number of interactions: binned GM vs GM
+      mat=get_interactions(cs, resolution=resolution, group="all", type="CSdiff", ref=cs@experiments[1,name])
+      mat=mat[name==cs@experiments[2,name]][(!is.na(is.significant))]
+      #number of significant interactions
+      dt=mat[,.(n.signif=sum(is.significant),n.total=.N),by=name][
+        ,.(name=locus,type="binned",resolution=resolution,cell="GM",variable=c("N","pc"),value=c(n.signif,100*n.signif/n.total))]
+      data=rbind(data,dt)
+      
+      #count number of interactions: binned IMR vs IMR
+      mat=get_interactions(cs, resolution=resolution, group="all", type="CSdiff", ref=cs@experiments[3,name])
+      mat=mat[name==cs@experiments[4,name]][(!is.na(is.significant))]
+      #number of significant interactions
+      dt=mat[,.(n.signif=sum(is.significant),n.total=.N),by=name][
+        ,.(name=locus,type="binned",resolution=resolution,cell="IMR",variable=c("N","pc"),value=c(n.signif,100*n.signif/n.total))]
+      data=rbind(data,dt)
+      
+      #count number of interactions: binnless GM vs GM
+      idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
+      csg=cs@groups[[idx1]]
+      idx2=get_cs_interaction_idx(csg, type="CSbdiff", raise=T, ref=cs@experiments[1,name])
+      csi=csg@interactions[[idx2]]
+      csi@settings$min.l10FC=0.2
+      mat=get_interactions(cs, type="CSbdiff", resolution=resolution, group="all", ref=cs@experiments[1,name])
+      mat[,value:=delta]
+      mat = csnorm:::detect_binless_patches(mat, csi@settings)
+      mat[,value:=NULL]
+      mat=mat[name==cs@experiments[2,name]]
+      #number of significant interactions
+      dt=mat[,.(n.signif=sum(is.maximum||is.minimum),n.total=.N),by=name][
+        ,.(name=locus,type="binless",resolution=resolution,cell="GM",variable=c("N","pc"),value=c(n.signif,100*n.signif/n.total))]
+      data=rbind(data,dt)
+      
+      #count number of interactions: binnless GM vs GM
+      idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
+      csg=cs@groups[[idx1]]
+      idx2=get_cs_interaction_idx(csg, type="CSbdiff", raise=T, ref=cs@experiments[3,name])
+      csi=csg@interactions[[idx2]]
+      csi@settings$min.l10FC=0.2
+      mat=get_interactions(cs, type="CSbdiff", resolution=resolution, group="all", ref=cs@experiments[3,name])
+      mat[,value:=delta]
+      mat = csnorm:::detect_binless_patches(mat, csi@settings)
+      mat[,value:=NULL]
+      mat=mat[name==cs@experiments[4,name]]
+      #number of significant interactions
+      dt=mat[,.(n.signif=sum(is.maximum||is.minimum),n.total=.N),by=name][
+        ,.(name=locus,type="binless",resolution=resolution,cell="IMR",variable=c("N","pc"),value=c(n.signif,100*n.signif/n.total))]
+      data=rbind(data,dt)
+      
+    }
   }
   
-  #jacard for binless interactions
-  mat=get_interactions(cs, resolution=resolution, group="all", type="CSbsig")
-  mat[,valid:=.SD[begin2-begin1>10000,.N>4],by=c("patchno","name")]
-  mat[,is.maximum:=ifelse(valid==T,is.maximum,F)]
-  #number of significant interactions, and percentage
-  mat[,.(num=sum(is.maximum),pc=sum(is.maximum)/.N),by=name]
-  #number of significant interactions
-  compnames=data.table(t(matrix(cs@experiments[,name][c(c(1,2),c(1,3),c(2,4),c(3,4))],nrow=2)))
-  foreach (nref=compnames[,V1],n=compnames[,V2],.combine=rbind) %do% {
-    refmat=mat[name==nref,.(bin1,bin2,ref.is=is.maximum)]
-    merge(mat[name==n,.(name,bin1,bin2,is=is.maximum)],refmat,by=c("bin1","bin2"))[
-      ,.(ref=nref,N=sum(is),refN=sum(ref.is),inter=sum(is==T&ref.is==T),union=sum(is==T|ref.is==T),
-         jacard=sum(is==T&ref.is==T)/sum(is==T|ref.is==T)),by=name]
-  }
-  
-  #number of overlaps for binless interactions
-  mat=get_interactions(cs, resolution=resolution, group="all", type="CSbsig")
-  mat[,valid:=.SD[begin2-begin1>10000,.N>4],by=c("patchno","name")]
-  mat[,is.maximum:=ifelse(valid==T,is.maximum,F)]
-  #number of significant interactions, and percentage
-  mat[,.(ismax=is.maximum[1]),by=c("patchno","name")][,.(nmax=sum(ismax),ntot=.N,max.pc=sum(ismax)/.N*100),by=name]
-  #number of overlaps with reference calls
-  compnames=data.table(t(matrix(cs@experiments[,name][c(c(1,2),c(1,3),c(2,4),c(3,4))],nrow=2)))
-  foreach (nref=compnames[,V1],n=compnames[,V2],.combine=rbind) %do% {
-    refmat=mat[name==nref,.(bin1,bin2,ref.is=is.maximum)]
-    mg=merge(mat[name==n,.(name,bin1,bin2,patchno,is=is.maximum)],refmat,by=c("bin1","bin2"))
-    mg[is==T][,.(ov=any(ref.is)),by=c("name","patchno")][,.(ref=nref,n.ov=sum(ov),ntot=.N,ov.pc=100*sum(ov)/.N),by=name]
-  }
-  
+  ggplot(info[variable=="pc"])+geom_violin(aes(type,value,colour=cell))+facet_wrap(~resolution)+scale_y_log10()
+  info[variable=="pc",.(num=.N,min=min(value),mean=mean(value),max=max(value)),by=c("resolution","type")]
+  info[variable=="N",.(num=.N,min=min(value),mean=mean(value),max=max(value)),by=c("resolution","type")]
   
 }
