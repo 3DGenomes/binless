@@ -359,7 +359,8 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
                 opt.every=10,
                 maxsteps=100000,
                 diag.rm = diag.rm,
-                min.patchsize = 4)
+                min.patchsize = 4,
+                min.l10FC = 0.5)
   cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
   csi=new("CSbsig", mat=mat, trails=trails, cts=cts, settings=settings)
   return(csi)

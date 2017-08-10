@@ -54,7 +54,8 @@ detect_binless_patches = function(mat, settings) {
   cl=stuff$components
   #report patch numbers, mark valid patches and isolate invalid ones
   mat[,patchno:=factor(cl$membership)]
-  mat[,valid:=.SD[diag.idx>settings$diag.rm,.N>settings$min.patchsize],by=patchno]
+  mat[,valid:=all(diag.idx>settings$diag.rm) && (.N>settings$min.patchsize) && (abs(value/log(10))>settings$min.l10FC)
+      ,by=patchno]
   g=delete_edges(g,c(incident_edges(g,V(g)[mat[,valid==F]]),recursive=T))
   #create fused graph
   g3 = contract(g, cl$membership, vertex.attr.comb = list(value="min", weight="sum")) %>% simplify()
