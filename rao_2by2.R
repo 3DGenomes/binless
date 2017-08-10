@@ -144,6 +144,7 @@ if (F) {
       csg=cs@groups[[idx1]]
       idx2=get_cs_interaction_idx(csg, type="CSbsig", raise=T)
       csi=csg@interactions[[idx2]]
+      csi@settings$min.l10FC=0.2
       mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
       mat[,value:=phi]
       mat = csnorm:::detect_binless_patches(mat, csi@settings)
@@ -177,6 +178,7 @@ if (F) {
       csg=cs@groups[[idx1]]
       idx2=get_cs_interaction_idx(csg, type="CSbdiff", raise=T, ref=cs@experiments[1,name])
       csi=csg@interactions[[idx2]]
+      csi@settings$min.l10FC=0.2
       mat=get_interactions(cs, type="CSbdiff", resolution=resolution, group="all", ref=cs@experiments[1,name])
       mat[,value:=delta]
       mat = csnorm:::detect_binless_patches(mat, csi@settings)
@@ -184,8 +186,6 @@ if (F) {
       mat[,delta.opt:=ifelse(is.maximum==T | is.minimum==T,NA,delta)]
       ggplot(mat)+geom_raster(aes(begin1,begin2,fill=delta))+
         geom_raster(aes(begin2,begin1,fill=delta.opt))+facet_wrap(~name)+
-        geom_polygon(aes(begin2,begin1,group=patchno),colour="blue",fill=NA,data=b)+
-        geom_polygon(aes(begin2,begin1,group=patchno),colour="red",fill=NA,data=a)+
         scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="black") +
         scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
         theme_void()+ theme(axis.title=element_blank(),
