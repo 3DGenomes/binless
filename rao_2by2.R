@@ -53,13 +53,42 @@ foreach (resolution=c(5000,10000,20000),.errorhandling = "pass") %do% {
 }
 
 if (F) {
-  subs=c("SELP_150k","Peak1_450k","ADAMTS2_450k","PARM1_600k","Tbx19_700k","SEMA3C_1M", "Fig1C_1M","FOXP1_1.3M",
-         "TBX3_1.5M","Comparison_1.7M","22qter_1.7M", "Talk_2M", "ADAMTS1_2.3M")
+  subs=c("SELP_150k","Peak1_450k","ADAMTS2_450k","PARM1_600k","Tbx19_700k","SEMA3C_1M", "FOXP1_1.3M",
+         "TBX3_1.5M","Comparison_1.7M")
+  
+  #plot last signal
+  info = foreach(sub=subs, .combine=rbind, .errorhandling="remove") %dopar% {
+    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base10k_dfuse",5,"_qmin_",0.01,"_stripped.RData"))
+    ggplot(cs@par$signal)+geom_raster(aes(bin1,bin2,fill=phi))+
+      geom_raster(aes(bin2,bin1,fill=pmin(phihat,3)))+facet_wrap(~name)+
+      scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white")+
+      theme_void()+ theme(axis.title=element_blank(),
+                          panel.background = element_rect(fill = "white", colour = "black"),
+                          panel.spacing=unit(0,"cm"))+
+      coord_fixed()+labs(fill="log10 FC")
+    ggsave(filename=paste0("images/rao_2by2_",sub,"_base10_iterated_signal.png"),width=10,height=10)
+  }
+  
+  #get binless parameters
+  info = foreach(sub=subs, .combine=rbind) %dopar% {
+    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base10k_dfuse",5,"_qmin_",0.01,"_stripped.RData"))
+    foreach (resolution=c(5000,10000), .combine=rbind, .errorhandling = "remove") %do% {
+      #side-by-side at 5k: observed
+      idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
+      csg=cs@groups[[idx1]]
+      idx2=get_cs_interaction_idx(csg, type="CSbsig", raise=T)
+      csi=csg@interactions[[idx2]]
+      ret=as.data.table(csi@par)
+      ret[,c("run","resolution"):=list(sub,resolution)]
+      ret
+    }
+  }
+  
   
   #generate plots
   mat = foreach(sub=subs, .combine=rbind, .errorhandling="remove") %dopar% {
-    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base10k_dfuse",5,"_qmin_",0.01,".RData"))
-    for (resolution in c(5000,10000)) {
+    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base10k_dfuse",5,"_qmin_",0.01,"_stripped.RData"))
+    foreach (resolution=c(5000,10000), .errorhandling="remove") %do% {
       #side-by-side at 5k: observed
       mat=get_matrices(cs, resolution=resolution, group="all")
       ggplot(mat)+
@@ -98,17 +127,31 @@ if (F) {
                             panel.spacing=unit(0,"cm")) + labs(fill="log10 FC")
       ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binned_differences.png"),width=15,height=5)
       
-      #side-by-side at 5k: binless signal
+      #side-by-side at 5k: binless signal without threshold
       mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
-      mat[,valid:=.SD[begin2-begin1>10000,.N>4],by=c("patchno","name")]
-      mat[,is.maximum:=ifelse(valid==T,is.maximum,F)]
-      a=mat[is.maximum==T]
-      a=a[,.SD[,.(begin1=c(begin1,begin1,end1,end1)-resolution/2, begin2=c(begin2,end2,begin2,end2)-resolution/2,
-                  patchno, phi)][chull(begin1,begin2)], by=c("patchno","name")]
-      ggplot(mat)+geom_raster(aes(begin1,begin2,fill=phi))+
-        geom_raster(aes(begin2,begin1,fill=phi))+facet_wrap(~name)+
-        geom_polygon(aes(begin2,begin1,group=patchno),colour="black",fill=NA,data=a)+
+      ggplot(mat)+geom_raster(aes(begin1,begin2,fill=beta))+
+        geom_raster(aes(begin2,begin1,fill=beta_cv))+facet_wrap(~name)+
         scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white")+
+        scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
+        theme_void()+ theme(axis.title=element_blank(),
+                            panel.background = element_rect(fill = "white", colour = "black"),
+                            panel.spacing=unit(0,"cm"))+
+        coord_fixed()+labs(fill="log10 FC")
+      ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binless_signal_nothresh.png"),width=10,height=10)
+      
+      #side-by-side at 5k: binless signal
+      idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
+      csg=cs@groups[[idx1]]
+      idx2=get_cs_interaction_idx(csg, type="CSbsig", raise=T)
+      csi=csg@interactions[[idx2]]
+      mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
+      mat[,value:=phi]
+      mat = csnorm:::detect_binless_patches(mat, csi@settings)
+      mat[,value:=NULL]
+      mat[,phi.max:=ifelse(is.maximum==T,NA,phi)]
+      ggplot(mat)+geom_raster(aes(begin1,begin2,fill=phi))+
+        geom_raster(aes(begin2,begin1,fill=phi.max))+facet_wrap(~name)+
+        scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="black")+
         scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
         theme_void()+ theme(axis.title=element_blank(),
                             panel.background = element_rect(fill = "white", colour = "black"),
@@ -117,22 +160,33 @@ if (F) {
       ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binless_signal.png"),width=10,height=10)
       
       
-      #side-by-side at 5k: binless difference
+      #side-by-side at 5k: binless difference without threshold
       mat=get_interactions(cs, type="CSbdiff", resolution=resolution, group="all", ref=cs@experiments[1,name])
-      mat[,valid:=.SD[begin2-begin1>10000,.N>4],by=c("patchno","name")]
-      mat[,is.maximum:=ifelse(valid==T,is.maximum,F)]
-      mat[,is.minimum:=ifelse(valid==T,is.minimum,F)]
-      a=mat[is.maximum==T]
-      a=a[,.SD[,.(begin1=c(begin1,begin1,end1,end1)-resolution/2, begin2=c(begin2,end2,begin2,end2)-resolution/2,
-                  patchno, delta)][chull(begin1,begin2)], by=c("patchno","name")]
-      b=mat[is.minimum==T]
-      b=b[,.SD[,.(begin1=c(begin1,begin1,end1,end1)-resolution/2, begin2=c(begin2,end2,begin2,end2)-resolution/2,
-                  patchno, delta)][chull(begin1,begin2)], by=c("patchno","name")]
+      ggplot(mat)+geom_raster(aes(begin1,begin2,fill=beta))+
+        geom_raster(aes(begin2,begin1,fill=beta_cv))+facet_wrap(~name)+
+        scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white") +
+        scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
+        theme_void()+ theme(axis.title=element_blank(),
+                            panel.background = element_rect(fill = "white", colour = "black"),
+                            panel.spacing=unit(0,"cm"))+
+        coord_fixed()+labs(fill="log10 FC")
+      ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binless_differences_nothresh.png"),width=15,height=5)
+      
+      #side-by-side at 5k: binless difference
+      idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
+      csg=cs@groups[[idx1]]
+      idx2=get_cs_interaction_idx(csg, type="CSbdiff", raise=T, ref=cs@experiments[1,name])
+      csi=csg@interactions[[idx2]]
+      mat=get_interactions(cs, type="CSbdiff", resolution=resolution, group="all", ref=cs@experiments[1,name])
+      mat[,value:=delta]
+      mat = csnorm:::detect_binless_patches(mat, csi@settings)
+      mat[,value:=NULL]
+      mat[,delta.opt:=ifelse(is.maximum==T | is.minimum==T,NA,delta)]
       ggplot(mat)+geom_raster(aes(begin1,begin2,fill=delta))+
-        geom_raster(aes(begin2,begin1,fill=delta))+facet_wrap(~name)+
+        geom_raster(aes(begin2,begin1,fill=delta.opt))+facet_wrap(~name)+
         geom_polygon(aes(begin2,begin1,group=patchno),colour="blue",fill=NA,data=b)+
         geom_polygon(aes(begin2,begin1,group=patchno),colour="red",fill=NA,data=a)+
-        scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white") +
+        scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="black") +
         scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
         theme_void()+ theme(axis.title=element_blank(),
                             panel.background = element_rect(fill = "white", colour = "black"),
