@@ -87,9 +87,7 @@ if (F) {
   #pick dataset to show 4 different resolutions
   sub="FOXP1"
   size="1.3M"
-  sub="TBX3"
-  size="1.5M"
-  load(paste0("data/rao_HiCall_",sub,"_",size,"_csnorm_optimized_base10k_bpk30_dfuse20_cv_cvsd_outlier_rmdiag.RData"))
+  load(paste0("data/rao_HiCall_",sub,"_",size,"_csnorm_optimized_base10k_bpk30_dfuse20_cv_cvsd_outlier_rmdiag_stripped.RData"))
   
   mat = foreach(resolution=c(5000,10000,20000,50000), .combine=rbind, .errorhandling="remove") %do% {
     mat=get_matrices(cs, resolution=resolution, group="all")[name==name[1]]
@@ -126,10 +124,10 @@ if (F) {
   #side-by-side at 5k: signal
   mat=get_matrices(cs, resolution=resolution, group="all")
   mat.sig=get_interactions(cs, resolution=resolution, group="all", type="CSsig")
-  #mat[,is.significant:=prob.gt.expected>1-1e-6]
+  mat.sig[,is.significant:=prob.gt.expected>1-1e-12]
   ggplot(mat.sig)+
-    geom_raster(aes(begin1,begin2,fill=log10(signal)),data=mat[signal<1000])+
-    geom_raster(aes(begin2,begin1,fill=log10(signal)),data=mat[signal<1000])+coord_fixed()+facet_wrap(~name)+
+    geom_raster(aes(begin1,begin2,fill=log10(signal)))+
+    geom_raster(aes(begin2,begin1,fill=log10(signal)))+coord_fixed()+facet_wrap(~name)+
     geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat.sig[is.significant==T])+
     scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white")+
     scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
@@ -139,12 +137,9 @@ if (F) {
   ggsave(filename=paste0("images/rao_",sub,"_GMvsIMR90_base10at5_binned_signal.png"),width=10,height=5)
   
   #side-by-side at 5k: normalized
-  mat=get_matrices(cs, resolution=resolution, group="all")
-  mat.sig=get_interactions(cs, resolution=resolution, group="all", type="CSsig")
-  #mat[,is.significant:=prob.gt.expected>1-1e-6]
   ggplot(mat.sig)+
-    geom_raster(aes(begin1,begin2,fill=log10(normalized)),data=mat[signal<1000])+
-    geom_raster(aes(begin2,begin1,fill=log10(normalized)),data=mat[signal<1000])+coord_fixed()+facet_wrap(~name)+
+    geom_raster(aes(begin1,begin2,fill=log10(normalized)),data=mat)+
+    geom_raster(aes(begin2,begin1,fill=log10(normalized)),data=mat)+coord_fixed()+facet_wrap(~name)+
     geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat.sig[is.significant==T])+
     scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white")+
     scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
@@ -155,7 +150,6 @@ if (F) {
   
   #side-by-side at 5k: differences
   mat=get_interactions(cs, resolution=resolution, group="all", type="CSdiff")
-  mat=mat[abs(difference)<100]
   mat[,name:="FOXP1 IMR90 vs GM"]
   #mat[,is.significant:=prob.gt.expected>1-1e-6]
   ggplot(mat)+
@@ -171,18 +165,19 @@ if (F) {
   
   
   #side-by-side at 5k: binless signal
+  idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
+  csg=cs@groups[[idx1]]
+  idx2=get_cs_interaction_idx(csg, type="CSbsig", raise=T)
+  csi=csg@interactions[[idx2]]
+  csi@settings$min.l10FC=0.2
   mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
   mat[,value:=phi]
-  mat=csnorm:::detect_binless_patches(mat,mat[name==name[1],nlevels(bin1)],cs@settings$tol.leg)
-  mat[,valid:=.SD[begin2-begin1-resolution>cs@settings$dmin,.N>4],by=c("patchno","name")]
-  mat[,is.maximum:=ifelse(valid==T,is.maximum,F)]
-  a=mat[is.maximum==T]
-  a=a[,.SD[,.(begin1=c(begin1,begin1,end1,end1)-resolution/2, begin2=c(begin2,end2,begin2,end2)-resolution/2,
-              patchno, phi)][chull(begin1,begin2)], by=c("patchno","name")]
-  ggplot(mat)+geom_raster(aes(begin1,begin2,fill=phi))+
-    geom_raster(aes(begin2,begin1,fill=phi))+facet_wrap(~name)+
-    geom_polygon(aes(begin2,begin1,group=patchno),colour="black",fill=NA,data=a)+
-    scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white")+
+  mat = csnorm:::detect_binless_patches(mat, csi@settings)
+  mat[,value:=NULL]
+  mat[,phi.max:=ifelse(is.maximum==T,NA,phi)]
+  ggplot(mat)+geom_raster(aes(begin1,begin2,fill=phi/log(10)))+
+    geom_raster(aes(begin2,begin1,fill=phi.max/log(10)))+facet_wrap(~name)+
+    scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="black")+
     scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
     theme_void()+ theme(axis.title=element_blank(),
                         panel.background = element_rect(fill = "white", colour = "black"),
@@ -191,46 +186,27 @@ if (F) {
   ggsave(filename=paste0("images/rao_",sub,"_GMvsIMR90_base10at5_binless_signal.png"),width=10,height=5)
   
   #side-by-side at 5k: binless signal with decay
-  mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
-  mat[,value:=phi]
-  mat=csnorm:::detect_binless_patches(mat,mat[name==name[1],nlevels(bin1)],cs@settings$tol.leg)
   mat=merge(mat,get_matrices(cs, resolution=resolution, group="all")[,.(name,bin1,bin2,decaymat)],by=c("name","bin1","bin2"))
-  mat[,valid:=.SD[begin2-begin1-resolution>cs@settings$dmin,.N>4],by=c("patchno","name")]
-  mat[,is.maximum:=ifelse(valid==T,is.maximum,F)]
-  a=mat[is.maximum==T]
-  a=a[,.SD[,.(begin1=c(begin1,begin1,end1,end1)-resolution/2, begin2=c(begin2,end2,begin2,end2)-resolution/2,
-              patchno, phi)][chull(begin1,begin2)], by=c("patchno","name")]
   ggplot(mat)+geom_raster(aes(begin1,begin2,fill=phi/log(10)+log10(decaymat)))+
-    geom_raster(aes(begin2,begin1,fill=phi/log(10)+log10(decaymat)))+facet_wrap(~name)+
-    geom_polygon(aes(begin2,begin1,group=patchno),colour="black",fill=NA,data=a)+
-    scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white")+
+    geom_raster(aes(begin2,begin1,fill=phi.max/log(10)+log10(decaymat)))+facet_wrap(~name)+
+    scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="black")+
     scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
     theme_void()+ theme(axis.title=element_blank(),
                         panel.background = element_rect(fill = "white", colour = "black"),
                         panel.spacing=unit(0,"cm"))+
-    coord_fixed()+guides(fill=F)
+    coord_fixed()+labs(fill="log10 FC")
   ggsave(filename=paste0("images/rao_",sub,"_GMvsIMR90_base10at5_binless_normalized.png"),width=10,height=5)
   
   
   #side-by-side at 5k: binless difference
+  idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
+  csg=cs@groups[[idx1]]
+  idx2=get_cs_interaction_idx(csg, type="CSbdiff", raise=T, ref=cs@experiments[1,name])
+  csi=csg@interactions[[idx2]]
   mat=get_interactions(cs, type="CSbdiff", resolution=resolution, group="all", ref=cs@experiments[1,name])
-  mat[,name:="FOXP1 IMR90 vs GM"]
-  mat[,value:=delta]
-  mat=csnorm:::detect_binless_patches(mat,mat[name==name[1],nlevels(bin1)],cs@settings$tol.leg)
-  mat[,valid:=.SD[begin2-begin1-resolution>cs@settings$dmin,.N>4],by=c("patchno","name")]
-  mat[,is.maximum:=ifelse(valid==T,is.maximum,F)]
-  mat[,is.minimum:=ifelse(valid==T,is.minimum,F)]
-  a=mat[is.maximum==T]
-  a=a[,.SD[,.(begin1=c(begin1,begin1,end1,end1)-resolution/2, begin2=c(begin2,end2,begin2,end2)-resolution/2,
-              patchno, delta)][chull(begin1,begin2)], by=c("patchno","name")]
-  b=mat[is.minimum==T]
-  b=b[,.SD[,.(begin1=c(begin1,begin1,end1,end1)-resolution/2, begin2=c(begin2,end2,begin2,end2)-resolution/2,
-              patchno, delta)][chull(begin1,begin2)], by=c("patchno","name")]
-  ggplot(mat)+geom_raster(aes(begin1,begin2,fill=delta))+
-    geom_raster(aes(begin2,begin1,fill=delta))+facet_wrap(~name)+
-    geom_polygon(aes(begin2,begin1,group=patchno),colour="blue",fill=NA,data=b)+
-    geom_polygon(aes(begin2,begin1,group=patchno),colour="red",fill=NA,data=a)+
-    scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white") +
+  ggplot(mat)+geom_raster(aes(begin1,begin2,fill=delta/log(10)))+
+    geom_raster(aes(begin2,begin1,fill=delta/log(10)))+facet_wrap(~name)+
+    scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="black") +
     scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
     theme_void()+ theme(axis.title=element_blank(),
                         panel.background = element_rect(fill = "white", colour = "black"),
