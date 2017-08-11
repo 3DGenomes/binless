@@ -312,7 +312,7 @@ if (F) {
       
     }
   }
-  
+  info=info[name!="Comparison"]
   ggplot(info[variable=="pc"])+geom_violin(aes(type,value,colour=cell))+facet_wrap(~resolution)+scale_y_log10()
   info[variable=="pc",.(num=.N,min=min(value),mean=mean(value),max=max(value)),by=c("resolution","type")]
   info[variable=="N",.(num=.N,min=min(value),mean=mean(value),max=max(value)),by=c("resolution","type")]

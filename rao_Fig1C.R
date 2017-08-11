@@ -118,6 +118,7 @@ if (F) {
     coord_fixed()+theme(panel.background=element_blank(), axis.text.x = element_text(angle = 90, hjust = 1))
   ggsave(filename=paste0("images/rao_HiC003_GM12878_hg19_Fig1C_1M_base",base.res/1000,"k_all_binned_",resolution/1000,"kb.pdf"), width=20,height=5)
   
+  mat=get_matrices(cs, resolution=resolution, group="all")
   mat.sig=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
   mat.all.sig=merge(mat[,.(name,bin1,bin2,begin1,begin2,observed,decaymat,normalized,signal)],
                     mat.sig[,.(name,bin1,bin2,phihat,weight,beta,phi,patchno)])
@@ -134,6 +135,10 @@ if (F) {
   ggsave(filename=paste0("images/rao_HiC003_GM12878_hg19_Fig1C_1M_base",base.res/1000,"k_all_binless_",resolution/1000,"kb.pdf"), width=20,height=5)
   
   #binless size distribution
+  mat=get_matrices(cs, resolution=resolution, group="all")
+  mat.sig=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
+  mat.all.sig=merge(mat[,.(name,bin1,bin2,begin1,begin2,observed,decaymat,normalized,signal)],
+                    mat.sig[,.(name,bin1,bin2,phihat,weight,beta,phi,patchno)])
   patchdistr=mat.all.sig[,.(size=.N,ncounts=sum(observed)),by=c("name","patchno")]
   patchdistr[,surface.pc:=100*size/sum(size)]
   patchdistr[,cat:=ordered(ifelse(size<=4,"small",ifelse(surface.pc>1,"large","medium")),c("small","medium","large"))]
@@ -141,13 +146,23 @@ if (F) {
     labs(x="patch surface (% total)",y="count",fill="patch size")
   ggsave(filename=paste0("images/rao_HiC003_GM12878_hg19_Fig1C_1M_base",base.res/1000,"k_patch_surf_",resolution/1000,"kb.pdf"), width=10,height=9)
   
+  #reads per patch
   ggplot(patchdistr)+geom_histogram(aes(ncounts,fill=cat),position="stack",bins=50)+scale_x_log10()+
     labs(x="number of reads per patch",y="number of patches", fill="patch size")#+facet_wrap(~cat)
   ggsave(filename=paste0("images/rao_HiC003_GM12878_hg19_Fig1C_1M_base",base.res/1000,"k_patch_nreads_",resolution/1000,"kb.pdf"), width=10,height=9)
   
+  #read density
   ggplot(patchdistr)+geom_histogram(aes(ncounts/surface.pc,fill=cat),position="stack",bins=50)+scale_x_log10()+
     labs(x="read density per patch",y="number of patches", fill="patch size")#+facet_wrap(~cat)
   ggsave(filename=paste0("images/rao_HiC003_GM12878_hg19_Fig1C_1M_base",base.res/1000,"k_patch_density_",resolution/1000,"kb.pdf"), width=10,height=9)
+  
+  #reads per distance
+  mat.all.sig[,patchsize:=.N,by=c("name","patchno")]
+  mat.all.sig[,distance:=begin2-begin1]
+  ggplot(mat.all.sig[,.(var=mean(patchsize)),by=distance])+geom_point(aes(distance,var))
+  ggplot(mat.all.sig[,.(var=max(patchsize)),by=distance])+geom_point(aes(distance,var))
+  ggplot(mat.all.sig[,.(var=median(patchsize)),by=distance])+geom_point(aes(distance,var))
+  ggplot(mat.all.sig[,.(var=min(patchsize)),by=distance])+geom_point(aes(distance,var))
   
   
 }

@@ -53,7 +53,7 @@ for (resolution in c(10000)) {
 if(F) {
   #generate plots for all datasets
   run="cv_cvsd_outlier_rmdiag"
-  mat = foreach(name=c("FISH1","FISH2","FISH3","FISH4"), size=c("1.5M","1.5M","1.5M","2.2M")) %do% {
+  mat = foreach(name=c("FISH1","FISH2","FISH3","FISH4"), size=c("1.5M","1.5M","1.5M","2.2M")) %dopar% {
             sub=paste0(name,"_",size)
             load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base10k_bpk",bpk,"_dfuse",dfuse,"_cv_cvsd_outlier_rmdiag_stripped.RData"))
             locs=fread("/scratch/rao/mapped/interesting_locations_hg38_FISH_oligos.bed")[grep(paste0(name,"_L"),V4)]
@@ -71,20 +71,26 @@ if(F) {
                   ggsave(p,filename=paste0("images/rao_plot_",sub,"_",run,"_",resolution/1000,"k_observed.png"),width=6,height=5)
                   
                   #binless with decay
+                  idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
+                  csg=cs@groups[[idx1]]
+                  idx2=get_cs_interaction_idx(csg, type="CSbsig", raise=T)
+                  csi=csg@interactions[[idx2]]
+                  csi@settings$min.l10FC=0.2
                   mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
-                  mat=merge(mat,mat.raw[,.(name,bin1,bin2,decaymat)],by=c("name","bin1","bin2"))
-                  a=mat[is.maximum==T]
-                  a=a[,.SD[,.(begin1=c(begin1,begin1,end1,end1)-resolution/2, begin2=c(begin2,end2,begin2,end2)-resolution/2,
-                              patchno, phi)][chull(begin1,begin2)], by=c("patchno","name")]
+                  mat[,value:=phi]
+                  mat = csnorm:::detect_binless_patches(mat, csi@settings)
+                  mat[,value:=NULL]
+                  mat[,phi.max:=ifelse(is.maximum==T,NA,phi)]
+                  mat=merge(mat,get_matrices(cs, resolution=resolution, group="all")[,.(name,bin1,bin2,decaymat)],by=c("name","bin1","bin2"))
                   p=ggplot(mat)+geom_raster(aes(begin1,begin2,fill=phi/log(10)+log10(decaymat)))+
-                    geom_raster(aes(begin2,begin1,fill=phi/log(10)+log10(decaymat)))+
-                    geom_polygon(aes(begin2,begin1,group=patchno),colour="black",fill=NA,data=a)+
-                    scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white")+
+                    geom_raster(aes(begin2,begin1,fill=phi.max/log(10)+log10(decaymat)))+
+                    scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="black")+
                     geom_segment(aes(x=V2,y=V2,xend=V3,yend=V3,colour=V4),data=locs,size=3)+
                     scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
-                    theme_minimal()+ theme(axis.title=element_blank(),
+                    theme_void()+ theme(axis.title=element_blank(),
                                         panel.background = element_rect(fill = "white", colour = "black"),
-                                        panel.spacing=unit(0,"cm"))+coord_fixed()+labs(fill="log10 FC")
+                                        panel.spacing=unit(0,"cm"))+
+                    coord_fixed()+labs(fill="log10 FC")
                   ggsave(p,filename=paste0("images/rao_plot_",sub,"_",run,"_",resolution/1000,"k_binless_with_decay.png"),width=6,height=5)
             }
   }
