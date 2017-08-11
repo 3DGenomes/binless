@@ -98,6 +98,12 @@ detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95,
   mat=cts[,.(phi.ref=0,delta=0,diffsig=1),by=c("name","bin1","bin2")]
   prior.sd=10
   for (i in 1:niter) {
+    if (i>1) {
+      mat[,phi.ref:=(phihat.ref/sigmasq.ref + (phihat-delta)/sigmasq)/(1/sigmasq.ref+1/sigmasq)]
+      ctsref=ctsref[,.(name,bin1,bin2,count,mu.nosig,weight)]
+      cts=cts[,.(name,bin1,bin2,count,mu.nosig,weight)]
+      mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig,diffsig.old)]
+    }
     ctsref=mat[ctsref]
     ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu.nosig)-1,(1/(exp(phi.ref)*mu.nosig)+1/csg@par$alpha))]
     mat=mat[ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
@@ -113,10 +119,6 @@ detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95,
     mat[,diffsig.old:=diffsig]
     mat[,diffsig:=exp(delta)]
     if(mat[,all(abs(diffsig-diffsig.old)<tol)]) break
-    mat[,phi.ref:=(phihat.ref/sigmasq.ref + (phihat-delta)/sigmasq)/(1/sigmasq.ref+1/sigmasq)]
-    ctsref=ctsref[,.(name,bin1,bin2,count,mu.nosig,weight)]
-    cts=cts[,.(name,bin1,bin2,count,mu.nosig,weight)]
-    mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig,diffsig.old)]
   }
   if (i==niter) message("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
   #
