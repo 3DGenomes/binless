@@ -313,7 +313,9 @@ if (F) {
     }
   }
   info=info[name!="Comparison"]
-  ggplot(info[variable=="pc"])+geom_violin(aes(type,value,colour=cell))+facet_wrap(~resolution)+scale_y_log10()
+  ggplot(info[variable=="pc"])+geom_boxplot(aes(type,value,colour=cell))+facet_wrap(~resolution)+scale_y_log10()
+  ggsave(filename=paste0("images/rao_plot_FISH_signal_comparison_5k.png"),width=6,height=5)
+  
   info[variable=="pc",.(num=.N,min=min(value),mean=mean(value),max=max(value)),by=c("resolution","type")]
   info[variable=="N",.(num=.N,min=min(value),mean=mean(value),max=max(value)),by=c("resolution","type")]
   

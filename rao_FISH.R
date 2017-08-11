@@ -94,4 +94,49 @@ if(F) {
                   ggsave(p,filename=paste0("images/rao_plot_",sub,"_",run,"_",resolution/1000,"k_binless_with_decay.png"),width=6,height=5)
             }
   }
-}
+  
+  #get statistics
+  run="cv_cvsd_outlier_rmdiag"
+  info = foreach(name=c("FISH1","FISH2","FISH3","FISH4"), size=c("1.5M","1.5M","1.5M","2.2M"), .combine=rbind) %dopar% {
+    sub=paste0(name,"_",size)
+    load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base10k_bpk",bpk,"_dfuse",dfuse,"_cv_cvsd_outlier_rmdiag_stripped.RData"))
+    locs=fread("/scratch/rao/mapped/interesting_locations_hg38_FISH_oligos.bed")[
+      grep(paste0(name,"_L"),V4),.(Lbegin=V2,Lend=V3,loc=V4)]
+    locs[,loc:=as.numeric(tstrsplit(loc,"_L")[[2]])]
+    setkey(locs,Lbegin,Lend)
+    foreach (resolution=c(5000,10000), .combine=rbind) %do% {
+      mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
+      mat=merge(mat,get_interactions(cs, resolution=resolution, group="all",type="CSsig")[
+        ,.(name,bin1,bin2,signal,is.significant,prob.gt.expected)],by=c("name","bin1","bin2"))
+      mat[,name:=NULL]
+      mat=foverlaps(mat,locs,by.x=c("begin1","end1"), type="any")
+      setnames(mat,c("Lbegin","Lend","loc"),c("Lbegin1","Lend1","loc1"))
+      mat=foverlaps(mat,locs,by.x=c("begin2","end2"), type="any")
+      setnames(mat,c("Lbegin","Lend","loc"),c("Lbegin2","Lend2","loc2"))
+      dt1=mat[loc1+loc2==3,.(name=name,resolution=resolution,locus="L1+L2 (positive)",is.maximum,phi,patchno,signal,is.significant,prob.gt.expected)]
+      dt2=mat[loc1+loc2==5,.(name=name,resolution=resolution,locus="L2+L3 (negative)",is.maximum,phi,patchno,signal,is.significant,prob.gt.expected)]
+      rbind(dt1,dt2)
+    }
+  }
+  
+  #binless
+  ggplot(info)+geom_boxplot(aes(locus,phi,colour=factor(resolution)))+facet_wrap(~name)
+  #binned
+  ggplot(info)+geom_boxplot(aes(locus,log(signal),colour=factor(resolution)))+facet_wrap(~name)
+  
+  info.vs=melt(info[resolution==5000&signal>0,.(locus,binned=log10(signal),binless=phi/log(10),name)],
+               measure.vars = c("binned","binless"), variable.name="method", value.name="log10 FC")
+  ggplot(info.vs)+geom_boxplot(aes(locus,`log10 FC`,colour=`method`))+facet_wrap(~name)
+  ggsave(filename=paste0("images/rao_plot_FISH_signal_comparison_5k.png"),width=6,height=5)
+  
+  info.vs[,.N,by=c("locus","method","name")]
+        
+  
+  #binless
+  ggplot(info[,.(nsignif=sum(is.maximum)),by=c("locus","resolution","name")])+
+    geom_point(aes(locus,nsignif,colour=factor(resolution)))+facet_wrap(~name)
+  #binned
+  ggplot(info[,.(nsignif=sum(is.significant)),by=c("locus","resolution","name")])+
+    geom_point(aes(locus,nsignif,colour=factor(resolution)))+facet_wrap(~name)
+  ggplot(info)+geom_boxplot(aes(locus,prob.gt.expected,colour=factor(resolution)))+facet_wrap(~name)
+  
