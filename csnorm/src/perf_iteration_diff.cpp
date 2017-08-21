@@ -6,7 +6,9 @@ using namespace Rcpp;
 #include <ctime>
 
 #include "perf_iteration_diff.hpp"
-#include "gfl_graph_fl.h" //graph_fused_lasso_weight_warm
+#include "FusedLassoOptimizer.hpp"
+#include "GFLLibrary.hpp"
+
 #include "perf_iteration_signal.hpp" //cts_to_signal_mat
 #include "util.hpp" //SQUARE
 #include "graph_trails.hpp" //boost_build_patch_graph_components
@@ -61,21 +63,17 @@ List wgfl_diff_cv(const DataFrame mat, int nbins,
   IntegerVector bin1 = as<IntegerVector>(mat["bin1"]);
   IntegerVector bin2 = as<IntegerVector>(mat["bin2"]);
   
-  std::vector<double> u_r(trails_r.size(),0); //residuals set to zero
-  std::vector<double> z_r;
-  z_r.reserve(trails_r.size());
-  for (int i=0; i<trails_r.size(); ++i) {
-    z_r.push_back(beta_r[trails_r[i]]);   //z set to beta values along trails
-  }
-  
   //build cv groups
   std::vector<int> cvgroup;
   const int ngroups=2;
   for (int i=0; i<N; ++i)
     cvgroup.push_back( (bin2[i]+bin1[i]) % ngroups ); // 2 cv groups in checkerboard pattern
   
+  //setup computation of fused lasso solution, clamped at 50
+  FusedLassoOptimizer<GFLLibrary> flo(nbins);
+  flo.setUp(ntrails, trails_i, breakpoints_i, alpha, inflate, ninner, converge, 50);
+    
   //Compute fused lasso solutions on each group and report to beta_cv
-  int res=0;
   std::vector<double> beta_cv(N, -100);
   for (int g=0; g<ngroups; ++g) {
     //prepare data and weights for group g and copy initial values
@@ -90,14 +88,16 @@ List wgfl_diff_cv(const DataFrame mat, int nbins,
       }
     }
     std::vector<double> values(beta_r);
-    //compute fused lasso solution
-    res += graph_fused_lasso_weight_warm (N, &d_r[0], &w_r[0], ntrails,
-                                          &trails_r[0], &breakpoints_r[0],
-                                          lam2, &alpha, inflate, ninner, converge,
-                                          &values[0], &z_r[0], &u_r[0]);
+    //compute fused lasso
+    flo.optimize(d_r, values, w_r, lam2);
+    values = flo.get();
+    alpha = flo.get_alpha();
+    
     //store fused solution at group positions back in beta_cv
     for (int i=0; i<N; ++i) if (cvgroup[i]==g) beta_cv[i] = values[i];
   }
+  int res = flo.get_ninner();
+    
   
   return List::create(_["beta_cv"]=wrap(beta_cv), _["cv.group"]=wrap(cvgroup),
                       _["ninner"]=wrap(res));
@@ -117,16 +117,9 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
     std::vector<double> beta_r = as<std::vector<double> >(beta_i);
     std::vector<double> beta_old = beta_r;
     std::vector<double> delta_r = soft_threshold(beta_r, 0, lam1);
-    std::vector<double> u_r(trails_r.size(),0); //residuals set to zero
-    std::vector<double> z_r;
-    z_r.reserve(trails_r.size());
-    for (int i=0; i<trails_r.size(); ++i) {
-        z_r.push_back(beta_r[trails_r[i]]);   //z set to beta values along trails
-    }
     DataFrame mat;
 
     int step=0;
-    int res=0;
     double maxval=converge+1;
     std::clock_t c_start,c_end;
     double c_cts(0), c_gfl(0);
@@ -138,6 +131,9 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
           << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
 
+    //setup computation of fused lasso solution, clamped at 50
+    FusedLassoOptimizer<GFLLibrary> flo(nbins);
+    flo.setUp(ntrails, trails_i, breakpoints_i, alpha, inflate, ninner, converge, 50);
 
     while (step<=nouter & maxval>converge) {
         beta_old = beta_r;
@@ -162,20 +158,14 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
         c_end = std::clock();
         c_cts += c_end - c_start;
 
-        //compute fused lasso solution
+        //compute fused lasso
         c_start = std::clock();
-        res += graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails,
-                                              &trails_r[0], &breakpoints_r[0],
-                                              lam2, &alpha, inflate, ninner, converge,
-                                              &beta_r[0], &z_r[0], &u_r[0]);
-        const double beta_max = 50;
-        for (std::vector<double>::iterator it = beta_r.begin(); it != beta_r.end(); ++it)
-          *it = std::min(beta_max, std::max(-beta_max, *it));
+        flo.optimize(y_r, beta_r, w_r, lam2);
+        beta_r = flo.get();
+        delta_r = flo.get(0, lam1);
+        alpha = flo.get_alpha();
         c_end = std::clock();
         c_gfl += c_end - c_start;
-
-        //soft-threshold it at the selected parameters
-        delta_r = soft_threshold(beta_r, 0, lam1);
 
         //update phi_ref
         phi_ref_r = compute_phi_ref(delta_r, phihat, phihat_var, phihat_ref,
@@ -206,7 +196,8 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
     /*Rcout << " eval final: " << step << "/" << nouter << " lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
           << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-
+    
+    int res = flo.get_ninner();
     
     DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                            _["bin2"]=mat["bin2"],
@@ -225,7 +216,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
     
     return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha),
                         _["phi.ref"]=wrap(phi_ref_r), _["delta"]=wrap(delta_r), _["mat"]=finalmat,
-                        _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res,
+                        _["nouter"]=step, _["ninner"]=res,
                         _["eCprime"]=0, _["lambda1"]=lam1, _["c_cts"]=c_cts, _["c_gfl"]=c_gfl);
 }
 
@@ -342,7 +333,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                            _["delta"]=delta,
                                            _["phi.ref"]=phi_ref_r,
                                            _["patchno"]=patchno);
-    return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi.ref"]=phi_ref_r,
+    return List::create(_["phi.ref"]=phi_ref_r,
                         _["delta"]=delta, _["beta"]=beta_r,
                         _["alpha"]=ret["alpha"], _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd,
                         _["mat"]=finalmat, _["lambda1"]=lam1, _["eCprime"]=0,
@@ -435,7 +426,7 @@ List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double disper
                                            _["delta"]=delta,
                                            _["phi.ref"]=phi_ref,
                                            _["patchno"]=patchno);
-    return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi.ref"]=phi_ref,
+    return List::create(_["phi.ref"]=phi_ref,
                         _["delta"]=delta, _["beta"]=beta_r,
                         _["alpha"]=ret["alpha"], _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC,
                         _["mat"]=finalmat, _["lambda1"]=lam1, _["eCprime"]=0,

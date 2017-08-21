@@ -100,7 +100,6 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
     DataFrame mat;
 
     int step=0;
-    int res=0;
     double maxval=converge+1;
     std::clock_t c_start,c_end;
     double c_cts(0), c_gfl(0);
@@ -162,7 +161,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
           << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
     
-    res = flo.get_ninner();
+    int res = flo.get_ninner();
     
     DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                            _["bin2"]=mat["bin2"],
@@ -203,7 +202,6 @@ List wgfl_signal_cv(const DataFrame mat, int nbins,
     flo.setUp(ntrails, trails_i, breakpoints_i, alpha, inflate, ninner, converge, 50);
     
     //Compute fused lasso solutions on each group and report to beta_cv
-    int res=0;
     std::vector<double> beta_cv(N, -100);
     for (int g=0; g<ngroups; ++g) {
       //prepare data and weights for group g and copy initial values
@@ -226,7 +224,7 @@ List wgfl_signal_cv(const DataFrame mat, int nbins,
       //store fused solution at group positions back in beta_cv
       for (int i=0; i<N; ++i) if (cvgroup[i]==g) beta_cv[i] = values[i];
     }
-    res = flo.get_ninner();
+    int res = flo.get_ninner();
     
     return List::create(_["beta_cv"]=wrap(beta_cv), _["cv.group"]=wrap(cvgroup),
                         _["ninner"]=wrap(res));
