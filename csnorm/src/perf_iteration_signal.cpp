@@ -7,6 +7,9 @@ using namespace Rcpp;
 #include <set>
 
 #include "perf_iteration_signal.hpp"
+#include "FusedLassoOptimizer.hpp"
+#include "GFLLibrary.hpp"
+
 #include "gfl_graph_fl.h" //graph_fused_lasso_weight_warm
 #include "util.hpp" //SQUARE
 #include "cts_core.h" //cts_to_signal_mat_core
@@ -95,12 +98,6 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
     std::vector<double> beta_old;
     std::vector<double> phi_r = soft_threshold(beta_r, eCprime,
                                 lam1); //sparse fused lasso soft-thresholds values
-    std::vector<double> u_r(trails_r.size(),0); //residuals set to zero
-    std::vector<double> z_r;
-    z_r.reserve(trails_r.size());
-    for (int i=0; i<trails_r.size(); ++i) {
-        z_r.push_back(beta_r[trails_r[i]]);   //z set to beta values along trails
-    }
     DataFrame mat;
 
     int step=0;
@@ -109,7 +106,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
     std::clock_t c_start,c_end;
     double c_cts(0), c_gfl(0);
     /*Rcout << " Perf iteration: start with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
-          << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
+          << " lam1= " << lam1 << " eCprime= " << eCprime
           << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
     /*Rcout << " eval init: lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
@@ -117,6 +114,10 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
 
 
+    //setup computation of fused lasso solution, clamped at 50
+    FusedLassoOptimizer<GFLLibrary> flo(nbins);
+    flo.setUp(ntrails, trails_i, breakpoints_i, alpha, inflate, ninner, converge, 50);
+    
     while (step<=nouter & maxval>converge) {
         beta_old = beta_r;
         step++;
@@ -128,28 +129,22 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
         c_end = std::clock();
         c_cts += c_end - c_start;
 
-        //compute fused lasso solution, clamped at 50
+        //compute fused lasso
         c_start = std::clock();
-        res += graph_fused_lasso_weight_warm (N, &y_r[0], &w_r[0], ntrails,
-                                              &trails_r[0], &breakpoints_r[0],
-                                              lam2, &alpha, inflate, ninner, converge,
-                                              &beta_r[0], &z_r[0], &u_r[0]);
-        const double beta_max = 50;
-        for (std::vector<double>::iterator it = beta_r.begin(); it != beta_r.end(); ++it)
-          *it = std::min(beta_max, std::max(-beta_max, *it));
+        flo.optimize(y_r, beta_r, w_r, lam2);
+        beta_r = flo.get();
+        phi_r = flo.get(eCprime, lam1);
+        alpha = flo.get_alpha();
         c_end = std::clock();
         c_gfl += c_end - c_start;
-
-        //soft-threshold it at the selected parameters
-        phi_r = soft_threshold(beta_r, eCprime, lam1);
 
         //update residual
         maxval = std::abs(beta_r[0]-beta_old[0]);
         for (int i=1; i<N;
                 ++i) maxval = std::max(std::abs(beta_r[i]-beta_old[i]), maxval);
         /*Rcout << " Iteration " << step << " with lam2= " << lam2 << " alpha= " << alpha << " reached maxval= " << maxval
-              << " after " << res << " steps phi[0]= " << phi_r[0]
-              << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
+              << " after " << flo.get_ninner() << " steps phi[0]= " << phi_r[0]
+              << " lam1= " << lam1 << " eCprime= " << eCprime
               << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
         /*Rcout << " eval step "<< step << ": lam2= " << lam2 << " lam1= " << lam1 << " eCprime= " << eCprime
               << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
@@ -160,14 +155,16 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
     }
     //if (step>nouter) Rcout << " warning: reached maximum number of outer iterations in wgfl_signal_perf_warm" << std::endl;
     /*Rcout << " Perf iteration: end   with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
-          << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
+          << " lam1= " << lam1 << " eCprime= " << eCprime
           << " nouter= " << step << " ninner= " << res << " maxval= " << maxval
           << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
     /*Rcout << " eval final: " << step << "/" << nouter << " lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
           << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-
+    
+    res = flo.get_ninner();
+    
     DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                            _["bin2"]=mat["bin2"],
                                            _["phihat"]=mat["phihat"],
@@ -180,7 +177,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
     
     return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha),
                         _["phi"]=wrap(phi_r), _["mat"]=finalmat,
-                        _["z"]=wrap(z_r), _["u"]=wrap(u_r), _["nouter"]=step, _["ninner"]=res,
+                        _["nouter"]=step, _["ninner"]=res,
                         _["eCprime"]=eCprime, _["lambda1"]=lam1, _["c_cts"]=c_cts, _["c_gfl"]=c_gfl);
 }
 
