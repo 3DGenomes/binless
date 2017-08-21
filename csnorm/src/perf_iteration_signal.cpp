@@ -10,7 +10,6 @@ using namespace Rcpp;
 #include "FusedLassoOptimizer.hpp"
 #include "GFLLibrary.hpp"
 
-#include "gfl_graph_fl.h" //graph_fused_lasso_weight_warm
 #include "util.hpp" //SQUARE
 #include "cts_core.h" //cts_to_signal_mat_core
 #include "graph_trails.hpp" //boost_build_patch_graph_components
@@ -193,18 +192,15 @@ List wgfl_signal_cv(const DataFrame mat, int nbins,
     IntegerVector bin1 = as<IntegerVector>(mat["bin1"]);
     IntegerVector bin2 = as<IntegerVector>(mat["bin2"]);
     
-    std::vector<double> u_r(trails_r.size(),0); //residuals set to zero
-    std::vector<double> z_r;
-    z_r.reserve(trails_r.size());
-    for (int i=0; i<trails_r.size(); ++i) {
-        z_r.push_back(beta_r[trails_r[i]]);   //z set to beta values along trails
-    }
-    
     //build cv groups
     std::vector<int> cvgroup;
     const int ngroups=2;
     for (int i=0; i<N; ++i)
       cvgroup.push_back( (bin2[i]+bin1[i]) % ngroups ); // 2 cv groups in checkerboard pattern
+    
+    //setup computation of fused lasso solution, clamped at 50
+    FusedLassoOptimizer<GFLLibrary> flo(nbins);
+    flo.setUp(ntrails, trails_i, breakpoints_i, alpha, inflate, ninner, converge, 50);
     
     //Compute fused lasso solutions on each group and report to beta_cv
     int res=0;
@@ -222,14 +218,15 @@ List wgfl_signal_cv(const DataFrame mat, int nbins,
         }
       }
       std::vector<double> values(beta_r);
-      //compute fused lasso solution
-      res += graph_fused_lasso_weight_warm (N, &p_r[0], &w_r[0], ntrails,
-                                              &trails_r[0], &breakpoints_r[0],
-                                              lam2, &alpha, inflate, ninner, converge,
-                                              &values[0], &z_r[0], &u_r[0]);
+      //compute fused lasso
+      flo.optimize(p_r, values, w_r, lam2);
+      values = flo.get();
+      alpha = flo.get_alpha();
+        
       //store fused solution at group positions back in beta_cv
       for (int i=0; i<N; ++i) if (cvgroup[i]==g) beta_cv[i] = values[i];
     }
+    res = flo.get_ninner();
     
     return List::create(_["beta_cv"]=wrap(beta_cv), _["cv.group"]=wrap(cvgroup),
                         _["ninner"]=wrap(res));
@@ -340,7 +337,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                                            _["phi"]=phi_r,
                                            _["cv.group"]=cv_run["cv.group"],
                                            _["patchno"]=patchno);
-    return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi"]=phi_r,
+    return List::create(_["phi"]=phi_r,
                         _["beta"]=beta_r, _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
                         _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd, _["mat"]=finalmat, _["eCprime"]=eCprime,
                         _["lambda1"]=lam1,
@@ -415,7 +412,7 @@ List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter,
                                            _["beta"]=beta_r,
                                            _["phi"]=phi_r,
                                            _["patchno"]=patchno);
-    return List::create(_["z"]=ret["z"], _["u"]=ret["u"], _["phi"]=phi_r,
+    return List::create(_["phi"]=phi_r,
                         _["beta"]=beta_r, _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
                         _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat, _["eCprime"]=eCprime,
                         _["lambda1"]=lam1,
