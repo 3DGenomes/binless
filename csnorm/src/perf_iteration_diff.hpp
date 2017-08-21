@@ -5,9 +5,6 @@
 using namespace Rcpp;
 #include <vector>
 
-void remove_outliers(const std::vector<int>& bin1, const std::vector<int>& bin2,
-                     std::vector<double>& phihat_var, List outliers);
-
 DataFrame cts_to_diff_mat(const DataFrame cts, const DataFrame ref, int nbins,
                           double dispersion,
                           std::vector<double>& phi_ref, std::vector<double>& delta, List outliers);
