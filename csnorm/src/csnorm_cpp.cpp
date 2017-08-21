@@ -12,9 +12,6 @@ RCPP_MODULE(csnorm_cpp) {
              "documentation for cts_to_signal_mat ");
     function("wgfl_signal_perf_warm", &wgfl_signal_perf_warm,
              "documentation for wgfl_signal_perf_warm ");
-    function("wgfl_signal_perf_opt_lambda1_eCprime",
-             &wgfl_signal_perf_opt_lambda1_eCprime,
-             "documentation for wgfl_signal_perf_opt_lambda1_eCprime");
     function("wgfl_signal_BIC", &wgfl_signal_BIC,
              "documentation for wgfl_signal_BIC ");
     function("wgfl_signal_BIC_fixed", &wgfl_signal_BIC_fixed,
