@@ -5,7 +5,7 @@ using namespace Rcpp;
 #include "perf_iteration_diff.hpp"
 #include "graph_trails.hpp"
 
-RCPP_MODULE(gfl) {
+RCPP_MODULE(csnorm_cpp) {
     using namespace Rcpp ;
 
     function("cts_to_signal_mat", &cts_to_signal_mat,
