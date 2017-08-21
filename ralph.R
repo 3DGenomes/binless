@@ -1,223 +1,141 @@
-library(ggplot2)
-library(data.table)
 library(csnorm)
-library(foreach)
+library(data.table)
+library(ggplot2)
 library(doParallel)
+library(foreach)
+library(scales)
+library(methods)
 
 setwd("/home/yannick/simulations/cs_norm")
 
 
-a=examine_dataset("/scratch/ralph/HiC/3_Mapped/Bcell_Sox2_10Mb_both_filled_map.tsv", skip=0L,nrows=1000000)
-csd1=read_and_prepare("/scratch/ralph/HiC/3_Mapped/Bcell_Sox2_10Mb_both_filled_map.tsv",
-                      "data/ralph_Bcell_Sox2_10Mb", "Bcell", "1", enzyme="MboI", circularize=-1, dangling.L=c(-1,0,3,4,8),
-                      dangling.R=c(4,3,0,-1,-5), maxlen=800, save.data=T)
-a=examine_dataset("/scratch/ralph/HiC/3_Mapped/EScell_Sox2_10Mb_both_filled_map.tsv", skip=0L,nrows=1000000)
-csd2=read_and_prepare("/scratch/ralph/HiC/3_Mapped/EScell_Sox2_10Mb_both_filled_map.tsv",
-                      "data/ralph_EScell_Sox2_10Mb", "EScell", "1", enzyme="MboI", circularize=-1, dangling.L=c(-1,0,3,4,8),
-                      dangling.R=c(4,3,0,-1,-5), maxlen=800, save.data=T)
 
-
-binned=bin_counts(cs@counts,resolution=10000,b1=34500000,e1=35000000,b2=34500000,e2=35000000)
-binned=bin_counts(cs@counts,resolution=50000,b1=33500000,e1=36000000,b2=33500000,e2=36000000)
-sfac=binned[name==cs@experiments[1,name],sum(N)]/binned[name==cs@experiments[2,name],sum(N)]
-binned[name==name[2],N:=N*sfac]
-ggplot(binned)+
-  geom_raster(aes(begin1,begin2,fill=log(N)))+
-  geom_raster(aes(begin2,begin1,fill=log(N)))+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~name,scales="free")
-
-
-load("data/ralph_EScell_Sox2_10Mb_csdata_with_data.RData")
-begin=34500000
-end=35000000
-data=csd@data[re.closest1>=begin&re.closest1<=end&re.closest2>=begin&re.closest2<=end]
-cs_data = prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
-csd = new("CSdata", info=csd@info, settings=list(circularize=-1),
-          data=data, biases=cs_data$biases, counts=cs_data$counts)
-save(csd, file="data/ralph_EScell_Sox2_0.5Mb_csdata_with_data.RData")
-csd@data=data.table()
-save(csd, file="data/ralph_EScell_Sox2_0.5Mb_csdata.RData")
-csd2=csd
+if (FALSE) {
+  a=examine_dataset("/scratch/ralph/HiC/B_rep1_Sox2.tsv", skip=0L,nrows=1000000, skip.fbm=F, read.len=75)
+  
+  foreach (cell=c("B","ES")) %:% foreach (replicate=c("1","2")) %:% foreach (locus=c("Sox2")) %do% {
+    csd0=read_and_prepare(paste0("/scratch/ralph/HiC/3_Mapped/",cell,"_rep",replicate,"_",locus,".tsv"), locus=NULL,
+                          paste0("data/ralph_",locus,"_",cell,"_rep",replicate), cell, replicate, enzyme="MboI",
+                                name=paste0(locus,"_",cell,"_rep",replicate), circularize=-1,
+                          dangling.L=c(0), dangling.R=c(3), maxlen=700, read.len=c(75,76), dmin=1000, save.data=T)
+    NULL
+  }
+  
+  load("data/ralph_Sox2_B_rep1_csdata_with_data.RData")
+  plot_binned(csd@data, resolution=10000, b1=csd@data[,min(rbegin1)], e1=csd@data[,max(rbegin2)]) 
+  plot_raw(csd@data, b1=csd@data[,min(rbegin1)+6500], e1=csd@data[,min(rbegin1)+8500]) 
+  data=csd@data[rbegin1>min(rbegin1)+6500&rbegin2<min(rbegin1)+8500]
+  data[,category:=grepl("[#~]",id)]
+}
 
 
 
-load("data/ralph_EScell_Sox2_0.5Mb_csdata.RData")
+
+args=commandArgs(trailingOnly=TRUE)
+sub=args[1]
+bpk=30
+dfuse=20 #as.integer(args[2])
+bpd=10 #as.integer(args[4])
+bpb=10 #as.integer(args[5])
+ncores=10
+
+
+locus="Sox2"
+cell="B"
+load(paste0("data/ralph_",locus,"_",cell,"_rep1_csdata.RData"))
 csd1=csd
-load("data/ralph_Bcell_Sox2_0.5Mb_csdata.RData")
+cell="ES"
+load(paste0("data/ralph_",locus,"_",cell,"_rep1_csdata.RData"))
 csd2=csd
-cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
-save(cs,file="data/ralph_Sox2_0.5Mb_csnorm.Rdata")
+cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none", dfuse=dfuse)
+cs = run_gauss(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
+               ngibbs = 5, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
+               ncounts = 1000000, ncores=ncores, base.res=10000, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T,
+               signif.threshold=T)
+save(cs,file=paste0("data/ralph_Sox2_B1_ES1_csnorm_optimized_base10k_cv.RData"))
 
+cs = run_gauss(cs, restart=T, ngibbs = 15, ncores=ncores)
+save(cs,file=paste0("data/ralph_Sox2_B1_ES1_csnorm_optimized_base10k_cv.RData"))
 
+#load(paste0("data/ralph_Sox2_B1_ES1_csnorm_optimized_base10k_cv.RData"))
 
-
-load("data/ralph_Sox2_0.5Mb_csnorm.Rdata")
-
-init.op <- csnorm:::csnorm_simplified_guess(
-  biases = cs@biases, counts = cs@counts, design = cs@design, lambda=1, dmin=cs@settings$dmin, dmax=cs@settings$dmax,
-  groups = 10, bf_per_kb = 1, bf_per_decade = 5, iter = 10000)
-
-
-cs = run_simplified(cs, bf_per_kb=1, bf_per_decade=5, bins_per_bf=10, groups=10, lambdas=10**seq(from=0,to=2,length.out=6),
-                    ngibbs = 3, iter=10000, ncores=30)
-save(cs, file="data/ralph_Sox2_0.5Mb_csnorm_optimized_bpk1_grp10.Rdata")
-
-load("data/ralph_Sox2_0.5Mb_csnorm_optimized_gibbs_bpk1_grp10.Rdata")
-
-for (bpk in 1:5) for (groups in c(10,50,100)) {
-  load(paste0("data/ralph_Sox2_0.5Mb_csnorm_optimized_gibbs_bpk",bpk,"_grp",groups,".Rdata"))
-  cat(paste("bpk",bpk,"groups",groups,"dispersion",cs@par$alpha,"\n"))
+for (resolution in c(10000)) {
+  cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
+  cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores, signif.threshold=T)
+  cs=detect_binless_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name], signif.threshold=T)
+  save(cs,file=paste0("data/ralph_Sox2_B1_ES1_csnorm_optimized_base10k_cv.RData"))
 }
 
-
-plots=check_fit(cs)
-
-
-### Binning at a given resolution
-cs=bin_all_datasets(cs, resolution=10000, ncores=30, verbose=T, ice=1)
-mat=get_matrices(cs, resolution=1000, group="all")
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(observed)))+
-  geom_raster(aes(begin2,begin1,fill=log(expected)))+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~name)
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
-  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~name)
-
-### Interaction calling 
-cs=detect_interactions(cs, resolution=10000, group="all", detection.type=1, threshold=0.95, ncores=30)
-cs=detect_interactions(cs, resolution=10000, group="all", detection.type=2, threshold=0.95, ncores=30)
-cs=detect_interactions(cs, resolution=10000, group="all", detection.type=3, threshold=3, ncores=30)
-mat1=get_interactions(cs, type="interactions", resolution=10000, group="all", detection.type=1,
-                      threshold=0.95, ref="expected")
-mat2=get_interactions(cs, type="interactions", resolution=10000, group="all", detection.type=2,
-                     threshold=0.95, ref="expected")
-mat3=get_interactions(cs, type="interactions", resolution=10000, group="all", detection.type=3,
-                      threshold=3, ref="expected")
-mat=rbindlist(list(det1=mat1,det2=mat2),use.names=T,idcol="method")
-#for example, we can plot the ice-like matrices with highlighted interactions in the upper left corner
-ggplot(mat1)+
-  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
-  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=prob.gt.expected<0.5),data=mat1[is.significant==T])+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_grid(~name)
-
-cs=detect_differences(cs, resolution=10000, group="all", detection.type=1, threshold=0.95, ncores=30, ref="EScell MboI 1")
-cs=detect_differences(cs, resolution=10000, group="all", detection.type=2, threshold=0.95, ncores=30, ref="EScell MboI 1")
-cs=detect_differences(cs, resolution=10000, group="all", detection.type=3, threshold=3, ncores=30, ref="EScell MboI 1")
-#
-mat1=get_interactions(cs, type="differences", resolution=10000, group="all", detection.type=1, threshold=0.95, ref="EScell MboI 1")
-mat2=get_interactions(cs, type="differences", resolution=10000, group="all", detection.type=2, threshold=0.95, ref="EScell MboI 1")
-mat3=get_interactions(cs, type="differences", resolution=10000, group="all", detection.type=3, threshold=3, ref="EScell MboI 1")
-mat1[,c("ratio","ratio.sd"):=list(NULL,NULL)]
-mat=rbindlist(list(det1=mat1,det2=mat2,det3=mat3),use.names=T,idcol="method")
-#for example, we can plot the ice-like matrices with highlighted interactions in the upper left corner
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
-  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=direction),data=mat1[is.significant==T])+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_grid(method~name)
-
-
-
-### Grouping of datasets
-
-#Datasets can be grouped (merged) to improve the quality of the matrices and the interaction detection power
-#for example, we can group datasets by condition and enzyme. For that purpose, pass group the corresponding groupings.
-cs=group_datasets(cs, resolution=20000, group=c("condition", "enzyme"), ice=1, verbose=T)
-
-#Again, you can detect interactions in these grouped datasets, and plot the results
-cs=detect_interactions(cs, resolution=20000, group=c("condition", "enzyme"), detection.type=1,
-                        threshold=0.95, ncores=30)
-mat=get_interactions(cs, type="interactions", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
-                     threshold=0.95, ref="expected")
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
-  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=prob.gt.expected<0.5),data=mat[is.significant==T])+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~name)
-
-
-### Difference calling
-
-#you can call significant differences. It's just like calling interactions, but you need to specify a reference.
-#All other matrices will then be compared to that one.
-cs=detect_differences(cs, ref="WT BglII", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
-                      threshold=0.95, ncores=30)
-
-#the interactions can be retrieved as usual, with a few changes
-# specify type="differences" and ref as given in detect_differences
-mat=get_interactions(cs, type="differences", resolution=20000, group=c("condition", "enzyme"), detection.type=1,
-                     threshold=0.95, ref="WT BglII")
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(icelike)))+
-  geom_raster(aes(begin2,begin1,fill=log(icelike)))+
-  geom_point(aes(begin1,begin2,colour=`prob.gt.WT BglII`<0.5),data=mat[is.significant==T])+
-  scale_fill_gradient(low="white", high="black", na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~name)
-
-#You can also plot the matrix of the ratio of one experiment to its reference, along with its error bar
-ggplot(mat)+
-  geom_raster(aes(begin1,begin2,fill=log(ratio)))+
-  geom_raster(aes(begin2,begin1,fill=log(ratio.sd)))+
-  scale_fill_gradient2(na.value = "white")+theme_bw()+theme(legend.position = "none")+
-  facet_wrap(~name)
-
-save(cs, file="data/caulo_csnorm_optimized.RData")
-
-
-
-### END
-
-
-#nu and delta correlation
-nu = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
-  load(i)
-  csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=cs@par$beta_nu, beta_delta=cs@par$beta_delta,
-                                   bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 10)[
-                                     ,.(pos,log_nu,log_delta,dset=j)]
-}
-nu[,pbin:=cut(pos,3)]
-ggplot(nu)+geom_line(aes(pos,exp(log_nu),colour=dset))+facet_wrap(~pbin,scales = "free_x", nrow=3)+
-  #scale_y_continuous(limits = c(0,2))+
-  ylab("nu")+scale_y_log10()
-#ggsave(filename=paste0("images/",prefix,"_nu.png"), width=10, height=7.5)
-
-#sorted with data points
-nu.obs = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
-  load(i)
-  a=data.table(id=cs@counts[,id1], pos=cs@counts[,pos1],
-               obs=cs@counts[,contact.down]*exp(-cs@pred$log_mean_cdown),
-               dset=j)[sample(.N,min(.N,100000))]
-  a=merge(a,cs@biases[,.(id,nu=exp(cs@par$log_nu))],by="id")
-  a[,obs:=obs*nu]
-  setkey(a,nu,pos)
-  a[,rank:=.I]
-  a
-}
-ggplot(nu.obs)+geom_line(aes(rank,nu,colour=dset))+geom_point(aes(rank,obs,colour=dset),alpha=0.01)+
-  #scale_y_continuous(limits = c(0,2))+
-  ylab("nu")+scale_y_log10()
-
-
-#diagonal decay
-decay.obs = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
-  load(i)
-  data.table(dist=cs@counts[,distance],
-             obs=cs@counts[,contact.down]*exp(-cs@pred$log_mean_cdown+cs@pred$log_decay_down),
-             decay=exp(cs@pred$log_decay_down),
-             dset=j)[sample(.N,min(.N,100000))]
-}
-decay.obs=decay.obs[dist>1000]
-setkey(decay.obs, dist)
-ggplot(decay.obs)+geom_line(aes(dist,decay,colour=dset))+geom_point(aes(dist,obs,colour=dset),alpha=0.01)+
-  scale_x_log10()+scale_y_log10()
-#ggsave(filename=paste0("images/",prefix,"_decay.png"), width=10, height=7.5)
-
+if (F) {
+  load("data/ralph_Sox2_csnorm_optimized_base10k.RData")
+  
+  csnorm:::has_converged(cs)
+  cs@diagnostics$params[,sum(runtime)/3600]
+  ggplot(cs@diagnostics$params[,.(step,leg,runtime)])+geom_line(aes(step,runtime,colour=leg))+scale_y_log10()
+  
+  plot_diagnostics(cs)$plot
+  plot_diagnostics(cs)$plot2
+  
+  signals=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
+    if ("signal" %in% cs@diagnostics$params[step==i,leg]) {
+      sig=copy(cs@diagnostics$params[step==i&leg=="signal",signal][[1]])
+      sig[,step:=i]
+      sig
+    }
+  }
+  
+  ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_wrap(~ step)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
+  ggplot(signals[name==name[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_wrap(~ step)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
+  ggplot(signals[step>=step[.N]-1])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_grid(step~ name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
+  ggplot(signals[step>=step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_wrap(~name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
+  ggplot(signals[step>=step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phihat))+facet_wrap(~name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
+  
+  #diagonal decay
+  ggplot(cs@par$decay[name==name[1]&std<10])+geom_line(aes(distance,log_decay))+
+    geom_line(aes(distance,log_decay+std),linetype="dotted")+geom_line(aes(distance,log_decay-std),linetype="dotted")+
+    scale_x_log10()
+  ggsave(filename="images/ralph_Sox2_B1_ES1_base10k_decay.pdf",width=20,height=7)
+  
+  write.table(cs@par$decay[name==name[1]&std<10,.(distance,log_decay,std)],
+              file="data/ralph_Sox2_B1_ES1_base10k_decay.txt", row.names=F, quote=F)
+  
+  
+  resolution=10000
+  mat.binned=get_matrices(cs, resolution=resolution, group="all")
+  #observed
+  ggplot(mat.binned)+geom_raster(aes(begin1,begin2,fill=log(observed)))+geom_raster(aes(begin2,begin1,fill=log(observed)))+facet_wrap(~name)+
+    scale_fill_gradient(high="black", low="white", na.value = "white")+coord_fixed()
+  ggsave(filename="images/ralph_Sox2_B1_ES1_base10k_observed.pdf",width=20,height=7)
+  
+  mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
+  ggplot(mat)+geom_raster(aes(begin1,begin2,fill=phi))+
+    geom_raster(aes(begin2,begin1,fill=phi))+coord_fixed()+
+    facet_wrap(~name)+scale_fill_gradient(high="black", low="white",na.value = "white")
+  ggsave(filename="images/ralph_Sox2_B1_ES1_base10k_binless.pdf",width=20,height=7)
+  ggplot(mat)+geom_raster(aes(begin1,begin2,fill=beta))+
+    geom_raster(aes(begin2,begin1,fill=beta))+coord_fixed()+
+    facet_wrap(~name)+scale_fill_gradient(high="black", low="white",na.value = "white")
+  ggsave(filename="images/ralph_Sox2_B1_ES1_base10k_binless_nosignif.pdf",width=20,height=7)
+  ggplot(mat)+geom_raster(aes(begin1,begin2,fill=log(weight)))+
+    geom_raster(aes(begin2,begin1,fill=log(weight)))+coord_fixed()+
+    facet_wrap(~name)+scale_fill_gradient(high="black", low="white",na.value = "white")
+  ggsave(filename="images/ralph_Sox2_B1_ES1_base10k_weight.pdf",width=20,height=7)
+  
+  mat.diff=get_interactions(cs, type="CSbdiff", resolution=resolution, group="all", ref=as.character(cs@experiments[1,name]))
+  ggplot(mat.diff)+geom_raster(aes(begin1,begin2,fill=delta))+coord_fixed()+
+    geom_raster(aes(begin2,begin1,fill=delta))+
+    facet_wrap(~name)+scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"),na.value="white")
+  ggsave(filename="images/ralph_Sox2_B1_ES1_base10k_bdiff.pdf",width=15,height=7)
+  ggplot(mat.diff)+geom_raster(aes(begin1,begin2,fill=beta))+coord_fixed()+
+    geom_raster(aes(begin2,begin1,fill=beta))+
+    facet_wrap(~name)+scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"),na.value="white")
+  ggsave(filename="images/ralph_Sox2_B1_ES1_base10k_bdiff_nosignif.pdf",width=15,height=7)
+  
+  write.table(merge(merge(mat.binned[,.(name,begin1,begin2,observed)],
+                          mat[,.(name,begin1,begin2,phi,beta.phi=beta,weight)]),
+                    mat.diff[,.(name,begin1,begin2,delta,beta.delta=beta)]),
+              file="data/ralph_Sox2_B1_ES1_base10k_normalized.txt", row.names=F, quote=F)
+  
+  
+}  
+  

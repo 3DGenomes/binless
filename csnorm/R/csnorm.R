@@ -14,24 +14,34 @@
 #' \code{\link{generate_fake_dataset}} follows model specification
 #'
 #' @section Normalization:
-#' \code{\link{run_simplified}}
+#' \code{\link{run_gauss}}
+#' \code{\link{run_gauss_bam}}
+#' \code{\link{run_exact}}
 #'
 #' @section Postprocessing:
 #' \code{\link{bin_all_datasets}}
 #' \code{\link{group_datasets}}
-#' \code{\link{detect_interactions}}
-#' \code{\link{detect_differences}}
-#' \code{\link{thresholds_estimator}}
+#' \code{\link{detect_binned_interactions}}
+#' \code{\link{detect_binned_differences}}
+#' \code{\link{detect_binless_interactions}}
+#' \code{\link{detect_binless_differences}}
 #' \code{\link{generate_genomic_biases}}
+#' \code{\link{plot_binless_matrix}}
 #'
 #' @useDynLib csnorm, .registration = TRUE
 #' @import rstan
+#' @import rstantools
+#' @import methods
+#' @import splines
 #' @import data.table
 #' @import doParallel
 #' @import foreach
 #' @import matrixStats
 #' @import ggplot2
-#' @import methods
+#' @import MASS
+#' @import Matrix
+#' @import quadprog
+#' @import igraph
 #' @importFrom Hmisc cut2
 #' @importFrom dplyr ntile
 #'
@@ -78,7 +88,7 @@ setMethod("show",signature="CSdata",definition=function(object) {
   ncounts=object@counts[,sum((contact.close>0)+(contact.far>0)+(contact.up>0)+(contact.down>0))]
   cat(" and ", ncounts, " nonzero counts\n", sep="")
   nreads=object@counts[,sum(contact.close+contact.far+contact.up+contact.down)]
-  cat(" from ", nreads, " reads\n", sep="")
+  cat(" from ", nreads, " count reads\n", sep="")
   cat(" Reads density excl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
   nreads=nreads+object@biases[,sum(dangling.L+dangling.R+rejoined)]
   cat(" Reads density incl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
@@ -90,42 +100,54 @@ setMethod("show",signature="CSdata",definition=function(object) {
   }
 })
 
-#' Class for one interaction detection
-#'
-#'
-#' @slot mat 
-#' @slot type 
-#' @slot threshold 
-#' @slot ref 
-#' @slot detection.type numeric. detection method
-#'
-#' @return
+#' Virtual class for one interaction detection
 #' @keywords internal
-#' @export
-#'
-#' @examples
 setClass("CSinter",
          slots = list(mat="data.table",
-                      type="character",
-                      detection.type="numeric",
-                      threshold="numeric",
-                      ref="character"))
-setMethod("show",signature="CSinter",definition=function(object) {
-  if (object@type=="interactions") {
-    cat("        Significant interactions wrt expected") 
-  } else {
-    cat("        Significant differences wrt ", object@ref)
-  }
-  cat(" (threshold=", object@threshold,", detection.type=", object@detection.type, ")\n")
+                      par="list",
+                      settings="list"),
+         contains = "VIRTUAL")
+
+#' Binned interaction detection
+#' @keywords internal
+setClass("CSsig", slot = list(threshold="numeric"), contains = "CSinter")
+setMethod("show", signature="CSsig", definition=function(object) {
+  cat("        Significant interactions wrt expected") 
+  cat(" (threshold=", object@threshold,")\n")
 })
 
-#' Class for one binned matrix and its interaction detections
+#' Binless difference detection
+#' @keywords internal
+setClass("CSdiff", slots = list(threshold="numeric", ref="character"), contains = "CSinter")
+setMethod("show", signature="CSdiff", definition=function(object) {
+  cat("        Significant differences wrt ", object@ref)
+  cat(" (threshold=", object@threshold,")\n")
+})
+
+#' Binless interaction detection
+#' @keywords internal
+setClass("CSbsig", slots = list(trails="list",cts="data.table",state="list"), contains = "CSinter")
+setMethod("show", signature="CSbsig", definition=function(object) {
+    cat("        Binless interactions wrt expected\n") 
+})
+
+#' Binless difference detection
+#' @keywords internal
+setClass("CSbdiff",
+         slots = list(ref="character",trails="list",cts="data.table",cts.ref="data.table",state="list"),
+         contains = "CSinter")
+setMethod("show", signature="CSbdiff", definition=function(object) {
+  cat("        Binless differences wrt ", object@ref, "\n") 
+})
+
+#' Class for one dataset grouping at a given (base) resolution
 #'
 #' @slot mat data.table. 
 #' @slot interactions list. 
+#' @slot resolution in bases.
 #' @slot group 
-#' @slot ice 
-#' @slot ice.iterations 
+#' @slot cts data.table. The counts and predicted means used in all calculations.
+#' @slot par
 #' @slot names 
 #'
 #' @return
@@ -133,24 +155,22 @@ setMethod("show",signature="CSinter",definition=function(object) {
 #' @export
 #'
 #' @examples
-setClass("CSmatrix",
+setClass("CSgroup",
          slots = list(mat="data.table",
                       interactions="list",
+                      resolution="numeric",
                       group="character",
-                      ice="logical",
-                      ice.iterations="numeric",
-                      names="character"))
+                      cts="data.table",
+                      par="list",
+                      names="data.table"))
 
-setMethod("show",signature="CSmatrix",definition=function(object) {
+setMethod("show",signature="CSgroup",definition=function(object) {
   if (length(object@group)==1 && object@group=="all") {
-    cat("      * Individual") 
+    cat("   *** Individual at", object@resolution/1000, "kb resolution") 
   } else {
-    cat("      * Group [", object@group,"]")
+    cat("   *** Group [", object@group,"] at", object@resolution/1000, "kb resolution")
   }
-  if (object@ice==T) {
-    cat(" with ICE (", object@ice.iterations,"iterations)")
-  }
-  cat( " : ", object@names, "\n")
+  cat( " : ", object@names[,do.call(paste,c(as.list(groupname), sep=" / "))], "\n")
   if (length(object@interactions)==0) {
     cat("        No interactions computed\n")
   } else {
@@ -158,27 +178,6 @@ setMethod("show",signature="CSmatrix",definition=function(object) {
   }
   cat("\n")
 })
-
-#' Class to hold binned matrices at a given resolution
-#'
-#' @slot resolution numeric. Matrix resolution, in bases
-#' @slot individual 
-#' @slot grouped 
-#'
-#' @return
-#' @export
-#'
-#' @examples
-setClass("CSbinned",
-         slots = list(resolution="numeric",
-                      individual="data.table",
-                      grouped="list"))
-
-setMethod("show",signature="CSbinned",definition=function(object) {
-  cat("   *** At", object@resolution/1000, "kb resolution:\n")
-  lapply(object@grouped, show)
-  cat("\n")
-  })
 
 #' Class to hold cut-site normalization data
 #'
@@ -203,9 +202,10 @@ setClass("CSnorm",
                       biases="data.table",
                       counts="data.table",
                       par="list",
+                      zeros="data.table",
                       diagnostics="list",
                       pred="list",
-                      binned="list"))
+                      groups="list"))
 
 setMethod("show",signature="CSnorm",definition=function(object) {
   cat("Cut-site normalization object\n")
@@ -220,6 +220,9 @@ setMethod("show",signature="CSnorm",definition=function(object) {
   cat(" and ", ncounts, " nonzero counts\n", sep="")
   nreads=object@counts[,sum(contact.close+contact.far+contact.up+contact.down)]
   cat(" from ", nreads, " reads\n", sep="")
+  cat(" First cut site at ", object@biases[,min(pos)], "\n", sep="")
+  cat(" Last cut site at ", object@biases[,max(pos)], "\n", sep="")
+  cat(" Cut sites span ", object@biases[,(max(pos)-min(pos))/1000], " kb\n", sep="")
   cat(" Reads density excl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
   nreads=nreads+object@biases[,sum(dangling.L+dangling.R+rejoined)]
   cat(" Reads density incl. biases: ", round(nreads/object@biases[,max(pos)-min(pos)]*1000), " reads per kilobase (rpkb)\n", sep="")
@@ -229,14 +232,18 @@ setMethod("show",signature="CSnorm",definition=function(object) {
     cat(" Dataset not yet normalized\n")
   } else {
     cat(" Normalized dataset\n")
-    cat("  lambda_nu: ",cs@par$lambda_nu, "\n  lambda_delta: ",cs@par$lambda_delta, "\n  lambda_diag: ",cs@par$lambda_diag,"\n")
-    cat("  dispersion: ",cs@par$alpha,"\n")
-    nbinned=length(object@binned)
-    if (nbinned==0) {
-      cat(" No binned matrix available")
+    cat("  lambda_iota: ",object@par$lambda_iota, "\n  lambda_rho: ",object@par$lambda_rho, "\n  lambda_diag: ",object@par$lambda_diag,"\n")
+    cat("  dispersion: ",object@par$alpha,"\n  log likelihood: ", object@par$value, "\n")
+    if (cs@diagnostics$params[,.N]>0) {
+      if (has_converged(cs)==T) cat("  Normalization has converged\n") else  cat("  WARNING: Normalization did not converge!\n")
+    }
+    #
+    ngroups=length(object@groups)
+    if (ngroups==0) {
+      cat(" No groupings available")
     } else {
-      cat("\n ### ", nbinned, " resolution available\n\n", sep="")
-      lapply(object@binned, show)
+      cat("\n ### ", ngroups, " groupings available\n\n", sep="")
+      lapply(object@groups, show)
     }
   }
 })

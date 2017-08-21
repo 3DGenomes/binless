@@ -1,5 +1,5 @@
 ////
-// Cut-site normalization model: generate nu and delta given their spline parameters
+// Cut-site normalization model: generate iota and rho given their spline parameters
 ////
 functions {
   #include "common_functions.stan"
@@ -12,12 +12,12 @@ data {
   int<lower=1> begin; //position of first and last cut site
   int<lower=begin+1> end;
   //fitted things
-  vector[Krow-1] beta_nu;
-  vector[Krow-1] beta_delta;
+  vector[Krow-1] beta_iota;
+  vector[Krow-1] beta_rho;
 }
 transformed data {
   vector[S] cutsites; //x positions, has to be within bounds of xrange
-  //bias spline, sparse (nu and delta have the same design)
+  //bias spline, sparse (iota and rho have the same design)
   vector[nnz(S)] Xrow_w;
   int Xrow_v[nnz(S)];
   int Xrow_u[S+1];
@@ -34,26 +34,26 @@ parameters {}
 model {}
 generated quantities {
   vector[S] pos;
-  vector[S] log_nu;
-  vector[S] log_delta;
+  vector[S] log_iota;
+  vector[S] log_rho;
   
   pos = cutsites;
-  //nu
+  //iota
   {
-    vector[Krow] beta_nu_aug;
-    vector[Krow] beta_nu_centered;
-    beta_nu_aug[1] = 0;
-    beta_nu_aug[2:] = beta_nu;
-    beta_nu_centered = beta_nu_aug - (prow * beta_nu_aug) * rep_vector(1,Krow);
-    log_nu = csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_nu_centered);
+    vector[Krow] beta_iota_aug;
+    vector[Krow] beta_iota_centered;
+    beta_iota_aug[1] = 0;
+    beta_iota_aug[2:] = beta_iota;
+    beta_iota_centered = beta_iota_aug - (prow * beta_iota_aug) * rep_vector(1,Krow);
+    log_iota = csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_iota_centered);
   }
-  //delta
+  //rho
   {
-    vector[Krow] beta_delta_aug;
-    vector[Krow] beta_delta_centered;
-    beta_delta_aug[1] = 0;
-    beta_delta_aug[2:] = beta_delta;
-    beta_delta_centered = beta_delta_aug - (prow * beta_delta_aug) * rep_vector(1,Krow);
-    log_delta = csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_delta_centered);
-      }
+    vector[Krow] beta_rho_aug;
+    vector[Krow] beta_rho_centered;
+    beta_rho_aug[1] = 0;
+    beta_rho_aug[2:] = beta_rho;
+    beta_rho_centered = beta_rho_aug - (prow * beta_rho_aug) * rep_vector(1,Krow);
+    log_rho = csr_matrix_times_vector(S, Krow, Xrow_w, Xrow_v, Xrow_u, beta_rho_centered);
+  }
 }

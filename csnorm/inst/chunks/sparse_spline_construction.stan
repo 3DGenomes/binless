@@ -11,7 +11,7 @@
   //row_vector[Krow] prow;
   //and row_weights needs to be filled
 
-  ////bias spline, sparse (nu and delta have the same design)
+  ////bias spline, sparse (iota and rho have the same design)
   //BEGIN sparse calculation
   //cannot write function that modifies its arguments so we put it here
   //input: vector[S] cutsites, int Krow, int splinedegree()
@@ -39,7 +39,7 @@
       int xend;
       xbegin = x_n[i];
       xend = x_n[i+1]-1;
-      {
+      if ((xend-xbegin)>=0) {
         matrix[xend-xbegin+1,splinedegree()+1] tmp;
         tmp = bspl_gen(cutsites[xbegin:xend], dx, t[i:(i+splinedegree())], splinedegree());
         for (ti in 1:(xend-xbegin+1)) {

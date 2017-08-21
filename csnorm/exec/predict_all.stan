@@ -24,8 +24,8 @@ data {
   vector<lower=dmin,upper=dmax>[N] dist; //genomic distance between rsites
   //estimated parameters
   real eC[Dsets];  //exposure for counts
-  vector[SD] log_nu; //take nu and delta directly to avoid base reconstruction
-  vector[SD] log_delta; 
+  vector[SD] log_iota; //take iota and rho directly to avoid base reconstruction
+  vector[SD] log_rho; 
   vector[Dsets*Kdiag] beta_diag_centered; //need to build spline base
 }
 parameters {}
@@ -56,10 +56,10 @@ generated quantities {
   }
   
   //means
-  log_mean_cclose = log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
-  log_mean_cfar   = log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
-  log_mean_cup    = log_decay + (log_nu + log_delta)[cidx[1]] + (log_nu + log_delta)[cidx[2]];
-  log_mean_cdown  = log_decay + (log_nu - log_delta)[cidx[1]] + (log_nu - log_delta)[cidx[2]];
+  log_mean_cclose = log_decay + log_rho[cidx[1]]  + log_iota[cidx[2]];
+  log_mean_cfar   = log_decay + log_iota[cidx[1]] + log_rho[cidx[2]];
+  log_mean_cup    = log_decay + log_iota[cidx[1]] + log_iota[cidx[2]];
+  log_mean_cdown  = log_decay + log_rho[cidx[1]]  + log_rho[cidx[2]];
   //add exposures
   for (d in 1:Dsets) {
     log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)] = log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)] + eC[d];
