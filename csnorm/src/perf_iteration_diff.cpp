@@ -50,60 +50,6 @@ DataFrame cts_to_diff_mat(const DataFrame cts, const DataFrame ref, int nbins,
                              _["weight"]=weight, _["diag.idx"]=didx, _["diag.grp"]=dgrp);
 }
 
-List wgfl_diff_cv(const DataFrame mat, int nbins,
-                    int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
-                    double lam2, double alpha, double inflate, int ninner, double converge, NumericVector beta_i) {
-  const int N = nbins*(nbins+1)/2; //size of fused lasso problem
-  std::vector<int> trails_r = as<std::vector<int> >(trails_i);
-  std::vector<int> breakpoints_r = as<std::vector<int> >(breakpoints_i);
-  std::vector<double> beta_r = as<std::vector<double> >(beta_i);
-  std::vector<double> phihat_r = as<std::vector<double> >(mat["phihat"]);
-  std::vector<double> phi_ref_r = as<std::vector<double> >(mat["phi_ref"]);
-  std::vector<double> phihat_var_r = as<std::vector<double> >(mat["phihat.var"]);
-  IntegerVector bin1 = as<IntegerVector>(mat["bin1"]);
-  IntegerVector bin2 = as<IntegerVector>(mat["bin2"]);
-  
-  //build cv groups
-  std::vector<int> cvgroup;
-  const int ngroups=2;
-  for (int i=0; i<N; ++i)
-    cvgroup.push_back( (bin2[i]+bin1[i]) % ngroups ); // 2 cv groups in checkerboard pattern
-  
-  //setup computation of fused lasso solution, clamped at 50
-  FusedLassoOptimizer<GFLLibrary> flo(nbins);
-  flo.setUp(ntrails, trails_i, breakpoints_i, alpha, inflate, ninner, converge, 50);
-    
-  //Compute fused lasso solutions on each group and report to beta_cv
-  std::vector<double> beta_cv(N, -100);
-  for (int g=0; g<ngroups; ++g) {
-    //prepare data and weights for group g and copy initial values
-    std::vector<double> d_r, w_r;
-    for (int i=0; i<N; ++i) {
-      if (cvgroup[i]==g) {
-        d_r.push_back(1000); //essential if lam2==0
-        w_r.push_back(0);
-      } else {
-        d_r.push_back(phihat_r[i]-phi_ref_r[i]);
-        w_r.push_back(1/phihat_var_r[i]);
-      }
-    }
-    std::vector<double> values(beta_r);
-    //compute fused lasso
-    flo.optimize(d_r, values, w_r, lam2);
-    values = flo.get();
-    alpha = flo.get_alpha();
-    
-    //store fused solution at group positions back in beta_cv
-    for (int i=0; i<N; ++i) if (cvgroup[i]==g) beta_cv[i] = values[i];
-  }
-  int res = flo.get_ninner();
-    
-  
-  return List::create(_["beta_cv"]=wrap(beta_cv), _["cv.group"]=wrap(cvgroup),
-                      _["ninner"]=wrap(res));
-}
-
-
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                          double dispersion, int nouter, int nbins,
                          int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
@@ -219,6 +165,60 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                         _["nouter"]=step, _["ninner"]=res,
                         _["eCprime"]=0, _["lambda1"]=lam1, _["c_cts"]=c_cts, _["c_gfl"]=c_gfl);
 }
+
+List wgfl_diff_cv(const DataFrame mat, int nbins,
+                  int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
+                  double lam2, double alpha, double inflate, int ninner, double converge, NumericVector beta_i) {
+    const int N = nbins*(nbins+1)/2; //size of fused lasso problem
+    std::vector<int> trails_r = as<std::vector<int> >(trails_i);
+    std::vector<int> breakpoints_r = as<std::vector<int> >(breakpoints_i);
+    std::vector<double> beta_r = as<std::vector<double> >(beta_i);
+    std::vector<double> phihat_r = as<std::vector<double> >(mat["phihat"]);
+    std::vector<double> phi_ref_r = as<std::vector<double> >(mat["phi_ref"]);
+    std::vector<double> phihat_var_r = as<std::vector<double> >(mat["phihat.var"]);
+    IntegerVector bin1 = as<IntegerVector>(mat["bin1"]);
+    IntegerVector bin2 = as<IntegerVector>(mat["bin2"]);
+    
+    //build cv groups
+    std::vector<int> cvgroup;
+    const int ngroups=2;
+    for (int i=0; i<N; ++i)
+        cvgroup.push_back( (bin2[i]+bin1[i]) % ngroups ); // 2 cv groups in checkerboard pattern
+    
+    //setup computation of fused lasso solution, clamped at 50
+    FusedLassoOptimizer<GFLLibrary> flo(nbins);
+    flo.setUp(ntrails, trails_i, breakpoints_i, alpha, inflate, ninner, converge, 50);
+    
+    //Compute fused lasso solutions on each group and report to beta_cv
+    std::vector<double> beta_cv(N, -100);
+    for (int g=0; g<ngroups; ++g) {
+        //prepare data and weights for group g and copy initial values
+        std::vector<double> d_r, w_r;
+        for (int i=0; i<N; ++i) {
+            if (cvgroup[i]==g) {
+                d_r.push_back(1000); //essential if lam2==0
+                w_r.push_back(0);
+            } else {
+                d_r.push_back(phihat_r[i]-phi_ref_r[i]);
+                w_r.push_back(1/phihat_var_r[i]);
+            }
+        }
+        std::vector<double> values(beta_r);
+        //compute fused lasso
+        flo.optimize(d_r, values, w_r, lam2);
+        values = flo.get();
+        alpha = flo.get_alpha();
+        
+        //store fused solution at group positions back in beta_cv
+        for (int i=0; i<N; ++i) if (cvgroup[i]==g) beta_cv[i] = values[i];
+    }
+    int res = flo.get_ninner();
+    
+    
+    return List::create(_["beta_cv"]=wrap(beta_cv), _["cv.group"]=wrap(cvgroup),
+                        _["ninner"]=wrap(res));
+}
+
 
 
 List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
