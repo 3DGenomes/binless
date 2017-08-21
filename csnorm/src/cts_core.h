@@ -1,5 +1,5 @@
-#ifndef GFL_C_H
-#define GFL_C_H
+#ifndef CTS_CORE_H
+#define CTS_CORE_H
 
 #ifdef __cplusplus
 extern "C" {

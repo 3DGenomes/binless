@@ -9,7 +9,7 @@ using namespace Rcpp;
 #include "perf_iteration_signal.hpp"
 #include "gfl_graph_fl.h" //graph_fused_lasso_weight_warm
 #include "util.hpp" //SQUARE
-#include "gfl_c.h" //cts_to_signal_mat_core
+#include "cts_core.h" //cts_to_signal_mat_core
 #include "graph_trails.hpp" //boost_build_patch_graph_components
 #include "optimize_lambda1_eCprime.hpp" //cpp_optimize_lambda1_eCprime
 #include "optimize_lambda1.hpp" //cpp_optimize_lambda1

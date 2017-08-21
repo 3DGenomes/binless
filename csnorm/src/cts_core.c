@@ -1,6 +1,6 @@
 #include <math.h>
 //#include <stdio.h>
-#include "gfl_c.h"
+#include "cts_core.h"
 
 void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
         double* lmu_nosig, double* weight, int nbins, double dispersion,
