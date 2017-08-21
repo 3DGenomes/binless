@@ -1,4 +1,4 @@
-#include "graph_fl.h"
+#include "gfl_graph_fl.h"
 
 int graph_fused_lasso (int n, double *y,
                         int ntrails, int *trails, int *breakpoints,

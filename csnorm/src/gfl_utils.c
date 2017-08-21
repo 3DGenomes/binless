@@ -17,7 +17,7 @@
  *   License along with GFL. If not, see <http://www.gnu.org/licenses/>.    *
  ****************************************************************************/
  
- #include "utils.h"
+#include "gfl_utils.h"
 
 void print_vector(int n, double *v)
 {

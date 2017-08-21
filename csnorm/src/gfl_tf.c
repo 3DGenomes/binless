@@ -22,7 +22,7 @@
  *   License along with glmgen. If not, see <http://www.gnu.org/licenses/>. *
  ****************************************************************************/
 
-#include "tf.h"
+#include "gfl_tf.h"
 
 /**
  * @brief Implementation of Nick Johnson's dynamic programming algorithm 

@@ -36,7 +36,7 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h>
 #include <float.h>
-#include "utils.h"
+#include "gfl_utils.h"
 
 /* Dynamic programming routines */
 

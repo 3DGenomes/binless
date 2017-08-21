@@ -6,9 +6,9 @@ using namespace Rcpp;
 #include <ctime>
 
 #include "perf_iteration_diff.hpp"
+#include "gfl_graph_fl.h" //graph_fused_lasso_weight_warm
 #include "perf_iteration_signal.hpp" //cts_to_signal_mat
 #include "util.hpp" //SQUARE
-#include "graph_fl.h" //graph_fused_lasso_weight_warm
 #include "graph_trails.hpp" //boost_build_patch_graph_components
 #include "optimize_lambda1_diff.hpp" //cpp_optimize_lambda1
 

@@ -30,7 +30,7 @@ extern "C" {
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_sf.h>
 #include <time.h>
-#include "csparse.h"
+#include "gfl_csparse.h"
 
 /* Define MAX and MIN functions */
 #ifndef MAX

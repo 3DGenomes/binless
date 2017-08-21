@@ -11,8 +11,8 @@ extern "C" {
 #endif
   
 #include <math.h>
-#include "tf.h"
-#include "utils.h"
+#include "gfl_tf.h"
+#include "gfl_utils.h"
 #include <omp.h>
 
 #define VARYING_PENALTY_DELAY 50

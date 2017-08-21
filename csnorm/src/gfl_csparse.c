@@ -3,7 +3,7 @@
 # include <math.h>
 # include <stdio.h>
 
-# include "csparse.h"
+# include "gfl_csparse.h"
 
 cs *cs_add ( const cs *A, const cs *B, double alpha, double beta )
 /*
