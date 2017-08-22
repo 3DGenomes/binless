@@ -5,12 +5,7 @@
 #include "gfl_graph_fl.h" //graph_fused_lasso_weight_warm
 
 
-void GFLLibrary::setUp(int ntrails, const NumericVector& trails, const NumericVector& breakpoints,
-                  double alpha, double inflate, int ninner, double converge, double clamp) {
-    ntrails_ = ntrails;
-    trails_ = Rcpp::as<std::vector<int> >(trails);
-    breakpoints_ = Rcpp::as<std::vector<int> >(breakpoints);
-    tsz_ = trails_.size();
+void GFLLibrary::setUp(double alpha, double inflate, int ninner, double converge, double clamp) {
     inflate_ = inflate;
     ninner_ = ninner;
     converge_ = converge;
@@ -47,3 +42,47 @@ void GFLLibrary::optimize(const std::vector<double>& y, const std::vector<double
     }
     
 }
+
+std::vector<std::vector<int> > GFLLibrary::triangle_grid_chain(unsigned nrows) const {
+    int ntotal = nrows*(nrows+1)/2-1;
+    std::vector<std::vector<int> > chains;
+    int l = nrows;
+    std::vector<int> current(1,0);
+    //rows of consecutive numbers
+    for (int i=1; i<=ntotal; ++i) {
+        if (current.size()==l) {
+            chains.push_back(current);
+            current = std::vector<int>(1,i);
+            l--;
+        } else {
+            current.push_back(i);
+        }
+    }
+    //columns with Ui+1 = Ui + (N-i) with U1 from 2 to nrow
+    for (int U1=2; U1<=nrows; ++U1) {
+        int Ui=U1;
+        current = std::vector<int>(1,Ui-1);
+        for (int i=1; i<U1; ++i) {
+            int Uip1 = Ui + nrows - i;
+            current.push_back(Uip1-1);
+            Ui=Uip1;
+        }
+        chains.push_back(current);
+    }
+    return(chains);
+}
+
+void GFLLibrary::store_trails(unsigned nrows) {
+    const std::vector<std::vector<int> > chains = triangle_grid_chain(nrows);
+    trails_.clear();
+    breakpoints_.clear();
+    for (std::vector<std::vector<int> >::const_iterator it = chains.begin() ;
+         it != chains.end(); ++it) {
+        if (trails_.size()>0) breakpoints_.push_back(trails_.size());
+        trails_.insert(trails_.end(), it->begin(), it->end());
+    }
+    if (trails_.size()>0) breakpoints_.push_back(trails_.size());
+    ntrails_ = breakpoints_.size();
+    tsz_ = trails_.size();
+}
+

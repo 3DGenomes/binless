@@ -8,7 +8,7 @@ using namespace Rcpp;
 
 #include "optimize_lambda1_eCprime.hpp"
 #include "util.hpp"
-#include "graph_trails.hpp" //boost_build_patch_graph_components
+#include "graph_helpers.hpp" //boost_build_patch_graph_components
 #include <boost/math/tools/minima.hpp> //brent_find_minima
 
 obj_lambda1_eCprime_BIC::obj_lambda1_eCprime_BIC(double tol_val,

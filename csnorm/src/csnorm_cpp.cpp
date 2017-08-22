@@ -3,7 +3,7 @@ using namespace Rcpp;
 
 #include "perf_iteration_signal.hpp"
 #include "perf_iteration_diff.hpp"
-#include "graph_trails.hpp"
+#include "graph_helpers.hpp"
 
 RCPP_MODULE(csnorm_cpp) {
     using namespace Rcpp ;
@@ -24,10 +24,6 @@ RCPP_MODULE(csnorm_cpp) {
     function("wgfl_diff_BIC", &wgfl_diff_BIC, "documentation for wgfl_diff_BIC ");
     function("wgfl_diff_BIC_fixed", &wgfl_diff_BIC_fixed, "documentation for wgfl_diff_BIC_fixed ");
     
-    function("boost_triangle_grid_chain", &boost_triangle_grid_chain,
-             "documentation for boost_triangle_grid_chain ");
-    function("boost_chains_to_trails", &boost_chains_to_trails,
-             "documentation for boost_chains_to_trails ");
     function("boost_build_patch_graph_components",
              &boost_build_patch_graph_components,
              "documentation for boost_build_patch_graph_components ");

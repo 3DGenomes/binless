@@ -9,11 +9,12 @@ using namespace Rcpp;
 class GFLLibrary {
 public:
     
-    GFLLibrary(unsigned nrows) : N_(nrows*(nrows+1)/2) {}
+    GFLLibrary(unsigned nrows) : N_(nrows*(nrows+1)/2) {
+        store_trails(nrows);
+    }
     
     //temporary fix until the whole refactoring is done, and this moves to the constructor
-    void setUp(int ntrails, const NumericVector& trails, const NumericVector& breakpoints,
-               double alpha, double inflate, int ninner, double converge, double clamp);
+    void setUp(double alpha, double inflate, int ninner, double converge, double clamp);
     
     //run the optimization on the given data. The objective is
     // sum_i w_i(y_i-beta_i)^2 + lambda2 * sum_ij |beta_i-beta_j|
@@ -43,6 +44,11 @@ protected:
     ~GFLLibrary() {}
     
 private:
+    
+    std::vector<std::vector<int> > triangle_grid_chain(unsigned nrows) const;
+    
+    void store_trails(unsigned nrows);
+    
     unsigned N_; //size of the fused lasso problem
     int ntrails_;
     std::vector<int> trails_, breakpoints_;

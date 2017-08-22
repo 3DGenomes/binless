@@ -8,8 +8,7 @@ using namespace Rcpp;
 
 #include "optimize_lambda1_diff.hpp"
 #include "util.hpp"
-#include "graph_trails.hpp" //boost_build_patch_graph_components
-#include <boost/math/tools/minima.hpp> //brent_find_minima
+#include "graph_helpers.hpp" //boost_build_patch_graph_components
 
 obj_lambda1_diff_BIC::obj_lambda1_diff_BIC(double minUB, double tol_val,
                                  IntegerVector patchno, NumericVector forbidden_vals,

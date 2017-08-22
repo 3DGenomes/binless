@@ -710,7 +710,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
   groupnames=cts[,unique(name)]
   nbins=length(cs@settings$sbins)-1
   params = foreach(g=groupnames, .combine=rbind) %do% {
-    csig=new("CSbsig", mat=cs@par$signal[name==g], trails=cs@settings$trails, cts=cts[name==g],
+    csig=new("CSbsig", mat=cs@par$signal[name==g], cts=cts[name==g],
              settings=list(outliers=outliers, nbins=nbins, dispersion=cs@par$alpha,
                            tol.val=cs@settings$tol.leg, inflate=2, nperf=500, opt.every=10, maxsteps=100000))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
@@ -870,10 +870,8 @@ prepare_first_signal_estimation = function(biases, names, base.res) {
   signal.mat=CJ(name=names,bin1=signal.bins,bin2=signal.bins,sorted=F,unique=F)[bin2>=bin1]
   signal.mat[,phi:=0]
   setkey(signal.mat,name,bin1,bin2)
-  ### build optimization trails
-  trails = csnorm:::gfl_compute_trails(signal.mat[,nlevels(bin1)])
   stopifnot(all(signal.mat[,.N,by=name]$N==signal.mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
-  return(list(signal=signal.mat,trails=trails,sbins=sbins))
+  return(list(signal=signal.mat,sbins=sbins))
 }
 
 #' Diagnostics plots to monitor convergence of normalization (gaussian
@@ -912,7 +910,6 @@ save_stripped = function(cs, fname) {
   strip_interaction = function(csi) {
     if (class(csi) %in% c("CSbsig","CSbdiff")) {
       csi@state=list()
-      csi@trails=list()
       csi@cts=data.table()
     }
     return(csi)
@@ -1011,19 +1008,17 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     init.mean="data"
     cs=csnorm:::fill_parameters_perf(cs, dispersion=init.dispersion, fit.decay=fit.decay,
                                      fit.genomic=fit.genomic, fit.disp=fit.disp)
-    #prepare signal matrix and trails
+    #prepare signal matrix
     if (fit.signal==T) {
       if(verbose==T) cat("Preparing for signal estimation\n")
       stuff = csnorm:::prepare_first_signal_estimation(cs@biases, cs@experiments[,name], base.res)
       cs@par$signal=stuff$signal
       cs@settings$sbins=stuff$sbins
-      cs@settings$trails=stuff$trails
     } else {
       cs@settings$sbins=cs@biases[,c(min(pos)-1,max(pos)+1)]
       cs@par$signal=cs@biases[,.(phi=0,bin1=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                                  bin2=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)),by=name]
       setkey(cs@par$signal,name,bin1,bin2)
-      cs@par$settings$trails=NA
     }
     #get number of zeros along cut sites and decay
     if(verbose==T) cat("Counting zeros\n")

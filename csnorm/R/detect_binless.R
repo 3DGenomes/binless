@@ -1,15 +1,6 @@
 #' @include csnorm.R
 NULL
 
-#' compute trail information for the gfl package, for a triangle trid with nbins rows
-#' @keywords internal
-gfl_compute_trails = function(nbins) {
-  chain = csnorm:::boost_triangle_grid_chain(nbins)
-  trails = csnorm:::boost_chains_to_trails(chain)
-  stopifnot(uniqueN(trails$trails)==nbins*(nbins+1)/2)
-  return(trails)
-}
-
 #' dispatch for fused lasso perf iteration: warm/cold signal/difference
 #' @keywords internal
 gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
@@ -17,7 +8,6 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
   nbins=csig@settings$nbins
   dispersion=csig@settings$dispersion
   outliers=csig@settings$outliers
-  trails=csig@trails
   tol.val=csig@settings$tol.val
   state=csig@state
   stopifnot(length(state)>0) #warm start only
@@ -26,13 +16,11 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
   nperf=csig@settings$nperf
   maxsteps=csig@settings$maxsteps
   if (is.null(ctsg.ref)) {
-    perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                              trails$breakpoints, lambda1, lambda2, eCprime,
+    perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, lambda1, lambda2, eCprime,
                                               state$alpha, inflate, maxsteps, tol.val/20, outliers, state$beta)
   } else {
     stopifnot(eCprime==0)
-    perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                            trails$breakpoints, lambda1, lambda2, state$alpha, inflate, maxsteps, tol.val/20, outliers,
+    perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda1, lambda2, state$alpha, inflate, maxsteps, tol.val/20, outliers,
                                             state$phi.ref, state$beta)
   }
   return(perf.c)
@@ -66,7 +54,6 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
   nbins=csig@settings$nbins
   dispersion=csig@settings$dispersion
   outliers=csig@settings$outliers
-  trails=csig@trails
   tol.val=csig@settings$tol.val
   state=csig@state
   stopifnot(length(state)>0) #warm start only
@@ -76,14 +63,12 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
   opt.every=csig@settings$opt.every
   maxsteps=csig@settings$maxsteps
   if (is.null(ctsg.ref)) {
-    perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                      trails$breakpoints, lambda2,
+    perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, lambda2,
                                       state$alpha, inflate, maxsteps, tol.val, outliers,
                                       state$beta, lambda1.min, refine.num, constrained, fixed)
   } else {
     stopifnot(constrained==T) #for now
-    perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                      trails$breakpoints, lambda2,
+    perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda2,
                                       state$alpha, inflate, maxsteps, tol.val, outliers,
                                       state$phi.ref, state$beta, lambda1.min, refine.num, constrained)
   }
@@ -100,7 +85,6 @@ gfl_BIC_fixed = function(csig, lambda1, lambda2, eCprime) {
   nbins=csig@settings$nbins
   dispersion=csig@settings$dispersion
   outliers=csig@settings$outliers
-  trails=csig@trails
   tol.val=csig@settings$tol.val
   state=csig@state
   stopifnot(length(state)>0) #warm start only
@@ -110,14 +94,12 @@ gfl_BIC_fixed = function(csig, lambda1, lambda2, eCprime) {
   opt.every=csig@settings$opt.every
   maxsteps=csig@settings$maxsteps
   if (is.null(ctsg.ref)) {
-    perf.c = csnorm:::wgfl_signal_BIC_fixed(ctsg, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                            trails$breakpoints, lambda1, lambda2, eCprime,
+    perf.c = csnorm:::wgfl_signal_BIC_fixed(ctsg, dispersion, nperf, nbins, lambda1, lambda2, eCprime,
                                             state$alpha, inflate, maxsteps, tol.val, outliers,
                                             state$beta)
   } else {
     stopifnot(eCprime==0)
-    perf.c = csnorm:::wgfl_diff_BIC_fixed(ctsg, ctsg.ref, dispersion, nperf, nbins, trails$ntrails, trails$trails,
-                                    trails$breakpoints, lambda1, lambda2,
+    perf.c = csnorm:::wgfl_diff_BIC_fixed(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda1, lambda2,
                                     state$alpha, inflate, maxsteps, tol.val, outliers,
                                     state$phi.ref, state$beta)
     
@@ -261,7 +243,6 @@ optimize_lambda2_simplified = function(csig, n.SD=1, constrained=T, positive=T, 
 #' @keywords internal
 gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
   matg = csig@mat
-  trails = csig@trails
   if (diff==F) {
     state = list(beta=matg[,phi], alpha=init.alpha, lambda1=0.05, eCprime=0)
   } else {
@@ -346,7 +327,6 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
   mat = csnorm:::get_signal_matrix(cs, resolution, groups=csg@names)
   #
   #add trail information
-  trails = csnorm:::gfl_compute_trails(csg@par$nbins)
   stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
   diag.rm = ceiling(cs@settings$dmin/resolution)
   #add other settings
@@ -362,7 +342,7 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
                 min.patchsize = 4,
                 min.l10FC = 0.5)
   cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
-  csi=new("CSbsig", mat=mat, trails=trails, cts=cts, settings=settings)
+  csi=new("CSbsig", mat=mat, cts=cts, settings=settings)
   return(csi)
 }
 
@@ -377,7 +357,7 @@ prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val) {
   mat[,c("phi","phi1"):=NULL]
   cts=csg@cts[name!=ref,.(name,bin1,bin2,count,lmu.nosig,weight)]
   cts.ref=csg@cts[name==ref,.(name,bin1,bin2,count,lmu.nosig,weight)]
-  csi=new("CSbdiff", mat=mat, trails=csi@trails, cts=cts, cts.ref=cts.ref,
+  csi=new("CSbdiff", mat=mat, cts=cts, cts.ref=cts.ref,
           ref=as.character(ref), settings=csi@settings)
   return(csi)
 }

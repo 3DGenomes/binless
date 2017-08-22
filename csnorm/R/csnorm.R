@@ -126,7 +126,7 @@ setMethod("show", signature="CSdiff", definition=function(object) {
 
 #' Binless interaction detection
 #' @keywords internal
-setClass("CSbsig", slots = list(trails="list",cts="data.table",state="list"), contains = "CSinter")
+setClass("CSbsig", slots = list(cts="data.table",state="list"), contains = "CSinter")
 setMethod("show", signature="CSbsig", definition=function(object) {
     cat("        Binless interactions wrt expected\n") 
 })
@@ -134,7 +134,7 @@ setMethod("show", signature="CSbsig", definition=function(object) {
 #' Binless difference detection
 #' @keywords internal
 setClass("CSbdiff",
-         slots = list(ref="character",trails="list",cts="data.table",cts.ref="data.table",state="list"),
+         slots = list(ref="character",cts="data.table",cts.ref="data.table",state="list"),
          contains = "CSinter")
 setMethod("show", signature="CSbdiff", definition=function(object) {
   cat("        Binless differences wrt ", object@ref, "\n") 

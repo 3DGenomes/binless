@@ -12,9 +12,9 @@ using namespace Rcpp;
 
 #include "util.hpp" //SQUARE
 #include "cts_core.h" //cts_to_signal_mat_core
-#include "graph_trails.hpp" //boost_build_patch_graph_components
 #include "optimize_lambda1_eCprime.hpp" //cpp_optimize_lambda1_eCprime
 #include "optimize_lambda1.hpp" //cpp_optimize_lambda1
+#include "graph_helpers.hpp" //build_patch_graph_components
 
 void remove_outliers(const std::vector<int>& bin1, const std::vector<int>& bin2, std::vector<double>& phihat_var, List outliers) {
   unsigned nbetas = phihat_var.size();
@@ -83,15 +83,11 @@ DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion,
                              _["diag.idx"]=didx_i, _["diag.grp"]=dgrp_i);
 }
 
-List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
-                           int nbins,
-                           int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
+List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins,
                            double lam1, double lam2, double eCprime,
                            double alpha, double inflate, int ninner, double converge,
                            List outliers, NumericVector beta_i) {
     const int N = nbins*(nbins+1)/2; //size of fused lasso problem
-    std::vector<int> trails_r = as<std::vector<int> >(trails_i);
-    std::vector<int> breakpoints_r = as<std::vector<int> >(breakpoints_i);
     std::vector<double> beta_r = as<std::vector<double> >
                                  (beta_i); //2d fused lasso before soft-thresholding
     std::vector<double> beta_old;
@@ -114,7 +110,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
 
     //setup computation of fused lasso solution, clamped at 50
     FusedLassoOptimizer<GFLLibrary> flo(nbins);
-    flo.setUp(ntrails, trails_i, breakpoints_i, alpha, inflate, ninner, converge, 50);
+    flo.setUp(alpha, inflate, ninner, converge, 50);
     
     while (step<=nouter & maxval>converge) {
         beta_old = beta_r;
@@ -180,11 +176,8 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter,
 }
 
 List wgfl_signal_cv(const DataFrame mat, int nbins,
-                    int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
                     double lam2, double alpha, double inflate, int ninner, double converge, NumericVector beta_i) {
     const int N = nbins*(nbins+1)/2; //size of fused lasso problem
-    std::vector<int> trails_r = as<std::vector<int> >(trails_i);
-    std::vector<int> breakpoints_r = as<std::vector<int> >(breakpoints_i);
     std::vector<double> beta_r = as<std::vector<double> >(beta_i);
     std::vector<double> phihat_r = as<std::vector<double> >(mat["phihat"]);
     std::vector<double> weight_r = as<std::vector<double> >(mat["weight"]);
@@ -199,7 +192,7 @@ List wgfl_signal_cv(const DataFrame mat, int nbins,
     
     //setup computation of fused lasso solution, clamped at 50
     FusedLassoOptimizer<GFLLibrary> flo(nbins);
-    flo.setUp(ntrails, trails_i, breakpoints_i, alpha, inflate, ninner, converge, 50);
+    flo.setUp(alpha, inflate, ninner, converge, 50);
     
     //Compute fused lasso solutions on each group and report to beta_cv
     std::vector<double> beta_cv(N, -100);
@@ -230,9 +223,7 @@ List wgfl_signal_cv(const DataFrame mat, int nbins,
                         _["ninner"]=wrap(res));
 }
 
-List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
-                     int nbins,
-                     int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
+List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins,
                      double lam2,  double alpha, double inflate, int ninner, double tol_val,
                      List outliers, NumericVector beta_i, double lambda1_min, int refine_num,
                      bool constrained, bool fixed) {
@@ -242,8 +233,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
     bool converged = true;
     //perf iteration for this set of values
     int nwarm = (int)(nouter/10.+1);
-    List ret = wgfl_signal_perf_warm(cts, dispersion, nwarm, nbins, ntrails,
-                                     trails_i, breakpoints_i, lam1, lam2, eCprime,
+    List ret = wgfl_signal_perf_warm(cts, dispersion, nwarm, nbins, lam1, lam2, eCprime,
                                      alpha, inflate, ninner, tol_val/20., outliers, beta_i);
     c_cts += as<double>(ret["c_cts"]);
     c_gfl += as<double>(ret["c_gfl"]);
@@ -251,8 +241,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
     if (as<int>(ret["nouter"])>nwarm) {
         beta_i = NumericVector(beta_i.size(),0);
         //Rcout << " warning: warm start failed " << std::endl;
-        ret = wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, ntrails, trails_i,
-                                    breakpoints_i, lam1, lam2, eCprime,
+        ret = wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, lam1, lam2, eCprime,
                                     alpha, inflate, ninner, tol_val/20., outliers, beta_i);
         if (as<int>(ret["nouter"])>nouter) {
           //Rcout << " warning: cold start did not converge" <<std::endl;
@@ -264,7 +253,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
     
     //compute CV datasets at optimized weights
     DataFrame mat = as<DataFrame>(ret["mat"]);
-    List cv_run = wgfl_signal_cv(mat, nbins, ntrails, trails_i, breakpoints_i, lam2,
+    List cv_run = wgfl_signal_cv(mat, nbins, lam2,
                                  alpha, inflate, ninner, tol_val/20., beta_i);
       
     //optimize lambda1 and eC
@@ -343,9 +332,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter,
                         _["c_brent"]=c_brent, _["c_refine"]=c_refine, _["converged"]=converged);
 }
 
-List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter,
-                     int nbins,
-                     int ntrails, const NumericVector trails_i, const NumericVector breakpoints_i,
+List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter, int nbins,
                      double lam1, double lam2, double eCprime, double alpha, double inflate, int ninner, double tol_val,
                      List outliers, NumericVector beta_i) {
     std::clock_t c_start,c_end;
@@ -353,8 +340,7 @@ List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter,
     bool converged = true;
     //perf iteration for this set of values
     int nwarm = (int)(nouter/10.+1);
-    List ret = wgfl_signal_perf_warm(cts, dispersion, nwarm, nbins, ntrails,
-                                     trails_i, breakpoints_i, 0, lam2, 0,
+    List ret = wgfl_signal_perf_warm(cts, dispersion, nwarm, nbins, 0, lam2, 0,
                                      alpha, inflate, ninner, tol_val/20., outliers, beta_i);
     c_cts += as<double>(ret["c_cts"]);
     c_gfl += as<double>(ret["c_gfl"]);
@@ -362,8 +348,7 @@ List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter,
     if (as<int>(ret["nouter"])>nwarm) {
         beta_i = NumericVector(beta_i.size(),0);
         //Rcout << " warning: warm start failed " << std::endl;
-        ret = wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, ntrails, trails_i,
-                                    breakpoints_i, lam1, lam2, eCprime,
+        ret = wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, lam1, lam2, eCprime,
                                     alpha, inflate, ninner, tol_val/20., outliers, beta_i);
         if (as<int>(ret["nouter"])>nouter) {
             //Rcout << " warning: cold start did not converge" <<std::endl;
