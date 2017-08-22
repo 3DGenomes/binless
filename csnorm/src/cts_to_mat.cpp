@@ -26,8 +26,8 @@ void remove_outliers(const std::vector<int>& bin1, const std::vector<int>& bin2,
   }
 }
 
-DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion,
-                            std::vector<double>& phi,
+DataFrame cts_to_signal_mat(const DataFrame& cts, int nbins, double dispersion,
+                            const std::vector<double>& phi,
                             double eCprime, List outliers) {
     //inputs
     int N = cts.nrows();
@@ -46,9 +46,10 @@ DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion,
     std::vector<int> bin2(nbetas, 0);
 
     //build mat from cts
+    double* pphi = const_cast<double*>(&phi[0]);
     cts_to_signal_mat_core(N, &cts_bin1[0], &cts_bin2[0], &count[0], &lmu_nosig[0],
                            &weight[0], nbins, dispersion,
-                           &phi[0], eCprime, &phihat[0], &phihat_var[0], &ncounts[0], &bin1[0], &bin2[0]);
+                           pphi, eCprime, &phihat[0], &phihat_var[0], &ncounts[0], &bin1[0], &bin2[0]);
     //remove outliers
     remove_outliers(bin1, bin2, phihat_var, outliers);
                            
@@ -76,7 +77,7 @@ DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion,
 
 DataFrame cts_to_diff_mat(const DataFrame& cts, const DataFrame ref, int nbins,
                           double dispersion,
-                          std::vector<double>& phi_ref, std::vector<double>& delta, List outliers) {
+                          const std::vector<double>& phi_ref, const std::vector<double>& delta, List outliers) {
     //assume eCprime = 0 for difference step
     const double eCprime=0;
     const DataFrame mat_ref = cts_to_signal_mat(ref, nbins, dispersion, phi_ref,
