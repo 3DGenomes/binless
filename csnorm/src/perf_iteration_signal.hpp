@@ -5,13 +5,6 @@
 using namespace Rcpp;
 #include <vector>
 
-void remove_outliers(const std::vector<int>& bin1, const std::vector<int>& bin2,
-                     std::vector<double>& phihat_var, List outliers);
-
-DataFrame cts_to_signal_mat(const DataFrame cts, int nbins, double dispersion,
-                            std::vector<double>& phi,
-                            double eCprime, List outliers);
-
 List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins,
                            double lam1, double lam2,  double eCprime,
                            double alpha, double converge,

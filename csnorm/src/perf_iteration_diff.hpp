@@ -5,10 +5,6 @@
 using namespace Rcpp;
 #include <vector>
 
-DataFrame cts_to_diff_mat(const DataFrame cts, const DataFrame ref, int nbins,
-                          double dispersion,
-                          std::vector<double>& phi_ref, std::vector<double>& delta, List outliers);
-
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                          double dispersion, int nouter, int nbins,
                          double lam1, double lam2, double alpha,

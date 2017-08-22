@@ -2,52 +2,17 @@
 using namespace Rcpp;
 #include <iostream>
 #include <vector>
-#include <algorithm>
 #include <ctime>
 
 #include "perf_iteration_diff.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
 #include "GFLLibrary.hpp"
 
-#include "perf_iteration_signal.hpp" //cts_to_signal_mat
+#include "cts_to_mat.hpp" //cts_to_diff_mat
 #include "util.hpp" //SQUARE
 #include "optimize_lambda1_diff.hpp" //cpp_optimize_lambda1
 #include "graph_helpers.hpp" //build_patch_graph_components
 
-
-DataFrame cts_to_diff_mat(const DataFrame cts, const DataFrame ref, int nbins,
-                          double dispersion,
-                          std::vector<double>& phi_ref, std::vector<double>& delta, List outliers) {
-    //assume eCprime = 0 for difference step
-    const double eCprime=0;
-    const DataFrame mat_ref = cts_to_signal_mat(ref, nbins, dispersion, phi_ref,
-                              eCprime, outliers);
-
-    std::vector<double> phi_oth;
-    phi_oth.reserve(delta.size());
-    for (int i=0; i<delta.size(); ++i) phi_oth[i] = phi_ref[i] + delta[i];
-    const DataFrame mat_oth = cts_to_signal_mat(cts, nbins, dispersion, phi_oth,
-                              eCprime, outliers);
-    IntegerVector bin1 = mat_ref["bin1"];
-    IntegerVector bin2 = mat_ref["bin2"];
-    NumericVector phihat_ref = mat_ref["phihat"];
-    NumericVector phihat_var_ref = mat_ref["phihat.var"];
-    NumericVector phihat = mat_oth["phihat"];
-    NumericVector phihat_var = mat_oth["phihat.var"];
-    NumericVector ncounts_oth = mat_oth["ncounts"];
-    NumericVector ncounts_ref = mat_ref["ncounts"];
-    NumericVector deltahat = phihat-phihat_ref;
-    NumericVector deltahat_var = phihat_var+phihat_var_ref;
-    NumericVector ncounts = ncounts_ref+ncounts_oth;
-    NumericVector weight = 1/deltahat_var;
-    IntegerVector didx = mat_ref["diag.idx"];
-    IntegerVector dgrp = mat_ref["diag.grp"];
-    return DataFrame::create(_["bin1"]=bin1, _["bin2"]=bin2,
-                             _["phihat"]=phihat, _["phihat.var"]=phihat_var,
-                             _["phihat.ref"]=phihat_ref, _["phihat.var.ref"]=phihat_var_ref,
-                             _["deltahat"]=deltahat, _["deltahat.var"]=deltahat_var, _["ncounts"]=ncounts,
-                             _["weight"]=weight, _["diag.idx"]=didx, _["diag.grp"]=dgrp);
-}
 
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                          double dispersion, int nouter, int nbins,

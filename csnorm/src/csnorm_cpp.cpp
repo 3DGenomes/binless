@@ -1,6 +1,7 @@
 #include <Rcpp.h>
 using namespace Rcpp;
 
+#include "cts_to_mat.hpp"
 #include "perf_iteration_signal.hpp"
 #include "perf_iteration_diff.hpp"
 #include "graph_helpers.hpp"
