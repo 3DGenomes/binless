@@ -6,7 +6,7 @@ using namespace Rcpp;
 #include <ctime>
 
 #include "perf_iteration_diff.hpp"
-#include "FusedLassoOptimizer.hpp"
+#include "FusedLassoGaussianEstimator.hpp"
 #include "GFLLibrary.hpp"
 
 #include "perf_iteration_signal.hpp" //cts_to_signal_mat
@@ -74,7 +74,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
           << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
 
     //setup computation of fused lasso solution, clamped at 50
-    FusedLassoOptimizer<GFLLibrary> flo(nbins, converge, 50);
+    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge, 50);
     flo.setUp(alpha, inflate, ninner);
 
     while (step<=nouter & maxval>converge) {
@@ -179,7 +179,7 @@ List wgfl_diff_cv(const DataFrame mat, int nbins,
         cvgroup.push_back( (bin2[i]+bin1[i]) % ngroups ); // 2 cv groups in checkerboard pattern
     
     //setup computation of fused lasso solution, clamped at 50
-    FusedLassoOptimizer<GFLLibrary> flo(nbins, converge, 50);
+    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge, 50);
     flo.setUp(alpha, inflate, ninner);
     
     //Compute fused lasso solutions on each group and report to beta_cv

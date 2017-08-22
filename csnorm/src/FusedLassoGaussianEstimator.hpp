@@ -1,5 +1,5 @@
-#ifndef FUSED_LASSO_OPTIMIZER_HPP
-#define FUSED_LASSO_OPTIMIZER_HPP
+#ifndef FUSED_LASSO_GAUSSIAN_ESTIMATOR_HPP
+#define FUSED_LASSO_GAUSSIAN_ESTIMATOR_HPP
 
 #include <Rcpp.h>
 using namespace Rcpp;
@@ -11,14 +11,14 @@ using namespace Rcpp;
 // This class defines the full interface and implements the sparse part of the lasso,
 // while the Library policy contains the dense implementation
 template<typename Library>
-class FusedLassoOptimizer : public Library {
+class FusedLassoGaussianEstimator : public Library {
     
 public:
     
     //initialize the problem with a triangle grid with nrows
     //requesting precision to be below a given convergence criterion
     //final beta value will be clamped if clamp>0
-    FusedLassoOptimizer(unsigned nrows, double converge, double clamp=-1) : Library(nrows, converge), clamp_(clamp) {}
+    FusedLassoGaussianEstimator(unsigned nrows, double converge, double clamp=-1) : Library(nrows, converge), clamp_(clamp) {}
     
     //run the optimization on the given data. The objective is
     // sum_i w_i(y_i-beta_i)^2 + lambda2 * sum_ij |beta_i-beta_j|

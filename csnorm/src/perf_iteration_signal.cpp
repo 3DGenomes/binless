@@ -7,7 +7,7 @@ using namespace Rcpp;
 #include <set>
 
 #include "perf_iteration_signal.hpp"
-#include "FusedLassoOptimizer.hpp"
+#include "FusedLassoGaussianEstimator.hpp"
 #include "GFLLibrary.hpp"
 
 #include "util.hpp" //SQUARE
@@ -109,7 +109,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
 
 
     //setup computation of fused lasso solution, clamped at 50
-    FusedLassoOptimizer<GFLLibrary> flo(nbins, converge, 50);
+    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge, 50);
     flo.setUp(alpha, inflate, ninner);
     
     while (step<=nouter & maxval>converge) {
@@ -191,7 +191,7 @@ List wgfl_signal_cv(const DataFrame mat, int nbins,
       cvgroup.push_back( (bin2[i]+bin1[i]) % ngroups ); // 2 cv groups in checkerboard pattern
     
     //setup computation of fused lasso solution, clamped at 50
-    FusedLassoOptimizer<GFLLibrary> flo(nbins, converge, 50);
+    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge, 50);
     flo.setUp(alpha, inflate, ninner);
     
     //Compute fused lasso solutions on each group and report to beta_cv
