@@ -1,25 +1,25 @@
-#ifndef FUSED_LASSO_GAUSSIAN_ESTIMATOR_HPP
-#define FUSED_LASSO_GAUSSIAN_ESTIMATOR_HPP
+#ifndef FUSED_LASSO_GENERALIZED_ESTIMATOR_HPP
+#define FUSED_LASSO_GENERALIZED_ESTIMATOR_HPP
 
 #include <Rcpp.h>
 using namespace Rcpp;
 #include <vector>
 
 #include "util.hpp"
+#include "FusedLassoGaussianEstimator.hpp"
 
 // A class that computes the 2D triangle grid fused lasso solution on some data.
-// This class uses a gaussian model, hence assumes that weights are held constant.
-// This class defines the full interface and implements the sparse part of the lasso,
-// while the Library policy contains the dense implementation
-template<typename Library>
-class FusedLassoGaussianEstimator : public Library {
+// This class assumes that weights can change and uses an underlying gaussian model in an iterative way (IRLS).
+template<typename Library, typename WeightUpdater>
+class FusedLassoGeneralizedEstimator : public FusedLassoGaussianEstimator<Library>, public WeightUpdater {
     
 public:
     
     //initialize the problem with a triangle grid with nrows
     //requesting precision to be below a given convergence criterion
     //final beta value will be clamped if clamp>0
-    FusedLassoGaussianEstimator(unsigned nrows, double converge, double clamp=-1) : Library(nrows, converge), clamp_(clamp) {}
+    FusedLassoGeneralizedEstimator(unsigned nrows, double converge, double clamp=-1)
+    : FusedLassoGaussianEstimator<Library>(nrows, converge, clamp), WeightUpdater() {}
     
     //run the optimization on the given data. The objective is
     // sum_i w_i(y_i-beta_i)^2 + lambda2 * sum_ij |beta_i-beta_j|
