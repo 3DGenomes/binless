@@ -22,7 +22,7 @@ public:
     // sum_i w_i(y_i-beta_i)^2 + lambda2 * sum_ij |beta_i-beta_j|
     // y, w and lambda2 are held constant, while beta starts at beta_init
     void optimize(const std::vector<double>& y, const std::vector<double>& beta_init,
-                  const std::vector<double>& w, double lambda2) const {
+                  const std::vector<double>& w, double lambda2) {
         Library::optimize(y, beta_init, w, lambda2);
     }
     

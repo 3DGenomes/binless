@@ -16,13 +16,12 @@ void GFLLibrary::setUp(double alpha, double inflate, int ninner, double converge
 }
 
 void GFLLibrary::optimize(const std::vector<double>& y, const std::vector<double>& beta_init,
-                          const std::vector<double>& w, double lambda2) const {
+                          const std::vector<double>& w, double lambda2) {
     //setup initial values
     beta_ = beta_init;
-    const unsigned tsz=trails_.size(); //beware that ntrails_ is not tsz
-    std::vector<double> u(tsz,0); //residuals set to zero
+    std::vector<double> u(tsz_,0); //residuals set to zero
     std::vector<double> z;
-    z.reserve(tsz);
+    z.reserve(tsz_);
     for (int i=0; i<trails_.size(); ++i) {
         z.push_back(beta_[trails_[i]]);   //z set to beta values along trails
     }
@@ -30,9 +29,7 @@ void GFLLibrary::optimize(const std::vector<double>& y, const std::vector<double
     //perform optimization on the C side
     double* py = const_cast<double*>(&y[0]);
     double* pw = const_cast<double*>(&w[0]);
-    int* ptr = const_cast<int*>(&trails_[0]);
-    int* pbr = const_cast<int*>(&breakpoints_[0]);
-    counter_ += graph_fused_lasso_weight_warm (N_, py, pw, ntrails_, ptr, pbr,
+    counter_ += graph_fused_lasso_weight_warm (N_, py, pw, ntrails_, &trails_[0], &breakpoints_[0],
                                                lambda2, &alpha_, inflate_, ninner_, converge_,
                                                &beta_[0], &z[0], &u[0]);
     

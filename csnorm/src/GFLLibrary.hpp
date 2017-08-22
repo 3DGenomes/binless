@@ -22,7 +22,7 @@ public:
     // values are clamped at their extreme value, see clamp parameter above
     // NOTE: for now, vectors are passed by value, to force copying from a conversion from Rcpp::NumericVector
     void optimize(const std::vector<double>& y, const std::vector<double>& beta_init,
-                  const std::vector<double>& w, double lambda2) const;
+                  const std::vector<double>& w, double lambda2);
     
     //return modified quantities
     std::vector<double> get_beta() const {
@@ -58,10 +58,9 @@ private:
     double converge_;
     double clamp_;
     
-    //cached values are allowed to change in const call optimize()
-    mutable double alpha_;
-    mutable unsigned counter_;
-    mutable std::vector<double> beta_;
+    double alpha_;
+    unsigned counter_;
+    std::vector<double> beta_;
 };
 
 #endif
