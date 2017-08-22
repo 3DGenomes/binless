@@ -14,8 +14,7 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
   if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
   nperf=csig@settings$nperf
   if (is.null(ctsg.ref)) {
-    perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, lambda1, lambda2, eCprime,
-                                              state$alpha, tol.val/20, outliers, state$beta)
+    perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, lambda2, state$alpha, tol.val/20, outliers, state$beta)
   } else {
     stopifnot(eCprime==0)
     perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda1, lambda2, state$alpha, tol.val/20, outliers,

@@ -6,9 +6,8 @@ using namespace Rcpp;
 #include <vector>
 
 List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins,
-                           double lam1, double lam2,  double eCprime,
-                           double alpha, double converge,
-                           List outliers, NumericVector phi_i);
+                           double lam2, double alpha, double converge,
+                           const List outliers, NumericVector phi_i);
 
 List wgfl_signal_cv(const DataFrame mat, int nbins, int ntrails,
                     double lam2, double alpha, double converge, NumericVector beta_i);
