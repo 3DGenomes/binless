@@ -6,6 +6,7 @@ using namespace Rcpp;
 #include <vector>
 
 #include "util.hpp"
+#include "Settings.hpp"
 
 // A class that computes the 2D triangle grid fused lasso solution on some data.
 // This class uses a gaussian model, hence assumes that weights are held constant.
@@ -19,7 +20,8 @@ public:
     //initialize the problem with a triangle grid with nrows
     //requesting precision to be below a given convergence criterion
     //final beta value will be clamped if clamp>0
-    FusedLassoGaussianEstimator(unsigned nrows, double converge, double clamp=-1) : Library(nrows, converge), clamp_(clamp) {}
+    FusedLassoGaussianEstimator(unsigned nrows, double converge) : Library(nrows, converge),
+    clamp_(Settings<FusedLassoGaussianEstimator<Library> >::get_clamp()) {}
     
     //run the optimization on the given data. The objective is
     // sum_i w_i(y_i-beta_i)^2 + lambda2 * sum_ij |beta_i-beta_j|

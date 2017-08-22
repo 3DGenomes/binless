@@ -5,16 +5,19 @@
 using namespace Rcpp;
 #include <vector>
 
+#include "Settings.hpp"
+
 //policy class that implements fused lasso solution using the GFL library
 class GFLLibrary {
 public:
     
-    GFLLibrary(unsigned nrows, double converge) : N_(nrows*(nrows+1)/2), converge_(converge) {
+    GFLLibrary(unsigned nrows, double converge) : N_(nrows*(nrows+1)/2), counter_(0), converge_(converge),
+     inflate_(Settings<GFLLibrary>::get_inflate()), ninner_(Settings<GFLLibrary>::get_ninner()) {
         store_trails(nrows);
     }
     
     //temporary fix until the whole refactoring is done, and this moves to the constructor
-    void setUp(double alpha, double inflate, int ninner);
+    void setUp(double alpha);
     
     //prepare the next optimization round
     void prepare(const std::vector<double>& beta_init);
@@ -50,15 +53,15 @@ private:
     void store_trails(unsigned nrows);
     
     unsigned N_; //size of the fused lasso problem
+    unsigned counter_;
     double converge_; //convergence to this precision or better
+    double inflate_;
+    int ninner_;
     int ntrails_;
     std::vector<int> trails_, breakpoints_;
     unsigned tsz_;
-    double inflate_;
-    int ninner_;
     
     double alpha_;
-    unsigned counter_;
     std::vector<double> beta_, z_, u_;
 };
 

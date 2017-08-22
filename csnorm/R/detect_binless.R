@@ -12,15 +12,13 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
   state=csig@state
   stopifnot(length(state)>0) #warm start only
   if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
-  inflate=csig@settings$inflate
   nperf=csig@settings$nperf
-  maxsteps=csig@settings$maxsteps
   if (is.null(ctsg.ref)) {
     perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, lambda1, lambda2, eCprime,
-                                              state$alpha, inflate, maxsteps, tol.val/20, outliers, state$beta)
+                                              state$alpha, tol.val/20, outliers, state$beta)
   } else {
     stopifnot(eCprime==0)
-    perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda1, lambda2, state$alpha, inflate, maxsteps, tol.val/20, outliers,
+    perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda1, lambda2, state$alpha, tol.val/20, outliers,
                                             state$phi.ref, state$beta)
   }
   return(perf.c)
@@ -58,18 +56,16 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
   state=csig@state
   stopifnot(length(state)>0) #warm start only
   if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
-  inflate=csig@settings$inflate
   nperf=csig@settings$nperf
   opt.every=csig@settings$opt.every
-  maxsteps=csig@settings$maxsteps
   if (is.null(ctsg.ref)) {
     perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, lambda2,
-                                      state$alpha, inflate, maxsteps, tol.val, outliers,
+                                      state$alpha, tol.val, outliers,
                                       state$beta, lambda1.min, refine.num, constrained, fixed)
   } else {
     stopifnot(constrained==T) #for now
     perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda2,
-                                      state$alpha, inflate, maxsteps, tol.val, outliers,
+                                      state$alpha, tol.val, outliers,
                                       state$phi.ref, state$beta, lambda1.min, refine.num, constrained)
   }
   return(perf.c)
@@ -89,18 +85,16 @@ gfl_BIC_fixed = function(csig, lambda1, lambda2, eCprime) {
   state=csig@state
   stopifnot(length(state)>0) #warm start only
   if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
-  inflate=csig@settings$inflate
   nperf=csig@settings$nperf
   opt.every=csig@settings$opt.every
-  maxsteps=csig@settings$maxsteps
   if (is.null(ctsg.ref)) {
     perf.c = csnorm:::wgfl_signal_BIC_fixed(ctsg, dispersion, nperf, nbins, lambda1, lambda2, eCprime,
-                                            state$alpha, inflate, maxsteps, tol.val, outliers,
+                                            state$alpha, tol.val, outliers,
                                             state$beta)
   } else {
     stopifnot(eCprime==0)
     perf.c = csnorm:::wgfl_diff_BIC_fixed(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda1, lambda2,
-                                    state$alpha, inflate, maxsteps, tol.val, outliers,
+                                    state$alpha, tol.val, outliers,
                                     state$phi.ref, state$beta)
     
   }
@@ -334,10 +328,8 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
                 nbins = csg@par$nbins,
                 dispersion = csg@par$alpha,
                 tol.val = tol.val,
-                inflate=2,
                 nperf=500,
                 opt.every=10,
-                maxsteps=100000,
                 diag.rm = diag.rm,
                 min.patchsize = 4,
                 min.l10FC = 0.5)

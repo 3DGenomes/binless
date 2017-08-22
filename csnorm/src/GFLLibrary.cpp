@@ -5,12 +5,8 @@
 #include "gfl_graph_fl.h" //graph_fused_lasso_weight_warm
 
 
-void GFLLibrary::setUp(double alpha, double inflate, int ninner) {
-    inflate_ = inflate;
-    ninner_ = ninner;
-    
+void GFLLibrary::setUp(double alpha) {
     alpha_ = alpha;
-    counter_ = 0;
 }
 
 void GFLLibrary::prepare(const std::vector<double>& beta_init) {
