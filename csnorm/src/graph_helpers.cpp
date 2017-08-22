@@ -45,7 +45,7 @@ Graph build_patch_graph(int nrow, const DataFrame mat, double tol_val) {
 
 
 //mat must be sorted by bin1 and bin2 and will not be checked for that
-List boost_build_patch_graph_components(int nbins, const DataFrame mat,
+List build_patch_graph_components(int nbins, const DataFrame mat,
                                         double tol_val) {
     //build graph with edges only between vertices with equal values
     Graph fG = build_patch_graph(nbins, mat, tol_val);

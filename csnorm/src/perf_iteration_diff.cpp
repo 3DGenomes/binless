@@ -296,7 +296,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                          _["ncounts"]=mat["ncounts"],
                                          _["weight"]=mat["weight"],
                                          _["value"]=delta_r);
-    List patches = boost_build_patch_graph_components(nbins, submat, tol_val);
+    List patches = build_patch_graph_components(nbins, submat, tol_val);
 
     //count the positive ones and deduce dof
     NumericVector delta = wrap(delta_r);
@@ -382,7 +382,7 @@ List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double disper
                                          _["ncounts"]=mat["ncounts"],
                                          _["weight"]=mat["weight"],
                                          _["value"]=delta_r);
-    List patches = boost_build_patch_graph_components(nbins, submat, tol_val);
+    List patches = build_patch_graph_components(nbins, submat, tol_val);
 
     //count the positive ones and deduce dof
     NumericVector delta = wrap(delta_r);

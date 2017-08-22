@@ -299,7 +299,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                                          _["ncounts"]=mat["ncounts"],
                                          _["weight"]=mat["weight"],
                                          _["value"]=phi_r);
-    List patches = boost_build_patch_graph_components(nbins, submat, tol_val);
+    List patches = build_patch_graph_components(nbins, submat, tol_val);
 
     //count the positive ones and deduce dof
     NumericVector phi = wrap(phi_r);
@@ -370,7 +370,7 @@ List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter, i
                                          _["ncounts"]=mat["ncounts"],
                                          _["weight"]=mat["weight"],
                                          _["value"]=phi_r);
-    List patches = boost_build_patch_graph_components(nbins, submat, tol_val);
+    List patches = build_patch_graph_components(nbins, submat, tol_val);
 
     //count the positive ones and deduce dof
     NumericVector phi = wrap(phi_r);

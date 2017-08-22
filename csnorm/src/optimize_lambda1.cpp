@@ -8,7 +8,7 @@ using namespace Rcpp;
 
 #include "optimize_lambda1.hpp"
 #include "util.hpp"
-#include "graph_helpers.hpp" //boost_build_patch_graph_components
+#include "graph_helpers.hpp" //build_patch_graph_components
 #include <boost/math/tools/minima.hpp> //brent_find_minima
 
 obj_lambda1_BIC::obj_lambda1_BIC(double minUB, double tol_val,
@@ -222,7 +222,7 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
     NumericVector beta_cv = mat["beta_cv"];
     IntegerVector cv_grp = mat["cv.group"];
     //get patch nos and sorted values
-    List cl = boost_build_patch_graph_components(nbins, mat, tol_val);
+    List cl = build_patch_graph_components(nbins, mat, tol_val);
     IntegerVector patchno = cl["membership"];
     //NumericVector patchvals = abs(get_patch_values(beta, patchno));
     NumericVector patchvals = abs(get_patch_values(beta_cv, patchno));

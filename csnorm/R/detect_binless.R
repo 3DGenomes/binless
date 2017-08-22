@@ -417,7 +417,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   if (verbose==T) cat(" Detect patches\n")
   csi@mat = foreach(g=groupnames, .combine=rbind) %do% {
     matg = mat[name==g]
-    #cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
+    #cl = csnorm:::build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
     #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
     matg[,value:=phi]
     matg = csnorm:::detect_binless_patches(matg, csi@settings)
@@ -483,7 +483,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   if (verbose==T) cat(" Detect patches\n")
   csi@mat = foreach(g=groupnames, .combine=rbind) %do% {
     matg = mat[name==g]
-    #cl = csnorm:::boost_build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
+    #cl = csnorm:::build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
     #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
     matg[,value:=delta]
     matg = csnorm:::detect_binless_patches(matg, csi@settings)
