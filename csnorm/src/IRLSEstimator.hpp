@@ -9,17 +9,15 @@
 // A class that computes the 2D triangle grid fused lasso solution on some data.
 // This class assumes that weights can change and uses an underlying gaussian model in an iterative way (IRLS).
 template<typename GaussianEstimator, typename WeightsUpdater>
-class IRLSEstimator : public GaussianEstimator, public WeightsUpdater {
+class IRLSEstimator {
     
 public:
     
     //initialize the problem with a triangle grid with nrows
     //requesting precision to be below a given convergence criterion
     //final beta value will be clamped if clamp>0
-    IRLSEstimator(unsigned nrows, double converge, unsigned nouter, double dispersion,
-                  const Rcpp::DataFrame& cts, const Rcpp::List& outliers)
-    : GaussianEstimator(nrows, converge), WeightsUpdater(nrows, dispersion, cts, outliers),
-      nouter_(nouter), converge_(converge), counter_(0) {}
+    IRLSEstimator(unsigned nouter, double converge, GaussianEstimator& gauss, WeightsUpdater& wt)
+    : nouter_(nouter), converge_(converge), counter_(0), gauss_(gauss), wt_(wt) {}
     
     //run the optimization on the given data. The objective is
     // sum_i w_i(y_i-beta_i)^2 + lambda2 * sum_ij |beta_i-beta_j|
@@ -31,31 +29,28 @@ public:
         counter_ = 0;
         double precision = converge_+1;
         std::vector<double> beta_old = beta_;
-        /*Rcpp::Rcout << " Perf iteration: start with lam2= " << lambda2 << " alpha= "
-                    << GaussianEstimator::get_alpha() << " phi[0]= " << beta_[0] << "\n";*/
+        Rcpp::Rcout << " Perf iteration: start with lam2= " << lambda2 << " alpha= "
+                    << gauss_.get_alpha() << " phi[0]= " << beta_[0] << "\n";
         do {
           //update weights
-          WeightsUpdater::update(beta_);
-          auto y = WeightsUpdater::get_y();
-          auto w = WeightsUpdater::get_w();
+          wt_.update(beta_);
+          auto y = wt_.get_y();
+          auto w = wt_.get_w();
           //estimate beta
-          GaussianEstimator::optimize(y, beta_, w, lambda2);
-          beta_ = GaussianEstimator::get();
+          gauss_.optimize(y, beta_, w, lambda2);
+          beta_ = gauss_.get();
           //update counters and compute precision
           precision = get_precision(beta_,beta_old);
           ++counter_;
           beta_old = beta_;
-          /*Rcpp::Rcout << " Iteration " << counter_ << " with lam2= " << lambda2 << " alpha= "
-            << GaussianEstimator::get_alpha() << " reached maxval= " << precision
-            << " after " << GaussianEstimator::get_ninner() << " steps " << " phi[0]= " << beta_[0] << "\n";*/
+          Rcpp::Rcout << " Iteration " << counter_ << " / " << nouter_ << " with lam2= " << lambda2 << " alpha= "
+            << gauss_.get_alpha() << " reached maxval= " << precision
+            << " after " << gauss_.get_ninner() << " steps " << " phi[0]= " << beta_[0] << "\n";
         } while (counter_ <= nouter_ && precision > converge_ );
-        /*Rcpp::Rcout << " Perf iteration: end with lam2= " << lambda2 << " alpha= "
-        << GaussianEstimator::get_alpha() << " phi[0]= " << beta_[0] << "\n";*/
+        Rcpp::Rcout << " Perf iteration: end with lam2= " << lambda2 << " alpha= "
+        << gauss_.get_alpha() << " phi[0]= " << beta_[0] << "\n";
         
     }
-    
-    //the get() call is already inherited from GaussianEstimator
-    //std::vector<double> get(double offset=0., double lambda1=0.) const
     
     //return the number of outer iterations
     unsigned get_nouter() const {
@@ -74,11 +69,21 @@ private:
         
     const unsigned nouter_;
     const double converge_;
-    
     unsigned counter_;
+    
+    GaussianEstimator& gauss_;
+    WeightsUpdater& wt_;
+    
     std::vector<double> beta_;
     
 };
+
+//named constructor
+template<typename GaussianEstimator, typename WeightsUpdater>
+IRLSEstimator<GaussianEstimator, WeightsUpdater>
+make_IRLSEstimator(unsigned nouter, double converge, GaussianEstimator& gauss, WeightsUpdater& wt) {
+    return IRLSEstimator<GaussianEstimator, WeightsUpdater>(nouter,converge,gauss,wt);
+}
 
 
 #endif

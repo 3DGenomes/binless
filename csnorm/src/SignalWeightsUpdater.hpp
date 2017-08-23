@@ -25,10 +25,6 @@ public:
     
     Rcpp::DataFrame get_mat() const { return mat_; }
     
-protected:
-    //to avoid direct destruction by user
-    ~SignalWeightsUpdater() {}
-    
 private:
     const unsigned nrows_;
     const double dispersion_;

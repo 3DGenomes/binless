@@ -21,21 +21,22 @@ using namespace Rcpp;
 List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins,
                            double lam2, double alpha, double converge,
                            const List outliers, NumericVector beta_i) {
-    //setup computation of fused lasso solution, clamped at 50
-    IRLSEstimator<FusedLassoGaussianEstimator<GFLLibrary>, SignalWeightsUpdater>
-       irls(nbins, converge, nouter, dispersion, cts, outliers);
-    irls.setUp(alpha);
+    //setup computation of fused lasso solution
+    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
+    flo.setUp(alpha);
+    SignalWeightsUpdater wt(nbins, dispersion, cts, outliers); //size of the problem and input data
     
     //do IRLS iterations until convergence
+    auto irls = make_IRLSEstimator(nouter, converge, flo, wt); //number of iterations, convergence criterion and workers
     std::vector<double> beta = as<std::vector<double> >(beta_i);
     irls.optimize(beta, lam2);
     
     //retrieve statistics
-    int res = irls.get_ninner();
+    int res = flo.get_ninner();
     unsigned step = irls.get_nouter();
-    alpha = irls.get_alpha();
-    beta = irls.get();
-    DataFrame mat = irls.get_mat();
+    alpha = flo.get_alpha();
+    beta = flo.get();
+    DataFrame mat = wt.get_mat();
     
     DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                            _["bin2"]=mat["bin2"],
