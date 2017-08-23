@@ -5,19 +5,17 @@
 #include "gfl_graph_fl.h" //graph_fused_lasso_weight_warm
 
 
-void GFLLibrary::setUp(double alpha) {
-    alpha_ = alpha;
-}
-
-void GFLLibrary::prepare(const std::vector<double>& beta_init) {
+void GFLLibrary::initialize(const std::vector<double>& beta, const var_t& init_data) {
     //setup initial values
     std::vector<double> u(tsz_,0); //residuals set to zero
     std::vector<double> z;
     z.reserve(tsz_);
     for (int i=0; i<trails_.size(); ++i) {
-        z.push_back(beta_init[trails_[i]]);   //z set to beta values along trails
+        z.push_back(beta[trails_[i]]);   //z set to beta values along trails
     }
-    beta_ = beta_init;
+    //store in class
+    beta_ = beta;
+    alpha_ = init_data.alpha;
     z_ = z;
     u_ = u;
 }
