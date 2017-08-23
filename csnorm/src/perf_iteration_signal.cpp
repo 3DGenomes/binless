@@ -23,13 +23,14 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
                            const List outliers, NumericVector beta_i) {
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
-    flo.setUp(alpha); //required for GFLLibrary
+    flo.setUp(alpha);
     SignalWeightsUpdater wt(nbins, dispersion, cts, outliers); //size of the problem and input data
+    wt.setUp(); //for consistency. No-op, since there's no phi_ref to compute
     
     //do IRLS iterations until convergence
     auto irls = make_IRLSEstimator(nouter, converge, flo, wt); //number of iterations, convergence criterion and workers
     std::vector<double> beta = as<std::vector<double> >(beta_i);
-    irls.optimize(lam2, beta);
+    irls.optimize(beta, lam2);
     
     //retrieve statistics
     int res = flo.get_ninner();

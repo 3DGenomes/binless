@@ -11,19 +11,14 @@
 class SignalWeightsUpdater {
 public:
     
-    struct var_t {
-        //To update weights in the signal case, we need only beta
-        std::vector<double> beta_;
-        //implicit conversion possible if other_var has a beta_ member
-        template<typename T> var_t(const T& other_var) : beta_(other_var.beta_) {}
-    };
-    
     SignalWeightsUpdater(unsigned nrows, double dispersion,
                          const Rcpp::DataFrame& cts, const Rcpp::List& outliers) :
        nrows_(nrows), dispersion_(dispersion), cts_(cts), outliers_(outliers) {}
     
-    void update(const var_t& params) {
-        mat_ = cts_to_signal_mat(cts_, nrows_, dispersion_, params.beta_, 0, outliers_);
+    void setUp() {} //for consistency with other WeightsUpdaters
+    
+    void update(const std::vector<double>& beta) {
+        mat_ = cts_to_signal_mat(cts_, nrows_, dispersion_, beta, 0, outliers_);
     }
     
     std::vector<double> get_y() const { return Rcpp::as<std::vector<double> >(mat_["phihat"]); }

@@ -13,13 +13,6 @@ class IRLSEstimator {
     
 public:
     
-    struct var_t {
-        GaussianEstimator::var_t gauss_var_;
-        WeightsUpdater::var_t wt_var_;
-        std::vector<double> get_beta() const { return gauss_var_.beta_; }
-        set_beta(const std::vector<double>& beta) { gauss_var.beta_ = beta; }
-    };
-    
     //initialize the problem with a triangle grid with nrows
     //requesting precision to be below a given convergence criterion
     //final beta value will be clamped if clamp>0
@@ -31,25 +24,25 @@ public:
     // for a fixed lambda2. We alternate updating y and w using WeightsUpdater
     // and updating beta with the chosen fused lasso implementation in GaussianEstimator.
     // Initial state will be computed from beta_init
-    void optimize(double lambda2, const var_t& init_data) {
-        data_ = init_data;
+    void optimize(const std::vector<double>& beta_init, double lambda2) {
+        beta_ = beta_init;
         counter_ = 0;
         double precision = converge_+1;
-        var_t data_old = data_;
+        std::vector<double> beta_old = beta_;
         Rcpp::Rcout << " Perf iteration: start with lam2= " << lambda2 << " alpha= "
                     << gauss_.get_alpha() << " phi[0]= " << beta_[0] << "\n";
         do {
           //update weights
-          wt_.update(data_.get_beta(), data_.wt_var_);
+          wt_.update(beta_);
           auto y = wt_.get_y();
           auto w = wt_.get_w();
           //estimate beta
-          gauss_.optimize(y, w, lambda2, data_.gauss_var_);
-          data_.set_beta(gauss_.get());
+          gauss_.optimize(y, beta_, w, lambda2);
+          beta_ = gauss_.get();
           //update counters and compute precision
-          precision = get_precision(data_.get_beta(),data_old.get_beta());
+          precision = get_precision(beta_,beta_old);
           ++counter_;
-          data_old = data_;
+          beta_old = beta_;
           Rcpp::Rcout << " Iteration " << counter_ << " / " << nouter_ << " with lam2= " << lambda2 << " alpha= "
             << gauss_.get_alpha() << " reached maxval= " << precision
             << " after " << gauss_.get_ninner() << " steps " << " phi[0]= " << beta_[0] << "\n";
@@ -81,7 +74,7 @@ private:
     GaussianEstimator& gauss_;
     WeightsUpdater& wt_;
     
-    var_t data_;
+    std::vector<double> beta_;
     
 };
 
