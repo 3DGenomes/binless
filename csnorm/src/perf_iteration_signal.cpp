@@ -2,7 +2,6 @@
 using namespace Rcpp;
 #include <iostream>
 #include <vector>
-#include <ctime>
 
 #include "perf_iteration_signal.hpp"
 
@@ -52,8 +51,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
     return List::create(_["beta"]=wrap(beta), _["alpha"]=wrap(alpha),
                         _["phi"]=wrap(beta), _["mat"]=finalmat,
                         _["nouter"]=step, _["ninner"]=res,
-                        _["eCprime"]=0, _["lambda1"]=0,
-                        _["c_cts"]=0, _["c_gfl"]=0);
+                        _["eCprime"]=0, _["lambda1"]=0);
 }
 
 List wgfl_signal_cv(const DataFrame mat, int nbins,
@@ -108,16 +106,12 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                      double lam2,  double alpha, double tol_val,
                      List outliers, NumericVector beta_i, double lambda1_min, int refine_num,
                      bool constrained, bool fixed) {
-    std::clock_t c_start,c_end;
-    double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
     double lam1=0, eCprime=0;
     bool converged = true;
     //perf iteration for this set of values
     int nwarm = (int)(nouter/10.+1);
     List ret = wgfl_signal_perf_warm(cts, dispersion, nwarm, nbins, lam2,
                                      alpha, tol_val/20., outliers, beta_i);
-    c_cts += as<double>(ret["c_cts"]);
-    c_gfl += as<double>(ret["c_gfl"]);
     //redo iteration if warm start did not work
     if (as<int>(ret["nouter"])>nwarm) {
         beta_i = NumericVector(beta_i.size(),0);
@@ -128,8 +122,6 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
           //Rcout << " warning: cold start did not converge" <<std::endl;
           converged = false;
         }
-        c_cts += as<double>(ret["c_cts"]);
-        c_gfl += as<double>(ret["c_gfl"]);
     }
     
     //compute CV datasets at optimized weights
@@ -138,7 +130,6 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                                  alpha, tol_val/20., beta_i);
       
     //optimize lambda1 and eC
-    c_start = std::clock();
     DataFrame newmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                          _["bin2"]=mat["bin2"],
                                          _["phihat"]=mat["phihat"],
@@ -162,13 +153,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     }
     lam1 = opt["lambda1"];
     eCprime = opt["eCprime"];
-    c_end = std::clock();
-
-    c_opt += c_end - c_start;
-    c_init += opt["c_init"];
-    c_brent += opt["c_brent"];
-    c_refine += opt["c_refine"];
-
+    
     //soft-threshold it at the selected parameters
     std::vector<double> beta_r = as<std::vector<double> >(ret["beta"]);
     std::vector<double> phi_r = soft_threshold(beta_r, eCprime, lam1);
@@ -208,23 +193,17 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     return List::create(_["phi"]=phi_r,
                         _["beta"]=beta_r, _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
                         _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd, _["mat"]=finalmat, _["eCprime"]=eCprime,
-                        _["lambda1"]=lam1,
-                        _["c_cts"]=c_cts, _["c_gfl"]=c_gfl, _["c_opt"]=c_opt, _["c_init"]=c_init,
-                        _["c_brent"]=c_brent, _["c_refine"]=c_refine, _["converged"]=converged);
+                        _["lambda1"]=lam1, _["converged"]=converged);
 }
 
 List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter, int nbins,
                      double lam1, double lam2, double eCprime, double alpha, double tol_val,
                      List outliers, NumericVector beta_i) {
-    std::clock_t c_start,c_end;
-    double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
     bool converged = true;
     //perf iteration for this set of values
     int nwarm = (int)(nouter/10.+1);
     List ret = wgfl_signal_perf_warm(cts, dispersion, nwarm, nbins, lam2,
                                      alpha, tol_val/20., outliers, beta_i);
-    c_cts += as<double>(ret["c_cts"]);
-    c_gfl += as<double>(ret["c_gfl"]);
     //redo iteration if warm start did not work
     if (as<int>(ret["nouter"])>nwarm) {
         beta_i = NumericVector(beta_i.size(),0);
@@ -235,8 +214,6 @@ List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter, i
             //Rcout << " warning: cold start did not converge" <<std::endl;
             converged=false;
         }
-        c_cts += as<double>(ret["c_cts"]);
-        c_gfl += as<double>(ret["c_gfl"]);
     }
 
     //soft-threshold it at the selected parameters
@@ -279,7 +256,6 @@ List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter, i
     return List::create(_["phi"]=phi_r,
                         _["beta"]=beta_r, _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
                         _["dof"]=dof, _["BIC"]=BIC, _["mat"]=finalmat, _["eCprime"]=eCprime,
-                        _["lambda1"]=lam1,
-                        _["c_cts"]=c_cts, _["c_gfl"]=c_gfl, _["converged"]=converged);
+                        _["lambda1"]=lam1, _["converged"]=converged);
 }
 

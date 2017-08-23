@@ -2,7 +2,6 @@
 using namespace Rcpp;
 #include <iostream>
 #include <vector>
-#include <ctime>
 
 #include "perf_iteration_diff.hpp"
 
@@ -60,7 +59,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
     return List::create(_["beta"]=wrap(beta), _["alpha"]=wrap(alpha),
                         _["phi.ref"]=wrap(phi_ref), _["delta"]=wrap(beta), _["mat"]=finalmat,
                         _["nouter"]=step, _["ninner"]=res,
-                        _["eCprime"]=0, _["lambda1"]=0, _["c_cts"]=0, _["c_gfl"]=0);
+                        _["eCprime"]=0, _["lambda1"]=0);
 }
 
 List wgfl_diff_cv(const DataFrame mat, int nbins,
@@ -120,16 +119,12 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    double lam2,  double alpha, double tol_val,
                    List outliers, NumericVector phi_ref_i,  NumericVector beta_i, double lambda1_min,
                    int refine_num, bool constrained) {
-    std::clock_t c_start,c_end;
-    double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
     double lam1=0;
     bool converged = true;
     //perf iteration for this set of values
     int nwarm = (int)(nouter/10.+1);
     List ret = wgfl_diff_perf_warm(cts, ref, dispersion, nwarm, nbins, lam2,
                                    alpha, tol_val/20., outliers, phi_ref_i, beta_i);
-    c_cts += as<double>(ret["c_cts"]);
-    c_gfl += as<double>(ret["c_gfl"]);
     //redo iteration if warm start did not work
     if (as<int>(ret["nouter"])>nwarm) {
         beta_i = NumericVector(beta_i.size(),0);
@@ -140,8 +135,6 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
           //Rcout << " warning: cold start did not converge" <<std::endl;
           converged = false;
         }
-        c_cts += as<double>(ret["c_cts"]);
-        c_gfl += as<double>(ret["c_gfl"]);
     }
     
     //compute CV datasets at optimized weights
@@ -149,7 +142,6 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     List cv_run = wgfl_diff_cv(mat, nbins, lam2, alpha, tol_val/20., beta_i);
     
     //optimize lambda1 assuming eCprime=0
-    c_start = std::clock();
     DataFrame newmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                          _["bin2"]=mat["bin2"],
                                          _["phihat"]=mat["phihat"],
@@ -168,12 +160,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     NumericVector opt = cpp_optimize_lambda1_diff(newmat, nbins, tol_val,
                         lambda1_min, refine_num);
     lam1 = opt["lambda1"];
-    c_end = std::clock();
-    c_opt += c_end - c_start;
-    c_init += opt["c_init"];
-    c_brent += opt["c_brent"];
-    c_refine += opt["c_refine"];
-
+    
     //soft-threshold it at the selected parameters
     std::vector<double> beta_r = as<std::vector<double> >(ret["beta"]);
     std::vector<double> delta_r = soft_threshold(beta_r, 0, lam1);
@@ -226,9 +213,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     return List::create(_["phi.ref"]=phi_ref_r,
                         _["delta"]=delta, _["beta"]=beta_r,
                         _["alpha"]=ret["alpha"], _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd,
-                        _["mat"]=finalmat, _["lambda1"]=lam1, _["eCprime"]=0,
-                        _["c_cts"]=c_cts, _["c_gfl"]=c_gfl, _["c_opt"]=c_opt, _["c_init"]=c_init,
-                        _["c_brent"]=c_brent, _["c_refine"]=c_refine, _["converged"]=converged);
+                        _["mat"]=finalmat, _["lambda1"]=lam1, _["eCprime"]=0, _["converged"]=converged);
 }
 
 
@@ -236,15 +221,11 @@ List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double disper
                    int nouter, int nbins,
                    double lam1, double lam2, double alpha, double tol_val,
                    List outliers, NumericVector phi_ref_i,  NumericVector beta_i) {
-    std::clock_t c_start,c_end;
-    double c_cts(0), c_gfl(0), c_opt(0), c_init(0), c_brent(0), c_refine(0);
     bool converged = true;
     //perf iteration for this set of values
     int nwarm = (int)(nouter/10.+1);
     List ret = wgfl_diff_perf_warm(cts, ref, dispersion, nwarm, nbins, lam2,
                                    alpha, tol_val/20., outliers, phi_ref_i, beta_i);
-    c_cts += as<double>(ret["c_cts"]);
-    c_gfl += as<double>(ret["c_gfl"]);
     //redo iteration if warm start did not work
     if (as<int>(ret["nouter"])>nwarm) {
         beta_i = NumericVector(beta_i.size(),0);
@@ -255,8 +236,6 @@ List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double disper
           //Rcout << " warning: cold start did not converge" <<std::endl;
           converged = false;
         }
-        c_cts += as<double>(ret["c_cts"]);
-        c_gfl += as<double>(ret["c_gfl"]);
     }
 
     //soft-threshold it at the selected parameters
@@ -316,8 +295,7 @@ List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double disper
     return List::create(_["phi.ref"]=phi_ref,
                         _["delta"]=delta, _["beta"]=beta_r,
                         _["alpha"]=ret["alpha"], _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC,
-                        _["mat"]=finalmat, _["lambda1"]=lam1, _["eCprime"]=0,
-                        _["c_cts"]=c_cts, _["c_gfl"]=c_gfl, _["converged"]=converged);
+                        _["mat"]=finalmat, _["lambda1"]=lam1, _["eCprime"]=0, _["converged"]=converged);
 }
 
 

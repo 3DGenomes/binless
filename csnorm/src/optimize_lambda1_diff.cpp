@@ -3,7 +3,6 @@ using namespace Rcpp;
 #include <iostream>
 #include <vector>
 #include <algorithm>
-#include <ctime>
 #include <string>
 
 #include "optimize_lambda1_diff.hpp"
@@ -227,7 +226,6 @@ NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
     const bool constrained = true;
     //extract vectors
     double lmin = std::max(lambda1_min,tol_val/2);
-    std::clock_t c_start = std::clock();
     NumericVector weight = 1/as<NumericVector>(mat["phihat.var"]);
     NumericVector weight_ref = 1/as<NumericVector>(mat["phihat.var.ref"]);
     NumericVector phihat = mat["phihat"];
@@ -259,14 +257,11 @@ NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     //get minimum authorized patch value
     double minpatch = max(abs(forbidden_vals));
-    std::clock_t c_in1 = std::clock();
     const double k=1;
     NumericVector best = optimize_CV_kSD(obj, 0, minpatch, 2*max(abs(beta)) + 2*tol_val, tol_val, patchvals, k);
-    std::clock_t c_in2 = std::clock();
     //finalize
     //obj.get(as<double>(best["UB"])+2*tol_val,"final");
     return NumericVector::create(_["eCprime"]=best["eCprime"], _["lambda1"]=best["lambda1"],
                                  _["UB"]=best["UB"], _["LB"]=best["LB"],
-                                 _["BIC"]=best["BIC"], _["BIC.sd"]=best["BIC.sd"], _["dof"]=best["dof"],
-                                 _["c_init"]=c_in1-c_start, _["c_brent"]=0, _["c_refine"]=c_in2-c_in1);
+                                 _["BIC"]=best["BIC"], _["BIC.sd"]=best["BIC.sd"], _["dof"]=best["dof"]);
 }
