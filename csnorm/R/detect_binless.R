@@ -17,7 +17,7 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
     perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, lambda2, state$alpha, tol.val/20, outliers, state$beta)
   } else {
     stopifnot(eCprime==0)
-    perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda1, lambda2, state$alpha, tol.val/20, outliers,
+    perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda2, state$alpha, tol.val/20, outliers,
                                             state$phi.ref, state$beta)
   }
   return(perf.c)
@@ -29,6 +29,7 @@ gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
   if (csig@state$lambda1==lambda1 & csig@state$lambda2==lambda2 & (class(csig)=="CSbdiff" | csig@state$eCprime==eCprime)) {
     perf.c = csig@state
   } else {
+    if (eCprime != 0 | lambda1>0) cat("WARNING: returned matrix will be unthresholded! Requested eCprime= ", eCprime, " and lambda1= ", lambda1, "\n")
     perf.c = csnorm:::gfl_perf_iteration(csig, lambda1, lambda2, eCprime)
   }
   if (class(csig)!="CSbdiff") {

@@ -5,8 +5,11 @@ using namespace Rcpp;
 #include <ctime>
 
 #include "perf_iteration_diff.hpp"
-#include "FusedLassoGaussianEstimator.hpp"
+
 #include "GFLLibrary.hpp"
+#include "FusedLassoGaussianEstimator.hpp"
+#include "DifferenceWeightsUpdater.hpp"
+#include "IRLSEstimator.hpp"
 
 #include "cts_to_mat.hpp" //cts_to_diff_mat
 #include "util.hpp" //SQUARE
@@ -16,94 +19,28 @@ using namespace Rcpp;
 
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                          double dispersion, int nouter, int nbins,
-                         double lam1, double lam2, double alpha, double converge,
+                         double lam2, double alpha, double converge,
                          List outliers, NumericVector phi_ref_i, NumericVector beta_i) {
-    const int N = nbins*(nbins+1)/2; //size of fused lasso problem
-    std::vector<double> phi_ref_r = as<std::vector<double> >(phi_ref_i);
-    std::vector<double> beta_r = as<std::vector<double> >(beta_i);
-    std::vector<double> beta_old = beta_r;
-    std::vector<double> delta_r = soft_threshold(beta_r, 0, lam1);
-    DataFrame mat;
-
-    int step=0;
-    double maxval=converge+1;
-    std::clock_t c_start,c_end;
-    double c_cts(0), c_gfl(0);
-    /*Rcout << " Perf iteration: start with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
-          << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
-          << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
-          << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-    /*Rcout << " eval init: lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
-          << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
-          << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-
-    //setup computation of fused lasso solution, clamped at 50
-    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge);
+    //setup computation of fused lasso solution
+    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
+    DifferenceWeightsUpdater wt(nbins, dispersion, cts, ref, outliers); //size of the problem and input data
+    std::vector<double> beta = as<std::vector<double> >(beta_i);
+    std::vector<double> phi_ref = as<std::vector<double> >(phi_ref_i);
+    wt.setUp(phi_ref, beta); //initial guess of phi_ref provided here
+                             //because we know the type of wt, but irls doesn't
     
-    while (step<=nouter & maxval>converge) {
-        beta_old = beta_r;
-        step++;
-        //compute weights
-        c_start = std::clock();
-        mat = cts_to_diff_mat(cts, ref, nbins, dispersion, phi_ref_r, delta_r, outliers);
-        std::vector<double> phihat_ref = Rcpp::as<std::vector<double> >
-                                         (mat["phihat.ref"]);
-        std::vector<double> phihat_var_ref = Rcpp::as<std::vector<double> >
-                                             (mat["phihat.var.ref"]);
-        std::vector<double> phihat = Rcpp::as<std::vector<double> >(mat["phihat"]);
-        std::vector<double> phihat_var = Rcpp::as<std::vector<double> >
-                                         (mat["phihat.var"]);
-        std::vector<double> y_r, w_r;
-        y_r.reserve(N);
-        w_r.reserve(N);
-        for (int i=0; i<N; ++i) {
-            y_r.push_back(phihat[i]-phi_ref_r[i]);
-            w_r.push_back(1/phihat_var[i]);
-        }
-        c_end = std::clock();
-        c_cts += c_end - c_start;
-
-        //compute fused lasso
-        c_start = std::clock();
-        flo.optimize(y_r, beta_r, w_r, lam2);
-        beta_r = flo.get();
-        delta_r = flo.get(0, lam1);
-        alpha = flo.get_alpha();
-        c_end = std::clock();
-        c_gfl += c_end - c_start;
-
-        //update phi_ref
-        phi_ref_r = compute_phi_ref(delta_r, phihat, phihat_var, phihat_ref,
-                                    phihat_var_ref);
-        
-        //update residual
-        maxval = std::abs(beta_r[0]-beta_old[0]);
-        for (int i=1; i<N; ++i)
-            maxval = std::max(std::abs(beta_r[i]-beta_old[i]), maxval);
-        /*Rcout << " Iteration " << step << " with lam2= " << lam2 << " alpha= " << alpha << " reached maxval= " << maxval
-              << " after " << res << " steps phi[0]= " << phi_r[0]
-              << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
-              << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-        /*Rcout << " eval step "<< step << ": lam2= " << lam2 << " lam1= " << lam1 << " eCprime= " << 0
-              << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
-              << " min(phi_ref)= " << min(NumericVector(wrap(phi_ref_r))) << " max(phi_ref)= "<< max(NumericVector(wrap(phi_ref_r)))
-              << " min(phi)= " << min(NumericVector(wrap(delta_r))) << " max(delta)= "<< max(NumericVector(wrap(delta_r)))
-              << " min(phihat)= " << min(NumericVector(wrap(y_r))) << " max(phihat)= "<< max(NumericVector(wrap(y_r))) << std::endl;*/
-
-
-    }
-    //if (step>nouter) Rcout << " warning: reached maximum number of outer iterations in wgfl_signal_perf_warm" << std::endl;
-    /*Rcout << " Perf iteration: end   with lam2= " << lam2 << " alpha= " << alpha << " phi[0]= " << phi_r[0]
-          << " z[0]= " << z_r[0] << " u[0]= " << u_r[0] << " lam1= " << lam1 << " eCprime= " << eCprime
-          << " nouter= " << step << " ninner= " << res
-          << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
-          << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
-    /*Rcout << " eval final: " << step << "/" << nouter << " lam2= " << lam2 << "lam1= " << lam1 << " eCprime= " << eCprime
-          << " min(beta)= " << min(NumericVector(wrap(beta_r))) << " max(beta)= "<< max(NumericVector(wrap(beta_r)))
-          << " min(phi)= " << min(NumericVector(wrap(phi_r))) << " max(phi)= "<< max(NumericVector(wrap(phi_r))) << std::endl;*/
+    //do IRLS iterations until convergence
+    auto irls = make_IRLSEstimator(nouter, converge, flo, wt); //number of iterations, convergence criterion and workers
+    irls.optimize(beta, lam2);
     
+    //retrieve statistics
     int res = flo.get_ninner();
+    unsigned step = irls.get_nouter();
+    alpha = flo.get_alpha();
+    beta = flo.get();
+    DataFrame mat = wt.get_mat();
+    phi_ref = wt.get_phi_ref();
     
     DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                            _["bin2"]=mat["bin2"],
@@ -116,14 +53,14 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                                            _["weight"]=mat["weight"],
                                            _["diag.idx"]=mat["diag.idx"],
                                            _["diag.grp"]=mat["diag.grp"],
-                                           _["beta"]=beta_r,
-                                           _["delta"]=delta_r,
-                                           _["phi_ref"]=phi_ref_r);
+                                           _["beta"]=beta,
+                                           _["delta"]=beta,
+                                           _["phi_ref"]=phi_ref);
     
-    return List::create(_["beta"]=wrap(beta_r), _["alpha"]=wrap(alpha),
-                        _["phi.ref"]=wrap(phi_ref_r), _["delta"]=wrap(delta_r), _["mat"]=finalmat,
+    return List::create(_["beta"]=wrap(beta), _["alpha"]=wrap(alpha),
+                        _["phi.ref"]=wrap(phi_ref), _["delta"]=wrap(beta), _["mat"]=finalmat,
                         _["nouter"]=step, _["ninner"]=res,
-                        _["eCprime"]=0, _["lambda1"]=lam1, _["c_cts"]=c_cts, _["c_gfl"]=c_gfl);
+                        _["eCprime"]=0, _["lambda1"]=0, _["c_cts"]=0, _["c_gfl"]=0);
 }
 
 List wgfl_diff_cv(const DataFrame mat, int nbins,
@@ -189,7 +126,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     bool converged = true;
     //perf iteration for this set of values
     int nwarm = (int)(nouter/10.+1);
-    List ret = wgfl_diff_perf_warm(cts, ref, dispersion, nwarm, nbins, lam1, lam2,
+    List ret = wgfl_diff_perf_warm(cts, ref, dispersion, nwarm, nbins, lam2,
                                    alpha, tol_val/20., outliers, phi_ref_i, beta_i);
     c_cts += as<double>(ret["c_cts"]);
     c_gfl += as<double>(ret["c_gfl"]);
@@ -197,7 +134,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     if (as<int>(ret["nouter"])>nwarm) {
         beta_i = NumericVector(beta_i.size(),0);
         //Rcout << " warning: warm start failed " << std::endl;
-        ret = wgfl_diff_perf_warm(cts, ref, dispersion, nouter, nbins, lam1, lam2,
+        ret = wgfl_diff_perf_warm(cts, ref, dispersion, nouter, nbins, lam2,
                                   alpha, tol_val/20., outliers, phi_ref_i, beta_i);
         if (as<int>(ret["nouter"])>nouter) {
           //Rcout << " warning: cold start did not converge" <<std::endl;
@@ -304,7 +241,7 @@ List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double disper
     bool converged = true;
     //perf iteration for this set of values
     int nwarm = (int)(nouter/10.+1);
-    List ret = wgfl_diff_perf_warm(cts, ref, dispersion, nwarm, nbins, 0, lam2,
+    List ret = wgfl_diff_perf_warm(cts, ref, dispersion, nwarm, nbins, lam2,
                                    alpha, tol_val/20., outliers, phi_ref_i, beta_i);
     c_cts += as<double>(ret["c_cts"]);
     c_gfl += as<double>(ret["c_gfl"]);
@@ -312,7 +249,7 @@ List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double disper
     if (as<int>(ret["nouter"])>nwarm) {
         beta_i = NumericVector(beta_i.size(),0);
         //Rcout << " warning: warm start failed " << std::endl;
-        ret = wgfl_diff_perf_warm(cts, ref, dispersion, nouter, nbins, 0, lam2,
+        ret = wgfl_diff_perf_warm(cts, ref, dispersion, nouter, nbins, lam2,
                                   alpha, tol_val/20., outliers, phi_ref_i, beta_i);
         if (as<int>(ret["nouter"])>nouter) {
           //Rcout << " warning: cold start did not converge" <<std::endl;
