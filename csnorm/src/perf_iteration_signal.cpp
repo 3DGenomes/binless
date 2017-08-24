@@ -27,9 +27,9 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
     wt.setUp(); //for consistency. No-op, since there's no phi_ref to compute
     
     //do IRLS iterations until convergence
-    auto irls = make_IRLSEstimator(nouter, converge, flo, wt); //number of iterations, convergence criterion and workers
+    auto irls = make_IRLSEstimator(converge, flo, wt); //number of iterations, convergence criterion and workers
     std::vector<double> beta = as<std::vector<double> >(beta_i);
-    irls.optimize(beta, lam2);
+    irls.optimize(nouter, beta, lam2);
     
     //retrieve statistics
     int res = flo.get_ninner();

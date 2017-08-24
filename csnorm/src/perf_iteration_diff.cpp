@@ -30,8 +30,8 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                              //because we know the type of wt, but irls doesn't
     
     //do IRLS iterations until convergence
-    auto irls = make_IRLSEstimator(nouter, converge, flo, wt); //number of iterations, convergence criterion and workers
-    irls.optimize(beta, lam2);
+    auto irls = make_IRLSEstimator(converge, flo, wt); //number of iterations, convergence criterion and workers
+    irls.optimize(nouter, beta, lam2);
     
     //retrieve statistics
     int res = flo.get_ninner();
