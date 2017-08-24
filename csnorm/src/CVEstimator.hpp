@@ -12,7 +12,7 @@ class CVEstimator {
     
 public:
     
-    CVEstimator(GaussianEstimator& gauss, WeightsUpdater& wt, double y_default = -100.)
+    CVEstimator(GaussianEstimator& gauss, const WeightsUpdater& wt, double y_default = -100.)
       : gauss_(gauss), wt_(wt), y_default_(y_default), N_(wt.get_bin1().size()) {
         //build cv groups
         const std::vector<int> bin1(wt.get_bin1()), bin2(wt.get_bin2());
@@ -60,7 +60,7 @@ public:
     
 private:
     GaussianEstimator& gauss_;
-    WeightsUpdater& wt_;
+    const WeightsUpdater& wt_;
     const double y_default_;
     unsigned N_;
     std::vector<int> cvgroup_;
