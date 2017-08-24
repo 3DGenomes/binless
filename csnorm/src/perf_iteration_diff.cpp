@@ -9,6 +9,7 @@ using namespace Rcpp;
 #include "FusedLassoGaussianEstimator.hpp"
 #include "DifferenceWeightsUpdater.hpp"
 #include "IRLSEstimator.hpp"
+#include "CVEstimator.hpp"
 
 #include "cts_to_mat.hpp" //cts_to_diff_mat
 #include "util.hpp" //SQUARE
@@ -62,58 +63,6 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                         _["eCprime"]=0, _["lambda1"]=0);
 }
 
-List wgfl_diff_cv(const DataFrame mat, int nbins,
-                  double lam2, double alpha, double converge, NumericVector beta_i) {
-    const int N = nbins*(nbins+1)/2; //size of fused lasso problem
-    std::vector<double> beta_r = as<std::vector<double> >(beta_i);
-    std::vector<double> phihat_r = as<std::vector<double> >(mat["phihat"]);
-    std::vector<double> phi_ref_r = as<std::vector<double> >(mat["phi_ref"]);
-    std::vector<double> phihat_var_r = as<std::vector<double> >(mat["phihat.var"]);
-    IntegerVector bin1 = as<IntegerVector>(mat["bin1"]);
-    IntegerVector bin2 = as<IntegerVector>(mat["bin2"]);
-    
-    //build cv groups
-    std::vector<int> cvgroup;
-    const int ngroups=2;
-    for (int i=0; i<N; ++i)
-        cvgroup.push_back( (bin2[i]+bin1[i]) % ngroups ); // 2 cv groups in checkerboard pattern
-    
-    //setup computation of fused lasso solution, clamped at 50 (see Settings.hpp)
-    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge);
-    flo.setUp(alpha);
-    
-    //Compute fused lasso solutions on each group and report to beta_cv
-    std::vector<double> beta_cv(N, -100);
-    for (int g=0; g<ngroups; ++g) {
-        //prepare data and weights for group g and copy initial values
-        std::vector<double> d_r, w_r;
-        for (int i=0; i<N; ++i) {
-            if (cvgroup[i]==g) {
-                d_r.push_back(1000); //essential if lam2==0
-                w_r.push_back(0);
-            } else {
-                d_r.push_back(phihat_r[i]-phi_ref_r[i]);
-                w_r.push_back(1/phihat_var_r[i]);
-            }
-        }
-        std::vector<double> values(beta_r);
-        //compute fused lasso
-        flo.optimize(d_r, values, w_r, lam2);
-        values = flo.get();
-        alpha = flo.get_alpha();
-        
-        //store fused solution at group positions back in beta_cv
-        for (int i=0; i<N; ++i) if (cvgroup[i]==g) beta_cv[i] = values[i];
-    }
-    int res = flo.get_ninner();
-    
-    
-    return List::create(_["beta_cv"]=wrap(beta_cv), _["cv.group"]=wrap(cvgroup),
-                        _["ninner"]=wrap(res));
-}
-
-
-
 List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    int nouter, int nbins,
                    double lam2,  double alpha, double tol_val,
@@ -152,42 +101,32 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     beta = flo.get();
     phi_ref = wt.get_phi_ref();
     DataFrame mat = wt.get_mat();
-    mat = DataFrame::create(_["bin1"]=mat["bin1"],
-                                           _["bin2"]=mat["bin2"],
-                                           _["phihat"]=mat["phihat"],
-                                           _["phihat.var"]=mat["phihat.var"],
-                                           _["phihat.ref"]=mat["phihat.ref"],
-                                           _["phihat.var.ref"]=mat["phihat.var.ref"],
-                                           _["ncounts"]=mat["ncounts"],
-                                           _["deltahat"]=mat["deltahat"],
-                                           _["weight"]=mat["weight"],
-                                           _["diag.idx"]=mat["diag.idx"],
-                                           _["diag.grp"]=mat["diag.grp"],
-                                           _["beta"]=beta,
-                                           _["delta"]=beta,
-                                           _["phi_ref"]=phi_ref);
     
     
     //compute CV datasets at optimized weights
-    List cv_run = wgfl_diff_cv(mat, nbins, lam2, alpha, tol_val/20., beta_i);
+    auto cv = make_CVEstimator(flo, wt, 1000);
+    cv.compute(beta, lam2);
+    mat = DataFrame::create(_["bin1"]=mat["bin1"],
+                            _["bin2"]=mat["bin2"],
+                            _["phihat"]=mat["phihat"],
+                            _["phihat.var"]=mat["phihat.var"],
+                            _["phihat.ref"]=mat["phihat.ref"],
+                            _["phihat.var.ref"]=mat["phihat.var.ref"],
+                            _["ncounts"]=mat["ncounts"],
+                            _["deltahat"]=mat["deltahat"],
+                            _["weight"]=mat["weight"],
+                            _["diag.idx"]=mat["diag.idx"],
+                            _["diag.grp"]=mat["diag.grp"],
+                            _["beta"]=beta,
+                            _["value"]=beta,
+                            _["delta"]=beta,
+                            _["phi_ref"]=phi_ref,
+                            _["beta_cv"]=cv.get_beta_cv(),
+                            _["cv.group"]=cv.get_cvgroup());
     
     //optimize lambda1 assuming eCprime=0
-    DataFrame newmat = DataFrame::create(_["bin1"]=mat["bin1"],
-                                         _["bin2"]=mat["bin2"],
-                                         _["phihat"]=mat["phihat"],
-                                         _["phihat.ref"]=mat["phihat.ref"],
-                                         _["phihat.var"]=mat["phihat.var"],
-                                         _["phihat.var.ref"]=mat["phihat.var.ref"],
-                                         _["ncounts"]=mat["ncounts"],
-                                         _["diag.idx"]=mat["diag.idx"],
-                                         _["diag.grp"]=mat["diag.grp"],
-                                         _["weight"]=mat["weight"],
-                                         _["beta"]=mat["beta"],
-                                         _["value"]=mat["beta"],
-                                         _["beta_cv"]=cv_run["beta_cv"],
-                                         _["cv.group"]=cv_run["cv.group"]);
     if (!constrained) stop("expected constrained==T when fixed==T");
-    NumericVector opt = cpp_optimize_lambda1_diff(newmat, nbins, tol_val,
+    NumericVector opt = cpp_optimize_lambda1_diff(mat, nbins, tol_val,
                         lambda1_min, refine_num);
     double lam1 = opt["lambda1"];
     
@@ -235,8 +174,8 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                            _["diag.idx"]=mat["diag.idx"],
                                            _["diag.grp"]=mat["diag.grp"],
                                            _["beta"]=beta_r,
-                                           _["beta_cv"]=cv_run["beta_cv"],
-                                           _["cv.group"]=cv_run["cv.group"],
+                                           _["beta_cv"]=mat["beta_cv"],
+                                           _["cv.group"]=mat["cv.group"],
                                            _["delta"]=delta,
                                            _["phi.ref"]=phi_ref_r,
                                            _["patchno"]=patchno);
