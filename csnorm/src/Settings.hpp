@@ -22,14 +22,5 @@ template<typename Library> struct Settings<FusedLassoGaussianEstimator<Library> 
     static const double get_clamp() { return 50; }
 };
 
-//settings for IRLSEstimator
-template<typename Estimator, typename WeightsUpdater>
-class IRLSEstimator;
-template<typename Estimator, typename WeightsUpdater>
-struct Settings<IRLSEstimator<Estimator, WeightsUpdater> > {
-    //maximum number of outer IRLS iterations (weight updates)
-    static const unsigned get_nouter() { return 500; }
-};
-
 #endif
 
