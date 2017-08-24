@@ -25,8 +25,8 @@ RCPP_MODULE(csnorm_cpp) {
     function("wgfl_diff_BIC", &wgfl_diff_BIC, "documentation for wgfl_diff_BIC ");
     function("wgfl_diff_BIC_fixed", &wgfl_diff_BIC_fixed, "documentation for wgfl_diff_BIC_fixed ");
     
-    function("build_patch_graph_components",
-             &build_patch_graph_components,
-             "documentation for build_patch_graph_components ");
+    function("get_patch_numbers",
+             &get_patch_numbers,
+             "documentation for get_patch_numbers ");
 }
 

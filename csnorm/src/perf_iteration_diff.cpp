@@ -14,7 +14,7 @@ using namespace Rcpp;
 #include "cts_to_mat.hpp" //cts_to_diff_mat
 #include "util.hpp" //SQUARE
 #include "optimize_lambda1_diff.hpp" //cpp_optimize_lambda1
-#include "graph_helpers.hpp" //build_patch_graph_components
+#include "graph_helpers.hpp" //get_patch_numbers
 
 
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
@@ -152,11 +152,10 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                          _["ncounts"]=mat["ncounts"],
                                          _["weight"]=mat["weight"],
                                          _["value"]=delta_r);
-    List patches = build_patch_graph_components(nbins, submat, tol_val);
+    IntegerVector patchno = get_patch_numbers(nbins, submat, tol_val);
 
     //count the positive ones and deduce dof
     NumericVector delta = wrap(delta_r);
-    IntegerVector patchno = patches["membership"];
     IntegerVector selected = patchno[abs(delta)>tol_val/2];
     const int dof = unique(selected).size();
 
@@ -230,11 +229,10 @@ List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double disper
                                          _["ncounts"]=mat["ncounts"],
                                          _["weight"]=mat["weight"],
                                          _["value"]=delta_r);
-    List patches = build_patch_graph_components(nbins, submat, tol_val);
+    IntegerVector patchno = get_patch_numbers(nbins, submat, tol_val);
 
     //count the positive ones and deduce dof
     NumericVector delta = wrap(delta_r);
-    IntegerVector patchno = patches["membership"];
     IntegerVector selected = patchno[abs(delta)>tol_val/2];
     const int dof = unique(selected).size();
 

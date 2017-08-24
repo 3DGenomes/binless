@@ -16,6 +16,6 @@ typedef boost::adjacency_list
 Graph build_patch_graph(int nrow, const DataFrame mat, double tol_val);
 
 //mat must be sorted by bin1 and bin2 and will not be checked for that
-List build_patch_graph_components(int nbins, const DataFrame mat, double tol_val);
+IntegerVector get_patch_numbers(int nbins, const DataFrame mat, double tol_val);
 
 #endif
