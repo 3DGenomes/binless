@@ -16,10 +16,10 @@ public:
         store_trails(nrows);
     }
     
-    //temporary fix until the whole refactoring is done, and this moves to the constructor
+    //any implementation-specific parameters are set here
     void setUp(double alpha);
     
-    //prepare the next optimization round
+    //prepare the next optimization round with the provided initial guess (warm start)
     void prepare(const std::vector<double>& beta_init);
     
     //run the optimization on the given data. The objective is
@@ -36,7 +36,6 @@ public:
         return counter_;
     }
     
-    //temporary, see above
     double get_alpha() const {
         return alpha_;
     }
