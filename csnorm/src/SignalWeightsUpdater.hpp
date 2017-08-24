@@ -25,6 +25,10 @@ public:
     
     std::vector<double> get_w() const { return Rcpp::as<std::vector<double> >(mat_["weight"]); }
     
+    std::vector<int> get_bin1() const { return Rcpp::as<std::vector<int> > (mat_["bin1"]); }
+    
+    std::vector<int> get_bin2() const { return Rcpp::as<std::vector<int> > (mat_["bin2"]); }
+    
     Rcpp::DataFrame get_mat() const { return mat_; }
     
 private:

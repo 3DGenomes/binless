@@ -59,7 +59,12 @@ public:
         return w_r;
     }
     
+    std::vector<int> get_bin1() const { return Rcpp::as<std::vector<int> > (mat_["bin1"]); }
+    
+    std::vector<int> get_bin2() const { return Rcpp::as<std::vector<int> > (mat_["bin2"]); }
+    
     std::vector<double> get_phi_ref() const { return phi_ref_; }
+    
     Rcpp::DataFrame get_mat() const { return mat_; }
     
 private:
