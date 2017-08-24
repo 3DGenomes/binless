@@ -106,29 +106,51 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                      double lam2,  double alpha, double tol_val,
                      List outliers, NumericVector beta_i, double lambda1_min, int refine_num,
                      bool constrained, bool fixed) {
-    double lam1=0, eCprime=0;
+    
+    //setup computation of fused lasso solution
     bool converged = true;
-    //perf iteration for this set of values
-    int nwarm = (int)(nouter/10.+1);
-    List ret = wgfl_signal_perf_warm(cts, dispersion, nwarm, nbins, lam2,
-                                     alpha, tol_val/20., outliers, beta_i);
-    //redo iteration if warm start did not work
-    if (as<int>(ret["nouter"])>nwarm) {
-        beta_i = NumericVector(beta_i.size(),0);
-        //Rcout << " warning: warm start failed " << std::endl;
-        ret = wgfl_signal_perf_warm(cts, dispersion, nouter, nbins, lam2,
-                                    alpha, tol_val/20., outliers, beta_i);
-        if (as<int>(ret["nouter"])>nouter) {
-          //Rcout << " warning: cold start did not converge" <<std::endl;
-          converged = false;
+    const double converge = tol_val/20.;
+    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
+    flo.setUp(alpha);
+    SignalWeightsUpdater wt(nbins, dispersion, cts, outliers); //size of the problem and input data
+    wt.setUp(); //for consistency. No-op, since there's no phi_ref to compute
+    std::vector<double> beta = as<std::vector<double> >(beta_i);
+    
+    //do IRLS iterations until convergence
+    //first, warm start
+    unsigned nwarm = (unsigned)(nouter/10.+1);
+    auto irls = make_IRLSEstimator(converge, flo, wt);
+    irls.optimize(nwarm, beta, lam2);
+    unsigned step = irls.get_nouter();
+    //cold start if failed
+    if (step>nwarm) {
+        std::fill(beta.begin(), beta.end(), 0);
+        irls.optimize(nouter, beta, lam2);
+        step = irls.get_nouter();
+        if (step>nouter) {
+            //Rcout << " warning: cold start did not converge" <<std::endl;
+            converged = false;
         }
     }
+    //retrieve statistics
+    alpha = flo.get_alpha();
+    beta = flo.get();
+    DataFrame mat = wt.get_mat();
+    mat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                           _["bin2"]=mat["bin2"],
+                                           _["phihat"]=mat["phihat"],
+                                           _["phihat.var"]=mat["phihat.var"],
+                                           _["ncounts"]=mat["ncounts"],
+                                           _["weight"]=mat["weight"],
+                                           _["diag.idx"]=mat["diag.idx"],
+                                           _["diag.grp"]=mat["diag.grp"],
+                                           _["beta"]=beta,
+                                           _["phi"]=beta);
     
     //compute CV datasets at optimized weights
-    DataFrame mat = as<DataFrame>(ret["mat"]);
     List cv_run = wgfl_signal_cv(mat, nbins, lam2,
                                  alpha, tol_val/20., beta_i);
-      
+    
     //optimize lambda1 and eC
     DataFrame newmat = DataFrame::create(_["bin1"]=mat["bin1"],
                                          _["bin2"]=mat["bin2"],
@@ -137,10 +159,10 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                                          _["diag.idx"]=mat["diag.idx"],
                                          _["diag.grp"]=mat["diag.grp"],
                                          _["weight"]=mat["weight"],
-                                         _["beta"]=ret["beta"],
+                                         _["beta"]=mat["beta"],
                                          _["beta_cv"]=cv_run["beta_cv"],
                                          _["cv.group"]=cv_run["cv.group"],
-                                         _["value"]=ret["beta"]);
+                                         _["value"]=mat["beta"]);
     NumericVector opt;
     if (fixed) { // is eCprime fixed to 0?
         if (!constrained) stop("expected constrained==T when fixed==T");
@@ -151,11 +173,11 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
         opt = cpp_optimize_lambda1_eCprime(newmat, nbins, tol_val, constrained,
                                            lambda1_min, refine_num, lam2);
     }
-    lam1 = opt["lambda1"];
-    eCprime = opt["eCprime"];
+    double lam1 = opt["lambda1"];
+    double eCprime = opt["eCprime"];
     
     //soft-threshold it at the selected parameters
-    std::vector<double> beta_r = as<std::vector<double> >(ret["beta"]);
+    std::vector<double> beta_r = as<std::vector<double> >(mat["beta"]);
     std::vector<double> phi_r = soft_threshold(beta_r, eCprime, lam1);
 
     //identify patches
@@ -191,7 +213,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                                            _["cv.group"]=cv_run["cv.group"],
                                            _["patchno"]=patchno);
     return List::create(_["phi"]=phi_r,
-                        _["beta"]=beta_r, _["alpha"]=ret["alpha"], _["lambda2"]=lam2,
+                        _["beta"]=beta_r, _["alpha"]=alpha, _["lambda2"]=lam2,
                         _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd, _["mat"]=finalmat, _["eCprime"]=eCprime,
                         _["lambda1"]=lam1, _["converged"]=converged);
 }

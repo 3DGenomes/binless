@@ -119,26 +119,56 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    double lam2,  double alpha, double tol_val,
                    List outliers, NumericVector phi_ref_i,  NumericVector beta_i, double lambda1_min,
                    int refine_num, bool constrained) {
-    double lam1=0;
+    
+    //setup computation of fused lasso solution
     bool converged = true;
-    //perf iteration for this set of values
-    int nwarm = (int)(nouter/10.+1);
-    List ret = wgfl_diff_perf_warm(cts, ref, dispersion, nwarm, nbins, lam2,
-                                   alpha, tol_val/20., outliers, phi_ref_i, beta_i);
-    //redo iteration if warm start did not work
-    if (as<int>(ret["nouter"])>nwarm) {
-        beta_i = NumericVector(beta_i.size(),0);
-        //Rcout << " warning: warm start failed " << std::endl;
-        ret = wgfl_diff_perf_warm(cts, ref, dispersion, nouter, nbins, lam2,
-                                  alpha, tol_val/20., outliers, phi_ref_i, beta_i);
-        if (as<int>(ret["nouter"])>nouter) {
-          //Rcout << " warning: cold start did not converge" <<std::endl;
-          converged = false;
+    const double converge = tol_val/20.;
+    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
+    flo.setUp(alpha);
+    DifferenceWeightsUpdater wt(nbins, dispersion, cts, ref, outliers); //size of the problem and input data
+    std::vector<double> beta = as<std::vector<double> >(beta_i);
+    std::vector<double> phi_ref = as<std::vector<double> >(phi_ref_i);
+    wt.setUp(phi_ref, beta); //initial guess of phi_ref provided here
+                             //because we know the type of wt, but irls doesn't
+    
+    //do IRLS iterations until convergence
+    //first, warm start
+    unsigned nwarm = (unsigned)(nouter/10.+1);
+    auto irls = make_IRLSEstimator(converge, flo, wt);
+    irls.optimize(nwarm, beta, lam2);
+    unsigned step = irls.get_nouter();
+    //cold start if failed
+    if (step>nwarm) {
+        std::fill(beta.begin(), beta.end(), 0);
+        irls.optimize(nouter, beta, lam2);
+        step = irls.get_nouter();
+        if (step>nouter) {
+            //Rcout << " warning: cold start did not converge" <<std::endl;
+            converged = false;
         }
     }
+    //retrieve statistics
+    alpha = flo.get_alpha();
+    beta = flo.get();
+    phi_ref = wt.get_phi_ref();
+    DataFrame mat = wt.get_mat();
+    mat = DataFrame::create(_["bin1"]=mat["bin1"],
+                                           _["bin2"]=mat["bin2"],
+                                           _["phihat"]=mat["phihat"],
+                                           _["phihat.var"]=mat["phihat.var"],
+                                           _["phihat.ref"]=mat["phihat.ref"],
+                                           _["phihat.var.ref"]=mat["phihat.var.ref"],
+                                           _["ncounts"]=mat["ncounts"],
+                                           _["deltahat"]=mat["deltahat"],
+                                           _["weight"]=mat["weight"],
+                                           _["diag.idx"]=mat["diag.idx"],
+                                           _["diag.grp"]=mat["diag.grp"],
+                                           _["beta"]=beta,
+                                           _["delta"]=beta,
+                                           _["phi_ref"]=phi_ref);
+    
     
     //compute CV datasets at optimized weights
-    DataFrame mat = as<DataFrame>(ret["mat"]);
     List cv_run = wgfl_diff_cv(mat, nbins, lam2, alpha, tol_val/20., beta_i);
     
     //optimize lambda1 assuming eCprime=0
@@ -152,17 +182,17 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                          _["diag.idx"]=mat["diag.idx"],
                                          _["diag.grp"]=mat["diag.grp"],
                                          _["weight"]=mat["weight"],
-                                         _["beta"]=ret["beta"],
-                                         _["value"]=ret["beta"],
+                                         _["beta"]=mat["beta"],
+                                         _["value"]=mat["beta"],
                                          _["beta_cv"]=cv_run["beta_cv"],
                                          _["cv.group"]=cv_run["cv.group"]);
     if (!constrained) stop("expected constrained==T when fixed==T");
     NumericVector opt = cpp_optimize_lambda1_diff(newmat, nbins, tol_val,
                         lambda1_min, refine_num);
-    lam1 = opt["lambda1"];
+    double lam1 = opt["lambda1"];
     
     //soft-threshold it at the selected parameters
-    std::vector<double> beta_r = as<std::vector<double> >(ret["beta"]);
+    std::vector<double> beta_r = as<std::vector<double> >(mat["beta"]);
     std::vector<double> delta_r = soft_threshold(beta_r, 0, lam1);
 
     //compute phi_ref
@@ -212,7 +242,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                            _["patchno"]=patchno);
     return List::create(_["phi.ref"]=phi_ref_r,
                         _["delta"]=delta, _["beta"]=beta_r,
-                        _["alpha"]=ret["alpha"], _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd,
+                        _["alpha"]=alpha, _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd,
                         _["mat"]=finalmat, _["lambda1"]=lam1, _["eCprime"]=0, _["converged"]=converged);
 }
 
