@@ -136,6 +136,7 @@ obj_lambda1_eCprime_CV::obj_lambda1_eCprime_CV(double minval, double tol_val,
                                                  NumericVector value, NumericVector weight, NumericVector valuehat,
                                                  NumericVector ncounts, double lambda2, IntegerVector cv_grp) :
     obj_lambda1_eCprime_base(value, weight, valuehat, min(value)),
+    compute_CV_signal(tol_val, value, weight, valuehat, patchno, cv_grp),
     minval_(minval), tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2),
     constrained_(constrained), forbidden_vals_(forbidden_vals), patchno_(patchno), value_(value),
  weight_(weight), valuehat_(valuehat), cv_grp_(cv_grp) {}
@@ -165,27 +166,7 @@ NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
                                  _["BIC"]=std::numeric_limits<double>::max(), _["BIC.sd"]=0,
                                  _["dof"]=NumericVector::get_na(), _["UB"]=UB, _["LB"]=LB);
   }
-  //compute dof and CV
-  std::vector<double> value_r = as<std::vector<double> >(value_);
-  NumericVector soft = wrap(soft_threshold(value_r, eCprime, lambda1));
-  IntegerVector selected = patchno_[abs(soft)>tol_val_/2];
-  const int dof = unique(selected).size();
-  
-  const NumericVector indiv_CV = weight_ * SQUARE(valuehat_ - (soft + eCprime));
-  NumericVector groupwise_CV, groupwise_weights;
-  const int ngroups=2;
-  for (int i=0; i<ngroups; ++i) {
-    groupwise_CV.push_back(sum(as<NumericVector>(indiv_CV[cv_grp_==i])));
-    groupwise_weights.push_back(sum(cv_grp_==i));
-  }
-  const double CV = sum(groupwise_weights*groupwise_CV)/sum(groupwise_weights);
-  const double CV_sd = std::sqrt(sum(groupwise_weights*SQUARE(groupwise_CV))/sum(groupwise_weights) - SQUARE(CV));
-  
-  if (!msg.empty()) Rcout << " OBJ " << msg << " ok lambda2= " << lambda2_ << " lambda1= " << lambda1
-                          << " eCprime= " << eCprime << " CV= " << CV  << " dof= " << dof 
-                          << " UB= " << UB  << " LB= " << LB << std::endl;
-  return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
-                               _["BIC"]=CV, _["BIC.sd"]=CV_sd, _["dof"]=dof, _["UB"]=UB, _["LB"]=LB);
+  return evaluate(LB, UB);
 }
 
 

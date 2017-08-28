@@ -6,6 +6,8 @@ using namespace Rcpp;
 #include <vector>
 #include <utility> //pair
 
+#include "optimize_lambda1.hpp" //compute_CV_signal
+
 struct obj_lambda1_eCprime_base {
     typedef std::pair<double, double> bounds_t;
     
@@ -40,7 +42,7 @@ struct obj_lambda1_eCprime_BIC : private obj_lambda1_eCprime_base {
 };
 
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using CV
-struct obj_lambda1_eCprime_CV : private obj_lambda1_eCprime_base {
+struct obj_lambda1_eCprime_CV : private obj_lambda1_eCprime_base, private compute_CV_signal {
     obj_lambda1_eCprime_CV(double minval, double tol_val,
                         bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                         NumericVector value, NumericVector weight, NumericVector valuehat,

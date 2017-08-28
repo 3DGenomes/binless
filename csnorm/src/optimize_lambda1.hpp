@@ -5,6 +5,17 @@
 using namespace Rcpp;
 #include <vector>
 
+struct compute_CV_signal {
+    compute_CV_signal(double tol_val, const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
+                      const IntegerVector& patchno, const IntegerVector& cv_grp) :
+       tol_val_(tol_val), value_(value), weight_(weight), valuehat_(valuehat), patchno_(patchno), cv_grp_(cv_grp) {}
+    NumericVector evaluate(double LB, double UB) const;
+private:
+  double tol_val_;
+  NumericVector value_, weight_, valuehat_;
+  IntegerVector patchno_, cv_grp_;
+};
+
 struct obj_lambda1_base {
     typedef double bounds_t;
     obj_lambda1_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minUB);
@@ -34,7 +45,7 @@ struct obj_lambda1_BIC : private obj_lambda1_base {
 };
 
 //objective functor to find lambda1 assuming eCprime=0, using CV
-struct obj_lambda1_CV : private obj_lambda1_base {
+struct obj_lambda1_CV : private obj_lambda1_base, private compute_CV_signal {
     obj_lambda1_CV(double minUB, double tol_val,
                 IntegerVector patchno, NumericVector forbidden_vals,
                 NumericVector value, NumericVector weight, NumericVector valuehat,
