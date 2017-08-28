@@ -6,17 +6,7 @@ using namespace Rcpp;
 #include <vector>
 
 #include "compute_CV.hpp"
-
-struct compute_BIC_signal {
-    compute_BIC_signal(double tol_val, const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
-                      const IntegerVector& patchno, const NumericVector& ncounts) :
-       tol_val_(tol_val), lsnc_(log(sum(ncounts))), value_(value), weight_(weight), valuehat_(valuehat), patchno_(patchno) {}
-    NumericVector evaluate(double LB, double UB) const;
-private:
-  double tol_val_, lsnc_;
-  NumericVector value_, weight_, valuehat_;
-  IntegerVector patchno_;
-};
+#include "compute_BIC.hpp"
 
 struct obj_lambda1_base {
     typedef double bounds_t;

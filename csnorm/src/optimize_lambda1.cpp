@@ -9,24 +9,7 @@ using namespace Rcpp;
 #include "util.hpp"
 #include "graph_helpers.hpp" //get_patch_numbers
 #include "compute_CV.hpp"
-
-
-Rcpp::NumericVector compute_BIC_signal::evaluate(double LB, double UB) const {
-    //compute dof and BIC
-    const double lambda1 = (UB-LB)/2;
-    const double eCprime = (UB+LB)/2.;
-    std::vector<double> value_r = as<std::vector<double> >(value_);
-    NumericVector soft = wrap(soft_threshold(value_r, eCprime, lambda1));
-    IntegerVector selected = patchno_[abs(soft)>tol_val_/2];
-    const int dof = unique(selected).size();
-    const double BIC = sum(weight_ * SQUARE(valuehat_ - (soft + eCprime))) + lsnc_*dof;
-    /*Rcout << " OBJ " << msg << " ok lambda2= " << lambda2_ << " lambda1= " << lambda1
-        << " eCprime= " << eCprime << " BIC= " << BIC  << " dof= " << dof
-        << " UB= " << UB  << " LB= " << LB << std::endl;*/
-    return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1, _["BIC"]=BIC, _["BIC.sd"]=-1,
-                                 _["dof"]=dof, _["UB"]=UB, _["LB"]=LB);
-}
-
+#include "compute_BIC.hpp"
 
 
 obj_lambda1_base::obj_lambda1_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minUB) :

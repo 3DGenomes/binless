@@ -5,11 +5,14 @@ using namespace Rcpp;
 #include <algorithm>
 #include <string>
 
+#include <utility> //pair
+#include <tuple> //tie
+
 #include "optimize_lambda1_eCprime.hpp"
 #include "util.hpp"
 #include "graph_helpers.hpp" //get_patch_numbers
-#include <utility> //pair
-#include <tuple> //tie
+#include "compute_CV.hpp"
+#include "compute_BIC.hpp"
 
     
 obj_lambda1_eCprime_base::bounds_t obj_lambda1_eCprime_base::optimize_bounds(double val) const {
