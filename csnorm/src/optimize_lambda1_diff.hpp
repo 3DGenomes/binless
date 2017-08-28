@@ -7,6 +7,7 @@ using namespace Rcpp;
 #include <utility> //pair
 
 #include "optimize_lambda1.hpp" //obj_lambda1_base and compute_CV_diff
+#include "compute_CV.hpp"
 
 //objective functor to find lambda1 assuming eCprime=0, using BIC
 struct obj_lambda1_diff_BIC : private obj_lambda1_base {
@@ -26,7 +27,7 @@ struct obj_lambda1_diff_BIC : private obj_lambda1_base {
 };
 
 //objective functor to find lambda1 assuming eCprime=0, using CV
-struct obj_lambda1_diff_CV : private obj_lambda1_base, private compute_CV_diff {
+struct obj_lambda1_diff_CV : private obj_lambda1_base, private compute_CV<DifferenceCVModel> {
     obj_lambda1_diff_CV(double minUB, double tol_val,
                 IntegerVector patchno, NumericVector forbidden_vals,
                 NumericVector value, NumericVector weight, NumericVector valuehat,

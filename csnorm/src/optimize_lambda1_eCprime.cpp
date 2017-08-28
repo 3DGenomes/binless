@@ -126,7 +126,7 @@ obj_lambda1_eCprime_CV::obj_lambda1_eCprime_CV(double minval, double tol_val,
                                                  NumericVector value, NumericVector weight, NumericVector valuehat,
                                                  NumericVector ncounts, double lambda2, IntegerVector cv_grp) :
     obj_lambda1_eCprime_base(value, weight, valuehat, min(value)),
-    compute_CV_signal(tol_val, value, weight, valuehat, patchno, cv_grp),
+    compute_CV(tol_val, value, weight, valuehat, patchno, cv_grp),
     minval_(minval), tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2),
     constrained_(constrained), forbidden_vals_(forbidden_vals), patchno_(patchno), value_(value),
  weight_(weight), valuehat_(valuehat), cv_grp_(cv_grp) {}
