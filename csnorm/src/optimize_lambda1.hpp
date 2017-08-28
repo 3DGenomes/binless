@@ -27,10 +27,10 @@ struct obj_lambda1_BIC : private obj_lambda1_base {
   
   NumericVector get(double val, std::string msg = "") const;
   
-  double minUB_, minabsval_, maxabsval_, tol_val_, lsnc_;
+  double minUB_, tol_val_, lsnc_;
   NumericVector forbidden_vals_;
   IntegerVector patchno_;
-  NumericVector value_, absval_, weight_, valuehat_;
+  NumericVector value_, weight_, valuehat_;
 };
 
 //objective functor to find lambda1 assuming eCprime=0, using CV
@@ -44,10 +44,10 @@ struct obj_lambda1_CV : private obj_lambda1_base {
 
     NumericVector get(double val, std::string msg = "") const;
 
-    double minUB_, minabsval_, maxabsval_, tol_val_, lsnc_;
+    double minUB_, tol_val_, lsnc_;
     NumericVector forbidden_vals_;
     IntegerVector patchno_;
-    NumericVector value_, absval_, weight_, valuehat_;
+    NumericVector value_, weight_, valuehat_;
     IntegerVector cv_grp_;
 };
 

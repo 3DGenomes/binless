@@ -8,7 +8,10 @@ using namespace Rcpp;
 
 struct obj_lambda1_eCprime_base {
     typedef std::pair<double, double> bounds_t;
-    obj_lambda1_eCprime_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minval);
+    
+    obj_lambda1_eCprime_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minval) :
+       value_(value), weight_(weight), valuehat_(valuehat), minval_(minval) {}
+    
     //given an UB candidate (and implicit dof), find the adequate UB and LB
     bounds_t optimize_bounds(double UB) const;
     

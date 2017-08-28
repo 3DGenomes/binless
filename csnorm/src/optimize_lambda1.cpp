@@ -9,16 +9,9 @@ using namespace Rcpp;
 #include "util.hpp"
 #include "graph_helpers.hpp" //get_patch_numbers
 
-obj_lambda1_base::obj_lambda1_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minUB) {
-    LogicalVector posweights = weight>0;
-    value_ = value[posweights];
-    absval_ = abs(value_);
-    weight_ = weight[posweights];
-    valuehat_ = valuehat[posweights];
-    minabsval_ = min(absval_);
-    maxabsval_ = max(absval_);
-    minUB_ = minUB;
-}
+obj_lambda1_base::obj_lambda1_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minUB) :
+    value_(value), absval_(abs(value)), weight_(weight), valuehat_(valuehat), minabsval_(min(absval_)),
+    maxabsval_(max(absval_)), minUB_(minUB) {}
 
 obj_lambda1_base::bounds_t obj_lambda1_base::optimize_bounds(double val) const {
     //split data in two groups and determine constraint values
@@ -83,15 +76,8 @@ obj_lambda1_BIC::obj_lambda1_BIC(double minUB, double tol_val,
                                  NumericVector value, NumericVector weight, NumericVector valuehat,
                                  NumericVector ncounts) :
   obj_lambda1_base(value, weight, valuehat, minUB),
-  minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(max(abs(value))),
-  tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals) {
-  LogicalVector posweights = weight>0;
-  patchno_ = patchno[posweights];
-  value_ = value[posweights];
-  absval_ = abs(value_);
-  weight_ = weight[posweights];
-  valuehat_ = valuehat[posweights];
-}
+  minUB_(minUB), tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals),
+  patchno_(patchno), value_(value), weight_(weight), valuehat_(valuehat) {}
 
 double obj_lambda1_BIC::operator()(double x) const {
   //return get(std::pow(10,x), "opt")["BIC"];
@@ -129,16 +115,8 @@ obj_lambda1_CV::obj_lambda1_CV(double minUB, double tol_val,
                          NumericVector value, NumericVector weight, NumericVector valuehat,
                          NumericVector ncounts, IntegerVector cv_grp) :
     obj_lambda1_base(value, weight, valuehat, minUB),
-    minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(max(abs(value))),
-    tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals) {
-  LogicalVector posweights = weight>0;
-  patchno_ = patchno[posweights];
-  value_ = value[posweights];
-  absval_ = abs(value_);
-  weight_ = weight[posweights];
-  valuehat_ = valuehat[posweights];
-  cv_grp_ = cv_grp[posweights];
-}
+    minUB_(minUB), tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals),
+    patchno_(patchno), value_(value), weight_(weight), valuehat_(valuehat), cv_grp_(cv_grp) {}
 
 double obj_lambda1_CV::operator()(double x) const {
     //return get(std::pow(10,x), "opt")["BIC"];

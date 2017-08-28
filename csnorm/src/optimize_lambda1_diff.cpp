@@ -15,15 +15,8 @@ obj_lambda1_diff_BIC::obj_lambda1_diff_BIC(double minUB, double tol_val,
                                  NumericVector value, NumericVector weight, NumericVector valuehat,
                                  NumericVector ncounts) :
   obj_lambda1_base(value, weight, valuehat, minUB),
-  minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(max(abs(value))),
-  tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals) {
-  LogicalVector posweights = weight>0;
-  patchno_ = patchno[posweights];
-  value_ = value[posweights];
-  absval_ = abs(value_);
-  weight_ = weight[posweights];
-  valuehat_ = valuehat[posweights];
-}
+  minUB_(minUB), tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals),
+  patchno_(patchno), value_(value), weight_(weight), valuehat_(valuehat) {}
 
 double obj_lambda1_diff_BIC::operator()(double x) const {
   //return get(std::pow(10,x), "opt")["BIC"];
@@ -62,18 +55,9 @@ obj_lambda1_diff_CV::obj_lambda1_diff_CV(double minUB, double tol_val,
                          NumericVector weight_ref, NumericVector valuehat_ref,
                          NumericVector ncounts, IntegerVector cv_grp) :
     obj_lambda1_base(value, weight, valuehat, minUB),
-    minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(std::max(max(abs(forbidden_vals)),max(abs(value)))),
-    tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals) {
-  LogicalVector posweights = weight>0;
-  patchno_ = patchno[posweights];
-  value_ = value[posweights];
-  absval_ = abs(value_);
-  weight_ = weight[posweights];
-  valuehat_ = valuehat[posweights];
-  weight_ref_ = weight_ref[posweights]; //not quite exact, should use all values
-  valuehat_ref_ = valuehat_ref[posweights];
-  cv_grp_ = cv_grp[posweights];
-}
+    minUB_(minUB), tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals),
+    patchno_(patchno), value_(value), weight_(weight), valuehat_(valuehat), weight_ref_(weight_ref),
+    valuehat_ref_(valuehat_ref), cv_grp_(cv_grp) {}
 
 double obj_lambda1_diff_CV::operator()(double x) const {
     //return get(std::pow(10,x), "opt")["BIC"];

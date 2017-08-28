@@ -11,28 +11,21 @@ using namespace Rcpp;
 #include <utility> //pair
 #include <tuple> //tie
 
-
-obj_lambda1_eCprime_base::obj_lambda1_eCprime_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minval) {
-  LogicalVector posweights = weight>0;
-  value_ = value[posweights];
-  weight_ = weight[posweights];
-  valuehat_ = valuehat[posweights];
-  minval_ = minval;
-}
     
 obj_lambda1_eCprime_base::bounds_t obj_lambda1_eCprime_base::optimize_bounds(double val) const {
-  //split data in two groups
-  LogicalVector grp1 = value_ <= val;
-  double b1,b2, xk, xkp1;
-  double a,b,UB,LB;
-  bool grp1only = is_true(all(grp1)), grp2only = is_true(all(!grp1));
-  double xmin = min(value_), xmax = max(value_); //here, we assume xmin >= minval_
+    //split data in two groups
+    LogicalVector grp1 = value_ <= val;
+    NumericVector w1 = weight_[grp1];
+    NumericVector w2 = weight_[!grp1];
+    bool grp1only = w2.size() == 0 || sum(w2) == 0;
+    bool grp2only = w1.size() == 0 || sum(w1) == 0;
+    double b1,b2, xk, xkp1;
+    double a,b,UB,LB;
+    double xmin = min(value_), xmax = max(value_); //here, we assume xmin >= minval_
   
   //compute UB and LB
   if ((!grp1only) && (!grp2only)) {//non-degenerate case
-      NumericVector w1 = weight_[grp1];
       NumericVector betahat1 = valuehat_[grp1];
-      NumericVector w2 = weight_[!grp1];
       NumericVector betahat2 = valuehat_[!grp1];
       NumericVector x1 = value_[grp1];
       NumericVector x2 = value_[!grp1];
@@ -64,8 +57,8 @@ obj_lambda1_eCprime_base::bounds_t obj_lambda1_eCprime_base::optimize_bounds(dou
           UB = xmax; //or any value > xmax
           LB = 2*b1 - UB;
       }
-      
   } else {//grp1 is empty, UB <= xmin
+      if (!grp2only) Rcout << "This should not have happened!\n";
       NumericVector w2 = weight_;
       NumericVector betahat2 = valuehat_;
       NumericVector x2 = value_;
@@ -94,14 +87,8 @@ obj_lambda1_eCprime_BIC::obj_lambda1_eCprime_BIC(double tol_val,
         NumericVector ncounts, double lambda2) :
     obj_lambda1_eCprime_base(value, weight, valuehat, min(value)),
     tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2), constrained_(constrained),
-    forbidden_vals_(forbidden_vals) {
-  LogicalVector posweights = weight>0;
-  patchno_ = patchno[posweights];
-  value_ = value[posweights];
-  weight_ = weight[posweights];
-  valuehat_ = valuehat[posweights];
-  minval_ = min(value_);
-}
+    forbidden_vals_(forbidden_vals), patchno_(patchno), value_(value), weight_(weight),
+    valuehat_(valuehat), minval_(min(value_)) {}
 
 double obj_lambda1_eCprime_BIC::operator()(double val) const {
     //return get(val, "opt")["BIC"];
@@ -150,14 +137,8 @@ obj_lambda1_eCprime_CV::obj_lambda1_eCprime_CV(double minval, double tol_val,
                                                  NumericVector ncounts, double lambda2, IntegerVector cv_grp) :
     obj_lambda1_eCprime_base(value, weight, valuehat, min(value)),
     minval_(minval), tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2),
-    constrained_(constrained), forbidden_vals_(forbidden_vals) {
-  LogicalVector posweights = weight>0;
-  patchno_ = patchno[posweights];
-  value_ = value[posweights];
-  weight_ = weight[posweights];
-  valuehat_ = valuehat[posweights];
-  cv_grp_ = cv_grp[posweights];
-}
+    constrained_(constrained), forbidden_vals_(forbidden_vals), patchno_(patchno), value_(value),
+ weight_(weight), valuehat_(valuehat), cv_grp_(cv_grp) {}
 
 double obj_lambda1_eCprime_CV::operator()(double val) const {
   //return get(val, "opt")["CV"];
