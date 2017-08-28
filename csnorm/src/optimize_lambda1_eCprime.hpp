@@ -4,9 +4,21 @@
 #include <Rcpp.h>
 using namespace Rcpp;
 #include <vector>
+#include <utility> //pair
+
+struct obj_lambda1_eCprime_base {
+    typedef std::pair<double, double> bounds_t;
+    obj_lambda1_eCprime_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minval);
+    //given an UB candidate (and implicit dof), find the adequate UB and LB
+    bounds_t optimize_bounds(double UB) const;
+    
+private:
+    NumericVector value_, weight_, valuehat_;
+    double minval_;
+};
 
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using BIC
-struct obj_lambda1_eCprime_BIC {
+struct obj_lambda1_eCprime_BIC : private obj_lambda1_eCprime_base {
   obj_lambda1_eCprime_BIC(double tol_val,
                       bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                       NumericVector value, NumericVector weight, NumericVector valuehat,
@@ -21,10 +33,11 @@ struct obj_lambda1_eCprime_BIC {
   NumericVector forbidden_vals_;
   IntegerVector patchno_;
   NumericVector value_, weight_, valuehat_;
+  double minval_;
 };
 
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using CV
-struct obj_lambda1_eCprime_CV {
+struct obj_lambda1_eCprime_CV : private obj_lambda1_eCprime_base {
     obj_lambda1_eCprime_CV(double minval, double tol_val,
                         bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                         NumericVector value, NumericVector weight, NumericVector valuehat,

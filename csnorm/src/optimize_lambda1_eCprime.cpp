@@ -8,36 +8,28 @@ using namespace Rcpp;
 #include "optimize_lambda1_eCprime.hpp"
 #include "util.hpp"
 #include "graph_helpers.hpp" //get_patch_numbers
+#include <utility> //pair
+#include <tuple> //tie
 
-obj_lambda1_eCprime_BIC::obj_lambda1_eCprime_BIC(double tol_val,
-        bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
-        NumericVector value, NumericVector weight, NumericVector valuehat,
-        NumericVector ncounts, double lambda2) :
-    tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2), constrained_(constrained),
-    forbidden_vals_(forbidden_vals) {
+
+obj_lambda1_eCprime_base::obj_lambda1_eCprime_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minval) {
   LogicalVector posweights = weight>0;
-  patchno_ = patchno[posweights];
   value_ = value[posweights];
   weight_ = weight[posweights];
   valuehat_ = valuehat[posweights];
+  minval_ = minval;
 }
-
-double obj_lambda1_eCprime_BIC::operator()(double val) const {
-    //return get(val, "opt")["BIC"];
-    return get(val)["BIC"];
-}
-
-//take val as a starting point for optimization of UB and LB at constant dof
-NumericVector obj_lambda1_eCprime_BIC::get(double val, std::string msg) const {
-    //split data in two groups
-    LogicalVector grp1 = value_ <= val;
-    double b1,b2, xk, xkp1;
-    double a,b,UB,LB;
-    bool grp1only = is_true(all(grp1)), grp2only = is_true(all(!grp1));
-    double xmin = min(value_), xmax = max(value_);
     
-    //compute UB and LB
-    if ((!grp1only) && (!grp2only)) {//non-degenerate case
+obj_lambda1_eCprime_base::bounds_t obj_lambda1_eCprime_base::optimize_bounds(double val) const {
+  //split data in two groups
+  LogicalVector grp1 = value_ <= val;
+  double b1,b2, xk, xkp1;
+  double a,b,UB,LB;
+  bool grp1only = is_true(all(grp1)), grp2only = is_true(all(!grp1));
+  double xmin = min(value_), xmax = max(value_); //here, we assume xmin >= minval_
+  
+  //compute UB and LB
+  if ((!grp1only) && (!grp2only)) {//non-degenerate case
       NumericVector w1 = weight_[grp1];
       NumericVector betahat1 = valuehat_[grp1];
       NumericVector w2 = weight_[!grp1];
@@ -53,11 +45,10 @@ NumericVector obj_lambda1_eCprime_BIC::get(double val, std::string msg) const {
       b = b1 - b2;
       //compute optimal UB and LB
       UB = std::max(std::min(xkp1, a), xk);
-      LB = std::min(b, xmin);
-      
-    } else if (grp1only) {//grp2 is empty, UB > xmax
-      NumericVector w1 = weight_[grp1];
-      NumericVector betahat1 = valuehat_[grp1];
+      LB = std::min(b, minval_);
+  } else if (grp1only) {//grp2 is empty, UB > xmax
+      NumericVector w1 = weight_;
+      NumericVector betahat1 = valuehat_;
       b1 = sum(w1*betahat1)/sum(w1);
       b2 = 0;
       xk = xmax;
@@ -66,30 +57,62 @@ NumericVector obj_lambda1_eCprime_BIC::get(double val, std::string msg) const {
       a = b1 + b2;
       b = b1 - b2;
       //compute optimal UB and LB
-      if (b1 >= (xmin+xmax)/2.) {
-        LB = xmin; //or any value < xmin
-        UB = 2*b1 - LB;
+      if (b1 >= (minval_+xmax)/2.) {
+          LB = minval_; //or any value < minval_
+          UB = 2*b1 - LB;
       } else {
-        UB = xmax; //or any value > xmax
-        LB = 2*b1 - UB;
+          UB = xmax; //or any value > xmax
+          LB = 2*b1 - UB;
       }
       
-    } else {//grp1 is empty, UB <= xmin
-        NumericVector w2 = weight_[!grp1];
-        NumericVector betahat2 = valuehat_[!grp1];
-        NumericVector x2 = value_[!grp1];
-        b1 = 0;
-        b2 = sum(w2*(x2-betahat2))/sum(w2);
-        xk = -std::numeric_limits<double>::infinity();
-        xkp1 = xmin;
-        //compute unconstrained minimum for UB and LB
-        a = b1 + b2;
-        b = b1 - b2;
-        //compute optimal UB and LB
-        UB = xmin;
-        if (b2<-tol_val_) Rcout << " warning: b2= " << b2 << " is negative, setting UB=LB" << std::endl;
-        LB = UB - 2*(std::max(b2,0.)+tol_val_);
-    }
+  } else {//grp1 is empty, UB <= xmin
+      NumericVector w2 = weight_;
+      NumericVector betahat2 = valuehat_;
+      NumericVector x2 = value_;
+      b1 = 0;
+      b2 = sum(w2*(x2-betahat2))/sum(w2);
+      xk = -std::numeric_limits<double>::infinity();
+      xkp1 = xmin;
+      //compute unconstrained minimum for UB and LB
+      a = b1 + b2;
+      b = b1 - b2;
+      //compute optimal UB and LB
+      if (b2 >= (xmin-minval_)/2.) {
+          UB = xmin;
+          LB = UB - 2*b2;
+      } else {
+          LB = minval_;
+          UB = LB + 2*b2;
+      }
+  }
+  return bounds_t{LB, UB};
+}
+
+obj_lambda1_eCprime_BIC::obj_lambda1_eCprime_BIC(double tol_val,
+        bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
+        NumericVector value, NumericVector weight, NumericVector valuehat,
+        NumericVector ncounts, double lambda2) :
+    obj_lambda1_eCprime_base(value, weight, valuehat, min(value)),
+    tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2), constrained_(constrained),
+    forbidden_vals_(forbidden_vals) {
+  LogicalVector posweights = weight>0;
+  patchno_ = patchno[posweights];
+  value_ = value[posweights];
+  weight_ = weight[posweights];
+  valuehat_ = valuehat[posweights];
+  minval_ = min(value_);
+}
+
+double obj_lambda1_eCprime_BIC::operator()(double val) const {
+    //return get(val, "opt")["BIC"];
+    return get(val)["BIC"];
+}
+
+//take val as a starting point for optimization of UB and LB at constant dof
+NumericVector obj_lambda1_eCprime_BIC::get(double val, std::string msg) const {
+    
+    double UB, LB;
+    std::tie(LB, UB) = optimize_bounds(val);
     
     //compute eCprime, lambda1
     double eCprime = (UB+LB)/2;
@@ -124,9 +147,10 @@ NumericVector obj_lambda1_eCprime_BIC::get(double val, std::string msg) const {
 obj_lambda1_eCprime_CV::obj_lambda1_eCprime_CV(double minval, double tol_val,
                                                  bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                                                  NumericVector value, NumericVector weight, NumericVector valuehat,
-                                                 NumericVector ncounts, double lambda2, IntegerVector cv_grp) : minval_(minval),
-                                                 tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2),
-                                                 constrained_(constrained), forbidden_vals_(forbidden_vals) {
+                                                 NumericVector ncounts, double lambda2, IntegerVector cv_grp) :
+    obj_lambda1_eCprime_base(value, weight, valuehat, min(value)),
+    minval_(minval), tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2),
+    constrained_(constrained), forbidden_vals_(forbidden_vals) {
   LogicalVector posweights = weight>0;
   patchno_ = patchno[posweights];
   value_ = value[posweights];
@@ -142,71 +166,10 @@ double obj_lambda1_eCprime_CV::operator()(double val) const {
 
 //take val as a starting point for optimization of UB and LB at constant dof
 NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
-  //split data in two groups
-  LogicalVector grp1 = value_ <= val;
-  double b1,b2, xk, xkp1;
-  double a,b,UB,LB;
-  bool grp1only = is_true(all(grp1)), grp2only = is_true(all(!grp1));
-  double xmin = min(value_), xmax = max(value_); //here, we assume xmin >= minval_
   
-  //compute UB and LB
-  if ((!grp1only) && (!grp2only)) {//non-degenerate case
-    NumericVector w1 = weight_[grp1];
-    NumericVector betahat1 = valuehat_[grp1];
-    NumericVector w2 = weight_[!grp1];
-    NumericVector betahat2 = valuehat_[!grp1];
-    NumericVector x1 = value_[grp1];
-    NumericVector x2 = value_[!grp1];
-    b1 = sum(w1*betahat1)/sum(w1);
-    b2 = sum(w2*(x2-betahat2))/sum(w2);
-    xk = max(x1);
-    xkp1 = min(x2);
-    //compute unconstrained minimum for UB and LB
-    a = b1 + b2;
-    b = b1 - b2;
-    //compute optimal UB and LB
-    UB = std::max(std::min(xkp1, a), xk);
-    LB = std::min(b, minval_);
-  } else if (grp1only) {//grp2 is empty, UB > xmax
-    NumericVector w1 = weight_;
-    NumericVector betahat1 = valuehat_;
-    b1 = sum(w1*betahat1)/sum(w1);
-    b2 = 0;
-    xk = xmax;
-    xkp1 = std::numeric_limits<double>::infinity();
-    //compute unconstrained minimum for UB and LB
-    a = b1 + b2;
-    b = b1 - b2;
-    //compute optimal UB and LB
-    if (b1 >= (minval_+xmax)/2.) {
-      LB = minval_; //or any value < minval_
-      UB = 2*b1 - LB;
-    } else {
-      UB = xmax; //or any value > xmax
-      LB = 2*b1 - UB;
-    }
+  double UB, LB;
+  std::tie(LB, UB) = optimize_bounds(val);
     
-  } else {//grp1 is empty, UB <= xmin
-    NumericVector w2 = weight_;
-    NumericVector betahat2 = valuehat_;
-    NumericVector x2 = value_;
-    b1 = 0;
-    b2 = sum(w2*(x2-betahat2))/sum(w2);
-    xk = -std::numeric_limits<double>::infinity();
-    xkp1 = xmin;
-    //compute unconstrained minimum for UB and LB
-    a = b1 + b2;
-    b = b1 - b2;
-    //compute optimal UB and LB
-    if (b2 >= (xmin-minval_)/2.) {
-      UB = xmin;
-      LB = UB - 2*b2;
-    } else {
-      LB = minval_;
-      UB = LB + 2*b2;
-    }
-  }
-  
   //compute eCprime, lambda1
   double eCprime = (UB+LB)/2;
   double lambda1 = (UB-LB)/2;
