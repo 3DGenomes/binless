@@ -14,7 +14,7 @@ struct compute_CV_diff {
                     const IntegerVector& patchno, const IntegerVector& cv_grp) :
     tol_val_(tol_val), value_(value), weight_(weight), valuehat_(valuehat), weight_ref_(weight_ref),
     valuehat_ref_(valuehat_ref), patchno_(patchno), cv_grp_(cv_grp) {}
-    NumericVector evaluate(double UB) const;
+    NumericVector evaluate(double LB, double UB) const;
 private:
     double tol_val_;
     NumericVector value_, weight_, valuehat_, weight_ref_, valuehat_ref_;

@@ -12,12 +12,12 @@ using namespace Rcpp;
 
 
 
-Rcpp::NumericVector compute_CV_diff::evaluate(double UB) const {
+Rcpp::NumericVector compute_CV_diff::evaluate(double LB, double UB) const {
     //compute dof and CV
-    const double lambda1 = UB;
-    const double eCprime = 0;
+    const double lambda1 = (UB-LB)/2;
+    const double eCprime = (UB+LB)/2.;
     std::vector<double> value_r = as<std::vector<double> >(value_);
-    std::vector<double> soft_r = soft_threshold(value_r, 0, lambda1);
+    std::vector<double> soft_r = soft_threshold(value_r, eCprime, lambda1);
     NumericVector soft = wrap(soft_r);
     std::vector<double> valuehat_r = as<std::vector<double> >(valuehat_);
     std::vector<double> valuehat_ref_r = as<std::vector<double> >(valuehat_ref_);
@@ -33,7 +33,8 @@ Rcpp::NumericVector compute_CV_diff::evaluate(double UB) const {
     IntegerVector selected = patchno_[abs(soft)>tol_val_/2];
     const int dof = unique(selected).size();
     
-    const NumericVector indiv_CV = weight_ref_ * SQUARE(valuehat_ref_ - phi_ref) + weight_*SQUARE(valuehat_-(phi_ref+soft));
+    const NumericVector indiv_CV = weight_ * SQUARE(valuehat_ - (soft + eCprime + phi_ref))
+    + weight_ref_ * SQUARE(valuehat_ref_ - phi_ref);
     NumericVector groupwise_CV, groupwise_weights;
     const int ngroups=2;
     for (int i=0; i<ngroups; ++i) {
@@ -44,10 +45,11 @@ Rcpp::NumericVector compute_CV_diff::evaluate(double UB) const {
     const double CV_sd = std::sqrt(sum(groupwise_weights*SQUARE(groupwise_CV))/sum(groupwise_weights) - SQUARE(CV));
     
     /*Rcout << " OBJ " << msg << " ok lambda1= " << lambda1 << " eCprime= 0"
-        << " CV= " << CV  << " dof= " << dof
-        << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;*/
-    return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1, _["BIC"]=CV, _["BIC.sd"]=CV_sd,
-                                 _["dof"]=dof, _["UB"]=UB, _["LB"]=-UB);
+     << " CV= " << CV  << " dof= " << dof
+     << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;*/
+    return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
+                                 _["BIC"]=CV, _["BIC.sd"]=CV_sd, _["dof"]=dof,
+                                 _["UB"]=UB, _["LB"]=-UB);
 }
 
 
@@ -126,7 +128,7 @@ NumericVector obj_lambda1_diff_CV::get(double val, std::string msg) const {
                                    _["dof"]=NumericVector::get_na(),
                                    _["UB"]=lambda1, _["LB"]=-lambda1);
   }
-    return evaluate(UB);
+    return evaluate(-UB, UB);
 }
 
 NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
