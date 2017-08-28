@@ -8,7 +8,7 @@ using namespace Rcpp;
 #include "optimize_lambda1.hpp"
 #include "util.hpp"
 #include "graph_helpers.hpp" //get_patch_numbers
-
+#include "compute_CV.hpp"
 
 
 Rcpp::NumericVector compute_BIC_signal::evaluate(double LB, double UB) const {
@@ -25,35 +25,6 @@ Rcpp::NumericVector compute_BIC_signal::evaluate(double LB, double UB) const {
         << " UB= " << UB  << " LB= " << LB << std::endl;*/
     return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1, _["BIC"]=BIC, _["BIC.sd"]=-1,
                                  _["dof"]=dof, _["UB"]=UB, _["LB"]=LB);
-}
-
-
-
-
-Rcpp::NumericVector compute_CV_signal::evaluate(double LB, double UB) const {
-    //compute dof and CV
-    const double lambda1 = (UB-LB)/2;
-    const double eCprime = (UB+LB)/2.;
-    std::vector<double> value_r = as<std::vector<double> >(value_);
-    NumericVector soft = wrap(soft_threshold(value_r, eCprime, lambda1));
-    IntegerVector selected = patchno_[abs(soft)>tol_val_/2];
-    const int dof = unique(selected).size();
-    
-    const NumericVector indiv_CV = weight_ * SQUARE(valuehat_ - (soft + eCprime));
-    NumericVector groupwise_CV, groupwise_weights;
-    const int ngroups=2;
-    for (int i=0; i<ngroups; ++i) {
-        groupwise_CV.push_back(sum(as<NumericVector>(indiv_CV[cv_grp_==i])));
-        groupwise_weights.push_back(sum(cv_grp_==i));
-    }
-    const double CV = sum(groupwise_weights*groupwise_CV)/sum(groupwise_weights);
-    const double CV_sd = std::sqrt(sum(groupwise_weights*SQUARE(groupwise_CV))/sum(groupwise_weights) - SQUARE(CV));
-    
-    /*Rcout << " OBJ " << msg << " ok lambda2= " << lambda2_ << " lambda1= " << lambda1
-        << " eCprime= " << eCprime << " CV= " << CV  << " dof= " << dof
-        << " UB= " << UB  << " LB= " << LB << std::endl;*/
-    return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
-                                 _["BIC"]=CV, _["BIC.sd"]=CV_sd, _["dof"]=dof, _["UB"]=UB, _["LB"]=LB);
 }
 
 
