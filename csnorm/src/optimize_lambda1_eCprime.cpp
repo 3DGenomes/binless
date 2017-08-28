@@ -86,6 +86,7 @@ obj_lambda1_eCprime_BIC::obj_lambda1_eCprime_BIC(double tol_val,
         NumericVector value, NumericVector weight, NumericVector valuehat,
         NumericVector ncounts, double lambda2) :
     obj_lambda1_eCprime_base(value, weight, valuehat, min(value)),
+    compute_BIC_signal(tol_val, value, weight, valuehat, patchno, ncounts),
     tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2), constrained_(constrained),
     forbidden_vals_(forbidden_vals), patchno_(patchno), value_(value), weight_(weight),
     valuehat_(valuehat), minval_(min(value_)) {}
@@ -116,18 +117,7 @@ NumericVector obj_lambda1_eCprime_BIC::get(double val, std::string msg) const {
                                          _["UB"]=UB, _["LB"]=LB);
         }
     }
-    //compute dof and BIC
-    std::vector<double> value_r = as<std::vector<double> >(value_);
-    NumericVector soft = wrap(soft_threshold(value_r, eCprime, lambda1));
-    IntegerVector selected = patchno_[abs(soft)>tol_val_/2];
-    const int dof = unique(selected).size();
-    const double BIC = sum(weight_ * SQUARE(valuehat_ - (soft + eCprime))) +
-                       lsnc_*dof;
-    if (!msg.empty()) Rcout << " OBJ " << msg << " ok lambda2= " << lambda2_ << " lambda1= " << lambda1
-                            << " eCprime= " << eCprime << " BIC= " << BIC  << " dof= " << dof 
-                            << " UB= " << UB  << " LB= " << LB << std::endl;
-    return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
-                                 _["BIC"]=BIC, _["dof"]=dof, _["UB"]=UB, _["LB"]=LB);
+    return evaluate(LB, UB);
 }
 
 
