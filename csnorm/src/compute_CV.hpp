@@ -3,15 +3,14 @@
 
 #include "util.hpp"
 
-class DifferenceCVModel {
+class DifferenceModel {
 public:
-    DifferenceCVModel(const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
-                    const NumericVector& weight_ref, const NumericVector& valuehat_ref,
-                    const IntegerVector& cv_grp) :
+    DifferenceModel(const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
+                    const NumericVector& weight_ref, const NumericVector& valuehat_ref) :
     value_(value), weight_(weight), valuehat_(valuehat), weight_ref_(weight_ref),
-    valuehat_ref_(valuehat_ref), cv_grp_(cv_grp) {}
+    valuehat_ref_(valuehat_ref) {}
     
-    NumericVector get_indiv_CV(double LB, double UB) const {
+    NumericVector get_chi_square(double LB, double UB) const {
         const double lambda1 = (UB-LB)/2;
         const double eCprime = (UB+LB)/2.;
         std::vector<double> value_r = as<std::vector<double> >(value_);
@@ -28,35 +27,32 @@ public:
         }
         NumericVector phi_ref = wrap(compute_phi_ref(soft_r, valuehat_r, var, valuehat_ref_r, var_ref));
         
-        const NumericVector indiv_CV = weight_ * SQUARE(valuehat_ - (soft + eCprime + phi_ref))
+        const NumericVector chisq = weight_ * SQUARE(valuehat_ - (soft + eCprime + phi_ref))
                                        + weight_ref_ * SQUARE(valuehat_ref_ - phi_ref);
-        return indiv_CV;
+        return chisq;
     }
 
 private:
     NumericVector value_, weight_, valuehat_, weight_ref_, valuehat_ref_;
-    IntegerVector cv_grp_;
 };
 
-class SignalCVModel {
+class SignalModel {
 public:
-    SignalCVModel(const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
-                      const IntegerVector& cv_grp) :
-    value_(value), weight_(weight), valuehat_(valuehat), cv_grp_(cv_grp) {}
+    SignalCVModel(const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat) :
+    value_(value), weight_(weight), valuehat_(valuehat) {}
     
-    NumericVector get_indiv_CV(double LB, double UB) const {
+    NumericVector get_chi_square(double LB, double UB) const {
         const double lambda1 = (UB-LB)/2;
         const double eCprime = (UB+LB)/2.;
         std::vector<double> value_r = as<std::vector<double> >(value_);
         NumericVector soft = wrap(soft_threshold(value_r, eCprime, lambda1));
         
-        const NumericVector indiv_CV = weight_ * SQUARE(valuehat_ - (soft + eCprime));
-        return indiv_CV;
+        const NumericVector chisq = weight_ * SQUARE(valuehat_ - (soft + eCprime));
+        return chisq;
     }
 
 private:
     NumericVector value_, weight_, valuehat_;
-    IntegerVector cv_grp_;
 };
 
 //DataModel is a temporary placeholder for the object that holds all the data and whether it is a difference or a signal calculation
@@ -65,22 +61,22 @@ public:
     //ugly, but works because of SFINAE
     compute_CV(double tol_val, const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
                const IntegerVector& patchno, const IntegerVector& cv_grp) :
-       DataModel(value, weight, valuehat, cv_grp), tol_val_(tol_val), value_(value), patchno_(patchno), cv_grp_(cv_grp) {}
+       DataModel(value, weight, valuehat), tol_val_(tol_val), value_(value), patchno_(patchno), cv_grp_(cv_grp) {}
     compute_CV(double tol_val, const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
                const NumericVector& weight_ref, const NumericVector& valuehat_ref,
                const IntegerVector& patchno, const IntegerVector& cv_grp) :
-       DataModel(value, weight, valuehat, weight_ref, valuehat_ref, cv_grp), tol_val_(tol_val), value_(value), patchno_(patchno), cv_grp_(cv_grp) {}
+       DataModel(value, weight, valuehat, weight_ref, valuehat_ref), tol_val_(tol_val), value_(value), patchno_(patchno), cv_grp_(cv_grp) {}
     
     NumericVector evaluate(double LB, double UB) const {
         //compute dof and CV
         const double lambda1 = (UB-LB)/2;
         const double eCprime = (UB+LB)/2.;
-        const NumericVector indiv_CV = DataModel::get_indiv_CV(LB, UB);
+        const NumericVector chisq = DataModel::get_chi_square(LB, UB);
         
         NumericVector groupwise_CV, groupwise_weights;
         const int ngroups=2;
         for (int i=0; i<ngroups; ++i) {
-            groupwise_CV.push_back(sum(as<NumericVector>(indiv_CV[cv_grp_==i])));
+            groupwise_CV.push_back(sum(as<NumericVector>(chisq[cv_grp_==i])));
             groupwise_weights.push_back(sum(cv_grp_==i));
         }
         const double CV = sum(groupwise_weights*groupwise_CV)/sum(groupwise_weights);

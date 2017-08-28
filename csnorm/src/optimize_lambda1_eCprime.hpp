@@ -44,7 +44,7 @@ struct obj_lambda1_eCprime_BIC : private obj_lambda1_eCprime_base, private compu
 };
 
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using CV
-struct obj_lambda1_eCprime_CV : private obj_lambda1_eCprime_base, private compute_CV<SignalCVModel> {
+struct obj_lambda1_eCprime_CV : private obj_lambda1_eCprime_base, private compute_CV<SignalModel> {
     obj_lambda1_eCprime_CV(double minval, double tol_val,
                         bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                         NumericVector value, NumericVector weight, NumericVector valuehat,

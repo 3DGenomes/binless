@@ -27,7 +27,7 @@ struct obj_lambda1_diff_BIC : private obj_lambda1_base {
 };
 
 //objective functor to find lambda1 assuming eCprime=0, using CV
-struct obj_lambda1_diff_CV : private obj_lambda1_base, private compute_CV<DifferenceCVModel> {
+struct obj_lambda1_diff_CV : private obj_lambda1_base, private compute_CV<DifferenceModel> {
     obj_lambda1_diff_CV(double minUB, double tol_val,
                 IntegerVector patchno, NumericVector forbidden_vals,
                 NumericVector value, NumericVector weight, NumericVector valuehat,

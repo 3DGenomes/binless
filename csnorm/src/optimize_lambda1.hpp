@@ -37,7 +37,7 @@ struct obj_lambda1_BIC : private obj_lambda1_base, private compute_BIC_signal {
 };
 
 //objective functor to find lambda1 assuming eCprime=0, using CV
-struct obj_lambda1_CV : private obj_lambda1_base, private compute_CV<SignalCVModel> {
+struct obj_lambda1_CV : private obj_lambda1_base, private compute_CV<SignalModel> {
     obj_lambda1_CV(double minUB, double tol_val,
                 IntegerVector patchno, NumericVector forbidden_vals,
                 NumericVector value, NumericVector weight, NumericVector valuehat,
