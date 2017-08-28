@@ -11,8 +11,6 @@ using namespace Rcpp;
 #include "optimize_lambda1_eCprime.hpp"
 #include "util.hpp"
 #include "graph_helpers.hpp" //get_patch_numbers
-#include "compute_CV.hpp"
-#include "compute_BIC.hpp"
 
     
 obj_lambda1_eCprime_base::bounds_t obj_lambda1_eCprime_base::optimize_bounds(double val) const {
@@ -89,7 +87,7 @@ obj_lambda1_eCprime_BIC::obj_lambda1_eCprime_BIC(double tol_val,
         NumericVector value, NumericVector weight, NumericVector valuehat,
         NumericVector ncounts, double lambda2) :
     obj_lambda1_eCprime_base(value, weight, valuehat, min(value)),
-    compute_BIC_signal(tol_val, value, weight, valuehat, patchno, ncounts),
+    compute_BIC(tol_val, value, weight, valuehat, patchno, ncounts),
     tol_val_(tol_val), lsnc_(log(sum(ncounts))), lambda2_(lambda2), constrained_(constrained),
     forbidden_vals_(forbidden_vals), patchno_(patchno), value_(value), weight_(weight),
     valuehat_(valuehat), minval_(min(value_)) {}

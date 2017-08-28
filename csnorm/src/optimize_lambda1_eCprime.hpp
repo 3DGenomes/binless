@@ -26,7 +26,7 @@ private:
 };
 
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using BIC
-struct obj_lambda1_eCprime_BIC : private obj_lambda1_eCprime_base, private compute_BIC_signal {
+struct obj_lambda1_eCprime_BIC : private obj_lambda1_eCprime_base, private compute_BIC<SignalModel> {
   obj_lambda1_eCprime_BIC(double tol_val,
                       bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                       NumericVector value, NumericVector weight, NumericVector valuehat,

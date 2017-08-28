@@ -21,7 +21,7 @@ private:
 };
 
 //objective functor to find lambda1 assuming eCprime=0, using BIC
-struct obj_lambda1_BIC : private obj_lambda1_base, private compute_BIC_signal {
+struct obj_lambda1_BIC : private obj_lambda1_base, private compute_BIC<SignalModel> {
   obj_lambda1_BIC(double minUB, double tol_val,
                   IntegerVector patchno, NumericVector forbidden_vals,
                   NumericVector value, NumericVector weight, NumericVector valuehat,

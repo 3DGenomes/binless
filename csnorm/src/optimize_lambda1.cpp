@@ -8,8 +8,6 @@ using namespace Rcpp;
 #include "optimize_lambda1.hpp"
 #include "util.hpp"
 #include "graph_helpers.hpp" //get_patch_numbers
-#include "compute_CV.hpp"
-#include "compute_BIC.hpp"
 
 
 obj_lambda1_base::obj_lambda1_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minUB) :
@@ -79,7 +77,7 @@ obj_lambda1_BIC::obj_lambda1_BIC(double minUB, double tol_val,
                                  NumericVector value, NumericVector weight, NumericVector valuehat,
                                  NumericVector ncounts) :
   obj_lambda1_base(value, weight, valuehat, minUB),
-  compute_BIC_signal(tol_val, value, weight, valuehat, patchno, ncounts),
+  compute_BIC(tol_val, value, weight, valuehat, patchno, ncounts),
   minUB_(minUB), tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals),
   patchno_(patchno), value_(value), weight_(weight), valuehat_(valuehat) {}
 

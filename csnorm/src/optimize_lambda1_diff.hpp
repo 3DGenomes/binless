@@ -11,10 +11,11 @@ using namespace Rcpp;
 #include "DataModels.hpp"
 
 //objective functor to find lambda1 assuming eCprime=0, using BIC
-struct obj_lambda1_diff_BIC : private obj_lambda1_base {
+struct obj_lambda1_diff_BIC : private obj_lambda1_base, private compute_BIC<DifferenceModel> {
   obj_lambda1_diff_BIC(double minUB, double tol_val,
                   IntegerVector patchno, NumericVector forbidden_vals,
                   NumericVector value, NumericVector weight, NumericVector valuehat,
+                  NumericVector weight_ref, NumericVector valuehat_ref,
                   NumericVector ncounts);
   
   double operator()(double x) const;
@@ -24,7 +25,7 @@ struct obj_lambda1_diff_BIC : private obj_lambda1_base {
   double minUB_, tol_val_, lsnc_;
   NumericVector forbidden_vals_;
   IntegerVector patchno_;
-  NumericVector value_, weight_, valuehat_;
+  NumericVector value_, weight_, valuehat_, weight_ref_, valuehat_ref_;
 };
 
 //objective functor to find lambda1 assuming eCprime=0, using CV
