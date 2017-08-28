@@ -9,10 +9,80 @@ using namespace Rcpp;
 #include "util.hpp"
 #include "graph_helpers.hpp" //get_patch_numbers
 
+obj_lambda1_base::obj_lambda1_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minUB) {
+    LogicalVector posweights = weight>0;
+    value_ = value[posweights];
+    absval_ = abs(value_);
+    weight_ = weight[posweights];
+    valuehat_ = valuehat[posweights];
+    minabsval_ = min(absval_);
+    maxabsval_ = max(absval_);
+    minUB_ = minUB;
+}
+
+obj_lambda1_base::bounds_t obj_lambda1_base::optimize_bounds(double val) const {
+    //split data in two groups and determine constraint values
+    //Rcout << "  GET at " << val << " maxabsval_= " << maxabsval_ << std::endl;
+    LogicalVector grp1 = value_ > val, grp2 = value_ < -val;
+    double xk,xkp1;
+    if (val>maxabsval_) {
+        xk=maxabsval_;
+        xkp1=std::numeric_limits<double>::infinity();
+    } else if (val<minabsval_) {
+        xk=0;
+        xkp1=minabsval_;
+    } else {
+        xk=max(as<NumericVector>(absval_[absval_<=val]));
+        xkp1=min(as<NumericVector>(absval_[absval_>val]));
+    }
+    //Rcout << "  xk= " << xk << " xkp1= " << xkp1 << std::endl;
+    //determine unconstrained UB
+    double UB;
+    bool grp1empty = is_true(all(!grp1)), grp2empty = is_true(all(!grp2));
+    //Rcout << "  grp1empty= " << grp1empty << " grp2empty= " << grp2empty << std::endl;
+    if (grp1empty && grp2empty) {
+        //UB larger than any value
+        UB=maxabsval_;
+    } else if (grp1empty) {
+        //UB larger than any positive value
+        NumericVector w2 = weight_[grp2];
+        NumericVector betahat2 = valuehat_[grp2];
+        NumericVector x2 = value_[grp2];
+        UB = -sum(w2*(x2-betahat2))/sum(w2);
+    } else if (grp2empty) {
+        NumericVector w1 = weight_[grp1];
+        NumericVector betahat1 = valuehat_[grp1];
+        NumericVector x1 = value_[grp1];
+        UB = sum(w1*(x1-betahat1))/sum(w1);
+    } else {
+        NumericVector w1 = weight_[grp1];
+        NumericVector betahat1 = valuehat_[grp1];
+        NumericVector x1 = value_[grp1];
+        double sw1 = sum(w1);
+        double b1 = sum(w1*(x1-betahat1))/sw1;
+        NumericVector w2 = weight_[grp2];
+        NumericVector betahat2 = valuehat_[grp2];
+        NumericVector x2 = value_[grp2];
+        double sw2 = sum(w2);
+        double b2 = sum(w2*(x2-betahat2))/sw2;
+        UB = (sw1*b1-sw2*b2)/(sw1+sw2);
+    }
+    //apply constraint
+    UB = std::min(std::max(UB,xk),xkp1);
+    if (minUB_ <= xkp1 && minUB_ > xk) UB=std::max(minUB_,UB);
+    //Rcout << "  UB= " << UB << " minUB= " << minUB_ << std::endl;
+    return UB;
+}
+
+    
+    
+    
+
 obj_lambda1_BIC::obj_lambda1_BIC(double minUB, double tol_val,
                                  IntegerVector patchno, NumericVector forbidden_vals,
                                  NumericVector value, NumericVector weight, NumericVector valuehat,
                                  NumericVector ncounts) :
+  obj_lambda1_base(value, weight, valuehat, minUB),
   minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(max(abs(value))),
   tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals) {
   LogicalVector posweights = weight>0;
@@ -29,56 +99,9 @@ double obj_lambda1_BIC::operator()(double x) const {
 }
 
 NumericVector obj_lambda1_BIC::get(double val, std::string msg) const {
-  //split data in two groups and determine constraint values
-  //Rcout << "  GET at " << val << " maxabsval_= " << maxabsval_ << std::endl;
-  LogicalVector grp1 = value_ > val, grp2 = value_ < -val;
-  double xk,xkp1;
-  if (val>maxabsval_) {
-    xk=maxabsval_;
-    xkp1=std::numeric_limits<double>::infinity();
-  } else if (val<minabsval_) {
-    xk=0;
-    xkp1=minabsval_;
-  } else {
-    xk=max(as<NumericVector>(absval_[absval_<=val]));
-    xkp1=min(as<NumericVector>(absval_[absval_>val]));
-  }
-  //Rcout << "  xk= " << xk << " xkp1= " << xkp1 << std::endl;
-  //determine unconstrained UB
-  double UB;
-  bool grp1empty = is_true(all(!grp1)), grp2empty = is_true(all(!grp2));
-  //Rcout << "  grp1empty= " << grp1empty << " grp2empty= " << grp2empty << std::endl;
-  if (grp1empty && grp2empty) {
-    //UB larger than any value
-    UB=maxabsval_;
-  } else if (grp1empty) {
-    //UB larger than any positive value
-    NumericVector w2 = weight_[grp2];
-    NumericVector betahat2 = valuehat_[grp2];
-    NumericVector x2 = value_[grp2];
-    UB = -sum(w2*(x2-betahat2))/sum(w2);
-  } else if (grp2empty) {
-    NumericVector w1 = weight_[grp1];
-    NumericVector betahat1 = valuehat_[grp1];
-    NumericVector x1 = value_[grp1];
-    UB = sum(w1*(x1-betahat1))/sum(w1);
-  } else {
-    NumericVector w1 = weight_[grp1];
-    NumericVector betahat1 = valuehat_[grp1];
-    NumericVector x1 = value_[grp1];
-    double sw1 = sum(w1);
-    double b1 = sum(w1*(x1-betahat1))/sw1;
-    NumericVector w2 = weight_[grp2];
-    NumericVector betahat2 = valuehat_[grp2];
-    NumericVector x2 = value_[grp2];
-    double sw2 = sum(w2);
-    double b2 = sum(w2*(x2-betahat2))/sw2;
-    UB = (sw1*b1-sw2*b2)/(sw1+sw2);
-  }
-  //apply constraint
-  UB = std::min(std::max(UB,xk),xkp1);
-  if (minUB_ <= xkp1) UB=std::max(minUB_,UB);
-  //Rcout << "  UB= " << UB << " minUB= " << minUB_ << std::endl;
+  
+    double UB = optimize_bounds(val);
+    
   //check if forbidden
   double lambda1=UB;
   if ( is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2)) || (UB < minUB_) ) {
@@ -105,6 +128,7 @@ obj_lambda1_CV::obj_lambda1_CV(double minUB, double tol_val,
                          IntegerVector patchno, NumericVector forbidden_vals,
                          NumericVector value, NumericVector weight, NumericVector valuehat,
                          NumericVector ncounts, IntegerVector cv_grp) :
+    obj_lambda1_base(value, weight, valuehat, minUB),
     minUB_(minUB), minabsval_(min(abs(value))), maxabsval_(max(abs(value))),
     tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals) {
   LogicalVector posweights = weight>0;
@@ -122,57 +146,10 @@ double obj_lambda1_CV::operator()(double x) const {
 }
 
 NumericVector obj_lambda1_CV::get(double val, std::string msg) const {
-  //split data in two groups and determine constraint values
-  //Rcout << "  GET at " << val << " maxabsval_= " << maxabsval_ << std::endl;
-  LogicalVector grp1 = value_ > val, grp2 = value_ < -val;
-  double xk,xkp1;
-  if (val>maxabsval_) {
-    xk=maxabsval_;
-    xkp1=std::numeric_limits<double>::infinity();
-  } else if (val<minabsval_) {
-    xk=0;
-    xkp1=minabsval_;
-  } else {
-    xk=max(as<NumericVector>(absval_[absval_<=val]));
-    xkp1=min(as<NumericVector>(absval_[absval_>val]));
-  }
-  //Rcout << "  xk= " << xk << " xkp1= " << xkp1 << std::endl;
-  //determine unconstrained UB
-  double UB;
-  bool grp1empty = is_true(all(!grp1)), grp2empty = is_true(all(!grp2));
-  //Rcout << "  grp1empty= " << grp1empty << " grp2empty= " << grp2empty << std::endl;
-  if (grp1empty && grp2empty) {
-    //UB larger than any value
-    UB=maxabsval_;
-  } else if (grp1empty) {
-    //UB larger than any positive value
-    NumericVector w2 = weight_[grp2];
-    NumericVector betahat2 = valuehat_[grp2];
-    NumericVector x2 = value_[grp2];
-    UB = -sum(w2*(x2-betahat2))/sum(w2);
-  } else if (grp2empty) {
-    NumericVector w1 = weight_[grp1];
-    NumericVector betahat1 = valuehat_[grp1];
-    NumericVector x1 = value_[grp1];
-    UB = sum(w1*(x1-betahat1))/sum(w1);
-  } else {
-    NumericVector w1 = weight_[grp1];
-    NumericVector betahat1 = valuehat_[grp1];
-    NumericVector x1 = value_[grp1];
-    double sw1 = sum(w1);
-    double b1 = sum(w1*(x1-betahat1))/sw1;
-    NumericVector w2 = weight_[grp2];
-    NumericVector betahat2 = valuehat_[grp2];
-    NumericVector x2 = value_[grp2];
-    double sw2 = sum(w2);
-    double b2 = sum(w2*(x2-betahat2))/sw2;
-    UB = (sw1*b1-sw2*b2)/(sw1+sw2);
-  }
-  //apply constraint
-  UB = std::min(std::max(UB,xk),xkp1);
-  if (minUB_ <= xkp1 && minUB_ > xk) UB=std::max(minUB_,UB);
-  //Rcout << "  UB= " << UB << " minUB= " << minUB_ << std::endl;
-  //check if forbidden
+    
+    double UB = optimize_bounds(val);
+    
+    //check if forbidden
   double lambda1=UB;
   if ( is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2)) || (UB < minUB_) ) {
       if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda1= " << lambda1

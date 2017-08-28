@@ -5,8 +5,19 @@
 using namespace Rcpp;
 #include <vector>
 
+struct obj_lambda1_base {
+    typedef double bounds_t;
+    obj_lambda1_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minUB);
+    //given an UB candidate (and implicit dof), find the adequate UB and LB
+    bounds_t optimize_bounds(double UB) const;
+    
+private:
+    NumericVector value_, absval_, weight_, valuehat_;
+    double minabsval_, maxabsval_, minUB_;
+};
+
 //objective functor to find lambda1 assuming eCprime=0, using BIC
-struct obj_lambda1_BIC {
+struct obj_lambda1_BIC : private obj_lambda1_base {
   obj_lambda1_BIC(double minUB, double tol_val,
                   IntegerVector patchno, NumericVector forbidden_vals,
                   NumericVector value, NumericVector weight, NumericVector valuehat,
@@ -23,7 +34,7 @@ struct obj_lambda1_BIC {
 };
 
 //objective functor to find lambda1 assuming eCprime=0, using CV
-struct obj_lambda1_CV {
+struct obj_lambda1_CV : private obj_lambda1_base {
     obj_lambda1_CV(double minUB, double tol_val,
                 IntegerVector patchno, NumericVector forbidden_vals,
                 NumericVector value, NumericVector weight, NumericVector valuehat,
