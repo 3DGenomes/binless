@@ -7,6 +7,7 @@ using namespace Rcpp;
 
 #include "compute_CV.hpp"
 #include "compute_BIC.hpp"
+#include "DataModels.hpp"
 
 struct obj_lambda1_base {
     typedef double bounds_t;

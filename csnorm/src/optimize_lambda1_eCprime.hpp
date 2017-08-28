@@ -9,6 +9,7 @@ using namespace Rcpp;
 #include "optimize_lambda1.hpp" //compute_BIC_signal and compute_CV_signal
 #include "compute_CV.hpp"
 #include "compute_BIC.hpp"
+#include "DataModels.hpp"
 
 struct obj_lambda1_eCprime_base {
     typedef std::pair<double, double> bounds_t;
