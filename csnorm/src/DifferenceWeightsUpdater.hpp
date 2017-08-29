@@ -13,7 +13,7 @@
 class DifferenceWeightsUpdater {
 public:
     
-    DifferenceWeightsUpdater(Dataset& data) : data_(data) {}
+    DifferenceWeightsUpdater(DifferenceDataset& data) : data_(data) {}
     
     void setUp(const std::vector<double>& phi_ref, const std::vector<double>& beta) {
         //store first estimate of phi_ref and compute mat
@@ -74,7 +74,7 @@ public:
     Rcpp::DataFrame get_mat() const { return data_.get_mat(); }
     
 private:
-    Dataset& data_;
+    DifferenceDataset& data_;
 };
 
 #endif

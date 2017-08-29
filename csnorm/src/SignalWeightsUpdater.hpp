@@ -12,7 +12,7 @@
 class SignalWeightsUpdater {
 public:
     
-    SignalWeightsUpdater(Dataset& data) : data_(data) {}
+    SignalWeightsUpdater(SignalDataset& data) : data_(data) {}
     
     void setUp() {} //for consistency with other WeightsUpdaters
     
@@ -33,7 +33,7 @@ public:
     Rcpp::DataFrame get_mat() const { return data_.get_mat(); }
     
 private:
-    Dataset& data_;
+    SignalDataset& data_;
 };
 
 #endif
