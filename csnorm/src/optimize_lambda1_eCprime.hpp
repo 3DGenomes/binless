@@ -3,26 +3,10 @@
 
 #include <Rcpp.h>
 using namespace Rcpp;
-#include <vector>
-#include <utility> //pair
 
-#include "optimize_lambda1.hpp" //compute_BIC_signal and compute_CV_signal
 #include "ScoreComputer.hpp"
 #include "DataLikelihoods.hpp"
-
-struct obj_lambda1_eCprime_base {
-    typedef std::pair<double, double> bounds_t;
-    
-    obj_lambda1_eCprime_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minval) :
-       value_(value), weight_(weight), valuehat_(valuehat), minval_(minval) {}
-    
-    //given an UB candidate (and implicit dof), find the adequate UB and LB
-    bounds_t optimize_bounds(double UB) const;
-    
-private:
-    NumericVector value_, weight_, valuehat_;
-    double minval_;
-};
+#include "base_objectives.hpp"
 
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using CV or BIC
 template<typename Score>

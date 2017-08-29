@@ -3,12 +3,10 @@
 
 #include <Rcpp.h>
 using namespace Rcpp;
-#include <vector>
-#include <utility> //pair
 
-#include "optimize_lambda1.hpp" //obj_lambda1_base and compute_CV_diff
 #include "ScoreComputer.hpp"
 #include "DataLikelihoods.hpp"
+#include "base_objectives.hpp"
 
 //objective functor to find lambda1 assuming eCprime=0, using CV or BIC, difference case
 template<typename Score>

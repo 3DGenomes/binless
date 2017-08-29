@@ -11,63 +11,6 @@ using namespace Rcpp;
 #include "Scores.hpp"
 
 
-obj_lambda1_base::obj_lambda1_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minUB) :
-    value_(value), absval_(abs(value)), weight_(weight), valuehat_(valuehat), minabsval_(min(absval_)),
-    maxabsval_(max(absval_)), minUB_(minUB) {}
-
-obj_lambda1_base::bounds_t obj_lambda1_base::optimize_bounds(double val) const {
-    //split data in two groups and determine constraint values
-    //Rcout << "  GET at " << val << " maxabsval_= " << maxabsval_ << std::endl;
-    LogicalVector grp1 = value_ > val, grp2 = value_ < -val;
-    double xk,xkp1;
-    if (val>maxabsval_) {
-        xk=maxabsval_;
-        xkp1=std::numeric_limits<double>::infinity();
-    } else if (val<minabsval_) {
-        xk=0;
-        xkp1=minabsval_;
-    } else {
-        xk=max(as<NumericVector>(absval_[absval_<=val]));
-        xkp1=min(as<NumericVector>(absval_[absval_>val]));
-    }
-    //Rcout << "  xk= " << xk << " xkp1= " << xkp1 << std::endl;
-    //determine unconstrained UB
-    double UB;
-    bool grp1empty = is_true(all(!grp1)), grp2empty = is_true(all(!grp2));
-    //Rcout << "  grp1empty= " << grp1empty << " grp2empty= " << grp2empty << std::endl;
-    if (grp1empty && grp2empty) {
-        //UB larger than any value
-        UB=maxabsval_;
-    } else if (grp1empty) {
-        //UB larger than any positive value
-        NumericVector w2 = weight_[grp2];
-        NumericVector betahat2 = valuehat_[grp2];
-        NumericVector x2 = value_[grp2];
-        UB = -sum(w2*(x2-betahat2))/sum(w2);
-    } else if (grp2empty) {
-        NumericVector w1 = weight_[grp1];
-        NumericVector betahat1 = valuehat_[grp1];
-        NumericVector x1 = value_[grp1];
-        UB = sum(w1*(x1-betahat1))/sum(w1);
-    } else {
-        NumericVector w1 = weight_[grp1];
-        NumericVector betahat1 = valuehat_[grp1];
-        NumericVector x1 = value_[grp1];
-        double sw1 = sum(w1);
-        double b1 = sum(w1*(x1-betahat1))/sw1;
-        NumericVector w2 = weight_[grp2];
-        NumericVector betahat2 = valuehat_[grp2];
-        NumericVector x2 = value_[grp2];
-        double sw2 = sum(w2);
-        double b2 = sum(w2*(x2-betahat2))/sw2;
-        UB = (sw1*b1-sw2*b2)/(sw1+sw2);
-    }
-    //apply constraint
-    UB = std::min(std::max(UB,xk),xkp1);
-    if (minUB_ <= xkp1 && minUB_ > xk) UB=std::max(minUB_,UB);
-    //Rcout << "  UB= " << UB << " minUB= " << minUB_ << std::endl;
-    return UB;
-}
 
 NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
                                    double tol_val, bool positive,
