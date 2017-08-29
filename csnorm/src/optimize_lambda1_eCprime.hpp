@@ -45,7 +45,7 @@ struct obj_lambda1_eCprime_BIC : private obj_lambda1_eCprime_base,
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using CV
 struct obj_lambda1_eCprime_CV : private obj_lambda1_eCprime_base,
                                 private ScoreComputer<SignalLikelihood,CVScore> {
-    obj_lambda1_eCprime_CV(double minval, double tol_val,
+    obj_lambda1_eCprime_CV(double tol_val,
                         bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                         NumericVector value, NumericVector weight, NumericVector valuehat,
                         NumericVector ncounts, double lambda2, IntegerVector cv_grp);

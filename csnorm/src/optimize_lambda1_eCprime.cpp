@@ -121,7 +121,7 @@ NumericVector obj_lambda1_eCprime_BIC::get(double val, std::string msg) const {
 }
 
 
-obj_lambda1_eCprime_CV::obj_lambda1_eCprime_CV(double minval, double tol_val,
+obj_lambda1_eCprime_CV::obj_lambda1_eCprime_CV(double tol_val,
                                                  bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                                                  NumericVector value, NumericVector weight, NumericVector valuehat,
                                                  NumericVector ncounts, double lambda2, IntegerVector cv_grp) :
