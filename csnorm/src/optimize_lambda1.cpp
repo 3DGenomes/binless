@@ -78,8 +78,7 @@ obj_lambda1_BIC::obj_lambda1_BIC(double minUB, double tol_val,
                                  NumericVector ncounts) :
   obj_lambda1_base(value, weight, valuehat, minUB),
   ScoreComputer(tol_val, value, weight, valuehat, patchno, ncounts),
-  minUB_(minUB), tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals),
-  patchno_(patchno), value_(value), weight_(weight), valuehat_(valuehat) {}
+  minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}
 
 double obj_lambda1_BIC::operator()(double x) const {
   //return get(std::pow(10,x), "opt")["BIC"];
@@ -112,8 +111,7 @@ obj_lambda1_CV::obj_lambda1_CV(double minUB, double tol_val,
                          NumericVector ncounts, IntegerVector cv_grp) :
     obj_lambda1_base(value, weight, valuehat, minUB),
     ScoreComputer(tol_val, value, weight, valuehat, patchno, cv_grp),
-    minUB_(minUB), tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals),
-    patchno_(patchno), value_(value), weight_(weight), valuehat_(valuehat), cv_grp_(cv_grp) {}
+    minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}
 
 double obj_lambda1_CV::operator()(double x) const {
     //return get(std::pow(10,x), "opt")["BIC"];

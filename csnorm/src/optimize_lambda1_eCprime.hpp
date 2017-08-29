@@ -37,12 +37,9 @@ struct obj_lambda1_eCprime_BIC : private obj_lambda1_eCprime_base,
   
   NumericVector get(double val, std::string msg = "") const;
   
-  double tol_val_, lsnc_, lambda2_;
+  double tol_val_, lambda2_;
   bool constrained_;
   NumericVector forbidden_vals_;
-  IntegerVector patchno_;
-  NumericVector value_, weight_, valuehat_;
-  double minval_;
 };
 
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using CV
@@ -57,12 +54,9 @@ struct obj_lambda1_eCprime_CV : private obj_lambda1_eCprime_base,
 
     NumericVector get(double val, std::string msg = "") const;
 
-    double minval_, tol_val_, lsnc_, lambda2_;
+    double tol_val_, lambda2_;
     bool constrained_;
     NumericVector forbidden_vals_;
-    IntegerVector patchno_;
-    NumericVector value_, weight_, valuehat_;
-    IntegerVector cv_grp_;
 };
 
 NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
