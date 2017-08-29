@@ -29,25 +29,17 @@ NumericVector obj_lambda1_diff_BIC::get(double val, std::string msg) const {
     double UB = optimize_bounds(val);
     
     //check if forbidden
-  double lambda1=UB;
-  if ( is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2)) || (UB < minUB_) ) {
-    if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda1= " << lambda1
-                            << " eCprime= 0 BIC= Inf dof= NA"
-                            << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;
-    return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1,
-                                 _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na(),
-                                 _["UB"]=lambda1, _["LB"]=-lambda1);
-  }
-  std::vector<double> value_r = as<std::vector<double> >(value_);
-  NumericVector soft = wrap(soft_threshold(value_r, 0, lambda1));
-  IntegerVector selected = patchno_[abs(soft)>tol_val_/2];
-  const int dof = unique(selected).size();
-  const double BIC = sum(weight_ * SQUARE(valuehat_ - soft)) + lsnc_*dof;
-  if (!msg.empty()) Rcout << " OBJ " << msg << " ok lambda1= " << lambda1 << " eCprime= 0"
-                          << " BIC= " << BIC  << " dof= " << dof
-                          << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;
-  return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1, _["BIC"]=BIC,
-                               _["dof"]=dof, _["UB"]=UB, _["LB"]=-UB);
+    double lambda1=UB;
+    if ( is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2)) || (UB < minUB_) ) {
+        if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda1= " << lambda1
+            << " eCprime= 0 BIC= Inf dof= NA"
+            << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;
+        return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1,
+                                     _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na(),
+                                     _["UB"]=lambda1, _["LB"]=-lambda1);
+    }
+    
+    return evaluate(-UB, UB);
 }
 
 obj_lambda1_diff_CV::obj_lambda1_diff_CV(double minUB, double tol_val,
