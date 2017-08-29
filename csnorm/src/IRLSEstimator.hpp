@@ -25,31 +25,31 @@ public:
     // and updating beta with the chosen fused lasso implementation in GaussianEstimator.
     // Initial state will be computed from beta_init
     void optimize(unsigned nouter, const std::vector<double>& beta_init, double lambda2) {
-        beta_ = beta_init;
+        std::vector<double> beta = beta_init;
         counter_ = 0;
         double precision = converge_+1;
-        std::vector<double> beta_old = beta_;
+        std::vector<double> beta_old = beta;
         /*Rcpp::Rcout << " Perf iteration: start with lam2= " << lambda2 << " alpha= "
                     << gauss_.get_alpha() << " phi[0]= " << beta_[0] << "\n";*/
         do {
           //update weights
-          wt_.update(beta_);
+          wt_.update(beta);
           auto y = wt_.get_y();
           auto w = wt_.get_w();
           //estimate beta
-          gauss_.optimize(y, beta_, w, lambda2);
-          beta_ = gauss_.get();
+          gauss_.optimize(y, beta, w, lambda2);
+          beta = gauss_.get();
           //update counters and compute precision
-          precision = get_precision(beta_,beta_old);
+          precision = get_precision(beta,beta_old);
           ++counter_;
-          beta_old = beta_;
+          beta_old = beta;
           /*Rcpp::Rcout << " Iteration " << counter_ << " / " << nouter << " with lam2= " << lambda2 << " alpha= "
             << gauss_.get_alpha() << " reached maxval= " << precision
             << " after " << gauss_.get_ninner() << " steps " << " phi[0]= " << beta_[0] << "\n";*/
         } while (counter_ <= nouter && precision > converge_ );
         /*Rcpp::Rcout << " Perf iteration: end with lam2= " << lambda2 << " alpha= "
         << gauss_.get_alpha() << " phi[0]= " << beta_[0] << "\n";*/
-        
+        wt_.update(beta); //store last beta and update weights
     }
     
     //return the number of outer iterations
@@ -72,9 +72,6 @@ private:
     
     GaussianEstimator& gauss_;
     WeightsUpdater& wt_;
-    
-    std::vector<double> beta_;
-    
 };
 
 //named constructor
