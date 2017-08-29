@@ -15,7 +15,7 @@ obj_lambda1_diff_BIC::obj_lambda1_diff_BIC(double minUB, double tol_val,
                                  NumericVector weight_ref, NumericVector valuehat_ref,
                                  NumericVector ncounts) :
   obj_lambda1_base(value, weight, valuehat, minUB),
-  compute_BIC(tol_val, value, weight, valuehat, weight_ref, valuehat_ref, patchno, ncounts),
+  ScoreComputer(tol_val, value, weight, valuehat, weight_ref, valuehat_ref, patchno, ncounts),
   minUB_(minUB), tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals),
   patchno_(patchno), value_(value), weight_(weight), valuehat_(valuehat) {}
 
@@ -56,7 +56,7 @@ obj_lambda1_diff_CV::obj_lambda1_diff_CV(double minUB, double tol_val,
                          NumericVector weight_ref, NumericVector valuehat_ref,
                          NumericVector ncounts, IntegerVector cv_grp) :
     obj_lambda1_base(value, weight, valuehat, minUB),
-    compute_CV(tol_val, value, weight, valuehat, weight_ref, valuehat_ref, patchno, cv_grp),
+    ScoreComputer(tol_val, value, weight, valuehat, weight_ref, valuehat_ref, patchno, cv_grp),
     minUB_(minUB), tol_val_(tol_val), lsnc_(log(sum(ncounts))), forbidden_vals_(forbidden_vals),
     patchno_(patchno), value_(value), weight_(weight), valuehat_(valuehat), weight_ref_(weight_ref),
     valuehat_ref_(valuehat_ref), cv_grp_(cv_grp) {}

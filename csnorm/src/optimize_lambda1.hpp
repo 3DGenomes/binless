@@ -5,8 +5,8 @@
 using namespace Rcpp;
 #include <vector>
 
-#include "compute_CV.hpp"
-#include "compute_BIC.hpp"
+#include "Scores.hpp"
+#include "ScoreComputer.hpp"
 #include "DataLikelihoods.hpp"
 
 struct obj_lambda1_base {
@@ -21,7 +21,8 @@ private:
 };
 
 //objective functor to find lambda1 assuming eCprime=0, using BIC
-struct obj_lambda1_BIC : private obj_lambda1_base, private compute_BIC<SignalLikelihood> {
+struct obj_lambda1_BIC : private obj_lambda1_base,
+                         private ScoreComputer<SignalLikelihood,BICScore> {
   obj_lambda1_BIC(double minUB, double tol_val,
                   IntegerVector patchno, NumericVector forbidden_vals,
                   NumericVector value, NumericVector weight, NumericVector valuehat,
@@ -38,7 +39,8 @@ struct obj_lambda1_BIC : private obj_lambda1_base, private compute_BIC<SignalLik
 };
 
 //objective functor to find lambda1 assuming eCprime=0, using CV
-struct obj_lambda1_CV : private obj_lambda1_base, private compute_CV<SignalLikelihood> {
+struct obj_lambda1_CV : private obj_lambda1_base,
+                        private ScoreComputer<SignalLikelihood,CVScore> {
     obj_lambda1_CV(double minUB, double tol_val,
                 IntegerVector patchno, NumericVector forbidden_vals,
                 NumericVector value, NumericVector weight, NumericVector valuehat,

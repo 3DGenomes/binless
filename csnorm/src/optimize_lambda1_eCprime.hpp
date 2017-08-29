@@ -7,8 +7,8 @@ using namespace Rcpp;
 #include <utility> //pair
 
 #include "optimize_lambda1.hpp" //compute_BIC_signal and compute_CV_signal
-#include "compute_CV.hpp"
-#include "compute_BIC.hpp"
+#include "Scores.hpp"
+#include "ScoreComputer.hpp"
 #include "DataLikelihoods.hpp"
 
 struct obj_lambda1_eCprime_base {
@@ -26,7 +26,8 @@ private:
 };
 
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using BIC
-struct obj_lambda1_eCprime_BIC : private obj_lambda1_eCprime_base, private compute_BIC<SignalLikelihood> {
+struct obj_lambda1_eCprime_BIC : private obj_lambda1_eCprime_base,
+                                 private ScoreComputer<SignalLikelihood,BICScore> {
   obj_lambda1_eCprime_BIC(double tol_val,
                       bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                       NumericVector value, NumericVector weight, NumericVector valuehat,
@@ -45,7 +46,8 @@ struct obj_lambda1_eCprime_BIC : private obj_lambda1_eCprime_base, private compu
 };
 
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using CV
-struct obj_lambda1_eCprime_CV : private obj_lambda1_eCprime_base, private compute_CV<SignalLikelihood> {
+struct obj_lambda1_eCprime_CV : private obj_lambda1_eCprime_base,
+                                private ScoreComputer<SignalLikelihood,CVScore> {
     obj_lambda1_eCprime_CV(double minval, double tol_val,
                         bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                         NumericVector value, NumericVector weight, NumericVector valuehat,
