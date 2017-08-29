@@ -18,11 +18,6 @@ obj_lambda1_diff_BIC::obj_lambda1_diff_BIC(double minUB, double tol_val,
   ScoreComputer(tol_val, value, weight, valuehat, weight_ref, valuehat_ref, patchno, ncounts),
   minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}
 
-double obj_lambda1_diff_BIC::operator()(double x) const {
-  //return get(std::pow(10,x), "opt")["BIC"];
-  return get(std::pow(10,x))["BIC"];
-}
-
 NumericVector obj_lambda1_diff_BIC::get(double val, std::string msg) const {
   
     double UB = optimize_bounds(val);
@@ -49,11 +44,6 @@ obj_lambda1_diff_CV::obj_lambda1_diff_CV(double minUB, double tol_val,
     obj_lambda1_base(value, weight, valuehat, minUB),
     ScoreComputer(tol_val, value, weight, valuehat, weight_ref, valuehat_ref, patchno, cv_grp),
     minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}
-
-double obj_lambda1_diff_CV::operator()(double x) const {
-    //return get(std::pow(10,x), "opt")["BIC"];
-    return get(std::pow(10,x))["BIC"];
-}
 
 NumericVector obj_lambda1_diff_CV::get(double val, std::string msg) const {
   

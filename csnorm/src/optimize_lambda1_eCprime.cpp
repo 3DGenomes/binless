@@ -91,11 +91,6 @@ obj_lambda1_eCprime_BIC::obj_lambda1_eCprime_BIC(double tol_val,
     tol_val_(tol_val), lambda2_(lambda2), constrained_(constrained),
     forbidden_vals_(forbidden_vals) {}
 
-double obj_lambda1_eCprime_BIC::operator()(double val) const {
-    //return get(val, "opt")["BIC"];
-    return get(val)["BIC"];
-}
-
 //take val as a starting point for optimization of UB and LB at constant dof
 NumericVector obj_lambda1_eCprime_BIC::get(double val, std::string msg) const {
     
@@ -128,11 +123,6 @@ obj_lambda1_eCprime_CV::obj_lambda1_eCprime_CV(double tol_val,
     obj_lambda1_eCprime_base(value, weight, valuehat, min(value)),
     ScoreComputer(tol_val, value, weight, valuehat, patchno, cv_grp),
     tol_val_(tol_val), lambda2_(lambda2), constrained_(constrained), forbidden_vals_(forbidden_vals) {}
-
-double obj_lambda1_eCprime_CV::operator()(double val) const {
-  //return get(val, "opt")["CV"];
-  return get(val)["CV"];
-}
 
 //take val as a starting point for optimization of UB and LB at constant dof
 NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
@@ -188,7 +178,7 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     /*obj_lambda1_eCprime_BIC obj(tol_val, constrained, patchno,
                             forbidden_vals,
                             beta, weight, phihat, ncounts, lambda2);*/
-    obj_lambda1_eCprime_CV obj(minval, tol_val, constrained, patchno,
+    obj_lambda1_eCprime_CV obj(tol_val, constrained, patchno,
                                forbidden_vals, beta_cv, weight, phihat, ncounts, lambda2, cv_grp);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     double minpatch = max(forbidden_vals);

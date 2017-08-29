@@ -33,8 +33,6 @@ struct obj_lambda1_eCprime_BIC : private obj_lambda1_eCprime_base,
                       NumericVector value, NumericVector weight, NumericVector valuehat,
                       NumericVector ncounts, double lambda2);
   
-  double operator()(double x) const;
-  
   NumericVector get(double val, std::string msg = "") const;
   
   double tol_val_, lambda2_;
@@ -49,8 +47,6 @@ struct obj_lambda1_eCprime_CV : private obj_lambda1_eCprime_base,
                         bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                         NumericVector value, NumericVector weight, NumericVector valuehat,
                         NumericVector ncounts, double lambda2, IntegerVector cv_grp);
-
-    double operator()(double x) const;
 
     NumericVector get(double val, std::string msg = "") const;
 

@@ -28,8 +28,6 @@ struct obj_lambda1_BIC : private obj_lambda1_base,
                   NumericVector value, NumericVector weight, NumericVector valuehat,
                   NumericVector ncounts);
   
-  double operator()(double x) const;
-  
   NumericVector get(double val, std::string msg = "") const;
   
   double minUB_, tol_val_;
@@ -43,8 +41,6 @@ struct obj_lambda1_CV : private obj_lambda1_base,
                 IntegerVector patchno, NumericVector forbidden_vals,
                 NumericVector value, NumericVector weight, NumericVector valuehat,
                 NumericVector ncounts, IntegerVector cv_grp);
-
-    double operator()(double x) const;
 
     NumericVector get(double val, std::string msg = "") const;
 

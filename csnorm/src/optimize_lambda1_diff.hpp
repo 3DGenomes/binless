@@ -20,8 +20,6 @@ struct obj_lambda1_diff_BIC : private obj_lambda1_base,
                   NumericVector weight_ref, NumericVector valuehat_ref,
                   NumericVector ncounts);
   
-  double operator()(double x) const;
-  
   NumericVector get(double val, std::string msg = "") const;
   
   double minUB_, tol_val_;
