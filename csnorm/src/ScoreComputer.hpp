@@ -36,7 +36,7 @@ public:
          << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;*/
         return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
                                      _["BIC"]=score, _["BIC.sd"]=score_sd, _["dof"]=dof,
-                                     _["UB"]=UB, _["LB"]=-UB); // do not report score name for now
+                                     _["UB"]=UB, _["LB"]=LB); // do not report score name for now
     }
 
 private:
