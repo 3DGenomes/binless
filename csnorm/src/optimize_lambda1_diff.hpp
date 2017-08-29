@@ -16,7 +16,7 @@ public:
                         IntegerVector patchno, NumericVector forbidden_vals,
                         NumericVector value, NumericVector weight, NumericVector valuehat,
                         NumericVector weight_ref, NumericVector valuehat_ref,
-                     NumericVector ncounts, const typename Score::var_t& score_specific) :
+                        const typename Score::var_t& score_specific) :
     obj_lambda1_base(value, weight, valuehat, minUB),
     ScoreComputer<DifferenceLikelihood,Score>(tol_val, value, weight, valuehat, weight_ref, valuehat_ref, patchno, score_specific),
     minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}

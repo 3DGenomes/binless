@@ -15,7 +15,7 @@ struct obj_lambda1_eCprime : private obj_lambda1_eCprime_base,
     obj_lambda1_eCprime(double tol_val,
                         bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                         NumericVector value, NumericVector weight, NumericVector valuehat,
-                        NumericVector ncounts, double lambda2, const typename Score::var_t& score_specific) :
+                        double lambda2, const typename Score::var_t& score_specific) :
        obj_lambda1_eCprime_base(value, weight, valuehat, min(value)),
        ScoreComputer<SignalLikelihood,Score>(tol_val, value, weight, valuehat, patchno, score_specific),
        tol_val_(tol_val), lambda2_(lambda2), constrained_(constrained), forbidden_vals_(forbidden_vals) {}

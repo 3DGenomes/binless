@@ -40,9 +40,9 @@ NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
     }
     //create functor
     /*obj_lambda1_diff<BICScore> obj(lmin, tol_val, patchno, forbidden_vals,
-                        beta, weight, phihat, ncounts, ncounts);*/
+                        beta, weight, phihat, ncounts);*/
     obj_lambda1_diff<CVScore> obj(lmin, tol_val, patchno, forbidden_vals,
-                    beta_cv, weight, phihat, weight_ref, phihat_ref, ncounts, cv_grp);
+                    beta_cv, weight, phihat, weight_ref, phihat_ref, cv_grp);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     //get minimum authorized patch value
     double minpatch = max(abs(forbidden_vals));

@@ -17,7 +17,7 @@ public:
     obj_lambda1(double minUB, double tol_val,
                 IntegerVector patchno, NumericVector forbidden_vals,
                 NumericVector value, NumericVector weight, NumericVector valuehat,
-                NumericVector ncounts, const typename Score::var_t& score_specific) :
+                const typename Score::var_t& score_specific) :
       obj_lambda1_base(value, weight, valuehat, minUB),
       ScoreComputer<SignalLikelihood,Score>(tol_val, value, weight, valuehat, patchno, score_specific),
       minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}
