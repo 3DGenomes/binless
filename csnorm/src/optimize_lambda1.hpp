@@ -7,7 +7,7 @@ using namespace Rcpp;
 
 #include "compute_CV.hpp"
 #include "compute_BIC.hpp"
-#include "DataModels.hpp"
+#include "DataLikelihoods.hpp"
 
 struct obj_lambda1_base {
     typedef double bounds_t;
@@ -21,7 +21,7 @@ private:
 };
 
 //objective functor to find lambda1 assuming eCprime=0, using BIC
-struct obj_lambda1_BIC : private obj_lambda1_base, private compute_BIC<SignalModel> {
+struct obj_lambda1_BIC : private obj_lambda1_base, private compute_BIC<SignalLikelihood> {
   obj_lambda1_BIC(double minUB, double tol_val,
                   IntegerVector patchno, NumericVector forbidden_vals,
                   NumericVector value, NumericVector weight, NumericVector valuehat,
@@ -38,7 +38,7 @@ struct obj_lambda1_BIC : private obj_lambda1_base, private compute_BIC<SignalMod
 };
 
 //objective functor to find lambda1 assuming eCprime=0, using CV
-struct obj_lambda1_CV : private obj_lambda1_base, private compute_CV<SignalModel> {
+struct obj_lambda1_CV : private obj_lambda1_base, private compute_CV<SignalLikelihood> {
     obj_lambda1_CV(double minUB, double tol_val,
                 IntegerVector patchno, NumericVector forbidden_vals,
                 NumericVector value, NumericVector weight, NumericVector valuehat,

@@ -3,9 +3,9 @@
 
 #include "util.hpp"
 
-class DifferenceModel {
+class DifferenceLikelihood {
 public:
-    DifferenceModel(const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
+    DifferenceLikelihood(const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
                     const NumericVector& weight_ref, const NumericVector& valuehat_ref) :
     value_(value), weight_(weight), valuehat_(valuehat), weight_ref_(weight_ref),
     valuehat_ref_(valuehat_ref) {}
@@ -36,9 +36,9 @@ private:
     NumericVector value_, weight_, valuehat_, weight_ref_, valuehat_ref_;
 };
 
-class SignalModel {
+class SignalLikelihood {
 public:
-    SignalModel(const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat) :
+    SignalLikelihood(const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat) :
     value_(value), weight_(weight), valuehat_(valuehat) {}
     
     NumericVector get_chi_square(double LB, double UB) const {

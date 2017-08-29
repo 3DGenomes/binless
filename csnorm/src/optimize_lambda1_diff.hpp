@@ -8,10 +8,10 @@ using namespace Rcpp;
 
 #include "optimize_lambda1.hpp" //obj_lambda1_base and compute_CV_diff
 #include "compute_CV.hpp"
-#include "DataModels.hpp"
+#include "DataLikelihoods.hpp"
 
 //objective functor to find lambda1 assuming eCprime=0, using BIC
-struct obj_lambda1_diff_BIC : private obj_lambda1_base, private compute_BIC<DifferenceModel> {
+struct obj_lambda1_diff_BIC : private obj_lambda1_base, private compute_BIC<DifferenceLikelihood> {
   obj_lambda1_diff_BIC(double minUB, double tol_val,
                   IntegerVector patchno, NumericVector forbidden_vals,
                   NumericVector value, NumericVector weight, NumericVector valuehat,
@@ -29,7 +29,7 @@ struct obj_lambda1_diff_BIC : private obj_lambda1_base, private compute_BIC<Diff
 };
 
 //objective functor to find lambda1 assuming eCprime=0, using CV
-struct obj_lambda1_diff_CV : private obj_lambda1_base, private compute_CV<DifferenceModel> {
+struct obj_lambda1_diff_CV : private obj_lambda1_base, private compute_CV<DifferenceLikelihood> {
     obj_lambda1_diff_CV(double minUB, double tol_val,
                 IntegerVector patchno, NumericVector forbidden_vals,
                 NumericVector value, NumericVector weight, NumericVector valuehat,

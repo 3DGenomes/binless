@@ -3,25 +3,25 @@
 
 #include "util.hpp"
 
-//DataModel is a temporary placeholder for the object that holds all the data and whether it is a difference or a signal calculation
-template<typename DataModel> class compute_BIC : private DataModel {
+//DataLikelihood is a temporary placeholder for the object that holds all the data and whether it is a difference or a signal calculation
+template<typename DataLikelihood> class compute_BIC : private DataLikelihood {
 public:
     //ugly, but works because of SFINAE
     compute_BIC(double tol_val, const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
                const IntegerVector& patchno, const NumericVector& ncounts) :
-    DataModel(value, weight, valuehat), tol_val_(tol_val), value_(value), patchno_(patchno),
+    DataLikelihood(value, weight, valuehat), tol_val_(tol_val), value_(value), patchno_(patchno),
     lsnc_(log(sum(ncounts))) {}
     compute_BIC(double tol_val, const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
                const NumericVector& weight_ref, const NumericVector& valuehat_ref,
                const IntegerVector& patchno, const NumericVector& ncounts) :
-    DataModel(value, weight, valuehat, weight_ref, valuehat_ref), tol_val_(tol_val),
+    DataLikelihood(value, weight, valuehat, weight_ref, valuehat_ref), tol_val_(tol_val),
     value_(value), patchno_(patchno), lsnc_(log(sum(ncounts))) {}
     
     NumericVector evaluate(double LB, double UB) const {
         //compute dof and CV
         const double lambda1 = (UB-LB)/2;
         const double eCprime = (UB+LB)/2.;
-        const NumericVector chisq = DataModel::get_chi_square(LB, UB);
+        const NumericVector chisq = DataLikelihood::get_chi_square(LB, UB);
         const int dof = get_dof(LB, UB);
 
         const double BIC = sum(chisq)+ lsnc_*dof;
