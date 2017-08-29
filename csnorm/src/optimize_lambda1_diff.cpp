@@ -8,62 +8,7 @@ using namespace Rcpp;
 #include "optimize_lambda1_diff.hpp"
 #include "util.hpp"
 #include "graph_helpers.hpp" //get_patch_numbers
-
-obj_lambda1_diff_BIC::obj_lambda1_diff_BIC(double minUB, double tol_val,
-                                 IntegerVector patchno, NumericVector forbidden_vals,
-                                 NumericVector value, NumericVector weight, NumericVector valuehat,
-                                 NumericVector weight_ref, NumericVector valuehat_ref,
-                                 NumericVector ncounts) :
-  obj_lambda1_base(value, weight, valuehat, minUB),
-  ScoreComputer(tol_val, value, weight, valuehat, weight_ref, valuehat_ref, patchno, ncounts),
-  minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}
-
-NumericVector obj_lambda1_diff_BIC::get(double val, std::string msg) const {
-  
-    double UB = optimize_bounds(val);
-    
-    //check if forbidden
-    double lambda1=UB;
-    if ( is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2)) || (UB < minUB_) ) {
-        if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda1= " << lambda1
-            << " eCprime= 0 BIC= Inf dof= NA"
-            << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;
-        return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1,
-                                     _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na(),
-                                     _["UB"]=lambda1, _["LB"]=-lambda1);
-    }
-    
-    return evaluate(-UB, UB);
-}
-
-obj_lambda1_diff_CV::obj_lambda1_diff_CV(double minUB, double tol_val,
-                         IntegerVector patchno, NumericVector forbidden_vals,
-                         NumericVector value, NumericVector weight, NumericVector valuehat,
-                         NumericVector weight_ref, NumericVector valuehat_ref,
-                         NumericVector ncounts, IntegerVector cv_grp) :
-    obj_lambda1_base(value, weight, valuehat, minUB),
-    ScoreComputer(tol_val, value, weight, valuehat, weight_ref, valuehat_ref, patchno, cv_grp),
-    minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}
-
-NumericVector obj_lambda1_diff_CV::get(double val, std::string msg) const {
-  
-    
-    double UB = optimize_bounds(val);
-    
-    
-    //check if forbidden
-  double lambda1=UB;
-  if ( is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2)) || (UB < minUB_) ) {
-      if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda1= " << lambda1
-                              << " eCprime= 0 CV= Inf dof= NA"
-                              << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;
-      return NumericVector::create(_["eCprime"]=0, _["lambda1"]=lambda1,
-                                   _["BIC"]=std::numeric_limits<double>::max(), _["BIC.sd"]=0,
-                                   _["dof"]=NumericVector::get_na(),
-                                   _["UB"]=lambda1, _["LB"]=-lambda1);
-  }
-    return evaluate(-UB, UB);
-}
+#include "Scores.hpp"
 
 NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
                                    double tol_val,
@@ -94,9 +39,9 @@ NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
       forbidden_vals = get_minimum_diagonal_values(abeta, diag_grp);
     }
     //create functor
-    /*obj_lambda1_diff_BIC obj(lmin, tol_val, patchno, forbidden_vals,
-                        beta, weight, phihat, ncounts);*/
-    obj_lambda1_diff_CV obj(lmin, tol_val, patchno, forbidden_vals,
+    /*obj_lambda1_diff<BICScore> obj(lmin, tol_val, patchno, forbidden_vals,
+                        beta, weight, phihat, ncounts, ncounts);*/
+    obj_lambda1_diff<CVScore> obj(lmin, tol_val, patchno, forbidden_vals,
                     beta_cv, weight, phihat, weight_ref, phihat_ref, ncounts, cv_grp);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     //get minimum authorized patch value
