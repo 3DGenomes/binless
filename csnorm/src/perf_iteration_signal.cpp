@@ -10,6 +10,7 @@ using namespace Rcpp;
 #include "SignalWeightsUpdater.hpp"
 #include "IRLSEstimator.hpp"
 #include "CVEstimator.hpp"
+#include "Dataset.hpp"
 
 #include "util.hpp" //SQUARE
 #include "cts_to_mat.hpp" //cts_to_signal_mat
@@ -18,13 +19,16 @@ using namespace Rcpp;
 #include "graph_helpers.hpp" //get_patch_numbers
 
 
+
 List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins,
                            double lam2, double alpha, double converge,
                            const List outliers, NumericVector beta_i) {
+    //Class that holds all the data. Other classes reference to it.
+    Dataset data(nbins, dispersion, cts, outliers);
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
-    SignalWeightsUpdater wt(nbins, dispersion, cts, outliers); //size of the problem and input data
+    SignalWeightsUpdater wt(data); //size of the problem and input data
     wt.setUp(); //for consistency. No-op, since there's no phi_ref to compute
     
     //do IRLS iterations until convergence
@@ -60,12 +64,14 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                      List outliers, NumericVector beta_i, double lambda1_min, int refine_num,
                      bool constrained, bool fixed) {
     
+    //Class that holds all the data. Other classes reference to it.
+    Dataset data(nbins, dispersion, cts, outliers);
     //setup computation of fused lasso solution
     bool converged = true;
     const double converge = tol_val/20.;
-    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
+    FusedLassoGaussianEstimator<GFLLibrary> flo(data.get_nbins(), converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
-    SignalWeightsUpdater wt(nbins, dispersion, cts, outliers); //size of the problem and input data
+    SignalWeightsUpdater wt(data); //size of the problem and input data
     wt.setUp(); //for consistency. No-op, since there's no phi_ref to compute
     std::vector<double> beta = as<std::vector<double> >(beta_i);
     

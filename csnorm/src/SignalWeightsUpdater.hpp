@@ -5,40 +5,35 @@
 #include <vector>
 
 #include "cts_to_mat.hpp"
+#include "Dataset.hpp"
 
 //policy class that updates IRLS data and weights given counts and a new beta
 //This class takes care of the case of signal estimation
 class SignalWeightsUpdater {
 public:
     
-    SignalWeightsUpdater(unsigned nrows, double dispersion,
-                         const Rcpp::DataFrame& cts, const Rcpp::List& outliers) :
-       nrows_(nrows), dispersion_(dispersion), cts_(cts), outliers_(outliers) {}
+    SignalWeightsUpdater(Dataset& data) : data_(data) {}
     
     void setUp() {} //for consistency with other WeightsUpdaters
     
     void update(const std::vector<double>& beta) {
-        mat_ = cts_to_signal_mat(cts_, nrows_, dispersion_, beta, 0, outliers_);
+        DataFrame mat = cts_to_signal_mat(data_.get_cts(), data_.get_nbins(), data_.get_dispersion(), beta, 0, data_.get_outliers());
+        data_.set_beta(beta);
+        data_.set_mat(mat);
     }
     
-    std::vector<double> get_y() const { return Rcpp::as<std::vector<double> >(mat_["phihat"]); }
+    std::vector<double> get_y() const { return Rcpp::as<std::vector<double> >(data_.get_mat()["phihat"]); }
     
-    std::vector<double> get_w() const { return Rcpp::as<std::vector<double> >(mat_["weight"]); }
+    std::vector<double> get_w() const { return Rcpp::as<std::vector<double> >(data_.get_mat()["weight"]); }
     
-    std::vector<int> get_bin1() const { return Rcpp::as<std::vector<int> > (mat_["bin1"]); }
+    std::vector<int> get_bin1() const { return Rcpp::as<std::vector<int> > (data_.get_mat()["bin1"]); }
     
-    std::vector<int> get_bin2() const { return Rcpp::as<std::vector<int> > (mat_["bin2"]); }
+    std::vector<int> get_bin2() const { return Rcpp::as<std::vector<int> > (data_.get_mat()["bin2"]); }
     
-    Rcpp::DataFrame get_mat() const { return mat_; }
+    Rcpp::DataFrame get_mat() const { return data_.get_mat(); }
     
 private:
-    const unsigned nrows_;
-    const double dispersion_;
-    const Rcpp::DataFrame cts_;
-    const Rcpp::List outliers_;
-    
-    Rcpp::DataFrame mat_;
-    
+    Dataset& data_;
 };
 
 #endif

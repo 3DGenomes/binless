@@ -10,6 +10,7 @@ using namespace Rcpp;
 #include "DifferenceWeightsUpdater.hpp"
 #include "IRLSEstimator.hpp"
 #include "CVEstimator.hpp"
+#include "Dataset.hpp"
 
 #include "cts_to_mat.hpp" //cts_to_diff_mat
 #include "util.hpp" //SQUARE
@@ -21,10 +22,12 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                          double dispersion, int nouter, int nbins,
                          double lam2, double alpha, double converge,
                          List outliers, NumericVector phi_ref_i, NumericVector beta_i) {
+    //Class that holds all the data. Other classes reference to it.
+    Dataset data(nbins, dispersion, cts, ref, outliers);
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
-    DifferenceWeightsUpdater wt(nbins, dispersion, cts, ref, outliers); //size of the problem and input data
+    DifferenceWeightsUpdater wt(data); //size of the problem and input data
     std::vector<double> beta = as<std::vector<double> >(beta_i);
     std::vector<double> phi_ref = as<std::vector<double> >(phi_ref_i);
     wt.setUp(phi_ref, beta); //initial guess of phi_ref provided here
@@ -69,12 +72,14 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    List outliers, NumericVector phi_ref_i,  NumericVector beta_i, double lambda1_min,
                    int refine_num, bool constrained) {
     
+    //Class that holds all the data. Other classes reference to it.
+    Dataset data(nbins, dispersion, cts, ref, outliers);
     //setup computation of fused lasso solution
     bool converged = true;
     const double converge = tol_val/20.;
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
-    DifferenceWeightsUpdater wt(nbins, dispersion, cts, ref, outliers); //size of the problem and input data
+    DifferenceWeightsUpdater wt(data); //size of the problem and input data
     std::vector<double> beta = as<std::vector<double> >(beta_i);
     std::vector<double> phi_ref = as<std::vector<double> >(phi_ref_i);
     wt.setUp(phi_ref, beta); //initial guess of phi_ref provided here
