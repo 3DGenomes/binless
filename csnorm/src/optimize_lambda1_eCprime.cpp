@@ -11,6 +11,7 @@ using namespace Rcpp;
 #include "optimize_lambda1_eCprime.hpp"
 #include "util.hpp"
 #include "graph_helpers.hpp" //get_patch_numbers
+#include "Scores.hpp"
 
     
 obj_lambda1_eCprime_base::bounds_t obj_lambda1_eCprime_base::optimize_bounds(double val) const {
@@ -82,72 +83,6 @@ obj_lambda1_eCprime_base::bounds_t obj_lambda1_eCprime_base::optimize_bounds(dou
   return bounds_t{LB, UB};
 }
 
-obj_lambda1_eCprime_BIC::obj_lambda1_eCprime_BIC(double tol_val,
-        bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
-        NumericVector value, NumericVector weight, NumericVector valuehat,
-        NumericVector ncounts, double lambda2) :
-    obj_lambda1_eCprime_base(value, weight, valuehat, min(value)),
-    ScoreComputer(tol_val, value, weight, valuehat, patchno, ncounts),
-    tol_val_(tol_val), lambda2_(lambda2), constrained_(constrained),
-    forbidden_vals_(forbidden_vals) {}
-
-//take val as a starting point for optimization of UB and LB at constant dof
-NumericVector obj_lambda1_eCprime_BIC::get(double val, std::string msg) const {
-    
-    double UB, LB;
-    std::tie(LB, UB) = optimize_bounds(val);
-    
-    //compute eCprime, lambda1
-    double eCprime = (UB+LB)/2;
-    double lambda1 = (UB-LB)/2;
-    /*Rcout << "EVAL at val= " << val << " LB= " << LB << " UB= " << UB << " b1= " << b1 << " b2= " << b2
-            << " xmin= " << xmin << " xk= " << xk << " xkp1= " << xkp1 << " a= " << a << " b= " << b << std::endl; */
-    //check if solution is feasible
-    if (constrained_) {
-        if ( is_true(any( (forbidden_vals_>UB+tol_val_/2) | (forbidden_vals_<LB-tol_val_/2) )) ) {
-            if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda2= " << lambda2_ << " lambda1= " << lambda1
-              << " eCprime= " << eCprime << " BIC= Inf dof= NA" << std::endl;
-            return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
-                                         _["BIC"]=std::numeric_limits<double>::max(), _["dof"]=NumericVector::get_na(),
-                                         _["UB"]=UB, _["LB"]=LB);
-        }
-    }
-    return evaluate(LB, UB);
-}
-
-
-obj_lambda1_eCprime_CV::obj_lambda1_eCprime_CV(double tol_val,
-                                                 bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
-                                                 NumericVector value, NumericVector weight, NumericVector valuehat,
-                                                 NumericVector ncounts, double lambda2, IntegerVector cv_grp) :
-    obj_lambda1_eCprime_base(value, weight, valuehat, min(value)),
-    ScoreComputer(tol_val, value, weight, valuehat, patchno, cv_grp),
-    tol_val_(tol_val), lambda2_(lambda2), constrained_(constrained), forbidden_vals_(forbidden_vals) {}
-
-//take val as a starting point for optimization of UB and LB at constant dof
-NumericVector obj_lambda1_eCprime_CV::get(double val, std::string msg) const {
-  
-  double UB, LB;
-  std::tie(LB, UB) = optimize_bounds(val);
-    
-  //compute eCprime, lambda1
-  double eCprime = (UB+LB)/2;
-  double lambda1 = (UB-LB)/2;
-  /*Rcout << "EVAL at val= " << val << " LB= " << LB << " UB= " << UB << " b1= " << b1 << " b2= " << b2
-          << " xmin= " << xmin << " xk= " << xk << " xkp1= " << xkp1 << " a= " << a << " b= " << b << std::endl; */
-  //check if solution is feasible
-  if ( UB<LB || (constrained_ && is_true(any( (forbidden_vals_>UB+tol_val_/2) | (forbidden_vals_<LB-tol_val_/2) )) ) ) {
-    if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda2= " << lambda2_ << " lambda1= " << lambda1
-                            << " eCprime= " << eCprime << " CV= Inf dof= NA"
-                            << " UB= " << UB  << " LB= " << LB << std::endl;
-    return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
-                                 _["BIC"]=std::numeric_limits<double>::max(), _["BIC.sd"]=0,
-                                 _["dof"]=NumericVector::get_na(), _["UB"]=UB, _["LB"]=LB);
-  }
-  return evaluate(LB, UB);
-}
-
-
 NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
         double tol_val, bool constrained,
         double lambda1_min, int refine_num, double lambda2) {
@@ -175,10 +110,10 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
       lmin = std::max(lmin, (max(forbidden_vals)-minval)/2);
     }
     //create functor
-    /*obj_lambda1_eCprime_BIC obj(tol_val, constrained, patchno,
+    /*obj_lambda1_eCprime<BICScore> obj(tol_val, constrained, patchno,
                             forbidden_vals,
-                            beta, weight, phihat, ncounts, lambda2);*/
-    obj_lambda1_eCprime_CV obj(tol_val, constrained, patchno,
+                            beta, weight, phihat, ncounts, lambda2, ncounts);*/
+    obj_lambda1_eCprime<CVScore> obj(tol_val, constrained, patchno,
                                forbidden_vals, beta_cv, weight, phihat, ncounts, lambda2, cv_grp);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     double minpatch = max(forbidden_vals);

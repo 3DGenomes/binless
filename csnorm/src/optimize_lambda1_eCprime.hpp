@@ -7,7 +7,6 @@ using namespace Rcpp;
 #include <utility> //pair
 
 #include "optimize_lambda1.hpp" //compute_BIC_signal and compute_CV_signal
-#include "Scores.hpp"
 #include "ScoreComputer.hpp"
 #include "DataLikelihoods.hpp"
 
@@ -25,31 +24,40 @@ private:
     double minval_;
 };
 
-//objective functor to find lambda1 and eCprime assuming the signal is positive, using BIC
-struct obj_lambda1_eCprime_BIC : private obj_lambda1_eCprime_base,
-                                 private ScoreComputer<SignalLikelihood,BICScore> {
-  obj_lambda1_eCprime_BIC(double tol_val,
-                      bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
-                      NumericVector value, NumericVector weight, NumericVector valuehat,
-                      NumericVector ncounts, double lambda2);
-  
-  NumericVector get(double val, std::string msg = "") const;
-  
-  double tol_val_, lambda2_;
-  bool constrained_;
-  NumericVector forbidden_vals_;
-};
-
-//objective functor to find lambda1 and eCprime assuming the signal is positive, using CV
-struct obj_lambda1_eCprime_CV : private obj_lambda1_eCprime_base,
-                                private ScoreComputer<SignalLikelihood,CVScore> {
-    obj_lambda1_eCprime_CV(double tol_val,
+//objective functor to find lambda1 and eCprime assuming the signal is positive, using CV or BIC
+template<typename Score>
+struct obj_lambda1_eCprime : private obj_lambda1_eCprime_base,
+                             private ScoreComputer<SignalLikelihood,Score> {
+    obj_lambda1_eCprime(double tol_val,
                         bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
                         NumericVector value, NumericVector weight, NumericVector valuehat,
-                        NumericVector ncounts, double lambda2, IntegerVector cv_grp);
+                        NumericVector ncounts, double lambda2, const typename Score::var_t& score_specific) :
+       obj_lambda1_eCprime_base(value, weight, valuehat, min(value)),
+       ScoreComputer<SignalLikelihood,Score>(tol_val, value, weight, valuehat, patchno, score_specific),
+       tol_val_(tol_val), lambda2_(lambda2), constrained_(constrained), forbidden_vals_(forbidden_vals) {}
+    
+    NumericVector get(double val, std::string msg = "") const {
+        //optimize bounds
+        double UB, LB;
+        std::tie(LB, UB) = obj_lambda1_eCprime_base::optimize_bounds(val);
+        //check if forbidden. TODO: encapsulate
+        double eCprime = (UB+LB)/2;
+        double lambda1 = (UB-LB)/2;
+        /*Rcout << "EVAL at val= " << val << " LB= " << LB << " UB= " << UB << " b1= " << b1 << " b2= " << b2
+         << " xmin= " << xmin << " xk= " << xk << " xkp1= " << xkp1 << " a= " << a << " b= " << b << std::endl; */
+        //check if solution is feasible
+        if ( UB<LB || (constrained_ && is_true(any( (forbidden_vals_>UB+tol_val_/2) | (forbidden_vals_<LB-tol_val_/2) )) ) ) {
+            if (!msg.empty()) Rcout << " OBJ " << msg << " forbidden lambda2= " << lambda2_ << " lambda1= " << lambda1
+                << " eCprime= " << eCprime << " CV= Inf dof= NA"
+                << " UB= " << UB  << " LB= " << LB << std::endl;
+            return NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
+                                         _["BIC"]=std::numeric_limits<double>::max(), _["BIC.sd"]=0,
+                                         _["dof"]=NumericVector::get_na(), _["UB"]=UB, _["LB"]=LB);
+        }
+        //return score
+        return ScoreComputer<SignalLikelihood,Score>::evaluate(LB, UB);
 
-    NumericVector get(double val, std::string msg = "") const;
-
+    }
     double tol_val_, lambda2_;
     bool constrained_;
     NumericVector forbidden_vals_;
