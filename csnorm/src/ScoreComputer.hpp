@@ -12,13 +12,13 @@ template<typename DataLikelihood, typename Score> class ScoreComputer : private 
 public:
     //ugly, but works because of SFINAE
     ScoreComputer(double tol_val, const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
-                  const IntegerVector& patchno, const typename Score::var_t& cv_grp) :
-       DataLikelihood(value, weight, valuehat), Score(cv_grp), tol_val_(tol_val), value_(value), patchno_(patchno) {}
+                  const IntegerVector& patchno, const typename Score::var_t& score_specific) :
+       DataLikelihood(value, weight, valuehat), Score(score_specific), tol_val_(tol_val), value_(value), patchno_(patchno) {}
     
     ScoreComputer(double tol_val, const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
                const NumericVector& weight_ref, const NumericVector& valuehat_ref,
-                  const IntegerVector& patchno, const typename Score::var_t& cv_grp) :
-       DataLikelihood(value, weight, valuehat, weight_ref, valuehat_ref), Score(cv_grp), tol_val_(tol_val), value_(value), patchno_(patchno) {}
+                  const IntegerVector& patchno, const typename Score::var_t& score_specific) :
+       DataLikelihood(value, weight, valuehat, weight_ref, valuehat_ref), Score(score_specific), tol_val_(tol_val), value_(value), patchno_(patchno) {}
     
     NumericVector evaluate(double LB, double UB) const {
         //compute dof and chi square
