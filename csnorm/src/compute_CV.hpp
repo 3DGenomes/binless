@@ -20,6 +20,7 @@ public:
         const double lambda1 = (UB-LB)/2;
         const double eCprime = (UB+LB)/2.;
         const NumericVector chisq = DataModel::get_chi_square(LB, UB);
+        const int dof = get_dof(LB, UB);
         
         NumericVector groupwise_CV, groupwise_weights;
         const int ngroups=2;
@@ -30,7 +31,6 @@ public:
         const double CV = sum(groupwise_weights*groupwise_CV)/sum(groupwise_weights);
         const double CV_sd = std::sqrt(sum(groupwise_weights*SQUARE(groupwise_CV))/sum(groupwise_weights) - SQUARE(CV));
         
-        const int dof = get_dof(LB, UB);
         /*Rcout << " OBJ " << msg << " ok lambda1= " << lambda1 << " eCprime= 0"
          << " CV= " << CV  << " dof= " << dof
          << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;*/
