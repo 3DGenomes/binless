@@ -10,7 +10,7 @@ using namespace Rcpp;
 #include "ScoreComputer.hpp"
 #include "DataLikelihoods.hpp"
 
-//objective functor to find lambda1 assuming eCprime=0, using CV
+//objective functor to find lambda1 assuming eCprime=0, using CV or BIC, difference case
 template<typename Score>
 class obj_lambda1_diff : private obj_lambda1_base, private ScoreComputer<DifferenceLikelihood,Score> {
 public:
