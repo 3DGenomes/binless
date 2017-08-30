@@ -11,19 +11,20 @@ using namespace Rcpp;
 
 //objective functor to find lambda1 assuming eCprime=0, using CV or BIC, difference case
 template<typename Score>
-class obj_lambda1_diff : private AnySignZeroOffsetBounds, private ScoreComputer<DifferenceLikelihood,Score> {
+class obj_lambda1_diff : private BoundsComputer<ZeroOffset,AnySign>,
+                         private ScoreComputer<DifferenceLikelihood,Score> {
 public:
     obj_lambda1_diff(double minUB, double tol_val,
                         const DifferenceData& data, NumericVector forbidden_vals,
                         const typename Score::var_t& score_specific) :
-    AnySignZeroOffsetBounds(data, minUB),
+    BoundsComputer<ZeroOffset,AnySign>(data, minUB),
     ScoreComputer<DifferenceLikelihood,Score>(tol_val, data, score_specific),
     minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}
     
     
     NumericVector get(double val, std::string msg = "") const {
         //optimize bounds
-        double UB = AnySignZeroOffsetBounds::optimize_bounds(val);
+        double UB = BoundsComputer<ZeroOffset,AnySign>::optimize_bounds(val);
         //check if forbidden. TODO: encapsulate
         double lambda1=UB;
         if ( is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2)) || (UB < minUB_) ) {

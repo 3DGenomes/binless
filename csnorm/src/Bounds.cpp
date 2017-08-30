@@ -5,7 +5,7 @@ using namespace Rcpp;
 #include "util.hpp"
 
     
-PositiveEstimatedOffsetBounds::bounds_t PositiveEstimatedOffsetBounds::optimize_bounds(double val) const {
+EstimatedOffset::bounds_t EstimatedOffset::optimize_bounds(double val) const {
     //split data in two groups
     LogicalVector grp1 = value_ <= val;
     NumericVector w1 = weight_[grp1];
@@ -75,7 +75,7 @@ PositiveEstimatedOffsetBounds::bounds_t PositiveEstimatedOffsetBounds::optimize_
 }
 
 
-AnySignZeroOffsetBounds::bounds_t AnySignZeroOffsetBounds::optimize_bounds(double val) const {
+ZeroOffset::bounds_t ZeroOffset::optimize_bounds(double val) const {
     //split data in two groups and determine constraint values
     //Rcout << "  GET at " << val << " maxabsval_= " << maxabsval_ << std::endl;
     LogicalVector grp1 = value_ > val, grp2 = value_ < -val;
