@@ -1,11 +1,11 @@
 #include <Rcpp.h>
 using namespace Rcpp;
 
-#include "base_objectives.hpp"
+#include "Bounds.hpp"
 #include "util.hpp"
 
     
-obj_lambda1_eCprime_base::bounds_t obj_lambda1_eCprime_base::optimize_bounds(double val) const {
+PositiveEstimatedOffsetBounds::bounds_t PositiveEstimatedOffsetBounds::optimize_bounds(double val) const {
     //split data in two groups
     LogicalVector grp1 = value_ <= val;
     NumericVector w1 = weight_[grp1];
@@ -75,7 +75,7 @@ obj_lambda1_eCprime_base::bounds_t obj_lambda1_eCprime_base::optimize_bounds(dou
 }
 
 
-obj_lambda1_base::bounds_t obj_lambda1_base::optimize_bounds(double val) const {
+AnySignZeroOffsetBounds::bounds_t AnySignZeroOffsetBounds::optimize_bounds(double val) const {
     //split data in two groups and determine constraint values
     //Rcout << "  GET at " << val << " maxabsval_= " << maxabsval_ << std::endl;
     LogicalVector grp1 = value_ > val, grp2 = value_ < -val;

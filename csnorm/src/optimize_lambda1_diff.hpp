@@ -6,24 +6,24 @@ using namespace Rcpp;
 
 #include "ScoreComputer.hpp"
 #include "DataLikelihoods.hpp"
-#include "base_objectives.hpp"
+#include "Bounds.hpp"
 #include "Data.hpp"
 
 //objective functor to find lambda1 assuming eCprime=0, using CV or BIC, difference case
 template<typename Score>
-class obj_lambda1_diff : private obj_lambda1_base, private ScoreComputer<DifferenceLikelihood,Score> {
+class obj_lambda1_diff : private AnySignZeroOffsetBounds, private ScoreComputer<DifferenceLikelihood,Score> {
 public:
     obj_lambda1_diff(double minUB, double tol_val,
                         const DifferenceData& data, NumericVector forbidden_vals,
                         const typename Score::var_t& score_specific) :
-    obj_lambda1_base(data, minUB),
+    AnySignZeroOffsetBounds(data, minUB),
     ScoreComputer<DifferenceLikelihood,Score>(tol_val, data, score_specific),
     minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}
     
     
     NumericVector get(double val, std::string msg = "") const {
         //optimize bounds
-        double UB = obj_lambda1_base::optimize_bounds(val);
+        double UB = AnySignZeroOffsetBounds::optimize_bounds(val);
         //check if forbidden. TODO: encapsulate
         double lambda1=UB;
         if ( is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2)) || (UB < minUB_) ) {

@@ -6,24 +6,24 @@ using namespace Rcpp;
 
 #include "ScoreComputer.hpp"
 #include "DataLikelihoods.hpp"
-#include "base_objectives.hpp"
+#include "Bounds.hpp"
 #include "Data.hpp"
 
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using CV or BIC
 template<typename Score>
-struct obj_lambda1_eCprime : private obj_lambda1_eCprime_base,
+struct obj_lambda1_eCprime : private PositiveEstimatedOffsetBounds,
                              private ScoreComputer<SignalLikelihood,Score> {
     obj_lambda1_eCprime(double tol_val,
                         bool constrained, const SignalData& data, NumericVector forbidden_vals,
                         double lambda2, const typename Score::var_t& score_specific) :
-       obj_lambda1_eCprime_base(data, min(data.get_value())),
+       PositiveEstimatedOffsetBounds(data, min(data.get_value())),
        ScoreComputer<SignalLikelihood,Score>(tol_val, data, score_specific),
        tol_val_(tol_val), lambda2_(lambda2), constrained_(constrained), forbidden_vals_(forbidden_vals) {}
     
     NumericVector get(double val, std::string msg = "") const {
         //optimize bounds
         double UB, LB;
-        std::tie(LB, UB) = obj_lambda1_eCprime_base::optimize_bounds(val);
+        std::tie(LB, UB) = PositiveEstimatedOffsetBounds::optimize_bounds(val);
         //check if forbidden. TODO: encapsulate
         double eCprime = (UB+LB)/2;
         double lambda1 = (UB-LB)/2;

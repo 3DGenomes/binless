@@ -6,25 +6,25 @@ using namespace Rcpp;
 
 #include "ScoreComputer.hpp"
 #include "DataLikelihoods.hpp"
-#include "base_objectives.hpp"
+#include "Bounds.hpp"
 #include "Data.hpp"
 
 
 //objective functor to find lambda1 assuming eCprime=0, using CV or BIC, signal case
 template<typename Score>
-class obj_lambda1 : private obj_lambda1_base,
+class obj_lambda1 : private AnySignZeroOffsetBounds,
                     private ScoreComputer<SignalLikelihood,Score> {
 public:
     obj_lambda1(double minUB, double tol_val,
                 const SignalData& data, NumericVector forbidden_vals,
                 const typename Score::var_t& score_specific) :
-      obj_lambda1_base(data, minUB),
+      AnySignZeroOffsetBounds(data, minUB),
       ScoreComputer<SignalLikelihood,Score>(tol_val, data, score_specific),
       minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}
     
     NumericVector get(double val, std::string msg = "") const {
         //optimize bounds
-        double UB = obj_lambda1_base::optimize_bounds(val);
+        double UB = AnySignZeroOffsetBounds::optimize_bounds(val);
         
         //check if forbidden. TODO: encapsulate
         double lambda1=UB;
