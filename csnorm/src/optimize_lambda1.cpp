@@ -44,10 +44,9 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
         }
     }
     //create functor
-    /*obj_lambda1<BICScore> obj(lmin, tol_val, patchno, forbidden_vals,
-                        beta, weight, phihat, ncounts);*/
-    obj_lambda1<CVScore> obj(lmin, tol_val, patchno, forbidden_vals,
-                    beta_cv, weight, phihat, cv_grp);
+    SignalData data(beta_cv, weight, phihat, patchno); //TODO: beta or beta_cv ?
+    /*obj_lambda1<BICScore> obj(lmin, tol_val, data, forbidden_vals, ncounts);*/
+    obj_lambda1<CVScore> obj(lmin, tol_val, data, forbidden_vals, cv_grp);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     //get minimum authorized patch value
     double minpatch = max(abs(forbidden_vals));

@@ -15,6 +15,10 @@ public:
                   const IntegerVector& patchno, const typename Score::var_t& score_specific) :
        DataLikelihood(value, weight, valuehat), Score(score_specific), tol_val_(tol_val), value_(value), patchno_(patchno) {}
     
+    template<typename Data>
+    ScoreComputer(double tol_val, const Data& data, const typename Score::var_t& score_specific) :
+       DataLikelihood(data), Score(score_specific), tol_val_(tol_val), value_(data.get_value()), patchno_(data.get_patchno()) {}
+    
     ScoreComputer(double tol_val, const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
                const NumericVector& weight_ref, const NumericVector& valuehat_ref,
                   const IntegerVector& patchno, const typename Score::var_t& score_specific) :

@@ -41,11 +41,9 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
       lmin = std::max(lmin, (max(forbidden_vals)-minval)/2);
     }
     //create functor
-    /*obj_lambda1_eCprime<BICScore> obj(tol_val, constrained, patchno,
-                            forbidden_vals,
-                            beta, weight, phihat, lambda2, ncounts);*/
-    obj_lambda1_eCprime<CVScore> obj(tol_val, constrained, patchno,
-                               forbidden_vals, beta_cv, weight, phihat, lambda2, cv_grp);
+    SignalData data(beta_cv, weight, phihat, patchno);
+    /*obj_lambda1_eCprime<BICScore> obj(tol_val, constrained, data, forbidden_vals, lambda2, ncounts);*/
+    obj_lambda1_eCprime<CVScore> obj(tol_val, constrained, data, forbidden_vals, lambda2, cv_grp);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     double minpatch = max(forbidden_vals);
     NumericVector best = optimize_CV(obj, patchvals(0) - 2*tol_val, minpatch, maxval + 2*tol_val, tol_val, patchvals);

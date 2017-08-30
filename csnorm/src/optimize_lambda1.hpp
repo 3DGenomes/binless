@@ -7,6 +7,7 @@ using namespace Rcpp;
 #include "ScoreComputer.hpp"
 #include "DataLikelihoods.hpp"
 #include "base_objectives.hpp"
+#include "Data.hpp"
 
 
 //objective functor to find lambda1 assuming eCprime=0, using CV or BIC, signal case
@@ -15,11 +16,10 @@ class obj_lambda1 : private obj_lambda1_base,
                     private ScoreComputer<SignalLikelihood,Score> {
 public:
     obj_lambda1(double minUB, double tol_val,
-                IntegerVector patchno, NumericVector forbidden_vals,
-                NumericVector value, NumericVector weight, NumericVector valuehat,
+                const SignalData& data, NumericVector forbidden_vals,
                 const typename Score::var_t& score_specific) :
-      obj_lambda1_base(value, weight, valuehat, minUB),
-      ScoreComputer<SignalLikelihood,Score>(tol_val, value, weight, valuehat, patchno, score_specific),
+      obj_lambda1_base(data, minUB),
+      ScoreComputer<SignalLikelihood,Score>(tol_val, data, score_specific),
       minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}
     
     NumericVector get(double val, std::string msg = "") const {

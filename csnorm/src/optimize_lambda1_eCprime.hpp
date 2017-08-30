@@ -7,17 +7,17 @@ using namespace Rcpp;
 #include "ScoreComputer.hpp"
 #include "DataLikelihoods.hpp"
 #include "base_objectives.hpp"
+#include "Data.hpp"
 
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using CV or BIC
 template<typename Score>
 struct obj_lambda1_eCprime : private obj_lambda1_eCprime_base,
                              private ScoreComputer<SignalLikelihood,Score> {
     obj_lambda1_eCprime(double tol_val,
-                        bool constrained, IntegerVector patchno, NumericVector forbidden_vals,
-                        NumericVector value, NumericVector weight, NumericVector valuehat,
+                        bool constrained, const SignalData& data, NumericVector forbidden_vals,
                         double lambda2, const typename Score::var_t& score_specific) :
-       obj_lambda1_eCprime_base(value, weight, valuehat, min(value)),
-       ScoreComputer<SignalLikelihood,Score>(tol_val, value, weight, valuehat, patchno, score_specific),
+       obj_lambda1_eCprime_base(data, min(data.get_value())),
+       ScoreComputer<SignalLikelihood,Score>(tol_val, data, score_specific),
        tol_val_(tol_val), lambda2_(lambda2), constrained_(constrained), forbidden_vals_(forbidden_vals) {}
     
     NumericVector get(double val, std::string msg = "") const {

@@ -10,8 +10,8 @@ using namespace Rcpp;
 struct obj_lambda1_eCprime_base {
     typedef std::pair<double, double> bounds_t;
     
-    obj_lambda1_eCprime_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minval) :
-       value_(value), weight_(weight), valuehat_(valuehat), minval_(minval) {}
+    obj_lambda1_eCprime_base(const SignalData& data, double minval) :
+       value_(data.get_value()), weight_(data.get_weight()), valuehat_(data.get_valuehat()), minval_(minval) {}
     
     //given an UB candidate (and implicit dof), find the adequate UB and LB
     bounds_t optimize_bounds(double UB) const;
@@ -23,9 +23,9 @@ private:
 
 struct obj_lambda1_base {
     typedef double bounds_t;
-    obj_lambda1_base(NumericVector value, NumericVector weight, NumericVector valuehat, double minUB) :
-      value_(value), absval_(abs(value)), weight_(weight), valuehat_(valuehat), minabsval_(min(absval_)),
-      maxabsval_(max(absval_)), minUB_(minUB) {}
+    obj_lambda1_base(const Data& data, double minUB) :
+      value_(data.get_value()), absval_(abs(data.get_value())), weight_(data.get_weight()),
+      valuehat_(data.get_valuehat()), minabsval_(min(absval_)), maxabsval_(max(absval_)), minUB_(minUB) {}
 
     //given an UB candidate (and implicit dof), find the adequate UB and LB
     bounds_t optimize_bounds(double UB) const;

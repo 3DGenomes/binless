@@ -2,13 +2,18 @@
 #define MODELS_HPP
 
 #include "util.hpp"
+#include "Data.hpp"
 
 class DifferenceLikelihood {
 public:
     DifferenceLikelihood(const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat,
-                    const NumericVector& weight_ref, const NumericVector& valuehat_ref) :
-    value_(value), weight_(weight), valuehat_(valuehat), weight_ref_(weight_ref),
-    valuehat_ref_(valuehat_ref) {}
+                         const NumericVector& weight_ref, const NumericVector& valuehat_ref) :
+       value_(value), weight_(weight), valuehat_(valuehat), weight_ref_(weight_ref),
+       valuehat_ref_(valuehat_ref) {}
+    
+    DifferenceLikelihood(const DifferenceData& data) :
+       value_(data.get_value()), weight_(data.get_weight()), valuehat_(data.get_valuehat()),
+       weight_ref_(data.get_weight_ref()), valuehat_ref_(data.get_valuehat_ref()) {}
     
     NumericVector get_chi_square(double LB, double UB) const {
         const double lambda1 = (UB-LB)/2;
@@ -39,7 +44,10 @@ private:
 class SignalLikelihood {
 public:
     SignalLikelihood(const NumericVector& value, const NumericVector& weight, const NumericVector& valuehat) :
-    value_(value), weight_(weight), valuehat_(valuehat) {}
+       value_(value), weight_(weight), valuehat_(valuehat) {}
+    
+    SignalLikelihood(const SignalData& data) :
+       value_(data.get_value()), weight_(data.get_weight()), valuehat_(data.get_valuehat()) {}
     
     NumericVector get_chi_square(double LB, double UB) const {
         const double lambda1 = (UB-LB)/2;
