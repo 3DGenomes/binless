@@ -126,7 +126,6 @@ ZeroOffset::bounds_t ZeroOffset::optimize_bounds(double val) const {
     UB = std::min(std::max(UB,xk),xkp1);
     if (minUB_ <= xkp1 && minUB_ > xk) UB=std::max(minUB_,UB);
     //Rcout << "  UB= " << UB << " minUB= " << minUB_ << std::endl;
-    if (UB<LB) Rcpp::stop("Found LB > UB!\n");
-    return UB;
+    return bounds_t{-UB,UB};
 }
 

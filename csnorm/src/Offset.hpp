@@ -22,7 +22,7 @@ private:
 };
 
 struct ZeroOffset {
-    typedef double bounds_t;
+    typedef std::pair<double,double> bounds_t;
     
     ZeroOffset(const Data& data, double minUB) :
       value_(data.get_value()), absval_(abs(data.get_value())), weight_(data.get_weight()),
