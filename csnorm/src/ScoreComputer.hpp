@@ -2,6 +2,7 @@
 #define SCORE_COMPUTER_HPP
 
 #include <Rcpp.h>
+#include <utility> //pair
 #include <tuple> //tie
 
 #include "CalculationTraits.hpp"
@@ -35,6 +36,8 @@ public:
                                      _["UB"]=UB, _["LB"]=LB); // do not report score name for now
     }
 
+    Rcpp::NumericVector evaluate(std::pair<double,double> bounds) const { return evaluate(bounds.first, bounds.second); }
+    
 private:
     int get_dof(double LB, double UB) const {
         const double lambda1 = (UB-LB)/2;
