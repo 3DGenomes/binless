@@ -17,6 +17,7 @@ public:
     ScoreComputer(double tol_val, const typename Calculation::data_t& data, const typename Score::var_t& score_specific) :
        Calculation::likelihood_t(data), Score(score_specific), tol_val_(tol_val), value_(data.get_value()), patchno_(data.get_patchno()) {}
     
+    //compute score obtained with these bounds
     Rcpp::NumericVector evaluate(double LB, double UB) const {
         //compute dof and chi square
         const double lambda1 = (UB-LB)/2;
@@ -37,6 +38,24 @@ public:
     }
 
     Rcpp::NumericVector evaluate(std::pair<double,double> bounds) const { return evaluate(bounds.first, bounds.second); }
+   
+    //return highest possible score, invalidating these bounds
+    Rcpp::NumericVector invalidate(double LB, double UB) const {
+        //compute dof and chi square
+        const double lambda1 = (UB-LB)/2;
+        const double eCprime = (UB+LB)/2.;
+        const double score = std::numeric_limits<double>::max();
+        const double score_sd = -1;
+        const NumericVector dof = NumericVector::get_na();
+        /*Rcout << " OBJ " << msg << " ok lambda1= " << lambda1 << " eCprime= 0"
+         << " CV= " << score  << " dof= " << dof
+         << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;*/
+        return Rcpp::NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
+                                           _["BIC"]=score, _["BIC.sd"]=score_sd, _["dof"]=dof,
+                                           _["UB"]=UB, _["LB"]=LB); // do not report score name for now
+    }
+    
+    Rcpp::NumericVector invalidate(std::pair<double,double> bounds) const { return invalidate(bounds.first, bounds.second); }
     
 private:
     int get_dof(double LB, double UB) const {
