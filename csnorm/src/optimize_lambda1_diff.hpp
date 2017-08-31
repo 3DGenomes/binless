@@ -3,10 +3,14 @@
 
 #include <Rcpp.h>
 using namespace Rcpp;
+#include <tuple> //tie
 
 #include "CalculationTraits.hpp"
 #include "ScoreComputer.hpp"
-#include "Bounds.hpp"
+#include "BoundsComputer.hpp"
+#include "Sign.hpp"
+#include "Offset.hpp"
+#include "DataLikelihoods.hpp"
 
 class DifferenceData;
 
@@ -25,7 +29,8 @@ public:
     
     NumericVector get(double val, std::string msg = "") const {
         //optimize bounds
-        double UB = BoundsComputer<ZeroOffset,AnySign>::optimize_bounds(val);
+        double UB, LB;
+        std::tie(LB, UB) = BoundsComputer<ZeroOffset,AnySign>::optimize_bounds(val);
         //check if forbidden. TODO: encapsulate
         double lambda1=UB;
         if ( is_true(any(abs(forbidden_vals_)>lambda1+tol_val_/2)) || (UB < minUB_) ) {

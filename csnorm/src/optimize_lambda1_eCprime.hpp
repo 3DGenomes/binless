@@ -3,10 +3,14 @@
 
 #include <Rcpp.h>
 using namespace Rcpp;
+#include <tuple> //tie
 
 #include "CalculationTraits.hpp"
 #include "ScoreComputer.hpp"
-#include "Bounds.hpp"
+#include "BoundsComputer.hpp"
+#include "Sign.hpp"
+#include "Offset.hpp"
+#include "DataLikelihoods.hpp"
 
 class SignalData;
 
