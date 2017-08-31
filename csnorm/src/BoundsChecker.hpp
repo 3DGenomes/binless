@@ -5,9 +5,10 @@
 
 #include "BoundsComputer.hpp" //for bounds_t typedef
 #include "Sign.hpp"
+#include "Degeneracy.hpp"
 
-//BoundsChecker does tag dispatching by the type of Sign
-template<typename Sign> class BoundsChecker {};
+//BoundsChecker does tag dispatching by type
+template<typename> class BoundsChecker {};
 
 //specialization in the case where the sign is positive
 template<> class BoundsChecker<PositiveSign> {
@@ -27,8 +28,32 @@ private:
 template<> class BoundsChecker<AnySign> {
 public:
     BoundsChecker(const Rcpp::NumericVector&) {};
-    bool is_valid(bounds_t, const Rcpp::NumericVector&) const { return true; }
+    bool is_valid(bounds_t) const { return true; }
 };
+
+
+
+//specialization in the case where degeneracies are forbidden
+template<> class BoundsChecker<ForbidDegeneracy> {
+public:
+    BoundsChecker(const Rcpp::NumericVector& forbidden_values) :
+     minval_(min(forbidden_values)), maxval_(max(forbidden_values)) {};
+    
+    bool is_valid(bounds_t bounds) const {
+        return (bounds.first <= minval) && (maxval <= bounds.second);
+    }
+    
+private:
+    double minval_, maxval_;
+};
+
+//specialization in the case where the degeneracies are allowed
+template<> class BoundsChecker<AllowDegeneracy> {
+public:
+    BoundsChecker(const Rcpp::NumericVector&) {};
+    bool is_valid(bounds_t) const { return true; }
+};
+
 
 
 #endif
