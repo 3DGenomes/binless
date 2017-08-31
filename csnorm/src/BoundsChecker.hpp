@@ -4,7 +4,7 @@
 #include <Rcpp.h>
 
 #include "BoundsComputer.hpp" //for bounds_t typedef
-#include "Sign.hpp"
+#include "Tags.hpp"
 #include "Degeneracy.hpp"
 
 //BoundsChecker does tag dispatching by type

@@ -8,8 +8,7 @@ using namespace Rcpp;
 #include "CalculationTraits.hpp"
 #include "ScoreComputer.hpp"
 #include "BoundsComputer.hpp"
-#include "Sign.hpp"
-#include "Offset.hpp"
+#include "Tags.hpp"
 #include "Likelihoods.hpp"
 
 class DifferenceData;

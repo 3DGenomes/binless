@@ -4,8 +4,7 @@
 #include <Rcpp.h>
 #include <type_traits>
 
-#include "Offset.hpp"
-#include "Sign.hpp"
+#include "Tags.hpp"
 #include "Data.hpp"
 
 //the type of bounds when passed around
