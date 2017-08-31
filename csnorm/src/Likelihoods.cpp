@@ -1,7 +1,7 @@
 #include <Rcpp.h>
 #include <vector>
 
-#include "DataLikelihoods.hpp"
+#include "Likelihoods.hpp"
 #include "util.hpp"
 
 Rcpp::NumericVector SignalLikelihood::get_chi_square(double LB, double UB) const {

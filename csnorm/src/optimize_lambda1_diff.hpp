@@ -10,7 +10,7 @@ using namespace Rcpp;
 #include "BoundsComputer.hpp"
 #include "Sign.hpp"
 #include "Offset.hpp"
-#include "DataLikelihoods.hpp"
+#include "Likelihoods.hpp"
 
 class DifferenceData;
 

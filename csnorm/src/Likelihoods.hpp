@@ -1,5 +1,5 @@
-#ifndef DATA_LIKELIHOODS_HPP
-#define DATA_LIKELIHOODS_HPP
+#ifndef LIKELIHOODS_HPP
+#define LIKELIHOODS_HPP
 
 #include <Rcpp.h>
 
