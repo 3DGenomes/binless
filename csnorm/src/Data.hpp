@@ -7,8 +7,9 @@
 class Data {
 public:
     Data(const Rcpp::NumericVector& value, const Rcpp::NumericVector& weight,
-         const Rcpp::NumericVector& valuehat, const Rcpp::IntegerVector& patchno) :
-    value_(value), weight_(weight), valuehat_(valuehat), patchno_(patchno) {}
+         const Rcpp::NumericVector& valuehat, const Rcpp::NumericVector& ncounts,
+         const Rcpp::IntegerVector& patchno) :
+    value_(value), weight_(weight), valuehat_(valuehat), ncounts_(ncounts), patchno_(patchno) {}
     
     Rcpp::NumericVector get_value() const { return value_; }
     
@@ -19,7 +20,7 @@ public:
     Rcpp::IntegerVector get_patchno() const { return patchno_; }
     
 private:
-    const Rcpp::NumericVector value_, weight_, valuehat_;
+    const Rcpp::NumericVector value_, weight_, valuehat_, ncounts_;
     const Rcpp::IntegerVector patchno_;
 };
 
@@ -29,8 +30,9 @@ class DifferenceData : public Data {
 public:
     DifferenceData(const Rcpp::NumericVector& value, const Rcpp::NumericVector& weight,
                    const Rcpp::NumericVector& valuehat, const Rcpp::NumericVector& weight_ref,
-                   const Rcpp::NumericVector& valuehat_ref, const Rcpp::IntegerVector& patchno) :
-      Data(value, weight, valuehat, patchno), weight_ref_(weight_ref), valuehat_ref_(valuehat_ref) {}
+                   const Rcpp::NumericVector& valuehat_ref, const Rcpp::NumericVector& ncounts,
+                   const Rcpp::IntegerVector& patchno) :
+      Data(value, weight, valuehat, ncounts, patchno), weight_ref_(weight_ref), valuehat_ref_(valuehat_ref) {}
     
     Rcpp::NumericVector get_weight_ref() const { return weight_ref_; }
     

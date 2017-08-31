@@ -44,7 +44,7 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
         }
     }
     //create functor
-    SignalData data(beta_cv, weight, phihat, patchno); //TODO: beta or beta_cv ?
+    SignalData data(beta_cv, weight, phihat, ncounts, patchno); //TODO: beta or beta_cv ?
     /*obj_lambda1<BICScore> obj(lmin, tol_val, data, forbidden_vals, ncounts);*/
     obj_lambda1<CVScore> obj(lmin, tol_val, data, forbidden_vals, cv_grp);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
