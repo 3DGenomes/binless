@@ -20,11 +20,21 @@ struct ForbidDegeneracy {
         if (it == vc.begin() || it == vc.end()) Rcpp::stop("This should not happen because candidates should extend beyond patch values"); //TODO
         return Rcpp::wrap(std::vector<double>(it-1,vc.end()));
     }
+    
+    //tell if these bounds include all forbidden values
+    bool is_valid(std::pair<double,double> bounds, const Rcpp::NumericVector& fv) const {
+        double minval = min(fv);
+        double maxval = max(fv);
+        double LB,UB;
+        std::tie(LB,UB) = bounds;
+        return (LB <= minval) && (maxval <= UB);
+    }
 };
 
 struct AllowDegeneracy {
     Rcpp::NumericVector get_forbidden_values(const DataFrame&) { return Rcpp::NumericVector(); }
     Rcpp::NumericVector filter_borders(const Rcpp::NumericVector& c, const Rcpp::NumericVector&) { return c; }
+    bool is_valid(std::pair<double,double> bounds, const Rcpp::NumericVector&) const { return true; }
 };
 
 
