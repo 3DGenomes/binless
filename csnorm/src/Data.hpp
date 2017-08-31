@@ -2,7 +2,6 @@
 #define DATA_HPP
 
 #include <Rcpp.h>
-#include <vector>
 
 class Data {
 public:
