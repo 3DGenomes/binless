@@ -23,7 +23,13 @@ private:
     const Rcpp::IntegerVector patchno_;
 };
 
-typedef Data SignalData;
+class SignalData : public Data {
+public:
+  SignalData(const Rcpp::NumericVector& value, const Rcpp::NumericVector& weight,
+       const Rcpp::NumericVector& valuehat, const Rcpp::NumericVector& ncounts,
+       const Rcpp::IntegerVector& patchno) :
+   Data(value, weight, valuehat, ncounts, patchno) {}
+};
 
 class DifferenceData : public Data {
 public:

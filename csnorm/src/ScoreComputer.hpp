@@ -4,21 +4,22 @@
 #include <Rcpp.h>
 #include <tuple> //tie
 
+#include "CalculationTraits.hpp"
 #include "util.hpp" //soft_threshold
 
 
-//DataLikelihood knows how to compute the chi square, Score knows how to assemble it into the BIC/CV
-template<typename DataLikelihood, typename Score> class ScoreComputer : private DataLikelihood, private Score {
+//Calculation is either Signal or Difference (points to both likelihoods and data structures)
+//Score knows how to assemble it into the BIC/CV
+template<typename Calculation, typename Score> class ScoreComputer : private Calculation::likelihood_t, private Score {
 public:
-    template<typename Data>
-    ScoreComputer(double tol_val, const Data& data, const typename Score::var_t& score_specific) :
-       DataLikelihood(data), Score(score_specific), tol_val_(tol_val), value_(data.get_value()), patchno_(data.get_patchno()) {}
+    ScoreComputer(double tol_val, const typename Calculation::data_t& data, const typename Score::var_t& score_specific) :
+       Calculation::likelihood_t(data), Score(score_specific), tol_val_(tol_val), value_(data.get_value()), patchno_(data.get_patchno()) {}
     
     NumericVector evaluate(double LB, double UB) const {
         //compute dof and chi square
         const double lambda1 = (UB-LB)/2;
         const double eCprime = (UB+LB)/2.;
-        const NumericVector chisq = DataLikelihood::get_chi_square(LB, UB);
+        const NumericVector chisq = Calculation::likelihood_t::get_chi_square(LB, UB);
         const int dof = get_dof(LB, UB);
         
         //assemble it into a score

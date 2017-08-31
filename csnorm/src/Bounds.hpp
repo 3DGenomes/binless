@@ -19,7 +19,7 @@ struct AnySign {
 struct EstimatedOffset {
   typedef std::pair<double,double> bounds_t;
   
-  EstimatedOffset(const SignalData& data, double minval) :
+  EstimatedOffset(const Data& data, double minval) :
        value_(data.get_value()), weight_(data.get_weight()), valuehat_(data.get_valuehat()), minval_(minval) {}
     
     //given an UB candidate (and implicit dof), find the adequate UB and LB

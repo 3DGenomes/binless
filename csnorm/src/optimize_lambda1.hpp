@@ -4,22 +4,22 @@
 #include <Rcpp.h>
 using namespace Rcpp;
 
+#include "CalculationTraits.hpp"
 #include "ScoreComputer.hpp"
-#include "DataLikelihoods.hpp"
 #include "Bounds.hpp"
-#include "Data.hpp"
 
+class SignalData;
 
 //objective functor to find lambda1 assuming eCprime=0, using CV or BIC, signal case
 template<typename Score>
 class obj_lambda1 : private BoundsComputer<ZeroOffset,AnySign>,
-                    private ScoreComputer<SignalLikelihood,Score> {
+                    private ScoreComputer<Signal,Score> {
 public:
     obj_lambda1(double minUB, double tol_val,
                 const SignalData& data, NumericVector forbidden_vals,
                 const typename Score::var_t& score_specific) :
       BoundsComputer<ZeroOffset,AnySign>(data, minUB),
-      ScoreComputer<SignalLikelihood,Score>(tol_val, data, score_specific),
+      ScoreComputer<Signal,Score>(tol_val, data, score_specific),
       minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}
     
     NumericVector get(double val, std::string msg = "") const {
@@ -37,7 +37,7 @@ public:
                                          _["dof"]=NumericVector::get_na(), _["UB"]=lambda1, _["LB"]=-lambda1);
         }
         //return score
-        return ScoreComputer<SignalLikelihood,Score>::evaluate(-UB, UB);
+        return ScoreComputer<Signal,Score>::evaluate(-UB, UB);
     }
     
 private:

@@ -4,20 +4,21 @@
 #include <Rcpp.h>
 using namespace Rcpp;
 
+#include "CalculationTraits.hpp"
 #include "ScoreComputer.hpp"
-#include "DataLikelihoods.hpp"
 #include "Bounds.hpp"
-#include "Data.hpp"
+
+class SignalData;
 
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using CV or BIC
 template<typename Score>
 struct obj_lambda1_eCprime : private BoundsComputer<EstimatedOffset,PositiveSign>,
-                             private ScoreComputer<SignalLikelihood,Score> {
+                             private ScoreComputer<Signal,Score> {
     obj_lambda1_eCprime(double tol_val,
                         bool constrained, const SignalData& data, NumericVector forbidden_vals,
                         double lambda2, const typename Score::var_t& score_specific) :
        BoundsComputer<EstimatedOffset,PositiveSign>(data, min(data.get_value())),
-       ScoreComputer<SignalLikelihood,Score>(tol_val, data, score_specific),
+       ScoreComputer<Signal,Score>(tol_val, data, score_specific),
        tol_val_(tol_val), lambda2_(lambda2), constrained_(constrained), forbidden_vals_(forbidden_vals) {}
     
     NumericVector get(double val, std::string msg = "") const {
@@ -39,7 +40,7 @@ struct obj_lambda1_eCprime : private BoundsComputer<EstimatedOffset,PositiveSign
                                          _["dof"]=NumericVector::get_na(), _["UB"]=UB, _["LB"]=LB);
         }
         //return score
-        return ScoreComputer<SignalLikelihood,Score>::evaluate(LB, UB);
+        return ScoreComputer<Signal,Score>::evaluate(LB, UB);
 
     }
     double tol_val_, lambda2_;

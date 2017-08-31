@@ -4,21 +4,22 @@
 #include <Rcpp.h>
 using namespace Rcpp;
 
+#include "CalculationTraits.hpp"
 #include "ScoreComputer.hpp"
-#include "DataLikelihoods.hpp"
 #include "Bounds.hpp"
-#include "Data.hpp"
+
+class DifferenceData;
 
 //objective functor to find lambda1 assuming eCprime=0, using CV or BIC, difference case
 template<typename Score>
 class obj_lambda1_diff : private BoundsComputer<ZeroOffset,AnySign>,
-                         private ScoreComputer<DifferenceLikelihood,Score> {
+                         private ScoreComputer<Difference,Score> {
 public:
     obj_lambda1_diff(double minUB, double tol_val,
                         const DifferenceData& data, NumericVector forbidden_vals,
                         const typename Score::var_t& score_specific) :
     BoundsComputer<ZeroOffset,AnySign>(data, minUB),
-    ScoreComputer<DifferenceLikelihood,Score>(tol_val, data, score_specific),
+    ScoreComputer<Difference,Score>(tol_val, data, score_specific),
     minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}
     
     
@@ -37,7 +38,7 @@ public:
                                          _["UB"]=lambda1, _["LB"]=-lambda1);
         }
         //return score
-        return ScoreComputer<DifferenceLikelihood,Score>::evaluate(-UB, UB);
+        return ScoreComputer<Difference,Score>::evaluate(-UB, UB);
     }
     
     double minUB_, tol_val_;
