@@ -6,14 +6,14 @@
 
 #include "util.hpp" //compute_phi_ref
 #include "cts_to_mat.hpp" //cts_to_diff_mat
-#include "Dataset.hpp"
+#include "RawData.hpp"
 
 //policy class that updates IRLS data and weights given counts and a new beta
 //This class takes care of the case of difference estimation
 class DifferenceWeightsUpdater {
 public:
     
-    DifferenceWeightsUpdater(DifferenceDataset& data) : data_(data) {}
+    DifferenceWeightsUpdater(DifferenceRawData& data) : data_(data) {}
     
     void setUp(const std::vector<double>& phi_ref, const std::vector<double>& beta) {
         //store first estimate of phi_ref and compute mat
@@ -74,7 +74,7 @@ public:
     Rcpp::DataFrame get_mat() const { return data_.get_mat(); }
     
 private:
-    DifferenceDataset& data_;
+    DifferenceRawData& data_;
 };
 
 #endif

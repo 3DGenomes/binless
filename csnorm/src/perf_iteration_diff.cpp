@@ -10,8 +10,8 @@ using namespace Rcpp;
 #include "DifferenceWeightsUpdater.hpp"
 #include "IRLSEstimator.hpp"
 #include "CVEstimator.hpp"
-#include "Dataset.hpp"
-#include "Data.hpp"
+#include "RawData.hpp"
+#include "BinnedData.hpp"
 #include "Traits.hpp"
 #include "Degeneracy.hpp"
 #include "SparsityEstimator.hpp"
@@ -26,7 +26,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                          double lam2, double alpha, double converge,
                          List outliers, NumericVector phi_ref_i, NumericVector beta_i) {
     //Class that holds all the data. Other classes reference to it.
-    DifferenceDataset data(nbins, dispersion, cts, ref, outliers);
+    DifferenceRawData data(nbins, dispersion, cts, ref, outliers);
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
@@ -76,7 +76,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    int refine_num, bool constrained) {
     
     //Class that holds all the data. Other classes reference to it.
-    DifferenceDataset data(nbins, dispersion, cts, ref, outliers);
+    DifferenceRawData data(nbins, dispersion, cts, ref, outliers);
     //setup computation of fused lasso solution
     bool converged = true;
     const double converge = tol_val/20.;
@@ -145,7 +145,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
         IntegerVector patchno = get_patch_numbers(nbins, mat, tol_val);
         NumericVector beta_cv = mat["beta_cv"];
         IntegerVector cv_grp = mat["cv.group"];
-        DifferenceData data(beta_r, weight, phihat, weight_ref, phihat_ref, ncounts, patchno);
+        DifferenceBinnedData data(beta_r, weight, phihat, weight_ref, phihat_ref, ncounts, patchno);
         SparsityEstimator<Difference, CV, ZeroOffset, AnySign, ForbidDegeneracy> est(nbins, tol_val, data, lam2, mat, beta_cv, cv_grp);
         opt = est.optimize();
         

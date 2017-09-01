@@ -1,11 +1,11 @@
-#ifndef DATA_HPP
-#define DATA_HPP
+#ifndef BINNED_DATA_HPP
+#define BINNED_DATA_HPP
 
 #include <Rcpp.h>
 
-class Data {
+class BinnedData {
 public:
-    Data(const Rcpp::NumericVector& value, const Rcpp::NumericVector& weight,
+    BinnedData(const Rcpp::NumericVector& value, const Rcpp::NumericVector& weight,
          const Rcpp::NumericVector& valuehat, const Rcpp::NumericVector& ncounts,
          const Rcpp::IntegerVector& patchno) :
     value_(value), weight_(weight), valuehat_(valuehat), ncounts_(ncounts), patchno_(patchno) {}
@@ -23,21 +23,21 @@ private:
     const Rcpp::IntegerVector patchno_;
 };
 
-class SignalData : public Data {
+class SignalBinnedData : public BinnedData {
 public:
-  SignalData(const Rcpp::NumericVector& value, const Rcpp::NumericVector& weight,
+  SignalBinnedData(const Rcpp::NumericVector& value, const Rcpp::NumericVector& weight,
        const Rcpp::NumericVector& valuehat, const Rcpp::NumericVector& ncounts,
        const Rcpp::IntegerVector& patchno) :
-   Data(value, weight, valuehat, ncounts, patchno) {}
+   BinnedData(value, weight, valuehat, ncounts, patchno) {}
 };
 
-class DifferenceData : public Data {
+class DifferenceBinnedData : public BinnedData {
 public:
-    DifferenceData(const Rcpp::NumericVector& value, const Rcpp::NumericVector& weight,
+    DifferenceBinnedData(const Rcpp::NumericVector& value, const Rcpp::NumericVector& weight,
                    const Rcpp::NumericVector& valuehat, const Rcpp::NumericVector& weight_ref,
                    const Rcpp::NumericVector& valuehat_ref, const Rcpp::NumericVector& ncounts,
                    const Rcpp::IntegerVector& patchno) :
-      Data(value, weight, valuehat, ncounts, patchno), weight_ref_(weight_ref), valuehat_ref_(valuehat_ref) {}
+      BinnedData(value, weight, valuehat, ncounts, patchno), weight_ref_(weight_ref), valuehat_ref_(valuehat_ref) {}
     
     Rcpp::NumericVector get_weight_ref() const { return weight_ref_; }
     

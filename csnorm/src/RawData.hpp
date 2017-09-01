@@ -1,12 +1,12 @@
-#ifndef DATASET_HPP
-#define DATASET_HPP
+#ifndef RAW_DATA_HPP
+#define RAW_DATA_HPP
 
 #include <Rcpp.h>
 #include <vector>
 
-class Dataset {
+class RawData {
 public:
-    Dataset(int nbins, double dispersion, const Rcpp::DataFrame& cts, const Rcpp::List& outliers) :
+    RawData(int nbins, double dispersion, const Rcpp::DataFrame& cts, const Rcpp::List& outliers) :
     nbins_(nbins), dispersion_(dispersion), cts_(cts), outliers_(outliers) {}
     
     int get_nbins() const { return nbins_; }
@@ -36,18 +36,18 @@ private:
     
 };
 
-class SignalDataset : public Dataset {
+class SignalRawData : public RawData {
 public:
-    SignalDataset(int nbins, double dispersion, const Rcpp::DataFrame& cts, const Rcpp::List& outliers) :
-     Dataset(nbins, dispersion, cts, outliers) {}
+    SignalRawData(int nbins, double dispersion, const Rcpp::DataFrame& cts, const Rcpp::List& outliers) :
+     RawData(nbins, dispersion, cts, outliers) {}
 };
 
 
-class DifferenceDataset : public Dataset {
+class DifferenceRawData : public RawData {
 public:
-    DifferenceDataset(int nbins, double dispersion, const Rcpp::DataFrame& cts, const Rcpp::DataFrame& ref,
+    DifferenceRawData(int nbins, double dispersion, const Rcpp::DataFrame& cts, const Rcpp::DataFrame& ref,
             const Rcpp::List& outliers) :
-      Dataset(nbins, dispersion, cts, outliers), ref_(ref) {}
+      RawData(nbins, dispersion, cts, outliers), ref_(ref) {}
     
     Rcpp::DataFrame get_ref() const { return ref_; }
     

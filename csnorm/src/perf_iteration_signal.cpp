@@ -10,8 +10,8 @@ using namespace Rcpp;
 #include "SignalWeightsUpdater.hpp"
 #include "IRLSEstimator.hpp"
 #include "CVEstimator.hpp"
-#include "Dataset.hpp"
-#include "Data.hpp"
+#include "RawData.hpp"
+#include "BinnedData.hpp"
 #include "Traits.hpp"
 #include "Degeneracy.hpp"
 #include "SparsityEstimator.hpp"
@@ -26,7 +26,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
                            double lam2, double alpha, double converge,
                            const List outliers, NumericVector beta_i) {
     //Class that holds all the data. Other classes reference to it.
-    SignalDataset data(nbins, dispersion, cts, outliers);
+    SignalRawData data(nbins, dispersion, cts, outliers);
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
@@ -67,7 +67,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                      bool constrained, bool fixed) {
     
     //Class that holds all the data. Other classes reference to it.
-    SignalDataset data(nbins, dispersion, cts, outliers);
+    SignalRawData data(nbins, dispersion, cts, outliers);
     //setup computation of fused lasso solution
     bool converged = true;
     const double converge = tol_val/20.;
@@ -122,7 +122,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
         IntegerVector patchno = get_patch_numbers(nbins, mat, tol_val);
         NumericVector beta_cv = mat["beta_cv"];
         IntegerVector cv_grp = mat["cv.group"];
-        SignalData data(beta_r, mat["weight"], mat["phihat"], mat["ncounts"], patchno);
+        SignalBinnedData data(beta_r, mat["weight"], mat["phihat"], mat["ncounts"], patchno);
         if (fixed) { // is eCprime fixed to 0?
             if (!constrained) stop("expected constrained==T when fixed==T");
             SparsityEstimator<Signal, CV, ZeroOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, data, lam2, mat, beta_cv, cv_grp);

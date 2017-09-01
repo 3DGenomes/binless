@@ -32,13 +32,13 @@ class SparsityEstimator : private Sign,
                           private ScoreOptimizer<Score> {
     
     typedef typename ScoreComputer<Calculation,Score>::value_t score_t;
-    typedef typename Calculation::data_t data_t;
+    typedef typename Calculation::binned_t binned_t;
     typedef typename ScoreComputer<Calculation,Score>::likelihood_var_t likelihood_var_t;
     typedef typename ScoreComputer<Calculation,Score>::assembler_var_t assembler_var_t;
 
 public:
     
-    SparsityEstimator(int nbins, double tol_val, const data_t& data, double lambda2,
+    SparsityEstimator(int nbins, double tol_val, const binned_t& data, double lambda2,
                       const DataFrame& mat, const likelihood_var_t& likelihood_var,
                       const assembler_var_t& assembler_var) :
      Degeneracy(mat),

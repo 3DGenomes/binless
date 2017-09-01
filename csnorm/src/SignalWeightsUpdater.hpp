@@ -5,14 +5,14 @@
 #include <vector>
 
 #include "cts_to_mat.hpp"
-#include "Dataset.hpp"
+#include "RawData.hpp"
 
 //policy class that updates IRLS data and weights given counts and a new beta
 //This class takes care of the case of signal estimation
 class SignalWeightsUpdater {
 public:
     
-    SignalWeightsUpdater(SignalDataset& data) : data_(data) {}
+    SignalWeightsUpdater(SignalRawData& data) : data_(data) {}
     
     void setUp() {} //for consistency with other WeightsUpdaters
     
@@ -33,7 +33,7 @@ public:
     Rcpp::DataFrame get_mat() const { return data_.get_mat(); }
     
 private:
-    SignalDataset& data_;
+    SignalRawData& data_;
 };
 
 #endif

@@ -5,7 +5,7 @@
 #include <type_traits>
 
 #include "Traits.hpp"
-#include "Data.hpp"
+#include "BinnedData.hpp"
 
 //the type of bounds when passed around
 typedef std::pair<double,double> bounds_t;
@@ -18,7 +18,7 @@ template<typename Sign> class BoundsComputer<EstimatedOffset, Sign> {
     static_assert(std::is_same<Sign, PositiveSign>::value,
                   "When offset is estimated, sign must be constrained to be positive!");
 public:
-    BoundsComputer(const Data& data, double minval) :
+    BoundsComputer(const BinnedData& data, double minval) :
      value_(data.get_value()), weight_(data.get_weight()),
      valuehat_(data.get_valuehat()), minval_(minval) {}
     
@@ -35,7 +35,7 @@ private:
 template<typename Sign>
 class BoundsComputer<ZeroOffset, Sign> {
 public:
-    BoundsComputer(const Data& data, double minUB) :
+    BoundsComputer(const BinnedData& data, double minUB) :
     value_(data.get_value()), absval_(abs(data.get_value())), weight_(data.get_weight()),
     valuehat_(data.get_valuehat()), minabsval_(min(absval_)), maxabsval_(max(absval_)), minUB_(minUB) {}
     

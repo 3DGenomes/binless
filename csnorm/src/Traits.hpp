@@ -14,19 +14,23 @@ typedef CVkSD<0> CV;
 
 
 class SignalLikelihood;
-class SignalData;
+class SignalRawData;
+class SignalBinnedData;
 
 struct Signal {
     typedef SignalLikelihood likelihood_t;
-    typedef SignalData data_t;
+    typedef SignalRawData raw_t;
+    typedef SignalBinnedData binned_t;
 };
 
 class DifferenceLikelihood;
-class DifferenceData;
+class DifferenceRawData;
+class DifferenceBinnedData;
 
 struct Difference {
     typedef DifferenceLikelihood likelihood_t;
-    typedef DifferenceData data_t;
+    typedef DifferenceRawData raw_t;
+    typedef DifferenceBinnedData binned_t;
 };
 
 #endif
