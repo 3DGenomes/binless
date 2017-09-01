@@ -47,12 +47,11 @@ public:
         const double eCprime = (UB+LB)/2.;
         const double score = std::numeric_limits<double>::max();
         const double score_sd = -1;
-        const NumericVector dof = NumericVector::get_na();
         /*Rcout << " OBJ " << msg << " ok lambda1= " << lambda1 << " eCprime= 0"
-         << " CV= " << score  << " dof= " << dof
+         << " CV= " << score  << " dof= NA"
          << " UB= " << lambda1 << " LB= " << -lambda1 << std::endl;*/
         return Rcpp::NumericVector::create(_["eCprime"]=eCprime, _["lambda1"]=lambda1,
-                                           _["BIC"]=score, _["BIC.sd"]=score_sd, _["dof"]=dof,
+                                           _["BIC"]=score, _["BIC.sd"]=score_sd, _["dof"]=NumericVector::get_na(),
                                            _["UB"]=UB, _["LB"]=LB); // do not report score name for now
     }
     
