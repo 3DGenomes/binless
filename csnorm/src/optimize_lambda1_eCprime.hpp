@@ -8,7 +8,7 @@ using namespace Rcpp;
 #include "Traits.hpp"
 #include "ScoreComputer.hpp"
 #include "BoundsComputer.hpp"
-#include "Tags.hpp"
+#include "Traits.hpp"
 #include "Likelihoods.hpp"
 
 class SignalData;

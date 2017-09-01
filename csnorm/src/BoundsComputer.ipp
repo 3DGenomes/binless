@@ -1,6 +1,6 @@
 #include <Rcpp.h>
 
-#include "Tags.hpp"
+#include "Traits.hpp"
 
 template<typename Sign>
 bounds_t BoundsComputer<EstimatedOffset, Sign>::optimize_bounds(double val) const {

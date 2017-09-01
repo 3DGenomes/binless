@@ -8,7 +8,7 @@ using namespace Rcpp;
 #include "optimize_lambda1.hpp"
 #include "util.hpp"
 #include "graph_helpers.hpp" //get_patch_numbers
-#include "Tags.hpp"
+#include "Traits.hpp"
 
 
 

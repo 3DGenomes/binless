@@ -8,7 +8,7 @@ using namespace Rcpp;
 #include "optimize_lambda1_eCprime.hpp"
 #include "util.hpp"
 #include "graph_helpers.hpp" //get_patch_numbers
-#include "Tags.hpp"
+#include "Traits.hpp"
 
 
 NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,

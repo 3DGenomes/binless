@@ -5,7 +5,7 @@
 #include <utility> //pair
 
 #include "util.hpp" //SQUARE
-#include "Tags.hpp"
+#include "Traits.hpp"
 
 //tag dispatcher
 template<typename> class ScoreAssembler {};

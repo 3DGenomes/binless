@@ -4,7 +4,7 @@
 #include <Rcpp.h>
 #include <type_traits>
 
-#include "Tags.hpp"
+#include "Traits.hpp"
 #include "Data.hpp"
 
 //the type of bounds when passed around
