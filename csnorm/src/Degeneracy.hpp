@@ -10,7 +10,7 @@ public:
     ForbidDegeneracy(const Rcpp::DataFrame& mat) : forbidden_values_(compute_forbidden_values(mat)) {}
     
     //exclude a number of patch values (used as UB borders) because they would make the system degenerate
-    Rcpp::NumericVector filter_borders(const Rcpp::NumericVector& c) {
+    Rcpp::NumericVector filter_borders(const Rcpp::NumericVector& c) const {
         double maxval = Rcpp::max(forbidden_values_);
         std::vector<double> vc = as<std::vector<double> >(c);
         auto it = std::find_if(vc.begin(), vc.end(), [maxval](double d) { return d > maxval; } );
@@ -33,7 +33,7 @@ private:
 
 class AllowDegeneracy {
 public:
-    Rcpp::NumericVector filter_borders(const Rcpp::NumericVector& c) { return c; }
+    Rcpp::NumericVector filter_borders(const Rcpp::NumericVector& c) const { return c; }
     Rcpp::NumericVector get_forbidden_values() { return Rcpp::NumericVector(); }
 };
 
