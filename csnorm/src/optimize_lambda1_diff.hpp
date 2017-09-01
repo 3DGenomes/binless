@@ -5,7 +5,7 @@
 using namespace Rcpp;
 #include <tuple> //tie
 
-#include "CalculationTraits.hpp"
+#include "Traits.hpp"
 #include "ScoreComputer.hpp"
 #include "BoundsComputer.hpp"
 #include "Tags.hpp"

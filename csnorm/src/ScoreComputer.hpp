@@ -5,7 +5,7 @@
 #include <utility> //pair
 #include <tuple> //tie
 
-#include "CalculationTraits.hpp"
+#include "Traits.hpp"
 #include "util.hpp" //soft_threshold
 
 

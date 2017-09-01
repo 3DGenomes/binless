@@ -1,5 +1,5 @@
-#ifndef CALCULATION_TRAITS_HPP
-#define CALCULATION_TRAITS_HPP
+#ifndef TRAITS_HPP
+#define TRAITS_HPP
 
 class SignalLikelihood;
 class SignalData;
