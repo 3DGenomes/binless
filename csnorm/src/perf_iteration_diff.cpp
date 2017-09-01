@@ -146,7 +146,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
         NumericVector beta_cv = mat["beta_cv"];
         IntegerVector cv_grp = mat["cv.group"];
         DifferenceBinnedData data(beta_r, weight, phihat, weight_ref, phihat_ref, ncounts, patchno);
-        SparsityEstimator<Difference, CV, ZeroOffset, AnySign, ForbidDegeneracy> est(nbins, tol_val, data, lam2, mat, beta_cv, cv_grp);
+        SparsityEstimator<Difference, CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy> est(nbins, tol_val, data, lam2, mat, beta_cv, cv_grp);
         opt = est.optimize();
         
     }

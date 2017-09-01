@@ -125,7 +125,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
         SignalBinnedData data(beta_r, mat["weight"], mat["phihat"], mat["ncounts"], patchno);
         if (fixed) { // is eCprime fixed to 0?
             if (!constrained) stop("expected constrained==T when fixed==T");
-            SparsityEstimator<Signal, CV, ZeroOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, data, lam2, mat, beta_cv, cv_grp);
+            SparsityEstimator<Signal, CVkSD<1>, ZeroOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, data, lam2, mat, beta_cv, cv_grp);
             opt = est.optimize();
         } else {
             SparsityEstimator<Signal, CV, EstimatedOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, data, lam2, mat, beta_cv, cv_grp);
