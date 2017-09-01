@@ -11,10 +11,13 @@ using namespace Rcpp;
 #include "IRLSEstimator.hpp"
 #include "CVEstimator.hpp"
 #include "Dataset.hpp"
+#include "Data.hpp"
+#include "Traits.hpp"
+#include "Degeneracy.hpp"
+#include "SparsityEstimator.hpp"
 
 #include "cts_to_mat.hpp" //cts_to_diff_mat
 #include "util.hpp" //SQUARE
-#include "optimize_lambda1_diff.hpp" //cpp_optimize_lambda1
 #include "graph_helpers.hpp" //get_patch_numbers
 
 
@@ -131,8 +134,22 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     
     //optimize lambda1 assuming eCprime=0
     if (!constrained) stop("expected constrained==T when fixed==T");
-    NumericVector opt = cpp_optimize_lambda1_diff(mat, nbins, tol_val,
-                        lambda1_min, refine_num, lam2);
+    NumericVector opt;
+    {
+        NumericVector beta_r = mat["beta"];
+        NumericVector weight = mat["weight"];
+        NumericVector phihat = mat["phihat"];
+        NumericVector weight_ref = 1/as<NumericVector>(mat["phihat.var.ref"]);
+        NumericVector phihat_ref = mat["phihat.ref"];
+        NumericVector ncounts = mat["ncounts"];
+        IntegerVector patchno = get_patch_numbers(nbins, mat, tol_val);
+        NumericVector beta_cv = mat["beta_cv"];
+        IntegerVector cv_grp = mat["cv.group"];
+        DifferenceData data(beta_r, weight, phihat, weight_ref, phihat_ref, ncounts, patchno);
+        SparsityEstimator<Difference, CV, ZeroOffset, AnySign, ForbidDegeneracy> est(nbins, tol_val, data, lam2, mat, beta_cv, cv_grp);
+        opt = est.optimize();
+        
+    }
     double lam1 = opt["lambda1"];
     
     //soft-threshold it at the selected parameters

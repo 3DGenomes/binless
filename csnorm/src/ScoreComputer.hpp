@@ -8,6 +8,7 @@
 #include "Traits.hpp"
 #include "util.hpp" //soft_threshold
 #include "ScoreAssembler.hpp"
+#include "Likelihoods.hpp"
 
 //Calculation is either Signal or Difference (points to both likelihoods and data structures)
 //Score knows how to assemble it into the BIC/CV

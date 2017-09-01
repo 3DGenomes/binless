@@ -11,11 +11,13 @@ using namespace Rcpp;
 #include "IRLSEstimator.hpp"
 #include "CVEstimator.hpp"
 #include "Dataset.hpp"
+#include "Data.hpp"
+#include "Traits.hpp"
+#include "Degeneracy.hpp"
+#include "SparsityEstimator.hpp"
 
 #include "util.hpp" //SQUARE
 #include "cts_to_mat.hpp" //cts_to_signal_mat
-#include "optimize_lambda1_eCprime.hpp" //cpp_optimize_lambda1_eCprime
-#include "optimize_lambda1.hpp" //cpp_optimize_lambda1
 #include "graph_helpers.hpp" //get_patch_numbers
 
 
@@ -115,14 +117,20 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     
     //optimize lambda1 and eC
     NumericVector opt;
-    if (fixed) { // is eCprime fixed to 0?
-        if (!constrained) stop("expected constrained==T when fixed==T");
-        const bool positive = true;
-        opt = cpp_optimize_lambda1(mat, nbins, tol_val, positive, lambda1_min,
-                                   refine_num, lam2);
-    } else {
-        opt = cpp_optimize_lambda1_eCprime(mat, nbins, tol_val, constrained,
-                                           lambda1_min, refine_num, lam2);
+    {
+        NumericVector beta_r = mat["beta"];
+        IntegerVector patchno = get_patch_numbers(nbins, mat, tol_val);
+        NumericVector beta_cv = mat["beta_cv"];
+        IntegerVector cv_grp = mat["cv.group"];
+        SignalData data(beta_r, mat["weight"], mat["phihat"], mat["ncounts"], patchno);
+        if (fixed) { // is eCprime fixed to 0?
+            if (!constrained) stop("expected constrained==T when fixed==T");
+            SparsityEstimator<Signal, CV, ZeroOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, data, lam2, mat, beta_cv, cv_grp);
+            opt = est.optimize();
+        } else {
+            SparsityEstimator<Signal, CV, EstimatedOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, data, lam2, mat, beta_cv, cv_grp);
+            opt = est.optimize();
+        }
     }
     double lam1 = opt["lambda1"];
     double eCprime = opt["eCprime"];
