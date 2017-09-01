@@ -43,15 +43,14 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
     unsigned step = irls.get_nouter();
     alpha = flo.get_alpha();
     beta = flo.get();
-    DataFrame mat = wt.get_mat();
     
-    DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
-                                           _["bin2"]=mat["bin2"],
-                                           _["phihat"]=mat["phihat"],
-                                           _["ncounts"]=mat["ncounts"],
-                                           _["weight"]=mat["weight"],
-                                           _["diag.idx"]=mat["diag.idx"],
-                                           _["diag.grp"]=mat["diag.grp"],
+    DataFrame finalmat = DataFrame::create(_["bin1"]=binned.get_bin1(),
+                                           _["bin2"]=binned.get_bin2(),
+                                           _["phihat"]=binned.bet_phihat(),
+                                           _["ncounts"]=binned.get_ncounts(),
+                                           _["weight"]=binned.get_weight(),
+                                           _["diag.idx"]=binned.get_diag_idx(),
+                                           _["diag.grp"]=binned.get_diag_grp(),
                                            _["beta"]=beta,
                                            _["phi"]=beta);
     

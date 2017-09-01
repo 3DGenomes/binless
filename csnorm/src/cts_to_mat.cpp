@@ -7,6 +7,10 @@ using namespace Rcpp;
 
 #include "cts_core.h" //cts_to_signal_mat_core
 
+#include "RawData.hpp"
+#include "BinnedData.hpp"
+
+
 void remove_outliers(const std::vector<int>& bin1, const std::vector<int>& bin2, std::vector<double>& phihat_var, List outliers) {
   unsigned nbetas = phihat_var.size();
   //remove bad rows
@@ -26,9 +30,14 @@ void remove_outliers(const std::vector<int>& bin1, const std::vector<int>& bin2,
   }
 }
 
-DataFrame cts_to_signal_mat(const DataFrame& cts, int nbins, double dispersion,
-                            const std::vector<double>& phi,
-                            double eCprime, List outliers) {
+void cts_to_signal_mat(const SignalRawData& raw, double eCprime, const Rcpp::NumericVector& beta_phi, SignalBinnedData& binned) {
+    //extract data from holder
+    const DataFrame& cts = raw.get_cts();
+    int nbins = raw.get_nbins();
+    double dispersion = raw.get_dispersion();
+    const std::vector<double> phi = Rcpp::as<std::vector<double> >(beta_phi);
+    const List& outliers = raw.get_outliers();
+
     //inputs
     int N = cts.nrows();
     std::vector<int> cts_bin1 = as<std::vector<int> >(cts["bin1"]);
@@ -53,6 +62,7 @@ DataFrame cts_to_signal_mat(const DataFrame& cts, int nbins, double dispersion,
     //remove outliers
     remove_outliers(bin1, bin2, phihat_var, outliers);
                            
+    //report back
     IntegerVector bin1_i, bin2_i, didx_i, dgrp_i;
     NumericVector phihat_i, phihat_var_i, ncounts_i, weight_i;
     bin1_i = wrap(bin1);
@@ -68,44 +78,36 @@ DataFrame cts_to_signal_mat(const DataFrame& cts, int nbins, double dispersion,
     didx_i = bin2_i-bin1_i;
     dgrp_i = floor(log10(bin2_i-bin1_i+1)*3);
 
-    
-    return DataFrame::create(_["bin1"]=bin1_i, _["bin2"]=bin2_i,
-                             _["phihat"]=phihat_i,
-                             _["phihat.var"]=phihat_var_i, _["ncounts"]=ncounts_i, _["weight"]=weight_i,
-                             _["diag.idx"]=didx_i, _["diag.grp"]=dgrp_i);
+    binned.set_bin1(bin1_i);
+    binned.set_bin2(bin2_i);
+    binned.set_phihat(phihat_i);
+    binned.set_weight(weight_i);
+    binned.set_ncounts(ncounts_i);
+    binned.set_diag_idx(didx_i);
+    binned.set_diag_grp(dgrp_i);
 }
 
-DataFrame cts_to_diff_mat(const DataFrame& cts, const DataFrame ref, int nbins,
-                          double dispersion,
-                          const std::vector<double>& phi_ref, const std::vector<double>& delta, List outliers) {
+void cts_to_diff_mat(const DifferenceRawData& raw, const Rcpp::NumericVector& phi_ref, const Rcpp::NumericVector& beta_delta, DifferenceBinnedData& binned) {
     //assume eCprime = 0 for difference step
     const double eCprime=0;
-    const DataFrame mat_ref = cts_to_signal_mat(ref, nbins, dispersion, phi_ref,
-                                                eCprime, outliers);
-    
-    std::vector<double> phi_oth;
-    phi_oth.reserve(delta.size());
-    for (int i=0; i<delta.size(); ++i) phi_oth[i] = phi_ref[i] + delta[i];
-    const DataFrame mat_oth = cts_to_signal_mat(cts, nbins, dispersion, phi_oth,
-                                                eCprime, outliers);
-    IntegerVector bin1 = mat_ref["bin1"];
-    IntegerVector bin2 = mat_ref["bin2"];
-    NumericVector phihat_ref = mat_ref["phihat"];
-    NumericVector phihat_var_ref = mat_ref["phihat.var"];
-    NumericVector phihat = mat_oth["phihat"];
-    NumericVector phihat_var = mat_oth["phihat.var"];
-    NumericVector ncounts_oth = mat_oth["ncounts"];
-    NumericVector ncounts_ref = mat_ref["ncounts"];
-    NumericVector deltahat = phihat-phihat_ref;
-    NumericVector deltahat_var = phihat_var+phihat_var_ref;
-    NumericVector ncounts = ncounts_ref+ncounts_oth;
-    NumericVector weight = 1/deltahat_var;
-    IntegerVector didx = mat_ref["diag.idx"];
-    IntegerVector dgrp = mat_ref["diag.grp"];
-    return DataFrame::create(_["bin1"]=bin1, _["bin2"]=bin2,
-                             _["phihat"]=phihat, _["phihat.var"]=phihat_var,
-                             _["phihat.ref"]=phihat_ref, _["phihat.var.ref"]=phihat_var_ref,
-                             _["deltahat"]=deltahat, _["deltahat.var"]=deltahat_var, _["ncounts"]=ncounts,
-                             _["weight"]=weight, _["diag.idx"]=didx, _["diag.grp"]=dgrp);
+    //compute ref matrix
+    SignalRawData sraw_ref(raw.get_nbins(), raw.get_dispersion(), raw.get_ref(), raw.get_outliers());
+    SignalBinnedData sbinned_ref;
+    cts_to_signal_mat(sraw_ref, eCprime, phi_ref, sbinned_ref);
+    //compute other matrix
+    Rcpp::NumericVector phi_oth = phi_ref+beta_delta; //unthresholded
+    SignalRawData sraw_oth(raw.get_nbins(), raw.get_dispersion(), raw.get_cts(), raw.get_outliers());
+    SignalBinnedData sbinned_oth;
+    cts_to_signal_mat(sraw_oth, eCprime, phi_oth, sbinned_oth);
+    //report
+    binned.set_bin1(sbinned_ref.get_bin1());
+    binned.set_bin2(sbinned_ref.get_bin2());
+    binned.set_beta_delta(beta_delta);
+    binned.set_weight(sbinned_oth.get_weight());
+    binned.set_deltahat(sbinned_oth.get_phihat() - sbinned_ref.get_phihat());
+    binned.set_ncounts(sbinned_oth.get_ncounts() + sbinned_ref.get_ncounts());
+    binned.set_weight_ref(sbinned_ref.get_weight());
+    binned.set_phihat_ref(sbinned_ref.get_phihat());
+    binned.set_phi_ref(phi_ref);
 }
 

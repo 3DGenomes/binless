@@ -12,28 +12,25 @@
 class SignalWeightsUpdater {
 public:
     
-    SignalWeightsUpdater(SignalRawData& data) : data_(data) {}
+    SignalWeightsUpdater(const SignalRawData& raw, SignalBinnedData& binned) : raw_(raw), binned_(binned) {}
     
     void setUp() {} //for consistency with other WeightsUpdaters
     
-    void update(const std::vector<double>& beta) {
-        DataFrame mat = cts_to_signal_mat(data_.get_cts(), data_.get_nbins(), data_.get_dispersion(), beta, 0, data_.get_outliers());
-        data_.set_beta(beta);
-        data_.set_mat(mat);
+    void update(const std::vector<double>& beta_phi) {
+        cts_to_signal_mat(raw_, 0, beta_phi, binned_); //offset is held at zero since we pass unthresholded beta_phi
     }
     
-    std::vector<double> get_y() const { return Rcpp::as<std::vector<double> >(data_.get_mat()["phihat"]); }
+    std::vector<double> get_y() const { return Rcpp::as<std::vector<double> >(binned_.get_phihat()); }
     
-    std::vector<double> get_w() const { return Rcpp::as<std::vector<double> >(data_.get_mat()["weight"]); }
+    std::vector<double> get_w() const { return Rcpp::as<std::vector<double> >(binned_.get_weight()); }
     
-    std::vector<int> get_bin1() const { return Rcpp::as<std::vector<int> > (data_.get_mat()["bin1"]); }
+    std::vector<int> get_bin1() const { return Rcpp::as<std::vector<int> > (binned_.get_bin1()); }
     
-    std::vector<int> get_bin2() const { return Rcpp::as<std::vector<int> > (data_.get_mat()["bin2"]); }
-    
-    Rcpp::DataFrame get_mat() const { return data_.get_mat(); }
+    std::vector<int> get_bin2() const { return Rcpp::as<std::vector<int> > (binned_.get_bin2()); }
     
 private:
-    SignalRawData& data_;
+    const SignalRawData& raw_;
+    SignalBinnedData& binned_;
 };
 
 #endif

@@ -25,12 +25,13 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                          double dispersion, int nouter, int nbins,
                          double lam2, double alpha, double converge,
                          List outliers, NumericVector phi_ref_i, NumericVector beta_i) {
-    //Class that holds all the data. Other classes reference to it.
-    DifferenceRawData data(nbins, dispersion, cts, ref, outliers);
+    //Classes that hold all the data. Other classes reference to it.
+    Difference::raw_t raw(nbins, dispersion, cts, ref, outliers);
+    Difference::binned_t binned; //stored here, but will be populated by WeightsUpdater
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
-    DifferenceWeightsUpdater wt(data); //size of the problem and input data
+    DifferenceWeightsUpdater wt(raw,binned); //size of the problem and input data
     std::vector<double> beta = as<std::vector<double> >(beta_i);
     std::vector<double> phi_ref = as<std::vector<double> >(phi_ref_i);
     wt.setUp(phi_ref, beta); //initial guess of phi_ref provided here
@@ -45,26 +46,25 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
     unsigned step = irls.get_nouter();
     alpha = flo.get_alpha();
     beta = flo.get();
-    DataFrame mat = wt.get_mat();
     phi_ref = wt.get_phi_ref();
     
-    DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
-                                           _["bin2"]=mat["bin2"],
-                                           _["phihat"]=mat["phihat"],
-                                           _["phihat.var"]=mat["phihat.var"],
-                                           _["phihat.ref"]=mat["phihat.ref"],
-                                           _["phihat.var.ref"]=mat["phihat.var.ref"],
-                                           _["ncounts"]=mat["ncounts"],
-                                           _["deltahat"]=mat["deltahat"],
-                                           _["weight"]=mat["weight"],
-                                           _["diag.idx"]=mat["diag.idx"],
-                                           _["diag.grp"]=mat["diag.grp"],
-                                           _["beta"]=beta,
-                                           _["delta"]=beta,
-                                           _["phi_ref"]=phi_ref);
+    DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
+                                      _["bin2"]=binned.get_bin2(),
+                                      _["phihat"]=binned.get_phihat(),
+                                      _["phihat.var"]=1/binned.get_weight(),
+                                      _["phihat.ref"]=binned.get_phihat_ref(),
+                                      _["phihat.var.ref"]=1/binned.get_weight_ref(),
+                                      _["ncounts"]=binned.get_ncounts(),
+                                      _["deltahat"]=binned.get_deltahat(),
+                                      _["weight"]=binned.get_weight(),
+                                      _["diag.idx"]=binned.get_diag_idx(),
+                                      _["diag.grp"]=binned.get_diag_grp(),
+                                      _["beta"]=beta,
+                                      _["delta"]=beta,
+                                      _["phi_ref"]=phi_ref);
     
     return List::create(_["beta"]=wrap(beta), _["alpha"]=wrap(alpha),
-                        _["phi.ref"]=wrap(phi_ref), _["delta"]=wrap(beta), _["mat"]=finalmat,
+                        _["phi.ref"]=wrap(phi_ref), _["delta"]=wrap(beta), _["mat"]=mat,
                         _["nouter"]=step, _["ninner"]=res,
                         _["eCprime"]=0, _["lambda1"]=0);
 }
@@ -75,14 +75,15 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    List outliers, NumericVector phi_ref_i,  NumericVector beta_i, double lambda1_min,
                    int refine_num, bool constrained) {
     
-    //Class that holds all the data. Other classes reference to it.
-    DifferenceRawData data(nbins, dispersion, cts, ref, outliers);
+    //Classes that hold all the data. Other classes reference to it.
+    Difference::raw_t raw(nbins, dispersion, cts, ref, outliers);
+    Difference::binned_t binned; //stored here, but will be populated by WeightsUpdater
     //setup computation of fused lasso solution
     bool converged = true;
     const double converge = tol_val/20.;
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
-    DifferenceWeightsUpdater wt(data); //size of the problem and input data
+    DifferenceWeightsUpdater wt(raw, binned); //size of the problem and input data
     std::vector<double> beta = as<std::vector<double> >(beta_i);
     std::vector<double> phi_ref = as<std::vector<double> >(phi_ref_i);
     wt.setUp(phi_ref, beta); //initial guess of phi_ref provided here
@@ -108,23 +109,22 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     alpha = flo.get_alpha();
     beta = flo.get();
     phi_ref = wt.get_phi_ref();
-    DataFrame mat = wt.get_mat();
     
     
     //compute CV datasets at optimized weights
     auto cv = make_CVEstimator(flo, wt, 1000);
     cv.compute(beta, lam2);
-    mat = DataFrame::create(_["bin1"]=mat["bin1"],
-                            _["bin2"]=mat["bin2"],
-                            _["phihat"]=mat["phihat"],
-                            _["phihat.var"]=mat["phihat.var"],
-                            _["phihat.ref"]=mat["phihat.ref"],
-                            _["phihat.var.ref"]=mat["phihat.var.ref"],
-                            _["ncounts"]=mat["ncounts"],
-                            _["deltahat"]=mat["deltahat"],
-                            _["weight"]=mat["weight"],
-                            _["diag.idx"]=mat["diag.idx"],
-                            _["diag.grp"]=mat["diag.grp"],
+    DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
+                            _["bin2"]=binned.get_bin2(),
+                            _["phihat"]=binned.get_phihat(),
+                            _["phihat.var"]=1/binned.get_weight(),
+                            _["phihat.ref"]=binned.get_phihat_ref(),
+                            _["phihat.var.ref"]=1/binned.get_weight_ref(),
+                            _["ncounts"]=binned.get_ncounts(),
+                            _["deltahat"]=binned.get_deltahat(),
+                            _["weight"]=binned.get_weight(),
+                            _["diag.idx"]=binned.get_diag_idx(),
+                            _["diag.grp"]=binned.get_diag_grp(),
                             _["beta"]=beta,
                             _["value"]=beta,
                             _["delta"]=beta,

@@ -36,8 +36,8 @@ template<typename Sign>
 class BoundsComputer<ZeroOffset, Sign> {
 public:
     BoundsComputer(const BinnedData& data, double minUB) :
-    value_(data.get_value()), absval_(abs(data.get_value())), weight_(data.get_weight()),
-    valuehat_(data.get_valuehat()), minabsval_(min(absval_)), maxabsval_(max(absval_)), minUB_(minUB) {}
+    beta_(data.get_beta()), absval_(abs(data.get_beta())), weight_(data.get_weight()),
+    y_(data.get_y()), minabsval_(min(absval_)), maxabsval_(max(absval_)), minUB_(minUB) {}
     
     //given an UB candidate (and implicit dof), find the adequate UB and LB
     bounds_t optimize_bounds(double val) const;
