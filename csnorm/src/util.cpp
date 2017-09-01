@@ -26,39 +26,6 @@ NumericVector get_patch_values(NumericVector value, IntegerVector patchno) {
     return unique_values;
 }
 
-//return the minimum value encountered along each counter diagonal
-NumericVector get_minimum_diagonal_values(NumericVector value,
-        IntegerVector diag_grp) {
-    int ndiags = max(diag_grp)+1;
-    LogicalVector diagtouch(ndiags, false);
-    NumericVector diagvals(ndiags, max(value)); //diag_idx starts at 0
-    for (int i=0; i<diag_grp.size(); ++i) {
-      diagvals(diag_grp(i)) = std::min(diagvals(diag_grp(i)),value(i));
-      diagtouch(diag_grp(i)) = true;
-    }
-    diagvals = diagvals[diagtouch];
-    diagvals = unique(diagvals);
-    std::sort(diagvals.begin(), diagvals.end());
-    return diagvals;
-}
-
-//return those values whose patches contain a whole counter diagonal
-NumericVector get_constant_diagonal_values(NumericVector value,
-        IntegerVector diag_idx, double tol_val) {
-    int ndiags = max(diag_idx)+1;
-    NumericVector diag_min(ndiags, max(value)), diag_max(ndiags,
-            min(value)); //diag_idx starts at 0
-    for (int i=0; i<diag_idx.size(); ++i) {
-        diag_min(diag_idx(i)) = std::min(diag_min(diag_idx(i)),value(i));
-        diag_max(diag_idx(i)) = std::max(diag_max(diag_idx(i)),value(i));
-    }
-    NumericVector diagvals = (diag_max+diag_min)/2.;
-    diagvals = diagvals[(diag_max-diag_min)<=tol_val];
-    diagvals = unique(diagvals);
-    std::sort(diagvals.begin(), diagvals.end());
-    return diagvals;
-}
-
 std::vector<double> compute_phi_ref(const std::vector<double>& delta_r,
                                     const std::vector<double>& phihat,
                                     const std::vector<double>& phihat_var, const std::vector<double>& phihat_ref,
