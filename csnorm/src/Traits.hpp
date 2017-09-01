@@ -7,9 +7,9 @@ struct ZeroOffset {};
 struct PositiveSign {};
 struct AnySign {};
 
-struct BIC { static const unsigned k = 0; };
+struct BIC { enum { k = 0 }; };
 
-template<unsigned kSD> struct CVkSD { static const unsigned k = kSD; };
+template<unsigned kSD> struct CVkSD { enum { k = kSD }; };
 typedef CVkSD<0> CV;
 
 
