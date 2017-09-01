@@ -66,6 +66,6 @@ NumericVector cpp_optimize_lambda1(const DataFrame mat, int nbins,
     NumericVector beta_cv = mat["beta_cv"];
     IntegerVector cv_grp = mat["cv.group"];
     SignalData data(beta, weight, phihat, ncounts, patchno);
-    SparsityEstimator<Signal, CV, EstimatedOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, data, lambda2, mat, beta_cv, cv_grp);
+    SparsityEstimator<Signal, CV, ZeroOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, data, lambda2, mat, beta_cv, cv_grp);
     return est.optimize();
 }

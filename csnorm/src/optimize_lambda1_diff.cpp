@@ -63,6 +63,6 @@ NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
     NumericVector beta_cv = mat["beta_cv"];
     IntegerVector cv_grp = mat["cv.group"];
     DifferenceData data(beta, weight, phihat, weight_ref, phihat_ref, ncounts, patchno);
-    SparsityEstimator<Difference, CV, EstimatedOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, data, lambda2, mat, beta_cv, cv_grp);
+    SparsityEstimator<Difference, CV, ZeroOffset, AnySign, ForbidDegeneracy> est(nbins, tol_val, data, lambda2, mat, beta_cv, cv_grp);
     return est.optimize();
 }
