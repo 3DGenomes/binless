@@ -13,10 +13,13 @@
 //Score knows how to assemble it into the BIC/CV
 template<typename Calculation, typename Score> class ScoreComputer : private Calculation::likelihood_t, private ScoreAssembler<Score> {
 public:
-    typedef typename ScoreAssembler<Score>::var_t var_t;
+    typedef typename Calculation::data_t data_t;
+    typedef typename Calculation::likelihood_t::var_t likelihood_var_t;
+    typedef typename ScoreAssembler<Score>::var_t assembler_var_t;
     typedef Rcpp::NumericVector value_t;
-    ScoreComputer(double tol_val, const typename Calculation::data_t& data, const var_t& score_specific) :
-       Calculation::likelihood_t(data), ScoreAssembler<Score>(score_specific), tol_val_(tol_val), value_(data.get_value()), patchno_(data.get_patchno()) {}
+    ScoreComputer(double tol_val, const data_t& data, const likelihood_var_t& likelihood_var, const assembler_var_t& assembler_var) :
+       Calculation::likelihood_t(data, likelihood_var), ScoreAssembler<Score>(assembler_var), tol_val_(tol_val), value_(data.get_value()),
+       patchno_(data.get_patchno()) {}
     
     //compute score obtained with these bounds
     Rcpp::NumericVector evaluate(double LB, double UB) const {

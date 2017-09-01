@@ -8,20 +8,24 @@ using namespace Rcpp;
 #include "Traits.hpp"
 #include "ScoreComputer.hpp"
 #include "BoundsComputer.hpp"
-#include "Traits.hpp"
 #include "Likelihoods.hpp"
 
 class SignalData;
 
 //objective functor to find lambda1 and eCprime assuming the signal is positive, using CV or BIC
 template<typename Score>
-struct obj_lambda1_eCprime : private BoundsComputer<EstimatedOffset,PositiveSign>,
+class obj_lambda1_eCprime : private BoundsComputer<EstimatedOffset,PositiveSign>,
                              private ScoreComputer<Signal,Score> {
+public:
+    typedef typename ScoreComputer<Signal,Score>::likelihood_var_t likelihood_var_t;
+    typedef typename ScoreComputer<Signal,Score>::assembler_var_t assembler_var_t;
+
     obj_lambda1_eCprime(double tol_val,
                         bool constrained, const SignalData& data, NumericVector forbidden_vals,
-                        double lambda2, const typename ScoreComputer<Signal,Score>::var_t& score_specific) :
+                        double lambda2, const likelihood_var_t& likelihood_var,
+                        const assembler_var_t& assembler_var) :
        BoundsComputer<EstimatedOffset,PositiveSign>(data, min(data.get_value())),
-       ScoreComputer<Signal,Score>(tol_val, data, score_specific),
+       ScoreComputer<Signal,Score>(tol_val, data,  likelihood_var, assembler_var),
        tol_val_(tol_val), lambda2_(lambda2), constrained_(constrained), forbidden_vals_(forbidden_vals) {}
     
     NumericVector get(double val, std::string msg = "") const {
@@ -46,6 +50,8 @@ struct obj_lambda1_eCprime : private BoundsComputer<EstimatedOffset,PositiveSign
         return ScoreComputer<Signal,Score>::evaluate(LB, UB);
 
     }
+
+private:
     double tol_val_, lambda2_;
     bool constrained_;
     NumericVector forbidden_vals_;

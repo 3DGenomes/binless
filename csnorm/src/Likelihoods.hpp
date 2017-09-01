@@ -7,8 +7,9 @@
 
 class SignalLikelihood {
 public:
-    SignalLikelihood(const SignalData& data) :
-       value_(data.get_value()), weight_(data.get_weight()), valuehat_(data.get_valuehat()) {}
+    typedef Rcpp::NumericVector var_t;
+    SignalLikelihood(const SignalData& data, const var_t& value) :
+       value_(value), weight_(data.get_weight()), valuehat_(data.get_valuehat()) {}
     
     Rcpp::NumericVector get_chi_square(double LB, double UB) const;
     
@@ -18,8 +19,9 @@ private:
 
 class DifferenceLikelihood {
 public:
-    DifferenceLikelihood(const DifferenceData& data) :
-    value_(data.get_value()), weight_(data.get_weight()), valuehat_(data.get_valuehat()),
+    typedef Rcpp::NumericVector var_t;
+    DifferenceLikelihood(const DifferenceData& data, const var_t& value) :
+    value_(value), weight_(data.get_weight()), valuehat_(data.get_valuehat()),
     weight_ref_(data.get_weight_ref()), valuehat_ref_(data.get_valuehat_ref()) {}
     
     Rcpp::NumericVector get_chi_square(double LB, double UB) const;

@@ -35,16 +35,20 @@ class SparsityEstimator : private Sign,
                           private ScoreOptimizer<Score> {
     
     typedef typename ScoreComputer<Calculation,Score>::value_t score_t;
-    
+    typedef typename Calculation::data_t data_t;
+    typedef typename ScoreComputer<Calculation,Score>::likelihood_var_t likelihood_var_t;
+    typedef typename ScoreComputer<Calculation,Score>::assembler_var_t assembler_var_t;
+
 public:
     
-    SparsityEstimator(int nbins, double tol_val, const typename Calculation::data_t& data, double lambda2,
-                      const DataFrame& mat, const typename ScoreComputer<Calculation,Score>::var_t& score_specific) :
+    SparsityEstimator(int nbins, double tol_val, const data_t& data, double lambda2,
+                      const DataFrame& mat, const likelihood_var_t& likelihood_var,
+                      const assembler_var_t& assembler_var) :
      Degeneracy(mat),
      BoundsComputer<Offset,Sign>(data, min(data.get_value())),
      BoundsChecker<Sign>(Rcpp::as<Rcpp::NumericVector>(mat["beta"])),
      BoundsChecker<Degeneracy>(Degeneracy::get_forbidden_values()),
-     ScoreComputer<Calculation,Score>(tol_val, data, score_specific),
+     ScoreComputer<Calculation,Score>(tol_val, data, likelihood_var, assembler_var),
      lambda2_(lambda2), UBcandidates_(get_UB_candidates(nbins, tol_val, mat)) {}
     
     score_t optimize() const {

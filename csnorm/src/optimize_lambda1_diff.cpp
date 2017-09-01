@@ -39,9 +39,9 @@ NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
       forbidden_vals = get_minimum_diagonal_values(abeta, diag_grp);
     }
     //create functor
-    DifferenceData data(beta_cv, weight, phihat, weight_ref, phihat_ref, ncounts, patchno); //TODO: beta_cv or beta?
-    /*obj_lambda1_diff<BIC> obj(lmin, tol_val, data, forbidden_vals, ncounts);*/
-    obj_lambda1_diff<CVkSD<1> > obj(lmin, tol_val, data, forbidden_vals, cv_grp);
+    DifferenceData data(beta, weight, phihat, weight_ref, phihat_ref, ncounts, patchno); //TODO: beta_cv or beta?
+    /*obj_lambda1_diff<BIC> obj(lmin, tol_val, data, forbidden_vals, beta, ncounts);*/
+    obj_lambda1_diff<CVkSD<1> > obj(lmin, tol_val, data, forbidden_vals, beta_cv, cv_grp);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     //get minimum authorized patch value
     double minpatch = max(abs(forbidden_vals));

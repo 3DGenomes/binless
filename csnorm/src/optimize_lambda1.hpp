@@ -18,11 +18,15 @@ template<typename Score>
 class obj_lambda1 : private BoundsComputer<ZeroOffset,AnySign>,
                     private ScoreComputer<Signal,Score> {
 public:
+    typedef typename ScoreComputer<Signal,Score>::likelihood_var_t likelihood_var_t;
+    typedef typename ScoreComputer<Signal,Score>::assembler_var_t assembler_var_t;
+
     obj_lambda1(double minUB, double tol_val,
                 const SignalData& data, NumericVector forbidden_vals,
-                const typename ScoreComputer<Signal,Score>::var_t& score_specific) :
+                const likelihood_var_t& likelihood_var,
+                const assembler_var_t& assembler_var) :
       BoundsComputer<ZeroOffset,AnySign>(data, minUB),
-      ScoreComputer<Signal,Score>(tol_val, data, score_specific),
+      ScoreComputer<Signal,Score>(tol_val, data,  likelihood_var, assembler_var),
       minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}
     
     NumericVector get(double val, std::string msg = "") const {
