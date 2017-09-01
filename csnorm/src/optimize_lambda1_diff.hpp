@@ -20,7 +20,7 @@ class obj_lambda1_diff : private BoundsComputer<ZeroOffset,AnySign>,
 public:
     obj_lambda1_diff(double minUB, double tol_val,
                         const DifferenceData& data, NumericVector forbidden_vals,
-                        const typename Score::var_t& score_specific) :
+                        const typename ScoreComputer<Difference,Score>::var_t& score_specific) :
     BoundsComputer<ZeroOffset,AnySign>(data, minUB),
     ScoreComputer<Difference,Score>(tol_val, data, score_specific),
     minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}

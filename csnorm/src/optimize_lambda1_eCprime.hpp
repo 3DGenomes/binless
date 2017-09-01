@@ -19,7 +19,7 @@ struct obj_lambda1_eCprime : private BoundsComputer<EstimatedOffset,PositiveSign
                              private ScoreComputer<Signal,Score> {
     obj_lambda1_eCprime(double tol_val,
                         bool constrained, const SignalData& data, NumericVector forbidden_vals,
-                        double lambda2, const typename Score::var_t& score_specific) :
+                        double lambda2, const typename ScoreComputer<Signal,Score>::var_t& score_specific) :
        BoundsComputer<EstimatedOffset,PositiveSign>(data, min(data.get_value())),
        ScoreComputer<Signal,Score>(tol_val, data, score_specific),
        tol_val_(tol_val), lambda2_(lambda2), constrained_(constrained), forbidden_vals_(forbidden_vals) {}

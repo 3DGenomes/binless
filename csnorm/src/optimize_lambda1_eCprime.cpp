@@ -8,7 +8,7 @@ using namespace Rcpp;
 #include "optimize_lambda1_eCprime.hpp"
 #include "util.hpp"
 #include "graph_helpers.hpp" //get_patch_numbers
-#include "Scores.hpp"
+#include "Tags.hpp"
 
 
 NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
@@ -39,8 +39,8 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     }
     //create functor
     SignalData data(beta_cv, weight, phihat, ncounts, patchno);
-    /*obj_lambda1_eCprime<BICScore> obj(tol_val, constrained, data, forbidden_vals, lambda2, ncounts);*/
-    obj_lambda1_eCprime<CVScore> obj(tol_val, constrained, data, forbidden_vals, lambda2, cv_grp);
+    /*obj_lambda1_eCprime<BIC> obj(tol_val, constrained, data, forbidden_vals, lambda2, ncounts);*/
+    obj_lambda1_eCprime<CVkSD<0> > obj(tol_val, constrained, data, forbidden_vals, lambda2, cv_grp);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     double minpatch = max(forbidden_vals);
     NumericVector best = optimize_CV(obj, patchvals(0) - 2*tol_val, minpatch, maxval + 2*tol_val, tol_val, patchvals);

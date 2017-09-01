@@ -20,7 +20,7 @@ class obj_lambda1 : private BoundsComputer<ZeroOffset,AnySign>,
 public:
     obj_lambda1(double minUB, double tol_val,
                 const SignalData& data, NumericVector forbidden_vals,
-                const typename Score::var_t& score_specific) :
+                const typename ScoreComputer<Signal,Score>::var_t& score_specific) :
       BoundsComputer<ZeroOffset,AnySign>(data, minUB),
       ScoreComputer<Signal,Score>(tol_val, data, score_specific),
       minUB_(minUB), tol_val_(tol_val), forbidden_vals_(forbidden_vals) {}

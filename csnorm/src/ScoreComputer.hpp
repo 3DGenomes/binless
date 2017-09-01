@@ -7,15 +7,16 @@
 
 #include "Traits.hpp"
 #include "util.hpp" //soft_threshold
-
+#include "ScoreAssembler.hpp"
 
 //Calculation is either Signal or Difference (points to both likelihoods and data structures)
 //Score knows how to assemble it into the BIC/CV
-template<typename Calculation, typename Score> class ScoreComputer : private Calculation::likelihood_t, private Score {
+template<typename Calculation, typename Score> class ScoreComputer : private Calculation::likelihood_t, private ScoreAssembler<Score> {
 public:
+    typedef typename ScoreAssembler<Score>::var_t var_t;
     typedef Rcpp::NumericVector value_t;
-    ScoreComputer(double tol_val, const typename Calculation::data_t& data, const typename Score::var_t& score_specific) :
-       Calculation::likelihood_t(data), Score(score_specific), tol_val_(tol_val), value_(data.get_value()), patchno_(data.get_patchno()) {}
+    ScoreComputer(double tol_val, const typename Calculation::data_t& data, const var_t& score_specific) :
+       Calculation::likelihood_t(data), ScoreAssembler<Score>(score_specific), tol_val_(tol_val), value_(data.get_value()), patchno_(data.get_patchno()) {}
     
     //compute score obtained with these bounds
     Rcpp::NumericVector evaluate(double LB, double UB) const {
@@ -27,7 +28,7 @@ public:
         
         //assemble it into a score
         double score, score_sd;
-        std::tie(score, score_sd) = Score::assemble(chisq, dof);
+        std::tie(score, score_sd) = ScoreAssembler<Score>::assemble(chisq, dof);
         
         /*Rcout << " OBJ " << msg << " ok lambda1= " << lambda1 << " eCprime= 0"
          << " CV= " << score  << " dof= " << dof

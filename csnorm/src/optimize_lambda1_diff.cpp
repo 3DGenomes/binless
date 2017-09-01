@@ -8,7 +8,7 @@ using namespace Rcpp;
 #include "optimize_lambda1_diff.hpp"
 #include "util.hpp"
 #include "graph_helpers.hpp" //get_patch_numbers
-#include "Scores.hpp"
+#include "Tags.hpp"
 
 NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
                                    double tol_val,
@@ -40,8 +40,8 @@ NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
     }
     //create functor
     DifferenceData data(beta_cv, weight, phihat, weight_ref, phihat_ref, ncounts, patchno); //TODO: beta_cv or beta?
-    /*obj_lambda1_diff<BICScore> obj(lmin, tol_val, data, forbidden_vals, ncounts);*/
-    obj_lambda1_diff<CVScore> obj(lmin, tol_val, data, forbidden_vals, cv_grp);
+    /*obj_lambda1_diff<BIC> obj(lmin, tol_val, data, forbidden_vals, ncounts);*/
+    obj_lambda1_diff<CVkSD<1> > obj(lmin, tol_val, data, forbidden_vals, cv_grp);
     //for (int i=0; i<forbidden_vals.size(); ++i) Rcout << "fv[ " << i << " ]= "<< forbidden_vals[i] << std::endl;
     //get minimum authorized patch value
     double minpatch = max(abs(forbidden_vals));
