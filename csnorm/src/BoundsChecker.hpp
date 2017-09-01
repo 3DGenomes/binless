@@ -13,15 +13,14 @@ template<typename> class BoundsChecker {};
 //specialization in the case where the sign is positive
 template<> class BoundsChecker<PositiveSign> {
 public:
-    BoundsChecker(const Rcpp::NumericVector& beta) : beta_(beta) {};
+    BoundsChecker(const Rcpp::NumericVector& beta) : minbeta_(Rcpp::min(beta)) {};
     
     bool is_valid(bounds_t bounds) const {
-        double minval = min(beta);
-        return bounds.first <= minval;
+        return bounds.first <= minbeta_;
     }
 
 private:
-    Rcpp::NumericVector beta_;
+    double minbeta_;
 };
 
 //specialization in the case where the sign is not constrained
@@ -40,7 +39,7 @@ public:
      minval_(min(forbidden_values)), maxval_(max(forbidden_values)) {};
     
     bool is_valid(bounds_t bounds) const {
-        return (bounds.first <= minval) && (maxval <= bounds.second);
+        return (bounds.first <= minval_) && (maxval_ <= bounds.second);
     }
     
 private:
