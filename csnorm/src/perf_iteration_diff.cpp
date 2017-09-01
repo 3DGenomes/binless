@@ -132,7 +132,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     //optimize lambda1 assuming eCprime=0
     if (!constrained) stop("expected constrained==T when fixed==T");
     NumericVector opt = cpp_optimize_lambda1_diff(mat, nbins, tol_val,
-                        lambda1_min, refine_num);
+                        lambda1_min, refine_num, lam2);
     double lam1 = opt["lambda1"];
     
     //soft-threshold it at the selected parameters

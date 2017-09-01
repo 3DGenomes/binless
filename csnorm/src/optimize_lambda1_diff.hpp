@@ -57,7 +57,7 @@ public:
 
 
 NumericVector cpp_optimize_lambda1_diff(const DataFrame mat, int nbins,
-                                   double tol_val, double lambda1_min, int refine_num);
+                                   double tol_val, double lambda1_min, int refine_num, double lambda2);
 
 
 #endif

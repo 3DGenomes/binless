@@ -119,7 +119,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
         if (!constrained) stop("expected constrained==T when fixed==T");
         const bool positive = true;
         opt = cpp_optimize_lambda1(mat, nbins, tol_val, positive, lambda1_min,
-                                   refine_num);
+                                   refine_num, lam2);
     } else {
         opt = cpp_optimize_lambda1_eCprime(mat, nbins, tol_val, constrained,
                                            lambda1_min, refine_num, lam2);

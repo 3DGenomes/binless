@@ -14,7 +14,7 @@ using namespace Rcpp;
 NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
         double tol_val, bool constrained,
         double lambda1_min, int refine_num, double lambda2) {
-    //extract vectors
+    /*//extract vectors
     double lmin = std::max(lambda1_min,tol_val/2);
     NumericVector weight = mat["weight"];
     NumericVector phihat = mat["phihat"];
@@ -48,8 +48,8 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     //obj.get(as<double>(best["UB"])+2*tol_val,"final");
     return NumericVector::create(_["eCprime"]=best["eCprime"], _["lambda1"]=best["lambda1"],
                                  _["UB"]=best["UB"], _["LB"]=best["LB"],
-                                 _["BIC"]=best["BIC"], _["BIC.sd"]=best["BIC.sd"], _["dof"]=best["dof"]);
-    /*NumericVector beta = mat["beta"];
+                                 _["BIC"]=best["BIC"], _["BIC.sd"]=best["BIC.sd"], _["dof"]=best["dof"]);*/
+    NumericVector beta = mat["beta"];
     NumericVector weight = mat["weight"];
     NumericVector phihat = mat["phihat"];
     NumericVector ncounts = mat["ncounts"];
@@ -58,5 +58,5 @@ NumericVector cpp_optimize_lambda1_eCprime(const DataFrame mat, int nbins,
     IntegerVector cv_grp = mat["cv.group"];
     SignalData data(beta, weight, phihat, ncounts, patchno);
     SparsityEstimator<Signal, CV, EstimatedOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, data, lambda2, mat, beta_cv, cv_grp);
-    return est.optimize();*/
+    return est.optimize();
 }
