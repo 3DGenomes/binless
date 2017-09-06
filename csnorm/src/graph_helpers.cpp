@@ -9,28 +9,25 @@ using namespace Rcpp;
 
 #include "graph_helpers.hpp"
 
-Graph build_patch_graph(int nrow, const DataFrame mat, double tol_val) {
+Graph build_patch_graph(int nbins, double tol_val, const IntegerVector& bin1,
+                        const IntegerVector& bin2, const NumericVector& value) {
     //create graph
-    int ntotal = nrow*(nrow+1)/2;
+    int ntotal = nbins*(nbins+1)/2;
     Graph G(ntotal);
     //std::cout << "Graph with " << ntotal << " vertices" << std::endl;
     //set coordinates in the 2d plane
     Graph::vertex_descriptor v = *boost::vertices(G).first;
-    for (int b1=1, i=0; b1<=nrow; ++b1) {
-        for (int b2=b1; b2<=nrow; ++b2, ++v, ++i) {
+    for (int b1=1, i=0; b1<=nbins; ++b1) {
+        for (int b2=b1; b2<=nbins; ++b2, ++v, ++i) {
             G[v].index = i;
             G[v].bin1 = b1;
             G[v].bin2 = b2;
             //std::cout << "vertex " << v << " has coordinates (" << b1 << "," << b2 << ")" << std::endl;
         }
     }
-    //retrieve data from matrix
-    IntegerVector bin1 = mat["bin1"];
-    IntegerVector bin2 = mat["bin2"];
-    NumericVector value = mat["value"];
     //add edges in 2d triangle grid if they are in the same patch
     v = *boost::vertices(G).first+1; //start at 2nd vertex
-    for (int l=nrow-1; l>=1; ++v, --l) {
+    for (int l=nbins-1; l>=1; ++v, --l) {
         for (int j=1; j<=l; ++v, ++j) {
             int i=G[v].index;
             if (G[v].bin1 != bin1(i) || G[v].bin2 != bin2(i)) {
@@ -45,10 +42,10 @@ Graph build_patch_graph(int nrow, const DataFrame mat, double tol_val) {
 
 
 //mat must be sorted by bin1 and bin2 and will not be checked for that
-IntegerVector get_patch_numbers(int nbins, const DataFrame mat,
-                                        double tol_val) {
+IntegerVector get_patch_numbers(int nbins, double tol_val, const IntegerVector& bin1,
+                                const IntegerVector& bin2, const NumericVector& value) {
     //build graph with edges only between vertices with equal values
-    Graph fG = build_patch_graph(nbins, mat, tol_val);
+    Graph fG = build_patch_graph(nbins, tol_val, bin1, bin2, value);
     //deduce connected components
     std::vector<int> component(boost::num_vertices(fG));
     int num = boost::connected_components(fG, &component[0]);

@@ -13,11 +13,10 @@ using namespace Rcpp;
 #include "RawData.hpp"
 #include "BinnedData.hpp"
 #include "Traits.hpp"
-#include "Degeneracy.hpp"
 #include "SparsityEstimator.hpp"
 
-#include "cts_to_mat.hpp" //cts_to_diff_mat
 #include "util.hpp" //SQUARE
+#include "cts_to_mat.hpp" //cts_to_diff_mat
 #include "graph_helpers.hpp" //get_patch_numbers
 
 
@@ -81,7 +80,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     //setup computation of fused lasso solution
     bool converged = true;
     const double converge = tol_val/20.;
-    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
+    FusedLassoGaussianEstimator<GFLLibrary> flo(raw.get_nbins(), converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
     DifferenceWeightsUpdater wt(raw, binned); //size of the problem and input data
     std::vector<double> beta = as<std::vector<double> >(beta_i);
@@ -105,11 +104,13 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
             converged = false;
         }
     }
-    //retrieve statistics
+    //retrieve statistics and compute patches
     alpha = flo.get_alpha();
     beta = flo.get();
     phi_ref = wt.get_phi_ref();
-    
+    IntegerVector patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
+                                              binned.get_bin2(), binned.get_beta_delta());
+    binned.set_patchno(patchno);
     
     //compute CV datasets at optimized weights
     auto cv = make_CVEstimator(flo, wt, 1000);
@@ -136,17 +137,9 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     if (!constrained) stop("expected constrained==T when fixed==T");
     NumericVector opt;
     {
-        NumericVector beta_r = mat["beta"];
-        NumericVector weight = mat["weight"];
-        NumericVector phihat = mat["phihat"];
-        NumericVector weight_ref = 1/as<NumericVector>(mat["phihat.var.ref"]);
-        NumericVector phihat_ref = mat["phihat.ref"];
-        NumericVector ncounts = mat["ncounts"];
-        IntegerVector patchno = get_patch_numbers(nbins, mat, tol_val);
         NumericVector beta_cv = mat["beta_cv"];
         IntegerVector cv_grp = mat["cv.group"];
-        DifferenceBinnedData data(beta_r, weight, phihat, weight_ref, phihat_ref, ncounts, patchno);
-        SparsityEstimator<Difference, CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy> est(nbins, tol_val, data, lam2, mat, beta_cv, cv_grp);
+        SparsityEstimator<Difference, CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, beta_cv, cv_grp);
         opt = est.optimize();
         
     }
@@ -174,10 +167,11 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                          _["ncounts"]=mat["ncounts"],
                                          _["weight"]=mat["weight"],
                                          _["value"]=delta_r);
-    IntegerVector patchno = get_patch_numbers(nbins, submat, tol_val);
-
-    //count the positive ones and deduce dof
     NumericVector delta = wrap(delta_r);
+    patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
+                                binned.get_bin2(), delta);
+    
+    //count the positive ones and deduce dof
     IntegerVector selected = patchno[abs(delta)>tol_val/2];
     const int dof = unique(selected).size();
 
@@ -251,10 +245,13 @@ List wgfl_diff_BIC_fixed(const DataFrame cts, const DataFrame ref, double disper
                                          _["ncounts"]=mat["ncounts"],
                                          _["weight"]=mat["weight"],
                                          _["value"]=delta_r);
-    IntegerVector patchno = get_patch_numbers(nbins, submat, tol_val);
-
-    //count the positive ones and deduce dof
     NumericVector delta = wrap(delta_r);
+    IntegerVector patchno = get_patch_numbers(nbins, tol_val,
+                                              Rcpp::as<Rcpp::IntegerVector>(mat["bin1"]),
+                                              Rcpp::as<Rcpp::IntegerVector>(mat["bin2"]),
+                                              delta);
+    
+    //count the positive ones and deduce dof
     IntegerVector selected = patchno[abs(delta)>tol_val/2];
     const int dof = unique(selected).size();
 

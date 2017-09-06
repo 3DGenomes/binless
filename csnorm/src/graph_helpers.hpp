@@ -13,9 +13,11 @@ struct Coordinate {
 typedef boost::adjacency_list
 <boost::vecS, boost::vecS, boost::undirectedS, Coordinate> Graph;
 
-Graph build_patch_graph(int nrow, const DataFrame mat, double tol_val);
+Graph build_patch_graph(int nbins, double tol_val, const IntegerVector& bin1,
+                        const IntegerVector& bin2, const NumericVector& value);
 
 //mat must be sorted by bin1 and bin2 and will not be checked for that
-IntegerVector get_patch_numbers(int nbins, const DataFrame mat, double tol_val);
+IntegerVector get_patch_numbers(int nbins, double tol_val, const IntegerVector& bin1,
+                                const IntegerVector& bin2, const NumericVector& value);
 
 #endif

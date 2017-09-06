@@ -5,7 +5,8 @@
 
 #include "BoundsComputer.hpp" //for bounds_t typedef
 #include "Traits.hpp"
-#include "Degeneracy.hpp"
+#include "BinnedData.hpp"
+#include "util.hpp" // get_forbidden_values
 
 //BoundsChecker does tag dispatching by type
 template<typename> class BoundsChecker {};
@@ -13,7 +14,7 @@ template<typename> class BoundsChecker {};
 //specialization in the case where the sign is positive
 template<> class BoundsChecker<PositiveSign> {
 public:
-    BoundsChecker(const Rcpp::NumericVector& beta) : minbeta_(Rcpp::min(beta)) {};
+    BoundsChecker(const BinnedData& binned) : minbeta_(Rcpp::min(binned.get_beta())) {};
     
     bool is_valid(bounds_t bounds) const {
         return bounds.first <= minbeta_;
@@ -26,7 +27,7 @@ private:
 //specialization in the case where the sign is not constrained
 template<> class BoundsChecker<AnySign> {
 public:
-    BoundsChecker(const Rcpp::NumericVector&) {};
+    BoundsChecker(const BinnedData&) {};
     bool is_valid(bounds_t) const { return true; }
 };
 
@@ -35,8 +36,11 @@ public:
 //specialization in the case where degeneracies are forbidden
 template<> class BoundsChecker<ForbidDegeneracy> {
 public:
-    BoundsChecker(const Rcpp::NumericVector& forbidden_values) :
-     minval_(min(forbidden_values)), maxval_(max(forbidden_values)) {};
+    BoundsChecker(const BinnedData& binned) {
+        Rcpp::NumericVector fv = get_forbidden_values(binned);
+        minval_ = min(fv);
+        maxval_ = max(fv);
+    }
     
     bool is_valid(bounds_t bounds) const {
         return (bounds.first <= minval_) && (maxval_ <= bounds.second);

@@ -13,7 +13,6 @@ using namespace Rcpp;
 #include "RawData.hpp"
 #include "BinnedData.hpp"
 #include "Traits.hpp"
-#include "Degeneracy.hpp"
 #include "SparsityEstimator.hpp"
 
 #include "util.hpp" //SQUARE
@@ -26,11 +25,12 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
                            double lam2, double alpha, double converge,
                            const List outliers, NumericVector beta_i) {
     //Class that holds all the data. Other classes reference to it.
-    SignalRawData data(nbins, dispersion, cts, outliers);
+    Signal::raw_t raw(nbins, dispersion, cts, outliers);
+    Signal::binned_t binned; //stored here, but will be populated by WeightsUpdater
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
-    SignalWeightsUpdater wt(data); //size of the problem and input data
+    SignalWeightsUpdater wt(raw,binned); //size of the problem and input data
     wt.setUp(); //for consistency. No-op, since there's no phi_ref to compute
     
     //do IRLS iterations until convergence
@@ -46,7 +46,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
     
     DataFrame finalmat = DataFrame::create(_["bin1"]=binned.get_bin1(),
                                            _["bin2"]=binned.get_bin2(),
-                                           _["phihat"]=binned.bet_phihat(),
+                                           _["phihat"]=binned.get_phihat(),
                                            _["ncounts"]=binned.get_ncounts(),
                                            _["weight"]=binned.get_weight(),
                                            _["diag.idx"]=binned.get_diag_idx(),
@@ -66,13 +66,14 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                      bool constrained, bool fixed) {
     
     //Class that holds all the data. Other classes reference to it.
-    SignalRawData data(nbins, dispersion, cts, outliers);
+    Signal::raw_t raw(nbins, dispersion, cts, outliers);
+    Signal::binned_t binned; //stored here, but will be populated by WeightsUpdater
     //setup computation of fused lasso solution
     bool converged = true;
     const double converge = tol_val/20.;
-    FusedLassoGaussianEstimator<GFLLibrary> flo(data.get_nbins(), converge); //size of the problem and convergence criterion
+    FusedLassoGaussianEstimator<GFLLibrary> flo(raw.get_nbins(), converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
-    SignalWeightsUpdater wt(data); //size of the problem and input data
+    SignalWeightsUpdater wt(raw,binned); //size of the problem and input data
     wt.setUp(); //for consistency. No-op, since there's no phi_ref to compute
     std::vector<double> beta = as<std::vector<double> >(beta_i);
     
@@ -92,22 +93,24 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
             converged = false;
         }
     }
-    //retrieve statistics
+    //retrieve statistics and compute patches
     alpha = flo.get_alpha();
     beta = flo.get();
-    DataFrame mat = wt.get_mat();
+    IntegerVector patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
+                                              binned.get_bin2(), binned.get_beta_phi());
+    binned.set_patchno(patchno);
     
     //compute CV datasets at optimized weights
     auto cv = make_CVEstimator(flo, wt, 0);
     cv.compute(beta, lam2);
-    mat = DataFrame::create(_["bin1"]=mat["bin1"],
-                            _["bin2"]=mat["bin2"],
-                            _["phihat"]=mat["phihat"],
-                            _["phihat.var"]=mat["phihat.var"],
-                            _["ncounts"]=mat["ncounts"],
-                            _["weight"]=mat["weight"],
-                            _["diag.idx"]=mat["diag.idx"],
-                            _["diag.grp"]=mat["diag.grp"],
+    DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
+                            _["bin2"]=binned.get_bin2(),
+                            _["phihat"]=binned.get_phihat(),
+                            _["phihat.var"]=1/binned.get_weight(),
+                            _["ncounts"]=binned.get_ncounts(),
+                            _["weight"]=binned.get_weight(),
+                            _["diag.idx"]=binned.get_diag_idx(),
+                            _["diag.grp"]=binned.get_diag_grp(),
                             _["beta"]=beta,
                             _["value"]=beta,
                             _["phi"]=beta,
@@ -118,16 +121,14 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     NumericVector opt;
     {
         NumericVector beta_r = mat["beta"];
-        IntegerVector patchno = get_patch_numbers(nbins, mat, tol_val);
         NumericVector beta_cv = mat["beta_cv"];
         IntegerVector cv_grp = mat["cv.group"];
-        SignalBinnedData data(beta_r, mat["weight"], mat["phihat"], mat["ncounts"], patchno);
         if (fixed) { // is eCprime fixed to 0?
             if (!constrained) stop("expected constrained==T when fixed==T");
-            SparsityEstimator<Signal, CVkSD<1>, ZeroOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, data, lam2, mat, beta_cv, cv_grp);
+            SparsityEstimator<Signal, CVkSD<1>, ZeroOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, beta_cv, cv_grp);
             opt = est.optimize();
         } else {
-            SparsityEstimator<Signal, CV, EstimatedOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, data, lam2, mat, beta_cv, cv_grp);
+            SparsityEstimator<Signal, CV, EstimatedOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, beta_cv, cv_grp);
             opt = est.optimize();
         }
     }
@@ -145,10 +146,11 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                                          _["ncounts"]=mat["ncounts"],
                                          _["weight"]=mat["weight"],
                                          _["value"]=phi_r);
-    IntegerVector patchno = get_patch_numbers(nbins, submat, tol_val);
+    NumericVector phi = wrap(phi_r);
+    patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
+                                binned.get_bin2(), phi);
 
     //count the positive ones and deduce dof
-    NumericVector phi = wrap(phi_r);
     IntegerVector selected = patchno[abs(phi)>tol_val/2];
     const int dof = unique(selected).size();
 
@@ -207,10 +209,10 @@ List wgfl_signal_BIC_fixed(const DataFrame cts, double dispersion, int nouter, i
                                          _["ncounts"]=mat["ncounts"],
                                          _["weight"]=mat["weight"],
                                          _["value"]=phi_r);
-    IntegerVector patchno = get_patch_numbers(nbins, submat, tol_val);
+    NumericVector phi = wrap(phi_r);
+    IntegerVector patchno = get_patch_numbers(nbins, tol_val, mat["bin1"], mat["bin2"], phi);
 
     //count the positive ones and deduce dof
-    NumericVector phi = wrap(phi_r);
     IntegerVector selected = patchno[abs(phi)>tol_val/2];
     const int dof = unique(selected).size();
 
