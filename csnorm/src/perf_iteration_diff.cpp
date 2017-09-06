@@ -115,30 +115,13 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     //compute CV datasets at optimized weights
     auto cv = make_CVEstimator(flo, wt, 1000);
     cv.compute(beta, lam2);
-    DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
-                            _["bin2"]=binned.get_bin2(),
-                            _["phihat"]=binned.get_phihat(),
-                            _["phihat.var"]=1/binned.get_weight(),
-                            _["phihat.ref"]=binned.get_phihat_ref(),
-                            _["phihat.var.ref"]=1/binned.get_weight_ref(),
-                            _["ncounts"]=binned.get_ncounts(),
-                            _["deltahat"]=binned.get_deltahat(),
-                            _["weight"]=binned.get_weight(),
-                            _["diag.idx"]=binned.get_diag_idx(),
-                            _["diag.grp"]=binned.get_diag_grp(),
-                            _["beta"]=beta,
-                            _["value"]=beta,
-                            _["delta"]=beta,
-                            _["phi_ref"]=phi_ref,
-                            _["beta_cv"]=cv.get_beta_cv(),
-                            _["cv.group"]=cv.get_cvgroup());
-    
+
     //optimize lambda1 assuming eCprime=0
     if (!constrained) stop("expected constrained==T when fixed==T");
     NumericVector opt;
     {
-        NumericVector beta_cv = mat["beta_cv"];
-        IntegerVector cv_grp = mat["cv.group"];
+        NumericVector beta_cv = Rcpp::wrap(cv.get_beta_cv());
+        IntegerVector cv_grp = Rcpp::wrap(cv.get_cvgroup());
         SparsityEstimator<Difference, CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, beta_cv, cv_grp);
         opt = est.optimize();
         
@@ -146,27 +129,21 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     double lam1 = opt["lambda1"];
     
     //soft-threshold it at the selected parameters
-    std::vector<double> beta_r = as<std::vector<double> >(mat["beta"]);
+    std::vector<double> beta_r = as<std::vector<double> >(binned.get_beta());
     std::vector<double> delta_r = soft_threshold(beta_r, 0, lam1);
 
     //compute phi_ref
+    std::vector<double> phihat_r = Rcpp::as<std::vector<double> >(binned.get_phihat());
+    NumericVector phihat_var = 1/binned.get_weight();
+    std::vector<double> phihat_var_r = Rcpp::as<std::vector<double> >(phihat_var);
     std::vector<double> phihat_ref_r = Rcpp::as<std::vector<double> >
-                                       (mat["phihat.ref"]);
-    std::vector<double> phihat_var_ref_r = Rcpp::as<std::vector<double> >
-                                           (mat["phihat.var.ref"]);
-    std::vector<double> phihat_r = Rcpp::as<std::vector<double> >(mat["phihat"]);
-    std::vector<double> phihat_var_r = Rcpp::as<std::vector<double> >
-                                       (mat["phihat.var"]);
+                                       (binned.get_phihat_ref());
+    NumericVector phihat_var_ref = 1/binned.get_weight_ref();
+    std::vector<double> phihat_var_ref_r = Rcpp::as<std::vector<double> >(phihat_var_ref);
     std::vector<double> phi_ref_r = compute_phi_ref(delta_r, phihat_r, phihat_var_r,
                                     phihat_ref_r, phihat_var_ref_r);
 
     //identify patches
-    DataFrame submat = DataFrame::create(_["bin1"]=mat["bin1"],
-                                         _["bin2"]=mat["bin2"],
-                                         _["valuehat"]=mat["deltahat"],
-                                         _["ncounts"]=mat["ncounts"],
-                                         _["weight"]=mat["weight"],
-                                         _["value"]=delta_r);
     NumericVector delta = wrap(delta_r);
     patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
                                 binned.get_bin2(), delta);
@@ -179,25 +156,27 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     const double BIC = opt["BIC"];
     const double BIC_sd = opt["BIC.sd"];
 
-    DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
-                                           _["bin2"]=mat["bin2"],
-                                           _["deltahat"]=mat["deltahat"],
-                                           _["weight"]=mat["weight"],
-                                           _["phihat.ref"]=mat["phihat.ref"],
-                                           _["phihat.var.ref"]=mat["phihat.var.ref"],
-                                           _["ncounts"]=mat["ncounts"],
-                                           _["diag.idx"]=mat["diag.idx"],
-                                           _["diag.grp"]=mat["diag.grp"],
-                                           _["beta"]=beta_r,
-                                           _["beta_cv"]=mat["beta_cv"],
-                                           _["cv.group"]=mat["cv.group"],
-                                           _["delta"]=delta,
-                                           _["phi.ref"]=phi_ref_r,
-                                           _["patchno"]=patchno);
+    DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
+                            _["bin2"]=binned.get_bin2(),
+                            _["phihat"]=binned.get_phihat(),
+                            _["phihat.var"]=1/binned.get_weight(),
+                            _["phihat.ref"]=binned.get_phihat_ref(),
+                            _["phihat.var.ref"]=1/binned.get_weight_ref(),
+                            _["ncounts"]=binned.get_ncounts(),
+                            _["deltahat"]=binned.get_deltahat(),
+                            _["weight"]=binned.get_weight(),
+                            _["diag.idx"]=binned.get_diag_idx(),
+                            _["diag.grp"]=binned.get_diag_grp(),
+                            _["beta"]=beta,
+                            _["delta"]=delta,
+                            _["phi_ref"]=phi_ref,
+                            _["beta_cv"]=cv.get_beta_cv(),
+                            _["cv.group"]=cv.get_cvgroup(),
+                            _["patchno"]=patchno);
     return List::create(_["phi.ref"]=phi_ref_r,
                         _["delta"]=delta, _["beta"]=beta_r,
                         _["alpha"]=alpha, _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd,
-                        _["mat"]=finalmat, _["lambda1"]=lam1, _["eCprime"]=0, _["converged"]=converged);
+                        _["mat"]=mat, _["lambda1"]=lam1, _["eCprime"]=0, _["converged"]=converged);
 }
 
 

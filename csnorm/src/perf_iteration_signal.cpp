@@ -103,26 +103,12 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     //compute CV datasets at optimized weights
     auto cv = make_CVEstimator(flo, wt, 0);
     cv.compute(beta, lam2);
-    DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
-                            _["bin2"]=binned.get_bin2(),
-                            _["phihat"]=binned.get_phihat(),
-                            _["phihat.var"]=1/binned.get_weight(),
-                            _["ncounts"]=binned.get_ncounts(),
-                            _["weight"]=binned.get_weight(),
-                            _["diag.idx"]=binned.get_diag_idx(),
-                            _["diag.grp"]=binned.get_diag_grp(),
-                            _["beta"]=beta,
-                            _["value"]=beta,
-                            _["phi"]=beta,
-                            _["beta_cv"]=cv.get_beta_cv(),
-                            _["cv.group"]=cv.get_cvgroup());
     
     //optimize lambda1 and eC
     NumericVector opt;
     {
-        NumericVector beta_r = mat["beta"];
-        NumericVector beta_cv = mat["beta_cv"];
-        IntegerVector cv_grp = mat["cv.group"];
+        NumericVector beta_cv = Rcpp::wrap(cv.get_beta_cv());
+        IntegerVector cv_grp = Rcpp::wrap(cv.get_cvgroup());
         if (fixed) { // is eCprime fixed to 0?
             if (!constrained) stop("expected constrained==T when fixed==T");
             SparsityEstimator<Signal, CVkSD<1>, ZeroOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, beta_cv, cv_grp);
@@ -136,16 +122,10 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     double eCprime = opt["eCprime"];
     
     //soft-threshold it at the selected parameters
-    std::vector<double> beta_r = as<std::vector<double> >(mat["beta"]);
+    std::vector<double> beta_r = as<std::vector<double> >(binned.get_beta());
     std::vector<double> phi_r = soft_threshold(beta_r, eCprime, lam1);
 
     //identify patches
-    DataFrame submat = DataFrame::create(_["bin1"]=mat["bin1"],
-                                         _["bin2"]=mat["bin2"],
-                                         _["valuehat"]=mat["phihat"],
-                                         _["ncounts"]=mat["ncounts"],
-                                         _["weight"]=mat["weight"],
-                                         _["value"]=phi_r);
     NumericVector phi = wrap(phi_r);
     patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
                                 binned.get_bin2(), phi);
@@ -158,22 +138,22 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     const double BIC = opt["BIC"];
     const double BIC_sd = opt["BIC.sd"];
     
-    DataFrame finalmat = DataFrame::create(_["bin1"]=mat["bin1"],
-                                           _["bin2"]=mat["bin2"],
-                                           _["phihat"]=mat["phihat"],
-                                           _["ncounts"]=mat["ncounts"],
-                                           _["weight"]=mat["weight"],
-                                           _["diag.idx"]=mat["diag.idx"],
-                                           _["diag.grp"]=mat["diag.grp"],
-                                           _["beta"]=beta_r,
-                                           _["beta_cv"]=mat["beta_cv"],
-                                           _["cv.group"]=mat["cv.group"],
-                                           _["phi"]=phi_r,
-                                           _["cv.group"]=mat["cv.group"],
-                                           _["patchno"]=patchno);
+    DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
+                                      _["bin2"]=binned.get_bin2(),
+                                      _["phihat"]=binned.get_phihat(),
+                                      _["ncounts"]=binned.get_ncounts(),
+                                      _["weight"]=binned.get_weight(),
+                                      _["diag.idx"]=binned.get_diag_idx(),
+                                      _["diag.grp"]=binned.get_diag_grp(),
+                                      _["beta"]=beta,
+                                      _["phi"]=phi,
+                                      _["beta_cv"]=cv.get_beta_cv(),
+                                      _["cv.group"]=cv.get_cvgroup(),
+                                      _["patchno"]=patchno);
+    
     return List::create(_["phi"]=phi_r,
                         _["beta"]=beta_r, _["alpha"]=alpha, _["lambda2"]=lam2,
-                        _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd, _["mat"]=finalmat, _["eCprime"]=eCprime,
+                        _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd, _["mat"]=mat, _["eCprime"]=eCprime,
                         _["lambda1"]=lam1, _["converged"]=converged);
 }
 
