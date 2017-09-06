@@ -30,8 +30,8 @@ public:
         if (beta_init.size() != N_) Rcpp::Rcout << "ERROR: wrong size for input to CV calculation, check code\n";
         
         //Compute fused lasso solutions on each group and report to beta_cv
-        std::vector<double> y = wt_.get_y();
-        std::vector<double> w = wt_.get_w();
+        std::vector<double> y = wt_.get_betahat();
+        std::vector<double> w = wt_.get_weight();
         const int ngroups=2;
         for (int g=0; g<ngroups; ++g) {
             //prepare data and weights for group g and copy initial values

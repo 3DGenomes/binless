@@ -19,14 +19,14 @@ template<typename Sign> class BoundsComputer<EstimatedOffset, Sign> {
                   "When offset is estimated, sign must be constrained to be positive!");
 public:
     BoundsComputer(const BinnedData& data, double minval) :
-     value_(data.get_value()), weight_(data.get_weight()),
-     valuehat_(data.get_valuehat()), minval_(minval) {}
+     beta_(data.get_beta()), weight_(data.get_weight()),
+     y_(data.get_betahat()), minval_(minval) {}
     
     //given an UB candidate (and implicit dof), find the adequate UB and LB
     bounds_t optimize_bounds(double val) const;
     
 private:
-    Rcpp::NumericVector value_, weight_, valuehat_;
+    Rcpp::NumericVector beta_, weight_, y_;
     double minval_;
 };
 
@@ -36,14 +36,14 @@ template<typename Sign>
 class BoundsComputer<ZeroOffset, Sign> {
 public:
     BoundsComputer(const BinnedData& data, double minUB) :
-    beta_(data.get_beta()), absval_(abs(data.get_beta())), weight_(data.get_weight()),
-    y_(data.get_y()), minabsval_(min(absval_)), maxabsval_(max(absval_)), minUB_(minUB) {}
+    beta_(data.get_beta()), absval_(abs(beta_)), weight_(data.get_weight()),
+    y_(data.get_betahat()), minabsval_(min(absval_)), maxabsval_(max(absval_)), minUB_(minUB) {}
     
     //given an UB candidate (and implicit dof), find the adequate UB and LB
     bounds_t optimize_bounds(double val) const;
     
 private:
-    Rcpp::NumericVector value_, absval_, weight_, valuehat_;
+    Rcpp::NumericVector beta_, absval_, weight_, y_;
     double minabsval_, maxabsval_, minUB_;
 };
 

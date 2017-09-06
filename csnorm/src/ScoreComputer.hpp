@@ -19,7 +19,7 @@ public:
     typedef typename ScoreAssembler<Score>::var_t assembler_var_t;
     typedef Rcpp::NumericVector value_t;
     ScoreComputer(double tol_val, const binned_t& data, const likelihood_var_t& likelihood_var, const assembler_var_t& assembler_var) :
-       Calculation::likelihood_t(data, likelihood_var), ScoreAssembler<Score>(assembler_var), tol_val_(tol_val), value_(data.get_value()),
+       Calculation::likelihood_t(data, likelihood_var), ScoreAssembler<Score>(assembler_var), tol_val_(tol_val), value_(data.get_beta()),
        patchno_(data.get_patchno()) {}
     
     //compute score obtained with these bounds

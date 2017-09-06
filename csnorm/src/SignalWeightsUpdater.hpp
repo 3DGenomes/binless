@@ -17,12 +17,13 @@ public:
     void setUp() {} //for consistency with other WeightsUpdaters
     
     void update(const std::vector<double>& beta_phi) {
-        cts_to_signal_mat(raw_, 0, beta_phi, binned_); //offset is held at zero since we pass unthresholded beta_phi
+        Rcpp::NumericVector beta_phi_r = wrap(beta_phi);
+        cts_to_signal_mat(raw_, 0, beta_phi_r, binned_); //offset is held at zero since we pass unthresholded beta_phi
     }
     
-    std::vector<double> get_y() const { return Rcpp::as<std::vector<double> >(binned_.get_phihat()); }
+    std::vector<double> get_betahat() const { return Rcpp::as<std::vector<double> >(binned_.get_phihat()); }
     
-    std::vector<double> get_w() const { return Rcpp::as<std::vector<double> >(binned_.get_weight()); }
+    std::vector<double> get_weight() const { return Rcpp::as<std::vector<double> >(binned_.get_weight()); }
     
     std::vector<int> get_bin1() const { return Rcpp::as<std::vector<int> > (binned_.get_bin1()); }
     

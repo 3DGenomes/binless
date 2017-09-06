@@ -34,8 +34,8 @@ public:
         do {
           //update weights
           wt_.update(beta);
-          auto y = wt_.get_y();
-          auto w = wt_.get_w();
+          auto y = wt_.get_betahat();
+          auto w = wt_.get_weight();
           //estimate beta
           gauss_.optimize(y, beta, w, lambda2);
           beta = gauss_.get();
