@@ -44,7 +44,7 @@ void cts_to_signal_mat(const SignalRawData& raw, double eCprime, const Rcpp::Num
     std::vector<int> cts_bin2 = as<std::vector<int> >(cts["bin2"]);
     std::vector<double> count = as<std::vector<double> >(cts["count"]);
     std::vector<double> lmu_nosig = as<std::vector<double> >(cts["lmu.nosig"]);
-    std::vector<double> weight = as<std::vector<double> >(cts["weight"]);
+    std::vector<double> weight = as<std::vector<double> >(cts["weight"]); //not related to 1/var !
     
     //outputs
     int nbetas = nbins*(nbins+1)/2; //size of fused lasso problem
@@ -106,6 +106,8 @@ void cts_to_diff_mat(const DifferenceRawData& raw, const Rcpp::NumericVector& ph
     binned.set_weight(sbinned_oth.get_weight());
     binned.set_deltahat(sbinned_oth.get_phihat() - sbinned_ref.get_phihat());
     binned.set_ncounts(sbinned_oth.get_ncounts() + sbinned_ref.get_ncounts());
+    binned.set_diag_idx(sbinned_ref.get_diag_idx());
+    binned.set_diag_grp(sbinned_ref.get_diag_grp());
     binned.set_weight_ref(sbinned_ref.get_weight());
     binned.set_phihat_ref(sbinned_ref.get_phihat());
     binned.set_phi_ref(phi_ref);
