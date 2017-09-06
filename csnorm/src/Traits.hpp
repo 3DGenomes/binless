@@ -33,5 +33,8 @@ struct Difference {
     typedef DifferenceBinnedData binned_t;
 };
 
+struct AllowDegeneracy {};
+struct ForbidDegeneracy {};
+
 #endif
 
