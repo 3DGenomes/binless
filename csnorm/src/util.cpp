@@ -47,4 +47,20 @@ std::vector<double> compute_phi_ref(const std::vector<double>& delta_r,
   return phi_ref_r;
 }
 
-
+Rcpp::NumericVector get_forbidden_values(const BinnedData& binned) {
+    Rcpp::NumericVector beta = binned.get_beta();
+    Rcpp::IntegerVector diag_grp = binned.get_diag_grp();
+    //retrieve minimum values for each counter diagonal group
+    //TODO: abs(beta) or beta?
+    int ndiags = max(diag_grp)+1;
+    Rcpp::LogicalVector diagtouch(ndiags, false);
+    Rcpp::NumericVector diagvals(ndiags, max(beta)); //diag_idx starts at 0
+    for (int i=0; i<diag_grp.size(); ++i) {
+        diagvals(diag_grp(i)) = std::min(diagvals(diag_grp(i)),beta(i));
+        diagtouch(diag_grp(i)) = true;
+    }
+    diagvals = diagvals[diagtouch];
+    diagvals = unique(diagvals);
+    std::sort(diagvals.begin(), diagvals.end());
+    return diagvals;
+}

@@ -5,6 +5,8 @@
 using namespace Rcpp;
 #include <vector>
 
+#include "BinnedData.hpp"
+
 #define SQUARE(x) ((x)*(x))
 
 std::vector<double> soft_threshold(const std::vector<double>& beta,
@@ -17,6 +19,9 @@ std::vector<double> compute_phi_ref(const std::vector<double>& delta_r,
                                     const std::vector<double>& phihat,
                                     const std::vector<double>& phihat_var, const std::vector<double>& phihat_ref,
                                     const std::vector<double>& phihat_var_ref);
+
+
+Rcpp::NumericVector get_forbidden_values(const BinnedData& binned);
 
 
 #endif
