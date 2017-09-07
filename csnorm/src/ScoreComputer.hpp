@@ -9,12 +9,13 @@
 #include "util.hpp" //soft_threshold
 #include "ScoreAssembler.hpp"
 #include "Likelihoods.hpp"
+#include "BinnedData.hpp"
 
 //Calculation is either Signal or Difference (points to both likelihoods and data structures)
 //Score knows how to assemble it into the BIC/CV
 template<typename Calculation, typename Score> class ScoreComputer : private Likelihood<Calculation>, private ScoreAssembler<Score> {
 public:
-    typedef typename Calculation::binned_t binned_t;
+    typedef BinnedData<Calculation> binned_t;
     typedef typename Likelihood<Calculation>::var_t likelihood_var_t;
     typedef typename ScoreAssembler<Score>::var_t assembler_var_t;
     typedef Rcpp::NumericVector value_t;

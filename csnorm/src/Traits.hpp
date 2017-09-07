@@ -13,22 +13,16 @@ template<unsigned kSD> struct CVkSD { enum { k = kSD }; };
 typedef CVkSD<0> CV;
 
 
-class SignalLikelihood;
 class SignalRawData;
-class SignalBinnedData;
 
 struct Signal {
     typedef SignalRawData raw_t;
-    typedef SignalBinnedData binned_t;
 };
 
-class DifferenceLikelihood;
 class DifferenceRawData;
-class DifferenceBinnedData;
 
 struct Difference {
     typedef DifferenceRawData raw_t;
-    typedef DifferenceBinnedData binned_t;
 };
 
 struct AllowDegeneracy {};

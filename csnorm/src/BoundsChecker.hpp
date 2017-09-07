@@ -14,7 +14,7 @@ template<typename> class BoundsChecker {};
 //specialization in the case where the sign is positive
 template<> class BoundsChecker<PositiveSign> {
 public:
-    BoundsChecker(const BinnedData& binned) : minbeta_(Rcpp::min(binned.get_beta())) {};
+    BoundsChecker(const BinnedDataCore& binned) : minbeta_(Rcpp::min(binned.get_beta())) {};
     
     bool is_valid(bounds_t bounds) const {
         return bounds.first <= minbeta_;
@@ -27,7 +27,7 @@ private:
 //specialization in the case where the sign is not constrained
 template<> class BoundsChecker<AnySign> {
 public:
-    BoundsChecker(const BinnedData&) {};
+    BoundsChecker(const BinnedDataCore&) {};
     bool is_valid(bounds_t) const { return true; }
 };
 
@@ -36,7 +36,7 @@ public:
 //specialization in the case where degeneracies are forbidden
 template<> class BoundsChecker<ForbidDegeneracy> {
 public:
-    BoundsChecker(const BinnedData& binned) {
+    BoundsChecker(const BinnedDataCore& binned) {
         Rcpp::NumericVector fv = get_forbidden_values(binned);
         minval_ = min(fv);
         maxval_ = max(fv);

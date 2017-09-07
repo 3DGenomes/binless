@@ -14,11 +14,11 @@ std::vector<double> soft_threshold(const std::vector<double>& beta,
 Rcpp::NumericVector get_patch_values(Rcpp::NumericVector value, Rcpp::IntegerVector patchno);
 
 
-Rcpp::NumericVector compute_phi_ref(const DifferenceBinnedData& binned,
+Rcpp::NumericVector compute_phi_ref(const BinnedData<Difference>& binned,
                                     const Rcpp::NumericVector& delta);
 
 
-Rcpp::NumericVector get_forbidden_values(const BinnedData& binned);
+Rcpp::NumericVector get_forbidden_values(const BinnedDataCore& binned);
 
 
 #endif

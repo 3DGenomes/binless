@@ -26,7 +26,7 @@ NumericVector get_patch_values(NumericVector value, IntegerVector patchno) {
     return unique_values;
 }
 
-Rcpp::NumericVector compute_phi_ref(const DifferenceBinnedData& binned,
+Rcpp::NumericVector compute_phi_ref(const BinnedData<Difference>& binned,
                                     const Rcpp::NumericVector& delta) {
   const int N = delta.size();
   std::vector<double> phihat = Rcpp::as<std::vector<double> >(binned.get_phihat());
@@ -49,7 +49,7 @@ Rcpp::NumericVector compute_phi_ref(const DifferenceBinnedData& binned,
   return Rcpp::wrap(phi_ref_r);
 }
 
-Rcpp::NumericVector get_forbidden_values(const BinnedData& binned) {
+Rcpp::NumericVector get_forbidden_values(const BinnedDataCore& binned) {
     Rcpp::NumericVector beta = binned.get_beta();
     Rcpp::IntegerVector diag_grp = binned.get_diag_grp();
     //retrieve minimum values for each counter diagonal group

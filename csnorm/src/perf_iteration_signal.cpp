@@ -26,7 +26,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
                            const List outliers, NumericVector beta_i) {
     //Class that holds all the data. Other classes reference to it.
     Signal::raw_t raw(nbins, dispersion, cts, outliers);
-    Signal::binned_t binned; //stored here, but will be populated by WeightsUpdater
+    BinnedData<Signal> binned; //stored here, but will be populated by WeightsUpdater
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
@@ -67,7 +67,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     
     //Class that holds all the data. Other classes reference to it.
     Signal::raw_t raw(nbins, dispersion, cts, outliers);
-    Signal::binned_t binned; //stored here, but will be populated by WeightsUpdater
+    BinnedData<Signal> binned; //stored here, but will be populated by WeightsUpdater
     //setup computation of fused lasso solution
     bool converged = true;
     const double converge = tol_val/20.;

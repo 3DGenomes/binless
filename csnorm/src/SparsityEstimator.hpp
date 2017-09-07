@@ -10,6 +10,7 @@
 #include "ScoreComputer.hpp"
 #include "ScoreOptimizer.hpp"
 #include "util.hpp"
+#include "BinnedData.hpp"
 
 // A class that estimates lambda1 (and an offset if needed) based on various criteria
 /* We define and use upper bound UB = offset + lambda1 and lower bound LB = offset - lambda1
@@ -32,7 +33,7 @@ class SparsityEstimator : private CandidatesFilter<Degeneracy>,
                           private ScoreOptimizer<Score> {
     
     typedef typename ScoreComputer<Calculation,Score>::value_t score_t;
-    typedef typename ScoreComputer<Calculation,Score>::binned_t binned_t;
+    typedef BinnedData<Calculation> binned_t;
     typedef typename ScoreComputer<Calculation,Score>::likelihood_var_t likelihood_var_t;
     typedef typename ScoreComputer<Calculation,Score>::assembler_var_t assembler_var_t;
 

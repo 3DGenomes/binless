@@ -3,8 +3,10 @@
 
 #include <Rcpp.h>
 
+#include "Traits.hpp"
+
 //generic binned data: input is betahat and weight, estimate is beta etc.
-class BinnedData {
+class BinnedDataCore {
 public:
     Rcpp::IntegerVector get_bin1() const { return bin1_; }
     void set_bin1(const Rcpp::IntegerVector& bin1) { bin1_ = bin1; }
@@ -39,8 +41,10 @@ private:
     Rcpp::IntegerVector patchno_, diag_idx_, diag_grp_;
 };
 
+template<typename> class BinnedData {};
+
 //signal binned data: input is phihat and weight, estimate is beta, phi etc.
-class SignalBinnedData : public BinnedData {
+template<> class BinnedData<Signal> : public BinnedDataCore {
 public:
 
     Rcpp::NumericVector get_beta_phi() const { return get_beta(); }
@@ -53,7 +57,7 @@ public:
 };
 
 //signal binned data: input is phihat and weight, estimate is beta, phi etc.
-class DifferenceBinnedData : public BinnedData {
+template<> class BinnedData<Difference> : public BinnedDataCore {
 public:
     Rcpp::NumericVector get_beta_delta() const { return get_beta(); }
     void set_beta_delta(const Rcpp::NumericVector& beta_delta) { set_beta(beta_delta); }

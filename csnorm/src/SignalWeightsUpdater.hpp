@@ -12,7 +12,7 @@
 class SignalWeightsUpdater {
 public:
     
-    SignalWeightsUpdater(const SignalRawData& raw, SignalBinnedData& binned) : raw_(raw), binned_(binned) {}
+    SignalWeightsUpdater(const SignalRawData& raw, BinnedData<Signal>& binned) : raw_(raw), binned_(binned) {}
     
     void setUp() {} //for consistency with other WeightsUpdaters
     
@@ -31,7 +31,7 @@ public:
     
 private:
     const SignalRawData& raw_;
-    SignalBinnedData& binned_;
+    BinnedData<Signal>& binned_;
 };
 
 #endif

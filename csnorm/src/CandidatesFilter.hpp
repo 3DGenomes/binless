@@ -5,6 +5,7 @@
 
 #include "BinnedData.hpp"
 #include "Traits.hpp"
+#include "util.hpp"
 
 //class to filter upper bound candidates based on a degeneracy policy
 //TODO: should the sign policy be included?
@@ -12,7 +13,7 @@ template<class Degeneracy> class CandidatesFilter {};
 
 template<> class CandidatesFilter<AllowDegeneracy> {
 public:
-    CandidatesFilter(const BinnedData&) {}
+    CandidatesFilter(const BinnedDataCore&) {}
     Rcpp::NumericVector filter(const Rcpp::NumericVector&) const { return Rcpp::NumericVector(); }
 };
 
@@ -20,7 +21,7 @@ public:
 template<> class CandidatesFilter<ForbidDegeneracy> {
 public:
     
-    CandidatesFilter(const BinnedData& binned) : maxval_(max(get_forbidden_values(binned))) {}
+    CandidatesFilter(const BinnedDataCore& binned) : maxval_(max(get_forbidden_values(binned))) {}
     
     //exclude a number of patch values (used as UB borders) because they would make the system degenerate
     Rcpp::NumericVector filter(const Rcpp::NumericVector& candidates) const {

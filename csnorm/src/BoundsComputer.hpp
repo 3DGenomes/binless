@@ -18,7 +18,7 @@ template<typename Sign> class BoundsComputer<EstimatedOffset, Sign> {
     static_assert(std::is_same<Sign, PositiveSign>::value,
                   "When offset is estimated, sign must be constrained to be positive!");
 public:
-    BoundsComputer(const BinnedData& data, double minval) :
+    BoundsComputer(const BinnedDataCore& data, double minval) :
      beta_(data.get_beta()), weight_(data.get_weight()),
      y_(data.get_betahat()), minval_(minval) {}
     
@@ -35,7 +35,7 @@ private:
 template<typename Sign>
 class BoundsComputer<ZeroOffset, Sign> {
 public:
-    BoundsComputer(const BinnedData& data, double minUB) :
+    BoundsComputer(const BinnedDataCore& data, double minUB) :
     beta_(data.get_beta()), absval_(abs(beta_)), weight_(data.get_weight()),
     y_(data.get_betahat()), minabsval_(min(absval_)), maxabsval_(max(absval_)), minUB_(minUB) {}
     
