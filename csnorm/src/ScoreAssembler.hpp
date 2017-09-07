@@ -7,8 +7,9 @@
 #include "util.hpp" //SQUARE
 #include "Traits.hpp"
 
-//tag dispatcher
-template<typename> class ScoreAssembler {};
+//ScoreAssembler receives a chi square and the degrees of freedom
+//and assembles them into a score (templated, BIC or CVkSD)
+template<typename Score> class ScoreAssembler {};
 
 //CV with or without kSD
 template<unsigned kSD> class ScoreAssembler<CVkSD<kSD> > {

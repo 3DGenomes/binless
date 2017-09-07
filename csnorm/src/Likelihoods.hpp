@@ -6,7 +6,9 @@
 #include "BinnedData.hpp"
 #include "Traits.hpp"
 
-//generic
+//Likelihood takes the data and unthresholded beta estimate, and returns
+//the squared deviations on each matrix bin, computed on the
+//templated data type (Signal or Difference)
 template<typename Calculation> class Likelihood {};
 
 //Signal
