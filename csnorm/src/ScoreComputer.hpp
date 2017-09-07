@@ -6,22 +6,25 @@
 #include <tuple> //tie
 
 #include "Traits.hpp"
-#include "util.hpp" //soft_threshold
 #include "ScoreAssembler.hpp"
 #include "Likelihoods.hpp"
+#include "DOFComputer.hpp"
 #include "BinnedData.hpp"
 
+//ScoreComputer takes data and evaluates the score at a given set of upper and lower bounds
 //Calculation is either Signal or Difference (points to both likelihoods and data structures)
 //Score knows how to assemble it into the BIC/CV
-template<typename Calculation, typename Score> class ScoreComputer : private Likelihood<Calculation>, private ScoreAssembler<Score> {
+template<typename Calculation, typename Score>
+class ScoreComputer : private Likelihood<Calculation>,
+                      private ScoreAssembler<Score>,
+                      private DOFComputer {
 public:
     typedef BinnedData<Calculation> binned_t;
     typedef typename Likelihood<Calculation>::var_t likelihood_var_t;
     typedef typename ScoreAssembler<Score>::var_t assembler_var_t;
     typedef Rcpp::NumericVector value_t;
     ScoreComputer(double tol_val, const binned_t& data, const likelihood_var_t& likelihood_var, const assembler_var_t& assembler_var) :
-       Likelihood<Calculation>(data, likelihood_var), ScoreAssembler<Score>(assembler_var), tol_val_(tol_val), value_(data.get_beta()),
-       patchno_(data.get_patchno()) {}
+       Likelihood<Calculation>(data, likelihood_var), ScoreAssembler<Score>(assembler_var), DOFComputer(tol_val, data) {}
     
     //compute score obtained with these bounds
     Rcpp::NumericVector evaluate(double LB, double UB) const {
@@ -61,22 +64,6 @@ public:
     }
     
     Rcpp::NumericVector invalidate(std::pair<double,double> bounds) const { return invalidate(bounds.first, bounds.second); }
-    
-private:
-    int get_dof(double LB, double UB) const {
-        const double lambda1 = (UB-LB)/2;
-        const double eCprime = (UB+LB)/2.;
-        std::vector<double> value_r = as<std::vector<double> >(value_);
-        Rcpp::NumericVector soft = wrap(soft_threshold(value_r, eCprime, lambda1));
-        Rcpp::IntegerVector selected = patchno_[abs(soft)>tol_val_/2];
-        const int dof = unique(selected).size();
-        return dof;
-    }
-    
-    double tol_val_;
-    Rcpp::NumericVector value_;
-    Rcpp::IntegerVector patchno_;
-
 };
 
 #endif
