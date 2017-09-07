@@ -112,7 +112,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     binned.set_patchno(patchno);
     
     //compute CV datasets at optimized weights
-    auto cv = make_CVEstimator(flo, binned, 1000);
+    auto cv = make_CVEstimator(flo, binned);
     cv.compute(beta, lam2);
 
     //optimize lambda1 assuming eCprime=0
