@@ -9,7 +9,7 @@ using namespace Rcpp;
 #include "FusedLassoGaussianEstimator.hpp"
 #include "SignalWeightsUpdater.hpp"
 #include "IRLSEstimator.hpp"
-#include "CVEstimator.hpp"
+#include "Preparation.hpp"
 #include "RawData.hpp"
 #include "BinnedData.hpp"
 #include "Traits.hpp"

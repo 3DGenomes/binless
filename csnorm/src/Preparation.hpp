@@ -1,18 +1,20 @@
-#ifndef CV_ESTIMATOR_HPP
-#define CV_ESTIMATOR_HPP
+#ifndef PREPARATION_HPP
+#define PREPARATION_HPP
 
 #include <Rcpp.h>
 #include <vector>
 
 #include "util.hpp"
+#include "Traits.hpp"
+
+template<typename Computation, typename GaussianEstimator> class Preparation;
 
 // A class that produces data used for cross-validation of fused lasso regression results
-template<typename GaussianEstimator>
-class CVEstimator {
+template<int kSD, typename GaussianEstimator> class Preparation<CVkSD<kSD>, GaussianEstimator> {
     
 public:
     
-    CVEstimator(GaussianEstimator& gauss, const BinnedDataCore& binned, double y_default = -100.)
+    Preparation(GaussianEstimator& gauss, const BinnedDataCore& binned, double y_default = -100.)
       : gauss_(gauss), binned_(binned), y_default_(y_default), N_(binned.get_bin1().size()) {
         //build cv groups
         const Rcpp::IntegerVector bin1(binned.get_bin1()), bin2(binned.get_bin2());
@@ -70,9 +72,9 @@ private:
 
 //named constructor
 template<typename GaussianEstimator>
-CVEstimator<GaussianEstimator>
+Preparation<CV,GaussianEstimator>
 make_CVEstimator(GaussianEstimator& gauss, BinnedDataCore& binned, double y_default = -100) {
-    return CVEstimator<GaussianEstimator>(gauss,binned,y_default);
+    return Preparation<CV,GaussianEstimator>(gauss,binned,y_default);
 }
 
 #endif
