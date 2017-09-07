@@ -12,14 +12,14 @@
 
 //Calculation is either Signal or Difference (points to both likelihoods and data structures)
 //Score knows how to assemble it into the BIC/CV
-template<typename Calculation, typename Score> class ScoreComputer : private Calculation::likelihood_t, private ScoreAssembler<Score> {
+template<typename Calculation, typename Score> class ScoreComputer : private Likelihood<Calculation>, private ScoreAssembler<Score> {
 public:
     typedef typename Calculation::binned_t binned_t;
-    typedef typename Calculation::likelihood_t::var_t likelihood_var_t;
+    typedef typename Likelihood<Calculation>::var_t likelihood_var_t;
     typedef typename ScoreAssembler<Score>::var_t assembler_var_t;
     typedef Rcpp::NumericVector value_t;
     ScoreComputer(double tol_val, const binned_t& data, const likelihood_var_t& likelihood_var, const assembler_var_t& assembler_var) :
-       Calculation::likelihood_t(data, likelihood_var), ScoreAssembler<Score>(assembler_var), tol_val_(tol_val), value_(data.get_beta()),
+       Likelihood<Calculation>(data, likelihood_var), ScoreAssembler<Score>(assembler_var), tol_val_(tol_val), value_(data.get_beta()),
        patchno_(data.get_patchno()) {}
     
     //compute score obtained with these bounds
@@ -27,7 +27,7 @@ public:
         //compute dof and chi square
         const double lambda1 = (UB-LB)/2;
         const double eCprime = (UB+LB)/2.;
-        const Rcpp::NumericVector chisq = Calculation::likelihood_t::get_chi_square(LB, UB);
+        const Rcpp::NumericVector chisq = Likelihood<Calculation>::get_chi_square(LB, UB);
         const int dof = get_dof(LB, UB);
         
         //assemble it into a score

@@ -18,7 +18,6 @@ class SignalRawData;
 class SignalBinnedData;
 
 struct Signal {
-    typedef SignalLikelihood likelihood_t;
     typedef SignalRawData raw_t;
     typedef SignalBinnedData binned_t;
 };
@@ -28,7 +27,6 @@ class DifferenceRawData;
 class DifferenceBinnedData;
 
 struct Difference {
-    typedef DifferenceLikelihood likelihood_t;
     typedef DifferenceRawData raw_t;
     typedef DifferenceBinnedData binned_t;
 };
