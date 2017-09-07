@@ -1,5 +1,5 @@
-#ifndef PREPARATION_HPP
-#define PREPARATION_HPP
+#ifndef SCORE_PREPARATOR_HPP
+#define SCORE_PREPARATOR_HPP
 
 #include <Rcpp.h>
 #include <vector>
@@ -7,14 +7,14 @@
 #include "util.hpp"
 #include "Traits.hpp"
 
-template<typename Score, typename GaussianEstimator> class Preparation;
+template<typename Score, typename GaussianEstimator> class ScorePreparator;
 
 // A class that produces data used for cross-validation of fused lasso regression results
-template<int kSD, typename GaussianEstimator> class Preparation<CVkSD<kSD>, GaussianEstimator> {
+template<int kSD, typename GaussianEstimator> class ScorePreparator<CVkSD<kSD>, GaussianEstimator> {
     
 public:
     
-    Preparation(GaussianEstimator& gauss, const BinnedDataCore& binned, double lambda2, double y_default = -100.)
+    ScorePreparator(GaussianEstimator& gauss, const BinnedDataCore& binned, double lambda2, double y_default = -100.)
      : gauss_(gauss), binned_(binned), y_default_(y_default), N_(binned.get_bin1().size()) {
         prepare();
         compute(binned.get_beta(), lambda2);
@@ -45,11 +45,11 @@ private:
 };
 
 // A class that produces data used for BIC of fused lasso regression results
-template<typename GaussianEstimator> class Preparation<BIC, GaussianEstimator> {
+template<typename GaussianEstimator> class ScorePreparator<BIC, GaussianEstimator> {
     
 public:
     
-    Preparation(GaussianEstimator& gauss, const BinnedDataCore& binned, double lambda2)
+    ScorePreparator(GaussianEstimator& gauss, const BinnedDataCore& binned, double lambda2)
      : gauss_(gauss), binned_(binned), N_(binned.get_bin1().size())  {
         compute(binned.get_beta(), lambda2);
     }
@@ -69,7 +69,7 @@ private:
     std::vector<double> beta_;
 };
 
-#include "Preparation.ipp"
+#include "ScorePreparator.ipp"
 
 #endif
 

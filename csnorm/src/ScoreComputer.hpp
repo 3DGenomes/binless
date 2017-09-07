@@ -10,13 +10,13 @@
 #include "Likelihoods.hpp"
 #include "DOFComputer.hpp"
 #include "BinnedData.hpp"
-#include "Preparation.hpp"
+#include "ScorePreparator.hpp"
 
 //ScoreComputer takes data and evaluates the score at a given set of upper and lower bounds
 //Calculation is either Signal or Difference (points to both likelihoods and data structures)
 //Score knows how to assemble it into the BIC/CV
 template<typename Calculation, typename Score, typename GaussianEstimator>
-class ScoreComputer : private Preparation<Score,GaussianEstimator>,
+class ScoreComputer : private ScorePreparator<Score,GaussianEstimator>,
                       private Likelihood<Calculation>,
                       private ScoreAssembler<Score>,
                       private DOFComputer {

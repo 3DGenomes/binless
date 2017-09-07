@@ -5,7 +5,7 @@
 #include "Traits.hpp"
 
 template<int kSD, typename GaussianEstimator>
-void Preparation<CVkSD<kSD>,GaussianEstimator>::prepare() {
+void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::prepare() {
     //build cv groups
     const Rcpp::IntegerVector bin1(binned_.get_bin1()), bin2(binned_.get_bin2());
     const int ngroups=2;
@@ -18,7 +18,7 @@ void Preparation<CVkSD<kSD>,GaussianEstimator>::prepare() {
 }
     
 template<int kSD, typename GaussianEstimator>
-void Preparation<CVkSD<kSD>,GaussianEstimator>::compute(const Rcpp::NumericVector& beta_init, double lambda2) {
+void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::compute(const Rcpp::NumericVector& beta_init, double lambda2) {
     if (beta_init.size() != N_) Rcpp::Rcout << "ERROR: wrong size for input to CV calculation, check code\n";
     
     //Compute fused lasso solutions on each group and report to beta_cv
@@ -48,7 +48,7 @@ void Preparation<CVkSD<kSD>,GaussianEstimator>::compute(const Rcpp::NumericVecto
 
    
 template<typename GaussianEstimator>
-void Preparation<BIC,GaussianEstimator>::compute(const Rcpp::NumericVector& beta_init, double lambda2) {
+void ScorePreparator<BIC,GaussianEstimator>::compute(const Rcpp::NumericVector& beta_init, double lambda2) {
     if (beta_init.size() != N_) Rcpp::Rcout << "ERROR: wrong size for input to BIC calculation, check code\n";
     
     //Compute fused lasso solutions on each group and report to beta_cv

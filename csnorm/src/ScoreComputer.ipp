@@ -7,14 +7,14 @@
 #include "Likelihoods.hpp"
 #include "DOFComputer.hpp"
 #include "BinnedData.hpp"
-#include "Preparation.hpp"
+#include "ScorePreparator.hpp"
 
 template<typename Calculation, typename Score, typename GaussianEstimator>
 ScoreComputer<Calculation,Score,GaussianEstimator>::ScoreComputer(double tol_val, const binned_t& data,
                                                 GaussianEstimator& gauss, double lambda2)
- : Preparation<Score,GaussianEstimator>(gauss, data, lambda2),
-   Likelihood<Calculation>(data, Preparation<Score,GaussianEstimator>::get_likelihood_var()),
-   ScoreAssembler<Score>(Preparation<Score,GaussianEstimator>::get_assembler_var()),
+ : ScorePreparator<Score,GaussianEstimator>(gauss, data, lambda2),
+   Likelihood<Calculation>(data, ScorePreparator<Score,GaussianEstimator>::get_likelihood_var()),
+   ScoreAssembler<Score>(ScorePreparator<Score,GaussianEstimator>::get_assembler_var()),
    DOFComputer(tol_val, data) {}
 
 
