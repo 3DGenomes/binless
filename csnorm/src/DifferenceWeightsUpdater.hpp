@@ -14,7 +14,7 @@
 class DifferenceWeightsUpdater {
 public:
     
-    DifferenceWeightsUpdater(const DifferenceRawData& raw, BinnedData<Difference>& binned) : raw_(raw), binned_(binned) {}
+    DifferenceWeightsUpdater(const RawData<Difference>& raw, BinnedData<Difference>& binned) : raw_(raw), binned_(binned) {}
     
     void setUp(const std::vector<double>& phi_ref, const std::vector<double>& beta_delta) {
         //store first estimate of phi_ref and compute mat
@@ -56,7 +56,7 @@ public:
     std::vector<double> get_phi_ref() const { return Rcpp::as<std::vector<double> >(binned_.get_phi_ref()); }
     
 private:
-    const DifferenceRawData& raw_;
+    const RawData<Difference>& raw_;
     BinnedData<Difference>& binned_;
 };
 

@@ -6,13 +6,14 @@
 
 #include "cts_to_mat.hpp"
 #include "RawData.hpp"
+#include "Traits.hpp"
 
 //policy class that updates IRLS data and weights given counts and a new beta
 //This class takes care of the case of signal estimation
 class SignalWeightsUpdater {
 public:
     
-    SignalWeightsUpdater(const SignalRawData& raw, BinnedData<Signal>& binned) : raw_(raw), binned_(binned) {}
+    SignalWeightsUpdater(const RawData<Signal>& raw, BinnedData<Signal>& binned) : raw_(raw), binned_(binned) {}
     
     void setUp() {} //for consistency with other WeightsUpdaters
     
@@ -30,7 +31,7 @@ public:
     std::vector<int> get_bin2() const { return Rcpp::as<std::vector<int> > (binned_.get_bin2()); }
     
 private:
-    const SignalRawData& raw_;
+    const RawData<Signal>& raw_;
     BinnedData<Signal>& binned_;
 };
 

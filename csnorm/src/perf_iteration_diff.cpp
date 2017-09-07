@@ -25,7 +25,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                          double lam2, double alpha, double converge,
                          List outliers, NumericVector phi_ref_i, NumericVector beta_i) {
     //Classes that hold all the data. Other classes reference to it.
-    Difference::raw_t raw(nbins, dispersion, cts, ref, outliers);
+    RawData<Difference> raw(nbins, dispersion, cts, ref, outliers);
     BinnedData<Difference> binned; //stored here, but will be populated by WeightsUpdater
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
@@ -75,7 +75,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    int refine_num, bool constrained) {
     
     //Classes that hold all the data. Other classes reference to it.
-    Difference::raw_t raw(nbins, dispersion, cts, ref, outliers);
+    RawData<Difference> raw(nbins, dispersion, cts, ref, outliers);
     BinnedData<Difference> binned; //stored here, but will be populated by WeightsUpdater
     //setup computation of fused lasso solution
     bool converged = true;

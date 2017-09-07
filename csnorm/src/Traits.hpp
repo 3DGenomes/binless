@@ -12,18 +12,9 @@ struct BIC { enum { k = 0 }; };
 template<unsigned kSD> struct CVkSD { enum { k = kSD }; };
 typedef CVkSD<0> CV;
 
+struct Signal {};
 
-class SignalRawData;
-
-struct Signal {
-    typedef SignalRawData raw_t;
-};
-
-class DifferenceRawData;
-
-struct Difference {
-    typedef DifferenceRawData raw_t;
-};
+struct Difference {};
 
 struct AllowDegeneracy {};
 struct ForbidDegeneracy {};

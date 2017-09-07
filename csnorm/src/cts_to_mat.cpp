@@ -31,7 +31,7 @@ void remove_outliers(const std::vector<int>& bin1, const std::vector<int>& bin2,
   }
 }
 
-void cts_to_signal_mat(const SignalRawData& raw, double eCprime, const Rcpp::NumericVector& beta_phi, BinnedData<Signal>& binned) {
+void cts_to_signal_mat(const RawData<Signal>& raw, double eCprime, const Rcpp::NumericVector& beta_phi, BinnedData<Signal>& binned) {
     //extract data from holder
     const DataFrame& cts = raw.get_cts();
     int nbins = raw.get_nbins();
@@ -88,16 +88,16 @@ void cts_to_signal_mat(const SignalRawData& raw, double eCprime, const Rcpp::Num
     binned.set_diag_grp(dgrp_i);
 }
 
-void cts_to_diff_mat(const DifferenceRawData& raw, const Rcpp::NumericVector& phi_ref, const Rcpp::NumericVector& beta_delta, BinnedData<Difference>& binned) {
+void cts_to_diff_mat(const RawData<Difference>& raw, const Rcpp::NumericVector& phi_ref, const Rcpp::NumericVector& beta_delta, BinnedData<Difference>& binned) {
     //assume eCprime = 0 for difference step
     const double eCprime=0;
     //compute ref matrix
-    SignalRawData sraw_ref(raw.get_nbins(), raw.get_dispersion(), raw.get_ref(), raw.get_outliers());
+    RawData<Signal> sraw_ref(raw.get_nbins(), raw.get_dispersion(), raw.get_ref(), raw.get_outliers());
     BinnedData<Signal> sbinned_ref;
     cts_to_signal_mat(sraw_ref, eCprime, phi_ref, sbinned_ref);
     //compute other matrix
     Rcpp::NumericVector phi_oth = phi_ref+beta_delta; //unthresholded
-    SignalRawData sraw_oth(raw.get_nbins(), raw.get_dispersion(), raw.get_cts(), raw.get_outliers());
+    RawData<Signal> sraw_oth(raw.get_nbins(), raw.get_dispersion(), raw.get_cts(), raw.get_outliers());
     BinnedData<Signal> sbinned_oth;
     cts_to_signal_mat(sraw_oth, eCprime, phi_oth, sbinned_oth);
     //report

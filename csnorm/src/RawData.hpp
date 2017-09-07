@@ -4,9 +4,11 @@
 #include <Rcpp.h>
 #include <vector>
 
-class RawData {
+#include "Traits.hpp"
+
+class RawDataCore {
 public:
-    RawData(int nbins, double dispersion, const Rcpp::DataFrame& cts, const Rcpp::List& outliers) :
+    RawDataCore(int nbins, double dispersion, const Rcpp::DataFrame& cts, const Rcpp::List& outliers) :
     nbins_(nbins), dispersion_(dispersion), cts_(cts), outliers_(outliers) {}
     
     int get_nbins() const { return nbins_; }
@@ -24,18 +26,20 @@ private:
     const Rcpp::List outliers_;
 };
 
-class SignalRawData : public RawData {
+template<typename> class RawData {};
+
+template<> class RawData<Signal> : public RawDataCore {
 public:
-    SignalRawData(int nbins, double dispersion, const Rcpp::DataFrame& cts, const Rcpp::List& outliers) :
-     RawData(nbins, dispersion, cts, outliers) {}
+    RawData(int nbins, double dispersion, const Rcpp::DataFrame& cts, const Rcpp::List& outliers) :
+     RawDataCore(nbins, dispersion, cts, outliers) {}
 };
 
 
-class DifferenceRawData : public RawData {
+template<> class RawData<Difference> : public RawDataCore {
 public:
-    DifferenceRawData(int nbins, double dispersion, const Rcpp::DataFrame& cts, const Rcpp::DataFrame& ref,
+    RawData(int nbins, double dispersion, const Rcpp::DataFrame& cts, const Rcpp::DataFrame& ref,
             const Rcpp::List& outliers) :
-      RawData(nbins, dispersion, cts, outliers), ref_(ref) {}
+      RawDataCore(nbins, dispersion, cts, outliers), ref_(ref) {}
     
     Rcpp::DataFrame get_ref() const { return ref_; }
     
