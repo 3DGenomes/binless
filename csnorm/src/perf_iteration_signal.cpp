@@ -101,7 +101,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     binned.set_patchno(patchno);
     
     //compute CV datasets at optimized weights
-    auto cv = make_CVEstimator(flo, wt, 0);
+    auto cv = make_CVEstimator(flo, binned, 0);
     cv.compute(beta, lam2);
     
     //optimize lambda1 and eC
