@@ -2,7 +2,6 @@
 #define UTIL_HPP
 
 #include <Rcpp.h>
-using namespace Rcpp;
 #include <vector>
 
 #include "BinnedData.hpp"
@@ -12,13 +11,11 @@ using namespace Rcpp;
 std::vector<double> soft_threshold(const std::vector<double>& beta,
                                    double eCprime, double lam1);
 
-NumericVector get_patch_values(NumericVector value, IntegerVector patchno);
+Rcpp::NumericVector get_patch_values(Rcpp::NumericVector value, Rcpp::IntegerVector patchno);
 
 
-std::vector<double> compute_phi_ref(const std::vector<double>& delta_r,
-                                    const std::vector<double>& phihat,
-                                    const std::vector<double>& phihat_var, const std::vector<double>& phihat_ref,
-                                    const std::vector<double>& phihat_var_ref);
+Rcpp::NumericVector compute_phi_ref(const DifferenceBinnedData& binned,
+                                    const Rcpp::NumericVector& delta);
 
 
 Rcpp::NumericVector get_forbidden_values(const BinnedData& binned);

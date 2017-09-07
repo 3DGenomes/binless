@@ -107,7 +107,6 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     //retrieve statistics and compute patches
     alpha = flo.get_alpha();
     beta = flo.get();
-    phi_ref = wt.get_phi_ref();
     IntegerVector patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
                                               binned.get_bin2(), binned.get_beta_delta());
     binned.set_patchno(patchno);
@@ -131,20 +130,12 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     //soft-threshold it at the selected parameters
     std::vector<double> beta_r = as<std::vector<double> >(binned.get_beta());
     std::vector<double> delta_r = soft_threshold(beta_r, 0, lam1);
-
-    //compute phi_ref
-    std::vector<double> phihat_r = Rcpp::as<std::vector<double> >(binned.get_phihat());
-    NumericVector phihat_var = 1/binned.get_weight();
-    std::vector<double> phihat_var_r = Rcpp::as<std::vector<double> >(phihat_var);
-    std::vector<double> phihat_ref_r = Rcpp::as<std::vector<double> >
-                                       (binned.get_phihat_ref());
-    NumericVector phihat_var_ref = 1/binned.get_weight_ref();
-    std::vector<double> phihat_var_ref_r = Rcpp::as<std::vector<double> >(phihat_var_ref);
-    std::vector<double> phi_ref_r = compute_phi_ref(delta_r, phihat_r, phihat_var_r,
-                                    phihat_ref_r, phihat_var_ref_r);
-
-    //identify patches
     NumericVector delta = wrap(delta_r);
+    
+    //compute phi_ref
+    Rcpp::NumericVector phi_ref_r = compute_phi_ref(binned, delta);
+    
+    //identify patches
     patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
                                 binned.get_bin2(), delta);
     
@@ -169,17 +160,13 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                             _["diag.grp"]=binned.get_diag_grp(),
                             _["beta"]=beta,
                             _["delta"]=delta,
-                            _["phi_ref"]=phi_ref,
+                            _["phi_ref"]=phi_ref_r,
                             _["beta_cv"]=cv.get_beta_cv(),
                             _["cv.group"]=cv.get_cvgroup(),
                             _["patchno"]=patchno);
     return List::create(_["phi.ref"]=phi_ref_r,
-                        _["delta"]=delta, _["beta"]=beta_r,
+                        _["delta"]=delta, _["beta"]=beta,
                         _["alpha"]=alpha, _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd,
                         _["mat"]=mat, _["lambda1"]=lam1, _["eCprime"]=0, _["converged"]=converged);
 }
-
-
-
-
 

@@ -151,7 +151,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                                       _["cv.group"]=cv.get_cvgroup(),
                                       _["patchno"]=patchno);
     
-    return List::create(_["phi"]=phi_r,
+    return List::create(_["phi"]=phi,
                         _["beta"]=beta_r, _["alpha"]=alpha, _["lambda2"]=lam2,
                         _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd, _["mat"]=mat, _["eCprime"]=eCprime,
                         _["lambda1"]=lam1, _["converged"]=converged);

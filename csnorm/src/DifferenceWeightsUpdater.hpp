@@ -25,17 +25,10 @@ public:
     
     void update(const std::vector<double>& beta_delta) {
         //update phi_ref based on new beta
-        std::vector<double> phihat = Rcpp::as<std::vector<double> >(binned_.get_phihat());
-        NumericVector phihat_var_r = 1/binned_.get_weight();
-        std::vector<double> phihat_var = Rcpp::as<std::vector<double> >(phihat_var_r);
-        std::vector<double> phihat_ref = Rcpp::as<std::vector<double> >(binned_.get_phihat_ref());
-        NumericVector phihat_var_ref_r = 1/binned_.get_weight_ref();
-        std::vector<double> phihat_var_ref = Rcpp::as<std::vector<double> >(phihat_var_ref_r);
         //use beta because we don't threshold
-        std::vector<double> phi_ref = compute_phi_ref(beta_delta, phihat, phihat_var, phihat_ref, phihat_var_ref);
-        //compute new matrix of weights
-        Rcpp::NumericVector phi_ref_r = wrap(phi_ref);
         Rcpp::NumericVector beta_delta_r = wrap(beta_delta);
+        Rcpp::NumericVector phi_ref_r = compute_phi_ref(binned_, beta_delta_r);
+        //compute new matrix of weights
         cts_to_diff_mat(raw_, phi_ref_r, beta_delta_r, binned_);
     }
     
