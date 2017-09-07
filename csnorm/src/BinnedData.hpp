@@ -48,6 +48,8 @@ public:
     
     Rcpp::NumericVector get_phihat() const { return get_betahat(); }
     void set_phihat(const Rcpp::NumericVector& phihat) { set_betahat(phihat); }
+
+    Rcpp::NumericVector get_phihat_var() const { return 1/get_weight(); }
 };
 
 //signal binned data: input is phihat and weight, estimate is beta, phi etc.
@@ -60,10 +62,14 @@ public:
     void set_deltahat(const Rcpp::NumericVector& deltahat) { set_betahat(deltahat); }
     
     Rcpp::NumericVector get_phihat() const { return get_phihat_ref() + get_deltahat(); }
+
+    Rcpp::NumericVector get_phihat_var() const { return 1/get_weight(); }
     
     Rcpp::NumericVector get_weight_ref() const { return weight_ref_; }
     void set_weight_ref(const Rcpp::NumericVector& weight_ref) { weight_ref_ = weight_ref; }
     
+    Rcpp::NumericVector get_phihat_var_ref() const { return 1/get_weight_ref(); }
+
     Rcpp::NumericVector get_phihat_ref() const { return phihat_ref_; }
     void set_phihat_ref(const Rcpp::NumericVector& phihat_ref) { phihat_ref_ = phihat_ref; }
     
