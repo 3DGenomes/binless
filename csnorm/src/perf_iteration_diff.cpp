@@ -9,7 +9,6 @@ using namespace Rcpp;
 #include "FusedLassoGaussianEstimator.hpp"
 #include "DifferenceWeightsUpdater.hpp"
 #include "IRLSEstimator.hpp"
-#include "Preparation.hpp"
 #include "RawData.hpp"
 #include "BinnedData.hpp"
 #include "Traits.hpp"
@@ -18,7 +17,6 @@ using namespace Rcpp;
 #include "util.hpp" //SQUARE
 #include "cts_to_mat.hpp" //cts_to_diff_mat
 #include "graph_helpers.hpp" //get_patch_numbers
-
 
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                          double dispersion, int nouter, int nbins,
@@ -111,17 +109,11 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                                               binned.get_bin2(), binned.get_beta_delta());
     binned.set_patchno(patchno);
     
-    //compute CV datasets at optimized weights
-    auto cv = make_CVEstimator(flo, binned);
-    cv.compute(beta, lam2);
-
     //optimize lambda1 assuming eCprime=0
     if (!constrained) stop("expected constrained==T when fixed==T");
     NumericVector opt;
     {
-        NumericVector beta_cv = Rcpp::wrap(cv.get_beta_cv());
-        IntegerVector cv_grp = Rcpp::wrap(cv.get_cvgroup());
-        SparsityEstimator<Difference, CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, beta_cv, cv_grp);
+        SparsityEstimator<Difference, CVkSD<1>, ZeroOffset, AnySign, FusedLassoGaussianEstimator<GFLLibrary>, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, flo);
         opt = est.optimize();
         
     }
@@ -161,8 +153,6 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                             _["beta"]=beta,
                             _["delta"]=delta,
                             _["phi_ref"]=phi_ref_r,
-                            _["beta_cv"]=cv.get_beta_cv(),
-                            _["cv.group"]=cv.get_cvgroup(),
                             _["patchno"]=patchno);
     return List::create(_["phi.ref"]=phi_ref_r,
                         _["delta"]=delta, _["beta"]=beta,

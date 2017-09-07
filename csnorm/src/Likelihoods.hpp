@@ -15,7 +15,9 @@ template<typename Calculation> class Likelihood {};
 template<> class Likelihood<Signal> {
 public:
     typedef Rcpp::NumericVector var_t;
-    Likelihood(const BinnedData<Signal>& data, const var_t& beta_phi) : binned_(data), beta_phi_(beta_phi) {}
+    
+    Likelihood(const BinnedData<Signal>& data, const var_t& beta_phi)
+      : binned_(data), beta_phi_(beta_phi) {}
     
     Rcpp::NumericVector get_chi_square(double LB, double UB) const {
         const double lambda1 = (UB-LB)/2;
@@ -36,8 +38,9 @@ private:
 template<> class Likelihood<Difference> {
 public:
     typedef Rcpp::NumericVector var_t;
-    Likelihood(const BinnedData<Difference>& data, const var_t& beta_delta) :
-    binned_(data), beta_delta_(beta_delta) {}
+    
+    Likelihood(const BinnedData<Difference>& data, const var_t& beta_delta)
+      : binned_(data), beta_delta_(beta_delta) {}
     
     Rcpp::NumericVector get_chi_square(double LB, double UB) const {
         const double lambda1 = (UB-LB)/2;

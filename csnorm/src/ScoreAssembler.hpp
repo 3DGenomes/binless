@@ -17,6 +17,7 @@ public:
     typedef Rcpp::IntegerVector var_t; //type of cv_grp
     typedef std::pair<double,double> value_t; //score return type
     const std::string score_name = "CV";
+    
     ScoreAssembler(const var_t& cv_grp) : cv_grp_(cv_grp) {}
     
     value_t assemble(const Rcpp::NumericVector& chisq, double) const {
@@ -41,6 +42,7 @@ public:
     typedef Rcpp::NumericVector var_t; //type of ncounts
     typedef std::pair<double,double> value_t; //score return type
     const std::string score_name = "BIC";
+    
     ScoreAssembler(const var_t& ncounts) : lsnc_(log(Rcpp::sum(ncounts))) {}
     
     value_t assemble(const Rcpp::NumericVector& chisq, double dof) const {

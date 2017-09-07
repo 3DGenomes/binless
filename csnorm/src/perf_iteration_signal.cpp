@@ -9,7 +9,6 @@ using namespace Rcpp;
 #include "FusedLassoGaussianEstimator.hpp"
 #include "SignalWeightsUpdater.hpp"
 #include "IRLSEstimator.hpp"
-#include "Preparation.hpp"
 #include "RawData.hpp"
 #include "BinnedData.hpp"
 #include "Traits.hpp"
@@ -100,21 +99,15 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                                               binned.get_bin2(), binned.get_beta_phi());
     binned.set_patchno(patchno);
     
-    //compute CV datasets at optimized weights
-    auto cv = make_CVEstimator(flo, binned);
-    cv.compute(beta, lam2);
-    
     //optimize lambda1 and eC
     NumericVector opt;
     {
-        NumericVector beta_cv = Rcpp::wrap(cv.get_beta_cv());
-        IntegerVector cv_grp = Rcpp::wrap(cv.get_cvgroup());
         if (fixed) { // is eCprime fixed to 0?
             if (!constrained) stop("expected constrained==T when fixed==T");
-            SparsityEstimator<Signal, CVkSD<1>, ZeroOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, beta_cv, cv_grp);
+            SparsityEstimator<Signal, CVkSD<1>, ZeroOffset, PositiveSign, FusedLassoGaussianEstimator<GFLLibrary>, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, flo);
             opt = est.optimize();
         } else {
-            SparsityEstimator<Signal, CV, EstimatedOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, beta_cv, cv_grp);
+            SparsityEstimator<Signal, CV, EstimatedOffset, PositiveSign, FusedLassoGaussianEstimator<GFLLibrary>, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, flo);
             opt = est.optimize();
         }
     }
@@ -147,8 +140,6 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                                       _["diag.grp"]=binned.get_diag_grp(),
                                       _["beta"]=beta,
                                       _["phi"]=phi,
-                                      _["beta_cv"]=cv.get_beta_cv(),
-                                      _["cv.group"]=cv.get_cvgroup(),
                                       _["patchno"]=patchno);
     
     return List::create(_["phi"]=phi,

@@ -5,11 +5,9 @@
 #include "Traits.hpp"
 
 template<int kSD, typename GaussianEstimator>
-Preparation<kSD,GaussianEstimator>::Preparation(GaussianEstimator& gauss, const BinnedDataCore& binned,
-                                   double y_default = -100.)
-      : gauss_(gauss), binned_(binned), y_default_(y_default), N_(binned.get_bin1().size()) {
+void Preparation<CVkSD<kSD>,GaussianEstimator>::prepare() {
     //build cv groups
-    const Rcpp::IntegerVector bin1(binned.get_bin1()), bin2(binned.get_bin2());
+    const Rcpp::IntegerVector bin1(binned_.get_bin1()), bin2(binned_.get_bin2());
     const int ngroups=2;
     for (int i=0; i<N_; ++i)
         cvgroup_.push_back( (bin2(i)+bin1(i)) % ngroups ); // 2 cv groups in checkerboard pattern
@@ -20,10 +18,11 @@ Preparation<kSD,GaussianEstimator>::Preparation(GaussianEstimator& gauss, const 
 }
     
 template<int kSD, typename GaussianEstimator>
-void Preparation<kSD,GaussianEstimator>::compute(const std::vector<double>& beta_init, double lambda2) {
+void Preparation<CVkSD<kSD>,GaussianEstimator>::compute(const Rcpp::NumericVector& beta_init, double lambda2) {
     if (beta_init.size() != N_) Rcpp::Rcout << "ERROR: wrong size for input to CV calculation, check code\n";
     
     //Compute fused lasso solutions on each group and report to beta_cv
+    std::vector<double> beta_init_v = Rcpp::as<std::vector<double> >(beta_init);
     std::vector<double> y = Rcpp::as<std::vector<double> >(binned_.get_betahat());
     std::vector<double> w = Rcpp::as<std::vector<double> >(binned_.get_weight());
     const int ngroups=2;
@@ -37,7 +36,7 @@ void Preparation<kSD,GaussianEstimator>::compute(const std::vector<double>& beta
             }
         }
         //compute fused lasso
-        gauss_.optimize(y_cv, beta_init, w_cv, lambda2);
+        gauss_.optimize(y_cv, beta_init_v, w_cv, lambda2);
         std::vector<double> values = gauss_.get();
         betas_.push_back(values);
         
@@ -49,14 +48,15 @@ void Preparation<kSD,GaussianEstimator>::compute(const std::vector<double>& beta
 
    
 template<typename GaussianEstimator>
-void Preparation<BIC,GaussianEstimator>::compute(const std::vector<double>& beta_init, double lambda2) {
+void Preparation<BIC,GaussianEstimator>::compute(const Rcpp::NumericVector& beta_init, double lambda2) {
     if (beta_init.size() != N_) Rcpp::Rcout << "ERROR: wrong size for input to BIC calculation, check code\n";
     
     //Compute fused lasso solutions on each group and report to beta_cv
+    std::vector<double> beta_init_v = Rcpp::as<std::vector<double> >(beta_init);
     std::vector<double> y = Rcpp::as<std::vector<double> >(binned_.get_betahat());
     std::vector<double> w = Rcpp::as<std::vector<double> >(binned_.get_weight());
     //compute fused lasso
-    gauss_.optimize(y, beta_init, w, lambda2);
+    gauss_.optimize(y, beta_init_v, w, lambda2);
     beta_ = gauss_.get();
 }
 
