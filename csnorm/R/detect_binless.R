@@ -74,31 +74,7 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
 #' compute BIC for a given value of lambda1, lambda2 and eCprime (performance iteration, persistent state)
 #' @keywords internal
 gfl_BIC_fixed = function(csig, lambda1, lambda2, eCprime) {
-  #state = perf.c[c("phi.ref","beta","alpha")]
-  #submat = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta)]
-  #
-  ctsg=csig@cts
-  nbins=csig@settings$nbins
-  dispersion=csig@settings$dispersion
-  outliers=csig@settings$outliers
-  tol.val=csig@settings$tol.val
-  state=csig@state
-  stopifnot(length(state)>0) #warm start only
-  if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
-  nperf=csig@settings$nperf
-  opt.every=csig@settings$opt.every
-  if (is.null(ctsg.ref)) {
-    perf.c = csnorm:::wgfl_signal_BIC_fixed(ctsg, dispersion, nperf, nbins, lambda1, lambda2, eCprime,
-                                            state$alpha, tol.val, outliers,
-                                            state$beta)
-  } else {
-    stopifnot(eCprime==0)
-    perf.c = csnorm:::wgfl_diff_BIC_fixed(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda1, lambda2,
-                                    state$alpha, tol.val, outliers,
-                                    state$phi.ref, state$beta)
-    
-  }
-  return(perf.c)
+ stop("signif.threshold=F not implemented!") 
 }
 
 #' cross-validate lambda2
