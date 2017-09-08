@@ -88,7 +88,8 @@ void cts_to_signal_mat(const RawData<Signal>& raw, double eCprime, const Rcpp::N
     binned.set_diag_grp(dgrp_i);
 }
 
-void cts_to_diff_mat(const RawData<Difference>& raw, const Rcpp::NumericVector& phi_ref, const Rcpp::NumericVector& beta_delta, BinnedData<Difference>& binned) {
+void cts_to_diff_mat(const RawData<Difference>& raw, const Rcpp::NumericVector& phi_ref, const Rcpp::NumericVector& beta_delta,
+                     BinnedData<Difference>& binned) {
     //assume eCprime = 0 for difference step
     const double eCprime=0;
     //compute ref matrix
@@ -105,7 +106,7 @@ void cts_to_diff_mat(const RawData<Difference>& raw, const Rcpp::NumericVector& 
     binned.set_bin2(sbinned_ref.get_bin2());
     binned.set_beta_delta(beta_delta);
     binned.set_weight(sbinned_oth.get_weight());
-    binned.set_deltahat(sbinned_oth.get_phihat() - sbinned_ref.get_phihat());
+    binned.set_deltahat(sbinned_oth.get_phihat() - phi_ref);
     binned.set_ncounts(sbinned_oth.get_ncounts() + sbinned_ref.get_ncounts());
     binned.set_diag_idx(sbinned_ref.get_diag_idx());
     binned.set_diag_grp(sbinned_ref.get_diag_grp());

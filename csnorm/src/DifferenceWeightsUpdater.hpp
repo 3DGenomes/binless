@@ -32,22 +32,9 @@ public:
         cts_to_diff_mat(raw_, phi_ref_r, beta_delta_r, binned_);
     }
     
-    std::vector<double> get_betahat() const {
-        std::vector<double> phihat = Rcpp::as<std::vector<double> >(binned_.get_phihat());
-        const unsigned N = phihat.size();
-        std::vector<double> y_r;
-        y_r.reserve(N);
-        std::vector<double> phi_ref = Rcpp::as<std::vector<double> >(binned_.get_phi_ref());
-        for (int i=0; i<N; ++i) {
-            y_r.push_back(phihat[i]-phi_ref[i]);
-        }
-        return y_r;
-    }
+    std::vector<double> get_betahat() const { return Rcpp::as<std::vector<double> >(binned_.get_deltahat()); }
     
-    std::vector<double> get_weight() const {
-        std::vector<double> w = Rcpp::as<std::vector<double> >(binned_.get_weight());
-        return w;
-    }
+    std::vector<double> get_weight() const { return Rcpp::as<std::vector<double> >(binned_.get_weight()); }
     
     std::vector<int> get_bin1() const { return Rcpp::as<std::vector<int> > (binned_.get_bin1()); }
     

@@ -51,7 +51,7 @@ public:
         Rcpp::NumericVector phi_ref = compute_phi_ref(binned_, delta);
         
         const Rcpp::NumericVector chisq = binned_.get_weight() * SQUARE(binned_.get_phihat() - (delta + eCprime + phi_ref))
-        + binned_.get_weight_ref() * SQUARE(binned_.get_phihat_ref() - phi_ref);
+                                        + binned_.get_weight_ref() * SQUARE(binned_.get_phihat_ref() - phi_ref);
         return chisq;
     }
     

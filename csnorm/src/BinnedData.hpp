@@ -65,7 +65,7 @@ public:
     Rcpp::NumericVector get_deltahat() const { return get_betahat(); }
     void set_deltahat(const Rcpp::NumericVector& deltahat) { set_betahat(deltahat); }
     
-    Rcpp::NumericVector get_phihat() const { return get_phihat_ref() + get_deltahat(); }
+    Rcpp::NumericVector get_phihat() const { return get_phi_ref() + get_deltahat(); }
 
     Rcpp::NumericVector get_phihat_var() const { return 1/get_weight(); }
     
