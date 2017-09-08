@@ -7,7 +7,7 @@ using namespace Rcpp;
 
 #include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
-#include "SignalWeightsUpdater.hpp"
+#include "WeightsUpdater.hpp"
 #include "IRLSEstimator.hpp"
 #include "RawData.hpp"
 #include "BinnedData.hpp"
@@ -29,7 +29,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
-    SignalWeightsUpdater wt(raw,binned); //size of the problem and input data
+    WeightsUpdater<Signal> wt(raw,binned); //size of the problem and input data
     wt.setUp(); //for consistency. No-op, since there's no phi_ref to compute
     
     //do IRLS iterations until convergence
@@ -72,7 +72,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     const double converge = tol_val/20.;
     FusedLassoGaussianEstimator<GFLLibrary> flo(raw.get_nbins(), converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
-    SignalWeightsUpdater wt(raw,binned); //size of the problem and input data
+    WeightsUpdater<Signal> wt(raw,binned); //size of the problem and input data
     wt.setUp(); //for consistency. No-op, since there's no phi_ref to compute
     std::vector<double> beta = as<std::vector<double> >(beta_i);
     

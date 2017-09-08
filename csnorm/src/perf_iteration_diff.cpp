@@ -7,7 +7,7 @@ using namespace Rcpp;
 
 #include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
-#include "DifferenceWeightsUpdater.hpp"
+#include "WeightsUpdater.hpp"
 #include "IRLSEstimator.hpp"
 #include "RawData.hpp"
 #include "BinnedData.hpp"
@@ -28,7 +28,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
-    DifferenceWeightsUpdater wt(raw,binned); //size of the problem and input data
+    WeightsUpdater<Difference> wt(raw,binned); //size of the problem and input data
     std::vector<double> beta = as<std::vector<double> >(beta_i);
     std::vector<double> phi_ref = as<std::vector<double> >(phi_ref_i);
     wt.setUp(phi_ref, beta); //initial guess of phi_ref provided here
@@ -43,7 +43,6 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
     unsigned step = irls.get_nouter();
     alpha = flo.get_alpha();
     beta = flo.get();
-    phi_ref = wt.get_phi_ref();
     
     DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
                                       _["bin2"]=binned.get_bin2(),
@@ -58,10 +57,10 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                                       _["diag.grp"]=binned.get_diag_grp(),
                                       _["beta"]=beta,
                                       _["delta"]=beta,
-                                      _["phi_ref"]=phi_ref);
+                                      _["phi_ref"]=binned.get_phi_ref());
     
     return List::create(_["beta"]=wrap(beta), _["alpha"]=wrap(alpha),
-                        _["phi.ref"]=wrap(phi_ref), _["delta"]=wrap(beta), _["mat"]=mat,
+                        _["phi.ref"]=binned.get_phi_ref(), _["delta"]=wrap(beta), _["mat"]=mat,
                         _["nouter"]=step, _["ninner"]=res,
                         _["eCprime"]=0, _["lambda1"]=0);
 }
@@ -80,7 +79,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     const double converge = tol_val/20.;
     FusedLassoGaussianEstimator<GFLLibrary> flo(raw.get_nbins(), converge); //size of the problem and convergence criterion
     flo.setUp(alpha);
-    DifferenceWeightsUpdater wt(raw, binned); //size of the problem and input data
+    WeightsUpdater<Difference> wt(raw, binned); //size of the problem and input data
     std::vector<double> beta = as<std::vector<double> >(beta_i);
     std::vector<double> phi_ref = as<std::vector<double> >(phi_ref_i);
     wt.setUp(phi_ref, beta); //initial guess of phi_ref provided here
