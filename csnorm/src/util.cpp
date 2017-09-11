@@ -17,15 +17,6 @@ std::vector<double> soft_threshold(const std::vector<double>& beta,
     return phi;
 }
 
-//return ascending list of the values of all detected patches in the matrix
-NumericVector get_patch_values(NumericVector value, IntegerVector patchno) {
-    int npatches = max(patchno)+1;
-    NumericVector unique_values(npatches); //patchno starts at 0
-    for (int i=0; i<patchno.size(); ++i) unique_values(patchno(i)) = value(i);
-    std::sort(unique_values.begin(), unique_values.end());
-    return unique_values;
-}
-
 Rcpp::NumericVector compute_phi_ref(const BinnedData<Difference>& binned,
                                     const Rcpp::NumericVector& delta) {
   const int N = delta.size();

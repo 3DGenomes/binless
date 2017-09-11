@@ -18,14 +18,14 @@ public:
     CandidatesGenerator(const binned_t& binned) : CandidatesFilter<Degeneracy>(binned) {}
     
     Rcpp::NumericVector get_UB_candidates(int nbins, double tol_val, const binned_t& binned) const;
-
-private:
-    
-    Rcpp::NumericVector expand_values(const NumericVector& values) const;
-
-    //propose a set of candidates for an upper bound based on a list of patch borders
-    Rcpp::NumericVector candidates_from_borders(const Rcpp::NumericVector& borders) const;
 };
+
+Rcpp::NumericVector expand_values(const Rcpp::NumericVector& values);
+
+//propose a set of candidates for an upper bound based on a list of patch borders
+Rcpp::NumericVector candidates_from_borders(const Rcpp::NumericVector& borders);
+
+Rcpp::NumericVector get_patch_values(const Rcpp::NumericVector& value, const Rcpp::IntegerVector& patchno);
 
 
 #include "CandidatesGenerator.ipp"

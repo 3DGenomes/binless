@@ -8,31 +8,6 @@
 #include "ScoreComputer.hpp"
 #include "ScoreOptimizer.hpp"
 
-
-template<typename Degeneracy, typename Calculation>
-Rcpp::NumericVector
-CandidatesGenerator<Degeneracy,Calculation>::expand_values(const NumericVector& values) const {
-    std::vector<double> ret;
-    ret.reserve(values.size());
-    ret.push_back(values(0)-1);
-    ret.insert(ret.end(), values.begin(), values.end());
-    ret.push_back(values(values.size()-1)+1);
-    return Rcpp::wrap(ret);
-}
-
-template<typename Degeneracy, typename Calculation>
-Rcpp::NumericVector
-CandidatesGenerator<Degeneracy,Calculation>::candidates_from_borders(const Rcpp::NumericVector& borders) const {
-    std::vector<double> ret;
-    if (borders.size()>1) {
-        ret.reserve(borders.size()-1);
-        for (unsigned i=0; i<borders.size()-1; ++i) {
-            ret.push_back((borders[i]+borders[i+1])/2);
-        }
-    }
-    return Rcpp::wrap(ret);
-}
-
 template<typename Degeneracy, typename Calculation>
 Rcpp::NumericVector
 CandidatesGenerator<Degeneracy,Calculation>::get_UB_candidates(int nbins, double tol_val, const binned_t& binned) const {
@@ -46,5 +21,3 @@ CandidatesGenerator<Degeneracy,Calculation>::get_UB_candidates(int nbins, double
     //compute a list of upper bound candidates
     return candidates_from_borders(borders);
 }
-
-

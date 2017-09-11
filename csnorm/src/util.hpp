@@ -11,9 +11,6 @@
 std::vector<double> soft_threshold(const std::vector<double>& beta,
                                    double eCprime, double lam1);
 
-Rcpp::NumericVector get_patch_values(Rcpp::NumericVector value, Rcpp::IntegerVector patchno);
-
-
 Rcpp::NumericVector compute_phi_ref(const BinnedData<Difference>& binned,
                                     const Rcpp::NumericVector& delta);
 
