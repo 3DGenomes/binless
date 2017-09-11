@@ -24,27 +24,27 @@ template<typename Calculation, //whether it's a Signal or a Difference calculati
          typename Score, //to choose between BIC, CV or CVkSD
          typename Offset, //whether offset should be held at zero (ZeroOffset) or estimated (EstimatedOffset)
          typename Sign, //whether there is no constraint on the sign of the estimate (AnySign) or whether it must be positive (PositiveSign)
-         typename GaussianEstimator, //the type of the fused lasso object
          typename Degeneracy = ForbidDegeneracy> //whether to forbid certain values in order to avoid degeneracies in the model
 class SparsityEstimator : private CandidatesFilter<Degeneracy>,
                           private BoundsComputer<Offset,Sign>,
                           private BoundsChecker<Sign>,
                           private BoundsChecker<Degeneracy>,
-                          private ScoreComputer<Calculation,Score,GaussianEstimator>,
+                          private ScoreComputer<Calculation,Score>,
                           private ScoreOptimizer<Score> {
     
-    typedef typename ScoreComputer<Calculation,Score,GaussianEstimator>::value_t score_t;
+    typedef typename ScoreComputer<Calculation,Score>::value_t score_t;
     typedef BinnedData<Calculation> binned_t;
     
 public:
-    
+
+    template<typename GaussianEstimator>
     SparsityEstimator(int nbins, double tol_val, const binned_t& binned, double lambda2,
                       GaussianEstimator& gauss) :
      CandidatesFilter<Degeneracy>(binned),
      BoundsComputer<Offset,Sign>(binned, min(binned.get_beta())),
      BoundsChecker<Sign>(binned),
      BoundsChecker<Degeneracy>(binned),
-     ScoreComputer<Calculation,Score,GaussianEstimator>(tol_val, binned, gauss, lambda2),
+     ScoreComputer<Calculation,Score>(tol_val, binned, gauss, lambda2),
      ScoreOptimizer<Score>(),
      lambda2_(lambda2), UBcandidates_(get_UB_candidates(nbins, tol_val, binned)) {}
     

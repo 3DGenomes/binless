@@ -15,14 +15,15 @@
 //ScoreComputer takes data and evaluates the score at a given set of upper and lower bounds
 //Calculation is either Signal or Difference (points to both likelihoods and data structures)
 //Score knows how to assemble it into the BIC/CV
-template<typename Calculation, typename Score, typename GaussianEstimator>
-class ScoreComputer : private ScorePreparator<Score,GaussianEstimator>,
-                      private Likelihood<Calculation>,
+template<typename Calculation, typename Score>
+class ScoreComputer : private Likelihood<Calculation>,
                       private ScoreAssembler<Score>,
                       private DOFComputer {
 public:
     typedef BinnedData<Calculation> binned_t;
     typedef Rcpp::NumericVector value_t;
+                          
+    template<typename GaussianEstimator>
     ScoreComputer(double tol_val, const binned_t& data, GaussianEstimator& gauss, double lambda2);
     
     //compute score obtained with these bounds

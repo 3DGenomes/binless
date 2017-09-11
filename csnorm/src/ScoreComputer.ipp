@@ -9,17 +9,20 @@
 #include "BinnedData.hpp"
 #include "ScorePreparator.hpp"
 
-template<typename Calculation, typename Score, typename GaussianEstimator>
-ScoreComputer<Calculation,Score,GaussianEstimator>::ScoreComputer(double tol_val, const binned_t& data,
+template<typename Calculation, typename Score>
+template<typename GaussianEstimator>
+ScoreComputer<Calculation,Score>::ScoreComputer(double tol_val, const binned_t& data,
                                                 GaussianEstimator& gauss, double lambda2)
- : ScorePreparator<Score,GaussianEstimator>(gauss, data, lambda2),
-   Likelihood<Calculation>(data, ScorePreparator<Score,GaussianEstimator>::get_likelihood_var()),
-   ScoreAssembler<Score>(ScorePreparator<Score,GaussianEstimator>::get_assembler_var()),
-   DOFComputer(tol_val, data) {}
+ : Likelihood<Calculation>(data),
+   DOFComputer(tol_val, data) {
+       ScorePreparator<Score,GaussianEstimator> prep(gauss, data, lambda2);
+       Likelihood<Calculation>::setUp(prep.get_likelihood_var());
+       ScoreAssembler<Score>::setUp(prep.get_assembler_var());
+   }
 
 
-template<typename Calculation, typename Score, typename GaussianEstimator>
-Rcpp::NumericVector ScoreComputer<Calculation,Score,GaussianEstimator>::evaluate(double LB, double UB) const {
+template<typename Calculation, typename Score>
+Rcpp::NumericVector ScoreComputer<Calculation,Score>::evaluate(double LB, double UB) const {
     //compute dof and chi square
     const double lambda1 = (UB-LB)/2;
     const double eCprime = (UB+LB)/2.;
@@ -38,8 +41,8 @@ Rcpp::NumericVector ScoreComputer<Calculation,Score,GaussianEstimator>::evaluate
                                  _["UB"]=UB, _["LB"]=LB); // do not report score name for now
 }
 
-template<typename Calculation, typename Score, typename GaussianEstimator>
-Rcpp::NumericVector ScoreComputer<Calculation,Score,GaussianEstimator>::invalidate(double LB, double UB) const {
+template<typename Calculation, typename Score>
+Rcpp::NumericVector ScoreComputer<Calculation,Score>::invalidate(double LB, double UB) const {
     //compute dof and chi square
     const double lambda1 = (UB-LB)/2;
     const double eCprime = (UB+LB)/2.;

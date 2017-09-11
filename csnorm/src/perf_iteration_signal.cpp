@@ -102,10 +102,10 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     {
         if (fixed) { // is eCprime fixed to 0?
             if (!constrained) stop("expected constrained==T when fixed==T");
-            SparsityEstimator<Signal, CVkSD<1>, ZeroOffset, PositiveSign, FusedLassoGaussianEstimator<GFLLibrary>, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, flo);
+            SparsityEstimator<Signal, CVkSD<1>, ZeroOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, flo);
             opt = est.optimize();
         } else {
-            SparsityEstimator<Signal, CV, EstimatedOffset, PositiveSign, FusedLassoGaussianEstimator<GFLLibrary>, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, flo);
+            SparsityEstimator<Signal, CV, EstimatedOffset, PositiveSign, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, flo);
             opt = est.optimize();
         }
     }
