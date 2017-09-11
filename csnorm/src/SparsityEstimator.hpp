@@ -20,11 +20,11 @@
  * We thus generate a list of upper bound candidates that get optimized between two patches
  * and evaluate the BIC or the CV at these optimized values
  */
-template<typename Calculation, //whether it's a Signal or a Difference calculation
-         typename Score, //to choose between BIC, CV or CVkSD
+template<typename Score, //to choose between BIC, CV or CVkSD
          typename Offset, //whether offset should be held at zero (ZeroOffset) or estimated (EstimatedOffset)
          typename Sign, //whether there is no constraint on the sign of the estimate (AnySign) or whether it must be positive (PositiveSign)
-         typename Degeneracy = ForbidDegeneracy> //whether to forbid certain values in order to avoid degeneracies in the model
+         typename Degeneracy, //whether to forbid certain values in order to avoid degeneracies in the model
+         typename Calculation> //whether it's a Signal or a Difference calculation
 class SparsityEstimator : private CandidatesFilter<Degeneracy>,
                           private BoundsComputer<Offset,Sign>,
                           private BoundsChecker<Sign>,
@@ -63,6 +63,15 @@ private:
     const Rcpp::NumericVector UBcandidates_;
 
 };
+
+//named constructor
+template<typename Score, typename Offset, typename Sign, typename Degeneracy, typename Calculation, typename GaussianEstimator>
+SparsityEstimator<Score, Offset, Sign, Degeneracy, Calculation>
+make_SparsityEstimator(int nbins, double tol_val, const BinnedData<Calculation>& binned, double lambda2,
+                       GaussianEstimator& gauss) {
+    return SparsityEstimator<Score, Offset, Sign, Degeneracy, Calculation>(nbins, tol_val, binned, lambda2, gauss);
+}
+
 
 #include "SparsityEstimator.ipp"
 

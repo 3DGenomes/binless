@@ -110,7 +110,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     if (!constrained) stop("expected constrained==T when fixed==T");
     NumericVector opt;
     {
-        SparsityEstimator<Difference, CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy> est(nbins, tol_val, binned, lam2, flo);
+        auto est = make_SparsityEstimator<CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
         opt = est.optimize();
         
     }
