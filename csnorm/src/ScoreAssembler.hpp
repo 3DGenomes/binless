@@ -18,7 +18,7 @@ public:
     typedef std::pair<double,double> value_t; //score return type
     const std::string score_name = "CV";
     
-    void setUp(const var_t& cv_grp) { cv_grp_ = cv_grp; }
+    ScoreAssembler(const var_t& cv_grp) : cv_grp_(cv_grp) {}
     
     value_t assemble(const Rcpp::NumericVector& chisq, double) const {
         Rcpp::NumericVector groupwise_CV, groupwise_weights;

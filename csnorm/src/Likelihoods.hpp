@@ -16,9 +16,8 @@ template<> class Likelihood<Signal> {
 public:
     typedef Rcpp::NumericVector var_t;
     
-    Likelihood(const BinnedData<Signal>& data) : binned_(data) {}
-    
-    void setUp(const var_t& beta_phi) { beta_phi_ = beta_phi; }
+    Likelihood(const BinnedData<Signal>& data, const var_t& beta_phi)
+      : binned_(data), beta_phi_(beta_phi) {}
     
     Rcpp::NumericVector get_chi_square(double LB, double UB) const {
         const double lambda1 = (UB-LB)/2;
@@ -32,8 +31,7 @@ public:
     
 private:
     const BinnedData<Signal>& binned_;
-    Rcpp::NumericVector beta_phi_; //non-const because initialized in setUp
-                     //otherwise would force reporting of template argument to derived classes
+    const Rcpp::NumericVector beta_phi_;
 };
 
 //Difference
@@ -41,9 +39,8 @@ template<> class Likelihood<Difference> {
 public:
     typedef Rcpp::NumericVector var_t;
     
-    Likelihood(const BinnedData<Difference>& data) : binned_(data) {}
-    
-    void setUp(const var_t& beta_delta) { beta_delta_ = beta_delta; }
+    Likelihood(const BinnedData<Difference>& data, const var_t& beta_delta)
+      : binned_(data), beta_delta_(beta_delta) {}
     
     Rcpp::NumericVector get_chi_square(double LB, double UB) const {
         const double lambda1 = (UB-LB)/2;
@@ -60,7 +57,7 @@ public:
     
 private:
     const BinnedData<Difference>& binned_;
-    Rcpp::NumericVector beta_delta_;
+    const Rcpp::NumericVector beta_delta_;
 };
 
 

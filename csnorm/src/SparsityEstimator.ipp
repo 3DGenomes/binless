@@ -8,9 +8,9 @@
 #include "ScoreComputer.hpp"
 #include "ScoreOptimizer.hpp"
 
-template<typename Score, typename Offset, typename Sign, typename Degeneracy, typename Calculation>
-typename SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation>::score_t
-SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation>::optimize() const {
+template<typename Score, typename Offset, typename Sign, typename Degeneracy, typename Calculation, typename GaussianEstimator>
+typename SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation,GaussianEstimator>::score_t
+SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation,GaussianEstimator>::optimize() const {
     //iterate over all candidates and evaluate the score
     std::vector<score_t> values;
     for (double c : UBcandidates_) {
@@ -19,10 +19,10 @@ SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation>::optimize() const {
         //check if they pass the constraints
         if (BoundsChecker<Sign>::is_valid(bounds) && BoundsChecker<Degeneracy>::is_valid(bounds)) {
             //evaluate the score and store it
-            score_t val = ScoreComputer<Calculation,Score>::evaluate(bounds);
+            score_t val = ScoreComputer<Calculation,Score,GaussianEstimator>::evaluate(bounds);
             values.push_back(val);
         } else {
-            score_t val = ScoreComputer<Calculation,Score>::invalidate(bounds);
+            score_t val = ScoreComputer<Calculation,Score,GaussianEstimator>::invalidate(bounds);
             values.push_back(val);
         }
     }
@@ -31,9 +31,9 @@ SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation>::optimize() const {
     return best;
 }
    
-template<typename Score, typename Offset, typename Sign, typename Degeneracy, typename Calculation>
+template<typename Score, typename Offset, typename Sign, typename Degeneracy, typename Calculation, typename GaussianEstimator>
 Rcpp::NumericVector
-SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation>::expand_values(const NumericVector& values) const {
+SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation,GaussianEstimator>::expand_values(const NumericVector& values) const {
     std::vector<double> ret;
     ret.reserve(values.size());
     ret.push_back(values(0)-1);
@@ -42,9 +42,9 @@ SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation>::expand_values(const
     return Rcpp::wrap(ret);
 }
 
-template<typename Score, typename Offset, typename Sign, typename Degeneracy, typename Calculation>
+template<typename Score, typename Offset, typename Sign, typename Degeneracy, typename Calculation, typename GaussianEstimator>
 Rcpp::NumericVector
-SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation>::candidates_from_borders(const Rcpp::NumericVector& borders) const {
+SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation,GaussianEstimator>::candidates_from_borders(const Rcpp::NumericVector& borders) const {
     std::vector<double> ret;
     if (borders.size()>1) {
         ret.reserve(borders.size()-1);
@@ -55,9 +55,9 @@ SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation>::candidates_from_bor
     return Rcpp::wrap(ret);
 }
 
-template<typename Score, typename Offset, typename Sign, typename Degeneracy, typename Calculation>
+template<typename Score, typename Offset, typename Sign, typename Degeneracy, typename Calculation, typename GaussianEstimator>
 Rcpp::NumericVector
-SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation>::get_UB_candidates(int nbins, double tol_val, const binned_t& binned) const {
+SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation,GaussianEstimator>::get_UB_candidates(int nbins, double tol_val, const binned_t& binned) const {
     //get patch values at which the degrees of freedom change
     Rcpp::NumericVector beta = binned.get_beta(); //Take all patches: even if weight is zero, the dof changes
     Rcpp::IntegerVector patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(), binned.get_bin2(), beta);
