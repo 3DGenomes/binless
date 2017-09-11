@@ -4,7 +4,7 @@
 #include <Rcpp.h>
 #include <vector>
 
-#include "CandidatesFilter.hpp"
+#include "CandidatesGenerator.hpp"
 #include "BoundsComputer.hpp"
 #include "BoundsChecker.hpp"
 #include "ScoreComputer.hpp"
@@ -26,7 +26,7 @@ template<typename Score, //to choose between BIC, CV or CVkSD
          typename Degeneracy, //whether to forbid certain values in order to avoid degeneracies in the model
          typename Calculation, //whether it's a Signal or a Difference calculation
          typename GaussianEstimator> //the type of the fused lasso object used for initialization
-class SparsityEstimator : private CandidatesFilter<Degeneracy>,
+class SparsityEstimator : private CandidatesGenerator<Degeneracy,Calculation>,
                           private BoundsComputer<Offset,Sign>,
                           private BoundsChecker<Sign>,
                           private BoundsChecker<Degeneracy>,
@@ -40,25 +40,17 @@ public:
     
     SparsityEstimator(int nbins, double tol_val, const binned_t& binned, double lambda2,
                       GaussianEstimator& gauss) :
-     CandidatesFilter<Degeneracy>(binned),
+     CandidatesGenerator<Degeneracy,Calculation>(binned),
      BoundsComputer<Offset,Sign>(binned, min(binned.get_beta())),
      BoundsChecker<Sign>(binned),
      BoundsChecker<Degeneracy>(binned),
      ScoreComputer<Calculation,Score,GaussianEstimator>(tol_val, binned, gauss, lambda2),
      ScoreOptimizer<Score>(),
-     lambda2_(lambda2), UBcandidates_(get_UB_candidates(nbins, tol_val, binned)) {}
+     lambda2_(lambda2), UBcandidates_(CandidatesGenerator<Degeneracy,Calculation>::get_UB_candidates(nbins, tol_val, binned)) {}
     
      score_t optimize() const;
     
 private:
-    
-    Rcpp::NumericVector expand_values(const NumericVector& values) const;
-
-    //propose a set of candidates for an upper bound based on a list of patch borders
-    Rcpp::NumericVector candidates_from_borders(const Rcpp::NumericVector& borders) const;
-
-    Rcpp::NumericVector get_UB_candidates(int nbins, double tol_val, const binned_t& binned) const;
-
     const double lambda2_;
     const Rcpp::NumericVector UBcandidates_;
 
