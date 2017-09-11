@@ -92,9 +92,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
             converged = false;
         }
     }
-    //retrieve statistics and compute patches
-    alpha = flo.get_alpha();
-    beta = flo.get();
+    //compute patches
     IntegerVector patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
                                               binned.get_bin2(), binned.get_beta_phi());
     binned.set_patchno(patchno);
@@ -143,7 +141,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                                       _["patchno"]=patchno);
     
     return List::create(_["phi"]=phi,
-                        _["beta"]=beta_r, _["alpha"]=alpha, _["lambda2"]=lam2,
+                        _["beta"]=beta_r, _["alpha"]=flo.get_alpha(), _["lambda2"]=lam2,
                         _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd, _["mat"]=mat, _["eCprime"]=eCprime,
                         _["lambda1"]=lam1, _["converged"]=converged);
 }

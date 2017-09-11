@@ -101,9 +101,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
             converged = false;
         }
     }
-    //retrieve statistics and compute patches
-    alpha = flo.get_alpha();
-    beta = flo.get();
+    //compute patches
     IntegerVector patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
                                               binned.get_bin2(), binned.get_beta_delta());
     binned.set_patchno(patchno);
@@ -155,7 +153,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                             _["patchno"]=patchno);
     return List::create(_["phi.ref"]=phi_ref_r,
                         _["delta"]=delta, _["beta"]=beta,
-                        _["alpha"]=alpha, _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd,
+                        _["alpha"]=flo.get_alpha(), _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd,
                         _["mat"]=mat, _["lambda1"]=lam1, _["eCprime"]=0, _["converged"]=converged);
 }
 
