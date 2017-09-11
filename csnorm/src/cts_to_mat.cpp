@@ -81,6 +81,7 @@ void cts_to_signal_mat(const RawData<Signal>& raw, double eCprime, const Rcpp::N
 
     binned.set_bin1(bin1_i);
     binned.set_bin2(bin2_i);
+    binned.set_beta_phi(beta_phi);
     binned.set_phihat(phihat_i);
     binned.set_weight(weight_i);
     binned.set_ncounts(ncounts_i);
