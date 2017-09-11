@@ -39,7 +39,7 @@ CandidatesGenerator<Degeneracy,Calculation>::get_UB_candidates(int nbins, double
     //get patch values at which the degrees of freedom change
     Rcpp::NumericVector beta = binned.get_beta(); //Take all patches: even if weight is zero, the dof changes
     Rcpp::IntegerVector patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(), binned.get_bin2(), beta);
-    Rcpp::NumericVector borders = get_patch_values(beta, patchno);//TODO: should we operate on beta_cv or beta?
+    Rcpp::NumericVector borders = get_patch_values(beta, patchno);
     borders = expand_values(borders);
     //filter out patch values we already know cannot be used to generate UB candidates
     borders = CandidatesFilter<Degeneracy>::filter(borders);
