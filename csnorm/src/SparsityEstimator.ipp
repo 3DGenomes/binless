@@ -3,7 +3,7 @@
 
 #include "util.hpp"
 #include "graph_helpers.hpp"
-#include "BoundsComputer.hpp"
+#include "BoundsOptimizer.hpp"
 #include "BoundsChecker.hpp"
 #include "ScoreComputer.hpp"
 #include "ScoreOptimizer.hpp"
@@ -15,7 +15,7 @@ SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation,GaussianEstimator>::o
     std::vector<score_t> values;
     for (double c : UBcandidates_) {
         //optimize bounds
-        bounds_t bounds = BoundsComputer<Offset,Sign>::optimize_bounds(c);
+        bounds_t bounds = BoundsOptimizer<Offset,Sign>::optimize_bounds(c);
         Rcpp::Rcout << "candidate= " << c << " LB= " <<bounds.first << " UB= " << bounds.second;
         //check if they pass the constraints
         if (BoundsChecker<Sign>::is_valid(bounds) && BoundsChecker<Degeneracy>::is_valid(bounds)) {

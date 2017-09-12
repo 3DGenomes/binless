@@ -3,10 +3,7 @@
 
 #include "util.hpp"
 #include "graph_helpers.hpp"
-#include "BoundsComputer.hpp"
-#include "BoundsChecker.hpp"
-#include "ScoreComputer.hpp"
-#include "ScoreOptimizer.hpp"
+#include "CandidatesFilter.hpp"
 
 template<typename Degeneracy, typename Calculation>
 Rcpp::NumericVector

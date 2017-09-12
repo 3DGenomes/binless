@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "CandidatesGenerator.hpp"
-#include "BoundsComputer.hpp"
+#include "BoundsOptimizer.hpp"
 #include "BoundsChecker.hpp"
 #include "ScoreComputer.hpp"
 #include "ScoreOptimizer.hpp"
@@ -27,7 +27,7 @@ template<typename Score, //to choose between BIC, CV or CVkSD
          typename Calculation, //whether it's a Signal or a Difference calculation
          typename GaussianEstimator> //the type of the fused lasso object used for initialization
 class SparsityEstimator : private CandidatesGenerator<Degeneracy,Calculation>,
-                          private BoundsComputer<Offset,Sign>,
+                          private BoundsOptimizer<Offset,Sign>,
                           private BoundsChecker<Sign>,
                           private BoundsChecker<Degeneracy>,
                           private ScoreComputer<Calculation,Score,GaussianEstimator>,
@@ -41,7 +41,7 @@ public:
     SparsityEstimator(int nbins, double tol_val, const binned_t& binned, double lambda2,
                       GaussianEstimator& gauss) :
      CandidatesGenerator<Degeneracy,Calculation>(binned),
-     BoundsComputer<Offset,Sign>(binned),
+     BoundsOptimizer<Offset,Sign>(binned),
      BoundsChecker<Sign>(binned),
      BoundsChecker<Degeneracy>(binned),
      ScoreComputer<Calculation,Score,GaussianEstimator>(tol_val, binned, gauss, lambda2),

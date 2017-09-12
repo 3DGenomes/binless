@@ -3,7 +3,7 @@
 
 #include <Rcpp.h>
 
-#include "BoundsComputer.hpp" //for bounds_t typedef
+#include "BoundsOptimizer.hpp" //for bounds_t typedef
 #include "Traits.hpp"
 #include "BinnedData.hpp"
 #include "util.hpp" // get_forbidden_values

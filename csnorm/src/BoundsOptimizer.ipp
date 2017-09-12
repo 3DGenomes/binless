@@ -3,7 +3,7 @@
 #include "Traits.hpp"
 
 template<typename Sign>
-bounds_t BoundsComputer<EstimatedOffset, Sign>::optimize_bounds(double val) const {
+bounds_t BoundsOptimizer<EstimatedOffset, Sign>::optimize_bounds(double val) const {
     //split data in two groups
     LogicalVector grp1 = beta_ <= val;
     Rcpp::NumericVector w1 = weight_[grp1];
@@ -75,7 +75,7 @@ bounds_t BoundsComputer<EstimatedOffset, Sign>::optimize_bounds(double val) cons
 
 
 template<typename Sign>
-bounds_t BoundsComputer<ZeroOffset, Sign>::optimize_bounds(double val) const {
+bounds_t BoundsOptimizer<ZeroOffset, Sign>::optimize_bounds(double val) const {
     //split data in two groups and determine constraint betas
     //Rcout << "  GET at " << val << " maxabsval_= " << maxabsval_ << std::endl;
     Rcpp::LogicalVector grp1 = beta_ > val, grp2 = beta_ < -val;

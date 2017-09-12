@@ -1,5 +1,5 @@
-#ifndef BOUNDS_COMPUTER_HPP
-#define BOUNDS_COMPUTER_HPP
+#ifndef BOUNDS_OPTIMIZER_HPP
+#define BOUNDS_OPTIMIZER_HPP
 
 #include <Rcpp.h>
 #include <type_traits>
@@ -10,15 +10,15 @@
 //the type of bounds when passed around
 typedef std::pair<double,double> bounds_t;
 
-//BoundsComputer does tag dispatching by the type of Sign and Offset
-template<typename Offset, typename Sign> class BoundsComputer {};
+//BoundsOptimizer does tag dispatching by the type of Sign and Offset
+template<typename Offset, typename Sign> class BoundsOptimizer {};
 
 //specialization in the case where the offset is estimated
-template<typename Sign> class BoundsComputer<EstimatedOffset, Sign> {
+template<typename Sign> class BoundsOptimizer<EstimatedOffset, Sign> {
     static_assert(std::is_same<Sign, PositiveSign>::value,
                   "When offset is estimated, sign must be constrained to be positive!");
 public:
-    BoundsComputer(const BinnedDataCore& data) :
+    BoundsOptimizer(const BinnedDataCore& data) :
      beta_(data.get_beta()), weight_(data.get_weight()),
      y_(data.get_betahat()), minval_(min(data.get_beta())) {}
     
@@ -33,9 +33,9 @@ private:
 
 //specialization in the case where the offset is fixed
 template<typename Sign>
-class BoundsComputer<ZeroOffset, Sign> {
+class BoundsOptimizer<ZeroOffset, Sign> {
 public:
-    BoundsComputer(const BinnedDataCore& data) :
+    BoundsOptimizer(const BinnedDataCore& data) :
     beta_(data.get_beta()), absval_(abs(beta_)), weight_(data.get_weight()),
     y_(data.get_betahat()), minabsval_(min(absval_)), maxabsval_(max(absval_)) {}
     
@@ -48,7 +48,7 @@ private:
 };
 
 
-#include "BoundsComputer.ipp" //implementation
+#include "BoundsOptimizer.ipp" //implementation
 
 #endif
 
