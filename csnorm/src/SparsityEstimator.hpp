@@ -26,7 +26,7 @@ template<typename Score, //to choose between BIC, CV or CVkSD
          typename Degeneracy, //whether to forbid certain values in order to avoid degeneracies in the model
          typename Calculation, //whether it's a Signal or a Difference calculation
          typename GaussianEstimator> //the type of the fused lasso object used for initialization
-class SparsityEstimator : private CandidatesGenerator<Degeneracy,Calculation>,
+class SparsityEstimator : private CandidatesGenerator<Degeneracy>,
                           private BoundsOptimizer<Offset,Sign>,
                           private BoundsChecker<Sign>,
                           private BoundsChecker<Degeneracy>,
@@ -40,13 +40,13 @@ public:
     
     SparsityEstimator(int nbins, double tol_val, const binned_t& binned, double lambda2,
                       GaussianEstimator& gauss) :
-     CandidatesGenerator<Degeneracy,Calculation>(binned),
+     CandidatesGenerator<Degeneracy>(binned),
      BoundsOptimizer<Offset,Sign>(binned),
      BoundsChecker<Sign>(binned),
      BoundsChecker<Degeneracy>(binned),
      ScoreComputer<Calculation,Score,GaussianEstimator>(tol_val, binned, gauss, lambda2),
      ScoreOptimizer<Score>(),
-     lambda2_(lambda2), UBcandidates_(CandidatesGenerator<Degeneracy,Calculation>::get_UB_candidates(nbins, tol_val, binned)) {}
+     lambda2_(lambda2), UBcandidates_(CandidatesGenerator<Degeneracy>::get_UB_candidates(nbins, tol_val, binned)) {}
     
      score_t optimize() const;
     

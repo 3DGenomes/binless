@@ -7,17 +7,14 @@
 #include "CandidatesFilter.hpp"
 #include "BinnedData.hpp"
 
-template<typename Degeneracy, //whether to forbid certain values in order to avoid degeneracies in the model
-         typename Calculation> //whether it's a Signal or a Difference calculation
+template<typename Degeneracy> //whether to forbid certain values in order to avoid degeneracies in the model
 class CandidatesGenerator : private CandidatesFilter<Degeneracy> {
-    
-    typedef BinnedData<Calculation> binned_t;
     
 public:
     
-    CandidatesGenerator(const binned_t& binned) : CandidatesFilter<Degeneracy>(binned) {}
+    CandidatesGenerator(const BinnedDataCore& binned) : CandidatesFilter<Degeneracy>(binned) {}
     
-    Rcpp::NumericVector get_UB_candidates(int nbins, double tol_val, const binned_t& binned) const;
+    Rcpp::NumericVector get_UB_candidates(int nbins, double tol_val, const BinnedDataCore& binned) const;
 };
 
 Rcpp::NumericVector expand_values(const Rcpp::NumericVector& values);
