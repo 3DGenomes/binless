@@ -16,22 +16,17 @@ SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation,GaussianEstimator>::o
     for (double c : UBcandidates_) {
         //optimize bounds
         bounds_t bounds = BoundsOptimizer<Offset,Sign>::optimize_bounds(c);
-        Rcpp::Rcout << "candidate= " << c << " LB= " <<bounds.first << " UB= " << bounds.second;
         //check if they pass the constraints
         if (BoundsChecker<Sign>::is_valid(bounds) && BoundsChecker<Degeneracy>::is_valid(bounds)) {
             //evaluate the score and store it
             score_t val = ScoreComputer<Calculation,Score,GaussianEstimator>::evaluate(bounds);
-            Rcpp::Rcout << " score= " << as<double>(val["BIC"]) << " valid\n";
             values.push_back(val);
         } else {
             score_t val = ScoreComputer<Calculation,Score,GaussianEstimator>::invalidate(bounds);
-            Rcpp::Rcout << " score= " << as<double>(val["BIC"]) << " invalid sign= " << BoundsChecker<Sign>::is_valid(bounds)
-                                      << " degeneracy= " << BoundsChecker<Degeneracy>::is_valid(bounds) << "\n";
             values.push_back(val);
         }
     }
     //pick the best one based on the scoring criterion
     score_t best = ScoreOptimizer<Score>::optimize(values); //ScoreOptimizer
-    Rcpp::Rcout << "best score UB= " << as<double>(best["UB"]) << " score= " << as<double>(best["BIC"]) << "\n";
     return best;
 }
