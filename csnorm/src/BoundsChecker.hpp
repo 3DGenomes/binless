@@ -40,6 +40,7 @@ public:
         Rcpp::NumericVector fv = get_forbidden_values(binned);
         minval_ = min(fv);
         maxval_ = max(fv);
+        Rcpp::Rcout << " forbidden values: min= " << minval_ << " max= " << maxval_ << "\n";
     }
     
     bool is_valid(bounds_t bounds) const {
