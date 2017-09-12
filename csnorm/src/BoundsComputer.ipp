@@ -123,8 +123,6 @@ bounds_t BoundsComputer<ZeroOffset, Sign>::optimize_bounds(double val) const {
     }
     //apply constraint
     UB = std::min(std::max(UB,xk),xkp1);
-    if (minUB_ <= xkp1 && minUB_ > xk) UB=std::max(minUB_,UB);
-    //Rcout << "  UB= " << UB << " minUB= " << minUB_ << std::endl;
     return bounds_t{-UB,UB};
 }
 

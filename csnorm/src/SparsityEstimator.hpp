@@ -41,7 +41,7 @@ public:
     SparsityEstimator(int nbins, double tol_val, const binned_t& binned, double lambda2,
                       GaussianEstimator& gauss) :
      CandidatesGenerator<Degeneracy,Calculation>(binned),
-     BoundsComputer<Offset,Sign>(binned, min(binned.get_beta())),
+     BoundsComputer<Offset,Sign>(binned),
      BoundsChecker<Sign>(binned),
      BoundsChecker<Degeneracy>(binned),
      ScoreComputer<Calculation,Score,GaussianEstimator>(tol_val, binned, gauss, lambda2),
