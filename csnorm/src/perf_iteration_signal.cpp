@@ -2,7 +2,6 @@
 using namespace Rcpp;
 #include <iostream>
 #include <vector>
-#include <ctime>
 
 #include "perf_iteration_signal.hpp"
 
@@ -64,7 +63,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                      double lam2,  double alpha, double tol_val,
                      List outliers, NumericVector beta_i, double lambda1_min, int refine_num,
                      bool constrained, bool fixed) {
-    std::clock_t c_start = std::clock();
+    
     //Class that holds all the data. Other classes reference to it.
     RawData<Signal> raw(nbins, dispersion, cts, outliers);
     BinnedData<Signal> binned; //stored here, but will be populated by WeightsUpdater
@@ -97,7 +96,6 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     IntegerVector patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
                                               binned.get_bin2(), binned.get_beta_phi());
     binned.set_patchno(patchno);
-    std::clock_t c_interm = std::clock();
     
     //optimize lambda1 and eC
     NumericVector opt;
@@ -130,12 +128,6 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     //retrieve BIC from previous computation
     const double BIC = opt["BIC"];
     const double BIC_sd = opt["BIC.sd"];
-    std::clock_t c_end = std::clock();
-    
-    Rcpp::Rcout << "wgfl_signal_BIC lambda2= " << lam2 << " converged= " << converged
-                << " ninner= " << flo.get_ninner() << " nouter= " << step << " lambda1= " << lam1 << " eCprime= " << eCprime
-                << " BIC= " << BIC << " t_lambda2= " << double(c_interm-c_start)/CLOCKS_PER_SEC
-                << " t_lambda1= " << double(c_end-c_interm)/CLOCKS_PER_SEC << " t_total= " << double(c_end-c_start)/CLOCKS_PER_SEC << "\n";
     
     DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
                                       _["bin2"]=binned.get_bin2(),
