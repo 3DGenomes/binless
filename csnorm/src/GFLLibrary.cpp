@@ -14,7 +14,7 @@ void GFLLibrary::prepare(const std::vector<double>& beta_init) {
     std::vector<double> u(tsz_,0); //residuals set to zero
     std::vector<double> z;
     z.reserve(tsz_);
-    for (int i=0; i<trails_.size(); ++i) {
+    for (unsigned i=0; i<trails_.size(); ++i) {
         z.push_back(beta_init[trails_[i]]);   //z set to beta values along trails
     }
     beta_ = beta_init;
@@ -31,7 +31,7 @@ void GFLLibrary::optimize(const std::vector<double>& y, const std::vector<double
                                                &beta_[0], &z_[0], &u_[0]);
 }
 
-std::vector<std::vector<int> > GFLLibrary::triangle_grid_chain(unsigned nrows) const {
+std::vector<std::vector<int> > GFLLibrary::triangle_grid_chain(int nrows) const {
     int ntotal = nrows*(nrows+1)/2-1;
     std::vector<std::vector<int> > chains;
     int l = nrows;
@@ -60,7 +60,7 @@ std::vector<std::vector<int> > GFLLibrary::triangle_grid_chain(unsigned nrows) c
     return(chains);
 }
 
-void GFLLibrary::store_trails(unsigned nrows) {
+void GFLLibrary::store_trails(int nrows) {
     const std::vector<std::vector<int> > chains = triangle_grid_chain(nrows);
     trails_.clear();
     breakpoints_.clear();

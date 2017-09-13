@@ -47,9 +47,9 @@ protected:
     
 private:
     
-    std::vector<std::vector<int> > triangle_grid_chain(unsigned nrows) const;
+    std::vector<std::vector<int> > triangle_grid_chain(int nrows) const;
     
-    void store_trails(unsigned nrows);
+    void store_trails(int nrows);
     
     unsigned N_; //size of the fused lasso problem
     unsigned counter_;

@@ -4,7 +4,7 @@
 #include "util.hpp"
 #include "Traits.hpp"
 
-template<int kSD, typename GaussianEstimator>
+template<unsigned kSD, typename GaussianEstimator>
 void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::prepare() {
     //build cv groups
     const Rcpp::IntegerVector bin1(binned_.get_bin1()), bin2(binned_.get_bin2());
@@ -17,7 +17,7 @@ void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::prepare() {
     betas_.reserve(2);
 }
     
-template<int kSD, typename GaussianEstimator>
+template<unsigned kSD, typename GaussianEstimator>
 void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::compute(const Rcpp::NumericVector& beta_init, double lambda2) {
     if (beta_init.size() != N_) Rcpp::Rcout << "ERROR: wrong size for input to CV calculation, check code\n";
     
