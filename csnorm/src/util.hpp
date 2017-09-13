@@ -15,8 +15,5 @@ Rcpp::NumericVector compute_phi_ref(const BinnedData<Difference>& binned,
                                     const Rcpp::NumericVector& delta);
 
 
-Rcpp::NumericVector get_forbidden_values(const BinnedDataCore& binned);
-
-
 #endif
 

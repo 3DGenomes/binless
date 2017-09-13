@@ -6,7 +6,6 @@
 
 #include "CandidatesGenerator.hpp"
 #include "BoundsOptimizer.hpp"
-#include "BoundsChecker.hpp"
 #include "ScoreComputer.hpp"
 #include "ScoreOptimizer.hpp"
 #include "util.hpp"
@@ -26,10 +25,8 @@ template<typename Score, //to choose between BIC, CV or CVkSD
          typename Degeneracy, //whether to forbid certain values in order to avoid degeneracies in the model
          typename Calculation, //whether it's a Signal or a Difference calculation
          typename GaussianEstimator> //the type of the fused lasso object used for initialization
-class SparsityEstimator : private CandidatesGenerator<Degeneracy>,
+class SparsityEstimator : private CandidatesGenerator<Offset,Sign,Degeneracy>,
                           private BoundsOptimizer<Offset,Sign>,
-                          private BoundsChecker<Sign>,
-                          private BoundsChecker<Degeneracy>,
                           private ScoreComputer<Calculation,Score,GaussianEstimator>,
                           private ScoreOptimizer<Score> {
     
@@ -40,20 +37,16 @@ public:
     
     SparsityEstimator(int nbins, double tol_val, const binned_t& binned, double lambda2,
                       GaussianEstimator& gauss) :
-     CandidatesGenerator<Degeneracy>(binned),
+     CandidatesGenerator<Offset,Sign,Degeneracy>(nbins, tol_val, binned),
      BoundsOptimizer<Offset,Sign>(binned),
-     BoundsChecker<Sign>(binned),
-     BoundsChecker<Degeneracy>(binned),
      ScoreComputer<Calculation,Score,GaussianEstimator>(tol_val, binned, gauss, lambda2),
      ScoreOptimizer<Score>(),
-     lambda2_(lambda2), UBcandidates_(CandidatesGenerator<Degeneracy>::get_UB_candidates(nbins, tol_val, binned)) {}
+     lambda2_(lambda2) {}
     
      score_t optimize() const;
     
 private:
     const double lambda2_;
-    const Rcpp::NumericVector UBcandidates_;
-
 };
 
 //named constructor
