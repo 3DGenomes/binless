@@ -157,9 +157,9 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, si
   return(csig)
 }
 
-#' cross-validate lambda2, easier CV version
+#' cross-validate lambda2
 #' @keywords internal
-optimize_lambda2_simplified = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, signif.threshold=T) {
+optimize_lambda2_simplified = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, signif.threshold=T, ncores=1) {
   obj = function(x) {
     if (signif.threshold==T) {
       csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed)
@@ -176,26 +176,23 @@ optimize_lambda2_simplified = function(csig, n.SD=1, constrained=T, positive=T, 
     #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
   }
-  #
-  #dt.fix = foreach (lam=10^(seq(0,1,length.out=100)),.combine=rbind) %dopar% {
-  #  csig@state <<- csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed)
-  #  as.data.table(csig@state[c("lambda2","lambda1","eCprime","dof","BIC")])
-  #}
-  ### optimization in two stages
-  #first, find minimum between 1 and 100
+  #first, find rough minimum between 1 and 100
   minlambda=1
   maxlambda=100
-  op<-optimize(obj, c(log10(minlambda),log10(maxlambda)))
-  obj(op$minimum)
-  #second, find minimum + SD
-  minlambda=csig@state$lambda2
-  optBIC=csig@state$BIC+n.SD*csig@state$BIC.sd
-  obj2 = function(x) {
-    a=obj(x)
-    return(a+2*abs(optBIC-a))
-  }
-  op<-optimize(obj2, c(log10(minlambda),log10(maxlambda)))
+  op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.01)
   lambda2=10^op$minimum
+  if (n.SD>0) {
+    #finally, find minimum + SD
+    minlambda=lambda2
+    maxlambda=100
+    optBIC=csig@state$BIC+n.SD*csig@state$BIC.sd
+    obj2 = function(x) {
+      a=obj(x)
+      return(a+2*abs(optBIC-a))
+    }
+    op<-optimize(obj2, c(log10(minlambda),log10(maxlambda)))
+    lambda2=10^op$minimum
+  }
   #finish
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
   if (lambda2==minlambda) cat("   Warning: lambda2 hit lower boundary.\n")
@@ -205,7 +202,6 @@ optimize_lambda2_simplified = function(csig, n.SD=1, constrained=T, positive=T, 
   csig@par=modifyList(csig@par,retvals)
   return(csig)
 }
-
 
 #' build initial state from phi / delta
 #' 
@@ -235,7 +231,7 @@ gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
 #' @keywords internal
 csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, signif.threshold=T, ncores=1) {
   n.SD=ifelse(fixed==T,1,0)
-  csig = csnorm:::optimize_lambda2(csig, n.SD=n.SD, constrained=constrained, positive=positive, fixed=fixed,
+  csig = csnorm:::optimize_lambda2_simplified(csig, n.SD=n.SD, constrained=constrained, positive=positive, fixed=fixed,
                                    signif.threshold=signif.threshold, ncores=ncores)
   csig@par$name=csig@cts[,name[1]]
   #matg=csnorm:::gfl_get_matrix(csig, 0, csig@par$lambda2, 0)
