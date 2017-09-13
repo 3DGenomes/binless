@@ -28,7 +28,6 @@ template<typename Offset, //whether offset should be held at zero (ZeroOffset) o
 class CandidatesGenerator : private CandidatesValues<Offset,Sign>,
                             private CandidatesUBMinDegen<Degeneracy>,
                             private CandidatesUBMinOsi<Offset,Sign> {
-    
 public:
     
     CandidatesGenerator(int nbins, double tol_val, const BinnedDataCore& binned)
@@ -42,23 +41,17 @@ public:
 private:
     Rcpp::NumericVector generate(int nbins, double tol_val, const BinnedDataCore& binned) const {
         //get UB borders: values at which dof changes (including zero weight)
-        Rcpp::Rcout << "beta min=" << min(binned.get_beta()) << " max=" << max(binned.get_beta()) << " N=" << binned.get_beta().size() << "\n";
         Rcpp::NumericVector values = CandidatesValues<Offset,Sign>::get();
-        Rcpp::Rcout << "values min=" << min(values) << " max=" << max(values) << " N=" << values.size() << "\n";
         Rcpp::NumericVector borders = borders_from_values(nbins,tol_val, binned, values);
-        Rcpp::Rcout << "borders min=" << min(borders) << " max=" << max(borders) << " N=" << borders.size() << "\n";
         //get minimum admissible UB
         double minUBd = CandidatesUBMinDegen<Degeneracy>::get(values);
         double minUBo = CandidatesUBMinOsi<Offset,Sign>::get();
         double minUB = std::max(minUBd,minUBo);
-        Rcout<< "minUB = max("<<minUBd<<", " << minUBo << ")\n";
         //cleanup the borders list, adding minUB as the lowest possible, expanding at the end
         borders = cleanup_borders(borders, minUB);
-        Rcpp::Rcout << "cleanup min=" << min(borders) << " max=" << max(borders) << " N=" << borders.size() << "\n";
         //now generate candidates from these borders
         //pick center of each interval to make it an UB candidate
         Rcpp::NumericVector UBcandidates = candidates_from_borders(borders);
-        Rcpp::Rcout << "candidates min=" << min(UBcandidates) << " max=" << max(UBcandidates) << " N=" << UBcandidates.size() << "\n";
         return UBcandidates;
     }
     
