@@ -57,7 +57,6 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
   stopifnot(length(state)>0) #warm start only
   if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
   nperf=csig@settings$nperf
-  opt.every=csig@settings$opt.every
   if (is.null(ctsg.ref)) {
     perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, lambda2,
                                       state$alpha, tol.val, outliers,
@@ -304,8 +303,7 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
                 nbins = csg@par$nbins,
                 dispersion = csg@par$alpha,
                 tol.val = tol.val,
-                nperf=500,
-                opt.every=10,
+                nperf=50,
                 diag.rm = diag.rm,
                 min.patchsize = 4,
                 min.l10FC = 0.5)
