@@ -18,7 +18,7 @@ using namespace Rcpp;
 #include "cts_to_mat.hpp" //cts_to_signal_mat
 #include "graph_helpers.hpp" //get_patch_numbers
 
-
+#include "Timer.hpp"
 
 List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins,
                            double lam2, double alpha, double converge,
@@ -63,7 +63,8 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                      double lam2,  double alpha, double tol_val,
                      List outliers, NumericVector beta_i, double lambda1_min, int refine_num,
                      bool constrained, bool fixed) {
-    
+    Timer timer("wgfl_signal_BIC");
+    timer.start_timer("1. lambda2");
     //Class that holds all the data. Other classes reference to it.
     RawData<Signal> raw(nbins, dispersion, cts, outliers);
     BinnedData<Signal> binned; //stored here, but will be populated by WeightsUpdater
@@ -96,6 +97,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     IntegerVector patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
                                               binned.get_bin2(), binned.get_beta_phi());
     binned.set_patchno(patchno);
+    timer.start_timer("2. lambda1");
     
     //optimize lambda1 and eC
     NumericVector opt;
@@ -128,6 +130,8 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     //retrieve BIC from previous computation
     const double BIC = opt["BIC"];
     const double BIC_sd = opt["BIC.sd"];
+    
+    timer.print_times();
     
     DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
                                       _["bin2"]=binned.get_bin2(),

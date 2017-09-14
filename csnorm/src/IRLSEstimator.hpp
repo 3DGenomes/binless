@@ -5,11 +5,12 @@
 #include <vector>
 
 #include "util.hpp"
+#include "Timer.hpp"
 
 // A class that computes the 2D triangle grid fused lasso solution on some data.
 // This class assumes that weights can change and uses an underlying gaussian model in an iterative way (IRLS).
 template<typename GaussianEstimator, typename WeightsUpdater>
-class IRLSEstimator {
+class IRLSEstimator : private Timer {
     
 public:
     
@@ -17,7 +18,7 @@ public:
     //requesting precision to be below a given convergence criterion
     //final beta value will be clamped if clamp>0
     IRLSEstimator(double converge, GaussianEstimator& gauss, WeightsUpdater& wt)
-    : converge_(converge), counter_(0), gauss_(gauss), wt_(wt) {}
+    : Timer("IRLSEstimator"), converge_(converge), counter_(0), gauss_(gauss), wt_(wt) {}
     
     //run the optimization on the given data. The objective is
     // sum_i w_i(y_i-beta_i)^2 + lambda2 * sum_ij |beta_i-beta_j|
@@ -33,10 +34,12 @@ public:
                     << gauss_.get_alpha() << " phi[0]= " << beta_[0] << "\n";*/
         do {
           //update weights
+          Timer::start_timer("weight");
           wt_.update(beta);
           auto y = wt_.get_betahat();
           auto w = wt_.get_weight();
           //estimate beta
+          Timer::start_timer("gauss");
           gauss_.optimize(y, beta, w, lambda2);
           beta = gauss_.get();
           //update counters and compute precision
@@ -49,7 +52,9 @@ public:
         } while (counter_ <= nouter && precision > converge_ );
         /*Rcpp::Rcout << " Perf iteration: end with lam2= " << lambda2 << " alpha= "
         << gauss_.get_alpha() << " phi[0]= " << beta_[0] << "\n";*/
+        Timer::start_timer("weight");
         wt_.update(beta); //store last beta and update weights
+        Timer::print_times();
     }
     
     //return the number of outer iterations
