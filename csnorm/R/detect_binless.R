@@ -100,9 +100,9 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, si
   #  obj(log10(lam))
   #  as.data.table(csig@state$mat)[,.(lambda2=lam,lambda1=csig@state$lambda1,eCprime=csig@state$eCprime,bin1,bin2,phihat,phi,beta)]
   #}
-  #dt.fix = foreach (lam=10^(seq(0,1,length.out=100)),.combine=rbind) %dopar% {
+  #dt.fix = foreach (lam=10^(seq(log10(12.8),log10(13.3),length.out=20)),.combine=rbind) %dopar% {
   #  csig@state <<- csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed)
-  #  as.data.table(csig@state[c("lambda2","lambda1","eCprime","dof","BIC")])
+  #  as.data.table(csig@state[c("lambda2","lambda1","eCprime","dof","BIC","BIC.sd","converged")])
   #}
   #dt=rbindlist(list(free=dt.free,fix=dt.fix), use=T, idcol="ori")
   #ggplot(dt)+geom_line(aes(lambda2,BIC,colour=ori))#+geom_point(data=r,aes(10^x,y))#+xlim(1,3)+ylim(1600,2000)
@@ -163,6 +163,7 @@ optimize_lambda2_simplified = function(csig, n.SD=1, constrained=T, positive=T, 
   obj = function(x) {
     if (signif.threshold==T) {
       csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed)
+      #cat("optimize at ", 10^(x), " BIC= ", csig@state$BIC,"\n")
     } else {
       a = csnorm:::gfl_BIC_fixed(csig, 0, lambda2=10^(x), 0)
       if (positive==T) {
@@ -179,7 +180,7 @@ optimize_lambda2_simplified = function(csig, n.SD=1, constrained=T, positive=T, 
   #first, find rough minimum between 1 and 100
   minlambda=1
   maxlambda=100
-  op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.01)
+  op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
   lambda2=10^op$minimum
   if (n.SD>0) {
     #finally, find minimum + SD
@@ -190,7 +191,7 @@ optimize_lambda2_simplified = function(csig, n.SD=1, constrained=T, positive=T, 
       a=obj(x)
       return(a+2*abs(optBIC-a))
     }
-    op<-optimize(obj2, c(log10(minlambda),log10(maxlambda)))
+    op<-optimize(obj2, c(log10(minlambda),log10(maxlambda)), tol=0.1)
     lambda2=10^op$minimum
   }
   #finish
