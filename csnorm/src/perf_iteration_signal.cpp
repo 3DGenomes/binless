@@ -20,7 +20,7 @@ using namespace Rcpp;
 
 #include "Timer.hpp"
 
-List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins,
+List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins, List GFLState,
                            double lam2, double converge,
                            const List outliers, NumericVector beta_i) {
     //Class that holds all the data. Other classes reference to it.
@@ -28,6 +28,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
     BinnedData<Signal> binned; //stored here, but will be populated by WeightsUpdater
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
+    flo.set_state(GFLState);
     WeightsUpdater<Signal> wt(raw,binned); //size of the problem and input data
     wt.setUp(); //for consistency. No-op, since there's no phi_ref to compute
     
@@ -57,7 +58,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
                         _["eCprime"]=0, _["lambda1"]=0);
 }
 
-List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins,
+List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins, List GFLState,
                      double lam2,  double tol_val,
                      List outliers, NumericVector beta_i, double lambda1_min, int refine_num,
                      bool constrained, bool fixed) {
@@ -70,6 +71,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     bool converged = true;
     const double converge = tol_val/20.;
     FusedLassoGaussianEstimator<GFLLibrary> flo(raw.get_nbins(), converge); //size of the problem and convergence criterion
+    flo.set_state(GFLState);
     WeightsUpdater<Signal> wt(raw,binned); //size of the problem and input data
     wt.setUp(); //for consistency. No-op, since there's no phi_ref to compute
     std::vector<double> beta = as<std::vector<double> >(beta_i);
@@ -90,6 +92,10 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
             converged = false;
         }
     }
+    
+    //store GFL state for next round
+    List new_GFLState = flo.get_state();
+    
     //compute patches
     IntegerVector patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
                                               binned.get_bin2(), binned.get_beta_phi());
@@ -142,7 +148,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                                       _["patchno"]=patchno);
     
     return List::create(_["phi"]=phi,
-                        _["beta"]=beta_r, _["lambda2"]=lam2,
+                        _["beta"]=beta_r, _["lambda2"]=lam2, _["GFLState"]=new_GFLState,
                         _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd, _["mat"]=mat, _["eCprime"]=eCprime,
                         _["lambda1"]=lam1, _["converged"]=converged);
 }

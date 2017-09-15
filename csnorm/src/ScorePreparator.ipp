@@ -23,6 +23,7 @@ void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::compute() {
     std::vector<double> y = Rcpp::as<std::vector<double> >(binned_.get_betahat());
     std::vector<double> w = Rcpp::as<std::vector<double> >(binned_.get_weight());
     const int ngroups=2;
+    auto state = gauss_.get_state();
     for (int g=0; g<ngroups; ++g) {
         //prepare data and weights for group g and copy initial values
         std::vector<double> y_cv(y), w_cv(w);
@@ -33,6 +34,7 @@ void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::compute() {
             }
         }
         //compute fused lasso
+        gauss_.set_state(state);
         gauss_.optimize(y_cv, w_cv, lambda2_);
         std::vector<double> values = gauss_.get();
         betas_.push_back(values);

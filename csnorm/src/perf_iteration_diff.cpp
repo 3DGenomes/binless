@@ -19,7 +19,7 @@ using namespace Rcpp;
 #include "graph_helpers.hpp" //get_patch_numbers
 
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
-                         double dispersion, int nouter, int nbins,
+                         double dispersion, int nouter, int nbins, List GFLState,
                          double lam2, double converge,
                          List outliers, NumericVector phi_ref_i, NumericVector beta_i) {
     //Classes that hold all the data. Other classes reference to it.
@@ -27,6 +27,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
     BinnedData<Difference> binned; //stored here, but will be populated by WeightsUpdater
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
+    flo.set_state(GFLState);
     WeightsUpdater<Difference> wt(raw,binned); //size of the problem and input data
     std::vector<double> beta = as<std::vector<double> >(beta_i);
     std::vector<double> phi_ref = as<std::vector<double> >(phi_ref_i);
@@ -64,7 +65,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
 }
 
 List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
-                   int nouter, int nbins,
+                   int nouter, int nbins, List GFLState,
                    double lam2, double tol_val,
                    List outliers, NumericVector phi_ref_i,  NumericVector beta_i, double lambda1_min,
                    int refine_num, bool constrained) {
@@ -76,6 +77,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     bool converged = true;
     const double converge = tol_val/20.;
     FusedLassoGaussianEstimator<GFLLibrary> flo(raw.get_nbins(), converge); //size of the problem and convergence criterion
+    flo.set_state(GFLState);
     WeightsUpdater<Difference> wt(raw, binned); //size of the problem and input data
     std::vector<double> beta = as<std::vector<double> >(beta_i);
     std::vector<double> phi_ref = as<std::vector<double> >(phi_ref_i);
@@ -149,7 +151,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                             _["phi_ref"]=phi_ref_r,
                             _["patchno"]=patchno);
     return List::create(_["phi.ref"]=phi_ref_r,
-                        _["delta"]=delta, _["beta"]=beta,
+                        _["delta"]=delta, _["beta"]=beta, _["GFLState"]=flo.get_state(),
                         _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd,
                         _["mat"]=mat, _["lambda1"]=lam1, _["eCprime"]=0, _["converged"]=converged);
 }

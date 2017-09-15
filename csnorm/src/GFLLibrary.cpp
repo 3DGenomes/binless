@@ -65,3 +65,19 @@ void GFLLibrary::optimize(const std::vector<double>& y, const std::vector<double
     //Rcpp::Rcout << "GFLLibrary: " << counter << " steps\n";
     counter_ += counter;
 }
+
+GFLLibrary::GFLState_t GFLLibrary::get_state() const {
+    return Rcpp::List::create(_["z"]=z_, _["u"]=u_,  _["alpha"]=alpha_,  _["beta"]=beta_,  _["counter"]=counter_);
+}
+
+void GFLLibrary::set_state(const GFLState_t& state) {
+    if (state.containsElementNamed("u") && Rcpp::as<std::vector<double> >(state["u"]).size() == tsz_) {
+        z_ = Rcpp::as<std::vector<double> >(state["z"]);
+        u_ = Rcpp::as<std::vector<double> >(state["u"]);
+        beta_ = Rcpp::as<std::vector<double> >(state["beta"]);
+        alpha_ = Rcpp::as<double>(state["alpha"]);
+        counter_ = Rcpp::as<unsigned>(state["counter"]);
+    }
+}
+
+

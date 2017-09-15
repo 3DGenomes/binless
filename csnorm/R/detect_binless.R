@@ -14,10 +14,10 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
   if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
   nperf=csig@settings$nperf
   if (is.null(ctsg.ref)) {
-    perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, lambda2, tol.val/20, outliers, state$beta)
+    perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2, tol.val/20, outliers, state$beta)
   } else {
     stopifnot(eCprime==0)
-    perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda2, tol.val/20, outliers,
+    perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2, tol.val/20, outliers,
                                             state$phi.ref, state$beta)
   }
   return(perf.c)
@@ -58,12 +58,12 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
   if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
   nperf=csig@settings$nperf
   if (is.null(ctsg.ref)) {
-    perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, lambda2,
+    perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2,
                                       tol.val, outliers,
                                       state$beta, lambda1.min, refine.num, constrained, fixed)
   } else {
     stopifnot(constrained==T) #for now
-    perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda2,
+    perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2,
                                       tol.val, outliers,
                                       state$phi.ref, state$beta, lambda1.min, refine.num, constrained)
   }
@@ -299,7 +299,8 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
                 nbins = csg@par$nbins,
                 dispersion = csg@par$alpha,
                 tol.val = tol.val,
-                nperf=50,
+                nperf = 50,
+                GFLState = list(), #cold start
                 diag.rm = diag.rm,
                 min.patchsize = 4,
                 min.l10FC = 0.5)
