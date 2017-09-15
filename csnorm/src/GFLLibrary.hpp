@@ -7,7 +7,7 @@ using namespace Rcpp;
 
 #include "Settings.hpp"
 
-std::vector<std::vector<int> > triangle_grid_chain(unsigned nrows);
+std::vector<std::vector<int> > triangle_grid_chain(int nrows);
 
 //policy class that implements fused lasso solution using the GFL library
 class GFLLibrary {
@@ -56,7 +56,7 @@ protected:
     
 private:
     
-    void store_trails(unsigned nrows);
+    void store_trails(int nrows);
     
     unsigned N_; //size of the fused lasso problem
     unsigned counter_;

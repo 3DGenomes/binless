@@ -4,7 +4,7 @@
 #include "GFLLibrary.hpp"
 #include "gfl_graph_fl.h" //graph_fused_lasso_weight_warm
 
-std::vector<std::vector<int> > triangle_grid_chain(unsigned nrows) {
+std::vector<std::vector<int> > triangle_grid_chain(int nrows) {
     int ntotal = nrows*(nrows+1)/2-1;
     std::vector<std::vector<int> > chains;
     int l = nrows;
@@ -33,7 +33,7 @@ std::vector<std::vector<int> > triangle_grid_chain(unsigned nrows) {
     return(chains);
 }
 
-void GFLLibrary::store_trails(unsigned nrows) {
+void GFLLibrary::store_trails(int nrows) {
     const std::vector<std::vector<int> > chains = triangle_grid_chain(nrows);
     trails_.clear();
     breakpoints_.clear();

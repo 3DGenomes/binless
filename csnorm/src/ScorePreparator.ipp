@@ -4,7 +4,7 @@
 #include "util.hpp"
 #include "Traits.hpp"
 
-template<int kSD, typename GaussianEstimator>
+template<unsigned kSD, typename GaussianEstimator>
 void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::prepare() {
     //build cv groups
     const Rcpp::IntegerVector bin1(binned_.get_bin1()), bin2(binned_.get_bin2());
@@ -17,7 +17,7 @@ void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::prepare() {
     betas_.reserve(2);
 }
     
-template<int kSD, typename GaussianEstimator>
+template<unsigned kSD, typename GaussianEstimator>
 void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::compute() {
     //Compute fused lasso solutions on each group and report to beta_cv
     std::vector<double> y = Rcpp::as<std::vector<double> >(binned_.get_betahat());

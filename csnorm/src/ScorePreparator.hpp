@@ -7,10 +7,10 @@
 #include "util.hpp"
 #include "Traits.hpp"
 
-template<typename Score, typename GaussianEstimator> class ScorePreparator;
+template<typename Score, typename GaussianEstimator> class ScorePreparator {};
 
 // A class that produces data used for cross-validation of fused lasso regression results
-template<int kSD, typename GaussianEstimator> class ScorePreparator<CVkSD<kSD>, GaussianEstimator> {
+template<unsigned kSD, typename GaussianEstimator> class ScorePreparator<CVkSD<kSD>, GaussianEstimator> {
     
 public:
     
