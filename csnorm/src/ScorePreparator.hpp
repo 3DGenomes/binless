@@ -15,9 +15,9 @@ template<int kSD, typename GaussianEstimator> class ScorePreparator<CVkSD<kSD>, 
 public:
     
     ScorePreparator(GaussianEstimator& gauss, const BinnedDataCore& binned, double lambda2, double y_default = -100.)
-     : gauss_(gauss), binned_(binned), y_default_(y_default), N_(binned.get_bin1().size()) {
+     : gauss_(gauss), binned_(binned), y_default_(y_default), lambda2_(lambda2), N_(binned.get_bin1().size()) {
         prepare();
-        compute(binned.get_beta(), lambda2);
+        compute();
     }
     
     std::vector<int> get_cvgroup() const { return cvgroup_; }
@@ -33,11 +33,11 @@ private:
     void prepare();
     
     //run 2-fold cv calculation on checkerboard pattern
-    void compute(const Rcpp::NumericVector& beta_init, double lambda2);
+    void compute();
     
     GaussianEstimator& gauss_;
     const BinnedDataCore& binned_;
-    const double y_default_;
+    const double y_default_, lambda2_;
     const unsigned N_;
     std::vector<int> cvgroup_;
     std::vector<double> beta_cv_;

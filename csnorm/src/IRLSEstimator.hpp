@@ -40,7 +40,7 @@ public:
           auto w = wt_.get_weight();
           //estimate beta
           Timer::start_timer("gauss");
-          gauss_.optimize(y, beta, w, lambda2);
+          gauss_.optimize(y, w, lambda2);
           beta = gauss_.get();
           //update counters and compute precision
           precision = get_precision(beta,beta_old);

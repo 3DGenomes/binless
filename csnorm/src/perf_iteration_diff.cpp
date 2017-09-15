@@ -20,14 +20,13 @@ using namespace Rcpp;
 
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                          double dispersion, int nouter, int nbins,
-                         double lam2, double alpha, double converge,
+                         double lam2, double converge,
                          List outliers, NumericVector phi_ref_i, NumericVector beta_i) {
     //Classes that hold all the data. Other classes reference to it.
     RawData<Difference> raw(nbins, dispersion, cts, ref, outliers);
     BinnedData<Difference> binned; //stored here, but will be populated by WeightsUpdater
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
-    flo.setUp(alpha);
     WeightsUpdater<Difference> wt(raw,binned); //size of the problem and input data
     std::vector<double> beta = as<std::vector<double> >(beta_i);
     std::vector<double> phi_ref = as<std::vector<double> >(phi_ref_i);
@@ -41,7 +40,6 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
     //retrieve statistics
     int res = flo.get_ninner();
     unsigned step = irls.get_nouter();
-    alpha = flo.get_alpha();
     beta = flo.get();
     
     DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
@@ -59,7 +57,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                                       _["delta"]=beta,
                                       _["phi_ref"]=binned.get_phi_ref());
     
-    return List::create(_["beta"]=wrap(beta), _["alpha"]=wrap(alpha),
+    return List::create(_["beta"]=wrap(beta),
                         _["phi.ref"]=binned.get_phi_ref(), _["delta"]=wrap(beta), _["mat"]=mat,
                         _["nouter"]=step, _["ninner"]=res,
                         _["eCprime"]=0, _["lambda1"]=0);
@@ -67,7 +65,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
 
 List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    int nouter, int nbins,
-                   double lam2,  double alpha, double tol_val,
+                   double lam2, double tol_val,
                    List outliers, NumericVector phi_ref_i,  NumericVector beta_i, double lambda1_min,
                    int refine_num, bool constrained) {
     
@@ -78,7 +76,6 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     bool converged = true;
     const double converge = tol_val/20.;
     FusedLassoGaussianEstimator<GFLLibrary> flo(raw.get_nbins(), converge); //size of the problem and convergence criterion
-    flo.setUp(alpha);
     WeightsUpdater<Difference> wt(raw, binned); //size of the problem and input data
     std::vector<double> beta = as<std::vector<double> >(beta_i);
     std::vector<double> phi_ref = as<std::vector<double> >(phi_ref_i);
@@ -153,7 +150,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                             _["patchno"]=patchno);
     return List::create(_["phi.ref"]=phi_ref_r,
                         _["delta"]=delta, _["beta"]=beta,
-                        _["alpha"]=flo.get_alpha(), _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd,
+                        _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd,
                         _["mat"]=mat, _["lambda1"]=lam1, _["eCprime"]=0, _["converged"]=converged);
 }
 

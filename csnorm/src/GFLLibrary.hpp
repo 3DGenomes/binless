@@ -7,20 +7,21 @@ using namespace Rcpp;
 
 #include "Settings.hpp"
 
+std::vector<std::vector<int> > triangle_grid_chain(unsigned nrows);
+
 //policy class that implements fused lasso solution using the GFL library
 class GFLLibrary {
 public:
     
     GFLLibrary(unsigned nrows, double converge) : N_(nrows*(nrows+1)/2), counter_(0), converge_(converge),
-     inflate_(Settings<GFLLibrary>::get_inflate()), ninner_(Settings<GFLLibrary>::get_ninner()) {
+     inflate_(Settings<GFLLibrary>::get_inflate()), ninner_(Settings<GFLLibrary>::get_ninner()),
+     alpha_(Settings<GFLLibrary>::get_alpha()) {
         store_trails(nrows);
+        reset();
     }
     
-    //any implementation-specific parameters are set here
-    void setUp(double alpha);
-    
-    //prepare the next optimization round with the provided initial guess (warm start)
-    void prepare(const std::vector<double>& beta_init);
+    //force a cold start
+    void reset();
     
     //run the optimization on the given data. The objective is
     // sum_i w_i(y_i-beta_i)^2 + lambda2 * sum_ij |beta_i-beta_j|
@@ -46,8 +47,6 @@ protected:
     ~GFLLibrary() {}
     
 private:
-    
-    std::vector<std::vector<int> > triangle_grid_chain(unsigned nrows) const;
     
     void store_trails(unsigned nrows);
     
