@@ -14,10 +14,10 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
   if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
   nperf=csig@settings$nperf
   if (is.null(ctsg.ref)) {
-    perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, lambda2, state$alpha, tol.val/20, outliers, state$beta)
+    perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2, tol.val/20, outliers, state$beta)
   } else {
     stopifnot(eCprime==0)
-    perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda2, state$alpha, tol.val/20, outliers,
+    perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2, tol.val/20, outliers,
                                             state$phi.ref, state$beta)
   }
   return(perf.c)
@@ -45,7 +45,7 @@ gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
 #' compute BIC for a given value of lambda2, optimizing lambda1 and eCprime (performance iteration, persistent state)
 #' @keywords internal
 gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, positive=T, fixed=F) {
-  #state = perf.c[c("phi.ref","beta","alpha")]
+  #state = perf.c[c("phi.ref","beta")]
   #submat = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta)]
   #
   ctsg=csig@cts
@@ -58,13 +58,13 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
   if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
   nperf=csig@settings$nperf
   if (is.null(ctsg.ref)) {
-    perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, lambda2,
-                                      state$alpha, tol.val, outliers,
+    perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2,
+                                      tol.val, outliers,
                                       state$beta, lambda1.min, refine.num, constrained, fixed)
   } else {
     stopifnot(constrained==T) #for now
-    perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, lambda2,
-                                      state$alpha, tol.val, outliers,
+    perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2,
+                                      tol.val, outliers,
                                       state$phi.ref, state$beta, lambda1.min, refine.num, constrained)
   }
   return(perf.c)
@@ -207,12 +207,12 @@ optimize_lambda2_simplified = function(csig, n.SD=1, constrained=T, positive=T, 
 #' build initial state from phi / delta
 #' 
 #' @keywords internal
-gfl_compute_initial_state = function(csig, diff=F, init.alpha=5) {
+gfl_compute_initial_state = function(csig, diff=F) {
   matg = csig@mat
   if (diff==F) {
-    state = list(beta=matg[,phi], alpha=init.alpha, lambda1=0.05, eCprime=0)
+    state = list(beta=matg[,phi], lambda1=0.05, eCprime=0)
   } else {
-    state = list(phi.ref=matg[,phi.ref], beta=matg[,delta], alpha=init.alpha)
+    state = list(phi.ref=matg[,phi.ref], beta=matg[,delta])
   }
   return(state)
 }
@@ -300,7 +300,8 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
                 nbins = csg@par$nbins,
                 dispersion = csg@par$alpha,
                 tol.val = tol.val,
-                nperf=50,
+                nperf = 50,
+                GFLState = list(), #cold start
                 diag.rm = diag.rm,
                 min.patchsize = 4,
                 min.l10FC = 0.5)
@@ -358,7 +359,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
     csig = csi
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
-    csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F, init.alpha=5)
+    csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F)
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=T, verbose=verbose,
                                 signif.threshold=signif.threshold, ncores=ncores)
   }
@@ -424,7 +425,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     csig = csi
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
-    csig@state = csnorm:::gfl_compute_initial_state(csig, diff=T, init.alpha=5)
+    csig@state = csnorm:::gfl_compute_initial_state(csig, diff=T)
     csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=T, verbose=verbose,
                                 signif.threshold=signif.threshold, ncores=ncores)
   }

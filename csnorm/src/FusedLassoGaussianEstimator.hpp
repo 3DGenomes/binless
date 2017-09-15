@@ -26,9 +26,7 @@ public:
     //run the optimization on the given data. The objective is
     // sum_i w_i(y_i-beta_i)^2 + lambda2 * sum_ij |beta_i-beta_j|
     // y, w and lambda2 are held constant, while beta starts at beta_init
-    void optimize(const std::vector<double>& y, const std::vector<double>& beta_init,
-                  const std::vector<double>& w, double lambda2) {
-        Library::prepare(beta_init);
+    void optimize(const std::vector<double>& y, const std::vector<double>& w, double lambda2) {
         Library::optimize(y, w, lambda2);
     }
     

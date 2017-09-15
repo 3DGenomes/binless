@@ -9,6 +9,8 @@ template<typename T> struct Settings {};
 //settings for GFLLibrary
 class GFLLibrary;
 template<> struct Settings<GFLLibrary> {
+    //initial adamts step size
+    static const double get_alpha() { return 5.; }
     //inflation factor for adamts step update
     static const double get_inflate() { return 2.; }
     //maximum number of adamts steps

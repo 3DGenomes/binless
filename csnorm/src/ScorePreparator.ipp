@@ -18,14 +18,12 @@ void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::prepare() {
 }
     
 template<unsigned kSD, typename GaussianEstimator>
-void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::compute(const Rcpp::NumericVector& beta_init, double lambda2) {
-    if (beta_init.size() != N_) Rcpp::Rcout << "ERROR: wrong size for input to CV calculation, check code\n";
-    
+void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::compute() {
     //Compute fused lasso solutions on each group and report to beta_cv
-    std::vector<double> beta_init_v = Rcpp::as<std::vector<double> >(beta_init);
     std::vector<double> y = Rcpp::as<std::vector<double> >(binned_.get_betahat());
     std::vector<double> w = Rcpp::as<std::vector<double> >(binned_.get_weight());
     const int ngroups=2;
+    auto state = gauss_.get_state();
     for (int g=0; g<ngroups; ++g) {
         //prepare data and weights for group g and copy initial values
         std::vector<double> y_cv(y), w_cv(w);
@@ -36,7 +34,8 @@ void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::compute(const Rcpp::NumericV
             }
         }
         //compute fused lasso
-        gauss_.optimize(y_cv, beta_init_v, w_cv, lambda2);
+        gauss_.set_state(state);
+        gauss_.optimize(y_cv, w_cv, lambda2_);
         std::vector<double> values = gauss_.get();
         betas_.push_back(values);
         

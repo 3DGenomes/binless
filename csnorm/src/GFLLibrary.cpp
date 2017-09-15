@@ -4,34 +4,7 @@
 #include "GFLLibrary.hpp"
 #include "gfl_graph_fl.h" //graph_fused_lasso_weight_warm
 
-
-void GFLLibrary::setUp(double alpha) {
-    alpha_ = alpha;
-}
-
-void GFLLibrary::prepare(const std::vector<double>& beta_init) {
-    //setup initial values
-    std::vector<double> u(tsz_,0); //residuals set to zero
-    std::vector<double> z;
-    z.reserve(tsz_);
-    for (unsigned i=0; i<trails_.size(); ++i) {
-        z.push_back(beta_init[trails_[i]]);   //z set to beta values along trails
-    }
-    beta_ = beta_init;
-    z_ = z;
-    u_ = u;
-}
-
-void GFLLibrary::optimize(const std::vector<double>& y, const std::vector<double>& w, double lambda2) {
-    //perform optimization on the C side
-    double* py = const_cast<double*>(&y[0]);
-    double* pw = const_cast<double*>(&w[0]);
-    counter_ += graph_fused_lasso_weight_warm (N_, py, pw, ntrails_, &trails_[0], &breakpoints_[0],
-                                               lambda2, &alpha_, inflate_, ninner_, converge_,
-                                               &beta_[0], &z_[0], &u_[0]);
-}
-
-std::vector<std::vector<int> > GFLLibrary::triangle_grid_chain(int nrows) const {
+std::vector<std::vector<int> > triangle_grid_chain(int nrows) {
     int ntotal = nrows*(nrows+1)/2-1;
     std::vector<std::vector<int> > chains;
     int l = nrows;
@@ -73,4 +46,38 @@ void GFLLibrary::store_trails(int nrows) {
     ntrails_ = breakpoints_.size();
     tsz_ = trails_.size();
 }
+
+void GFLLibrary::reset() {
+    //setup initial values for a cold start
+    counter_ = 0;
+    beta_ = std::vector<double>(N_,0);
+    z_ = std::vector<double>(tsz_,0);
+    u_ = std::vector<double>(tsz_,0);
+}
+
+void GFLLibrary::optimize(const std::vector<double>& y, const std::vector<double>& w, double lambda2) {
+    //perform optimization on the C side
+    double* py = const_cast<double*>(&y[0]);
+    double* pw = const_cast<double*>(&w[0]);
+    int counter = graph_fused_lasso_weight_warm (N_, py, pw, ntrails_, &trails_[0], &breakpoints_[0],
+                                               lambda2, &alpha_, inflate_, ninner_, converge_,
+                                               &beta_[0], &z_[0], &u_[0]);
+    //Rcpp::Rcout << "GFLLibrary: " << counter << " steps\n";
+    counter_ += counter;
+}
+
+GFLLibrary::GFLState_t GFLLibrary::get_state() const {
+    return Rcpp::List::create(_["z"]=z_, _["u"]=u_,  _["alpha"]=alpha_,  _["beta"]=beta_,  _["counter"]=counter_);
+}
+
+void GFLLibrary::set_state(const GFLState_t& state) {
+    if (state.containsElementNamed("u") && Rcpp::as<std::vector<double> >(state["u"]).size() == tsz_) {
+        z_ = Rcpp::as<std::vector<double> >(state["z"]);
+        u_ = Rcpp::as<std::vector<double> >(state["u"]);
+        beta_ = Rcpp::as<std::vector<double> >(state["beta"]);
+        alpha_ = Rcpp::as<double>(state["alpha"]);
+        counter_ = Rcpp::as<unsigned>(state["counter"]);
+    }
+}
+
 
