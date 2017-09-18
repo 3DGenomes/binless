@@ -4,6 +4,7 @@
 
 template<typename Sign>
 bounds_t BoundsOptimizer<EstimatedOffset, Sign>::optimize_bounds(double val) const {
+    Rcpp::Rcout << "\nBoundsOptimizer<EstimatedOffset, Sign> will optimize value " << val << "\n";
     //split data in two groups
     LogicalVector grp1 = beta_ <= val;
     Rcpp::NumericVector w1 = weight_[grp1];
@@ -13,6 +14,7 @@ bounds_t BoundsOptimizer<EstimatedOffset, Sign>::optimize_bounds(double val) con
     double b1,b2, xk, xkp1;
     double a,b,UB,LB;
     double xmin = min(beta_), xmax = max(beta_); //here, we assume xmin >= minval_
+    Rcpp::Rcout << "grp1empty= " << grp1empty << " grp2empty= " << grp2empty << " xmin= " << xmin << " xmax= " << xmax << "\n";
     
     //compute UB and LB
     if ((!grp2empty) && (!grp1empty)) {//non-degenerate case
@@ -30,6 +32,7 @@ bounds_t BoundsOptimizer<EstimatedOffset, Sign>::optimize_bounds(double val) con
         //compute optimal UB and LB
         UB = std::max(std::min(xkp1, a), xk);
         LB = std::min(b, minval_);
+        Rcpp::Rcout << "non-degenerate b1= " << b1 << " b2= " << b2 << " a= " << a << " b= " << b << " xk= " << xk << " xkp1= " << xkp1 << " UB= " << UB << " LB= " << LB << "\n";
     } else if (grp2empty) {//grp2 is empty, UB > xmax
         Rcpp::NumericVector w1 = weight_;
         Rcpp::NumericVector y1 = y_;
@@ -44,10 +47,13 @@ bounds_t BoundsOptimizer<EstimatedOffset, Sign>::optimize_bounds(double val) con
         if (b1 >= (minval_+xmax)/2.) {
             LB = minval_; //or any beta < minval_
             UB = 2*b1 - LB;
+            Rcpp::Rcout << "case1";
         } else {
             UB = xmax; //or any beta > xmax
             LB = 2*b1 - UB;
+            Rcpp::Rcout << "case2";
         }
+        Rcpp::Rcout << "UB>xmax b1= " << b1 << " b2= " << b2 << " a= " << a << " b= " << b << " xk= " << xk << " xkp1= " << xkp1 << " UB= " << UB << " LB= " << LB << "\n";
     } else {//grp1 is empty, UB <= xmin
         if (!grp1empty) Rcpp::Rcout << "This should not have happened!\n";
         Rcpp::NumericVector w2 = weight_;
