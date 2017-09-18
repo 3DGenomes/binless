@@ -143,7 +143,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                                       _["weight"]=binned.get_weight(),
                                       _["diag.idx"]=binned.get_diag_idx(),
                                       _["diag.grp"]=binned.get_diag_grp(),
-                                      _["beta"]=beta,
+                                      _["beta"]=beta_r,
                                       _["phi"]=phi,
                                       _["patchno"]=patchno);
     

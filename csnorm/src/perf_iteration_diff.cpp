@@ -146,12 +146,12 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                             _["weight"]=binned.get_weight(),
                             _["diag.idx"]=binned.get_diag_idx(),
                             _["diag.grp"]=binned.get_diag_grp(),
-                            _["beta"]=beta,
+                            _["beta"]=beta_r,
                             _["delta"]=delta,
                             _["phi_ref"]=phi_ref_r,
                             _["patchno"]=patchno);
     return List::create(_["phi.ref"]=phi_ref_r,
-                        _["delta"]=delta, _["beta"]=beta, _["GFLState"]=flo.get_state(),
+                        _["delta"]=delta, _["beta"]=beta_r, _["GFLState"]=flo.get_state(),
                         _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd,
                         _["mat"]=mat, _["lambda1"]=lam1, _["eCprime"]=0, _["converged"]=converged);
 }
