@@ -20,14 +20,14 @@ template<typename Sign> class BoundsOptimizer<EstimatedOffset, Sign> {
 public:
     BoundsOptimizer(const BinnedDataCore& data) :
      beta_(data.get_beta()), weight_(data.get_weight()),
-     y_(data.get_betahat()), minval_(min(data.get_beta())) {}
+     y_(data.get_betahat()), xmin_(min(data.get_beta())), xmax_(max(data.get_beta())) {}
     
     //given an UB candidate (and implicit dof), find the adequate UB and LB
     bounds_t optimize_bounds(double val) const;
     
 private:
     const Rcpp::NumericVector beta_, weight_, y_;
-    const double minval_;
+    const double xmin_, xmax_;
 };
 
 
