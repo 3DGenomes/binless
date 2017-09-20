@@ -310,9 +310,9 @@ check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10) {
   counts=merge(counts,biases,by.x=c("name","id1"),by.y=c("name","id"))
   counts=merge(counts,biases,by.x=c("name","id2"),by.y=c("name","id"),suffixes=c("1","2"))
   #compute p-values
-  counts[count>=mean,pval:=pnbinom(count,size=cs@par$alpha,mu=mean,lower.tail=F)]
-  counts[count<mean,pval:=pnbinom(count,size=cs@par$alpha,mu=mean,lower.tail=T)]
-  counts[,sd:=sqrt(mean+mean**2/cs@par$alpha)]
+  counts[count>=mean,pval:=pnbinom(count,size=cs@par$b*mean^cs@par$a,mu=mean,lower.tail=F)]
+  counts[count<mean,pval:=pnbinom(count,size=cs@par$b*mean^cs@par$a,mu=mean,lower.tail=T)]
+  counts[,sd:=sqrt(mean+1/cs@par$b*mean^(cs@par$a-2))]
   #graph p-values
   p.all=ggplot(counts)+geom_histogram(aes(pval))+facet_wrap(~name)+xlab("model p-value")+ylab("frequency")
   p.decay=ggplot(counts)+geom_jitter(aes(1,pval))+facet_grid(name~dbin)+ylab("model p-value")+xlab("diagonal decay bin")
@@ -330,7 +330,7 @@ check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10) {
 #' parameters up to the initial condition.
 #' 
 #' @param prefix character. As provided to \code{\link{run_gauss}} or
-#' \code{\link{run_gauss_bam}} or \code{\link{run_exact}}.
+#' \code{\link{run_exact}}.
 #'   
 #' @return A CSnorm object
 #' @export

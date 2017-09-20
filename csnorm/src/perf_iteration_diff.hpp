@@ -6,11 +6,11 @@ using namespace Rcpp;
 #include <vector>
 
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
-                         double dispersion, int nouter, int nbins, List GFLState,
+                         List dispersion, int nouter, int nbins, List GFLState,
                          double lam2, double converge,
                          List outliers, NumericVector phi_ref_i, NumericVector beta_i);
 
-List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
+List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, List dispersion,
                    int nouter, int nbins, List GFLState,
                    double lam2,  double tol_val,
                    List outliers, NumericVector phi_ref_i, NumericVector beta_i, double lambda1_min,

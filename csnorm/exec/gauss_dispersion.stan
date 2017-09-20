@@ -38,7 +38,8 @@ parameters {
   real eRJ[Dsets];
   real eDE[Dsets];
   //dispersion
-  real<lower=0> alpha;
+  real a;
+  real<lower=0> b;
 }
 transformed parameters {
   //means
@@ -63,15 +64,15 @@ transformed parameters {
 model {
   //// likelihoods
   //biases
-  rejoined  ~ neg_binomial_2_log(log_mean_RJ, alpha);
-  danglingL ~ neg_binomial_2_log(log_mean_DL, alpha);
-  danglingR ~ neg_binomial_2_log(log_mean_DR, alpha);
+  rejoined  ~ neg_binomial_2_log(log_mean_RJ, b*exp(a*log_mean_RJ));
+  danglingL ~ neg_binomial_2_log(log_mean_DL, b*exp(a*log_mean_DL));
+  danglingR ~ neg_binomial_2_log(log_mean_DR, b*exp(a*log_mean_DR));
   
   //counts: Close, Far, Up, Down
   for (d in 1:Dsets) {
-    target += weight[d]*neg_binomial_2_log_lpmf(counts_close[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)] + eC_sup[d], alpha);
-    target += weight[d]*neg_binomial_2_log_lpmf(counts_far[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)] + eC_sup[d], alpha);
-    target += weight[d]*neg_binomial_2_log_lpmf(counts_up[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cup[cbegin[d]:(cbegin[d+1]-1)] + eC_sup[d], alpha);
-    target += weight[d]*neg_binomial_2_log_lpmf(counts_down[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)] + eC_sup[d], alpha);
+    target += weight[d]*neg_binomial_2_log_lpmf(counts_close[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)], b*exp(a*log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)]));
+    target += weight[d]*neg_binomial_2_log_lpmf(counts_far[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)], b*exp(a*log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)]));
+    target += weight[d]*neg_binomial_2_log_lpmf(counts_up[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cup[cbegin[d]:(cbegin[d+1]-1)], b*exp(a*log_mean_cup[cbegin[d]:(cbegin[d+1]-1)]));
+    target += weight[d]*neg_binomial_2_log_lpmf(counts_down[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)], b*exp(a*log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)]));
   }
 }

@@ -3,7 +3,7 @@
 #include "cts_core.h"
 
 void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
-        double* lmu_nosig, double* weight, int nbins, double dispersion,
+        double* lmu_nosig, double* weight, int nbins, double disp_a, double disp_b,
         double* phi, double eCprime, double* phihat, double* phihat_var, double* ncounts,
         int* bin1, int* bin2)
 {
@@ -18,7 +18,7 @@ void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
     int pos = (b1-1)*(nbins+1) - (b1-1)*b1/2 + b2 - b1;
     double mu = exp( lmu_nosig[i] + phi[pos] + eCprime);
     double z = count[i]/mu-1;
-    double var = 1/mu + 1/dispersion;
+    double var = 1/mu + 1/(disp_b*pow(mu,disp_a));
     double w2v = weight[i]/(2*var);
     ncounts[pos] += weight[i];
     phihat_var[pos] += w2v;
