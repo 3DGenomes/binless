@@ -188,11 +188,11 @@ get_all_values = function(cs, param, trans) {
   #transform if necessary
   if (!is.na(trans)) {
     if (trans=="log") {
-      melted[,c("variable","value"):=list(paste("log",variable),log(value))]
+      melted[,c("variable","value"):=list(paste(variable,"(log)"),log(value))]
     } else if (trans=="log10") {
-      melted[,c("variable","value"):=list(paste("log10",variable),log10(value))]
+      melted[,c("variable","value"):=list(paste(variable,"(log10)"),log10(value))]
     } else if (trans=="exp") {
-      melted[,c("variable","value"):=list(paste("exp",variable),exp(value))]
+      melted[,c("variable","value"):=list(paste(variable,"(exp)"),exp(value))]
     } else {
       stop("unsupported transformation ",trans)
     }
