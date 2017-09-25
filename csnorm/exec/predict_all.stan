@@ -45,7 +45,7 @@ generated quantities {
     //design matrix
     {
       matrix[N,Kdiag] tmpXdiag;
-      tmpXdiag = bspline(dist, Kdiag, splinedegree(), dmin, dmax);
+      tmpXdiag = bspline(log(dist), Kdiag, splinedegree(), log(dmin), log(dmax));
       Xdiag = rep_matrix(0, N, Dsets*Kdiag);
       for (d in 1:Dsets) {
         Xdiag[cbegin[d]:(cbegin[d+1]-1),((d-1)*Kdiag+1):(d*Kdiag)] = tmpXdiag[cbegin[d]:(cbegin[d+1]-1),:];

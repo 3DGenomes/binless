@@ -39,7 +39,7 @@ csnorm_gauss_decay_muhat_data = function(cs, pseudocount=1e-2) {
                   zdecay[,.(name,dbin,category=NA,count=0,weight=nzero)])
   #compute z-scores and sum counts
   mcounts[,c("kappahat","var"):=list(log(count+pseudocount), 1/(count+pseudocount)+1/(cs@par$b*(count+pseudocount)^cs@par$a))]
-  csd = mcounts[,.(distance=(dbins[unclass(dbin)+1]*dbins[unclass(dbin)])/2.,
+  csd = mcounts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
                    kappahat=weighted.mean(kappahat, weight/var),
                    std=1/sqrt(sum(weight/var)), weight=sum(weight)), keyby=c("name", "dbin")]
   stopifnot(csd[,!is.na(distance)])
@@ -117,7 +117,7 @@ csnorm_gauss_decay_muhat_mean = function(cs) {
   cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   cts[,kappaij:=eC+log_decay]
   dbins=cs@settings$dbins
-  csd = cts[,.(distance=(dbins[unclass(dbin)+1]*dbins[unclass(dbin)])/2,
+  csd = cts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
                kappahat=weighted.mean(z+kappaij, weight/var),
                std=1/sqrt(sum(weight/(2*var))), weight=sum(weight)/2), keyby=c("name", "dbin")] #each count appears twice
   return(csd)
@@ -132,7 +132,7 @@ csnorm_generate_cubic_spline = function(cutsites, Krow, sparse=F) {
   t = min(cutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
   return(spline.des(cutsites, knots = t, outer.ok = T, sparse=sparse)$design)
 }
-
+  
 #' Optimize decay parameters
 #' @keywords internal
 #' 
@@ -160,7 +160,7 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     }
     SD = cbegin[2]-cbegin[1]
     cutsites = csd[,distance][cbegin[1]:(cbegin[2]-1)]
-    X = csnorm_generate_cubic_spline(cutsites, Kdiag, sparse=F)
+    X = csnorm_generate_cubic_spline(log(cutsites), Kdiag, sparse=F)
     W=csd[,weight][cbegin[1]:(cbegin[2]-1)]
     diags = list(rep(1,Kdiag), rep(-2,Kdiag))
     D = bandSparse(Kdiag-2, Kdiag, k=0:2, diagonals=c(diags, diags[1]))
@@ -175,7 +175,7 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     if (Dsets > 1) {
       for (d in 2:Dsets) {
         ncutsites = csd[,distance][cbegin[(2*d-1)]:(cbegin[2*d]-1)]
-        nBsp = csnorm_generate_cubic_spline(ncutsites, Kdiag, sparse=F)
+        nBsp = csnorm_generate_cubic_spline(log(ncutsites), Kdiag, sparse=F)
         cutsites = c(cutsites,ncutsites)
         X = rbind(X,nBsp)
         SDd = cbegin[2*d]-cbegin[(2*d-1)]
@@ -753,8 +753,8 @@ has_converged = function(cs, laststep=NULL) {
   conv.obj = all(delta<cs@settings$tol.obj)
   #parameter convergence
   getdiff=function(name,fn=identity){merge(params[step==laststep,.(leg,get(name))],
-                                           params[step==laststep-1,.(leg,get(name))],by="leg")[
-                                             leg==leg[.N],if(is.numeric(V2.y[[1]])){abs(fn(V2.x[[1]])-fn(V2.y[[1]]))}else{fn(V2.x[[1]])}]}
+                               params[step==laststep-1,.(leg,get(name))],by="leg")[
+                                 leg==leg[.N],if(is.numeric(V2.y[[1]])){abs(fn(V2.x[[1]])-fn(V2.y[[1]]))}else{fn(V2.x[[1]])}]}
   conv.eC = getdiff("eC")
   conv.a = getdiff("a")
   conv.b = getdiff("b",fn=log10)
@@ -784,11 +784,11 @@ get_nzeros = function(cs, sbins, ncores=1) {
              cut(pos2, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
              cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
   cts=rbind(cts[,.(name,pos1,bin1,bin2,dbin,variable)][
-    ,.(nnz=.N,dir="fwd"),keyby=c("name","pos1","bin1","bin2","dbin","variable")],
-    cts[,.(name,pos1=pos2,bin1=bin2,bin2=bin1,dbin,variable)][
-      ,.(nnz=.N,dir="rev"),keyby=c("name","pos1","bin1","bin2","dbin","variable")])
+              ,.(nnz=.N,dir="fwd"),keyby=c("name","pos1","bin1","bin2","dbin","variable")],
+            cts[,.(name,pos1=pos2,bin1=bin2,bin2=bin1,dbin,variable)][
+              ,.(nnz=.N,dir="rev"),keyby=c("name","pos1","bin1","bin2","dbin","variable")])
   cts[,cat:=ifelse(dir=="fwd",ifelse(variable %in% c("contact.up","contact.far"), "contact L", "contact R"),
-                   ifelse(variable %in% c("contact.up","contact.close"), "contact L", "contact R"))]
+                              ifelse(variable %in% c("contact.up","contact.close"), "contact L", "contact R"))]
   cts=cts[,.(nnz=sum(nnz)),keyby=c("name","pos1","bin1","bin2","dbin","cat","dir")]
   #Count the number of crossings per distance bin
   #looping over IDs avoids building NxN matrix
@@ -953,8 +953,8 @@ load_stripped = function(fname, ncores=1) {
 #' @param bf_per_kb positive numeric. Number of cubic spline basis functions per
 #'   kilobase, for genomic bias estimates. Small values make the optimization 
 #'   easy, but makes the genomic biases stiffer.
-#' @param bf_per_distance positive numeric. Number of cubic spline basis functions
-#'   per linear distance (in kb), for diagonal decay. Default parameter 
+#' @param bf_per_decade positive numeric. Number of cubic spline basis functions
+#'   per distance decade (in bases), for diagonal decay. Default parameter 
 #'   should suffice.
 #' @param bins_per_bf positive integer. Number of distance bins to split basis 
 #'   functions into. Must be sufficiently small so that the diagonal decay is 
@@ -978,7 +978,7 @@ load_stripped = function(fname, ncores=1) {
 #' 
 #' @examples
 #' 
-run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_distance=1, bins_per_bf=10, base.res=10000,
+run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
                      ngibbs = 20, iter=1000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
                      verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
                      tol.obj=1e-2, tol.leg=1e-4, ncores=1, signif.threshold=T) {
@@ -995,14 +995,13 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_distance=1, bins_per_bf
     cs@groups=list()
     #add settings
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
-                    list(bf_per_kb=bf_per_kb, bf_per_distance=bf_per_distance, bins_per_bf=bins_per_bf, base.res=base.res,
+                    list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
                          iter=iter, init_alpha=init_alpha, init.disp_b=init.dispersion, init.disp_a=0, tol.obj=tol.obj,
                          tol.leg=tol.leg, signif.threshold=signif.threshold))
-    cs@settings$Kdiag=round((cs@settings$dmax-cs@settings$dmin)/1000*cs@settings$bf_per_distance)
+    cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
-    cat("Kdiag=",cs@settings$Kdiag,"Krow=",cs@settings$Krow,"\n")
-    stepsz=1000/(cs@settings$bins_per_bf*cs@settings$bf_per_distance)
-    cs@settings$dbins=seq(cs@settings$dmin,cs@settings$dmax+stepsz,stepsz)
+    stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
+    cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
     #initial guess
     if (verbose==T) cat("No initial guess provided\n")
     cs@diagnostics=list()
