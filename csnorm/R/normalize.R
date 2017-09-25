@@ -81,12 +81,12 @@ optimize_stan_model = function(model, data, iter, verbose, init, ...) {
 #' @keywords internal
 #' @export
 #' 
-csnorm_fit_fixed = function(biases, counts, design, dmin, dmax, lambda, bf_per_kb=1, bf_per_decade=20, iter=10000,
+csnorm_fit_fixed = function(biases, counts, design, dmin, dmax, lambda, bf_per_kb=1, bf_per_distance=1, iter=10000,
                       verbose=T, weight=array(1,dim=design[,.N]), ...) {
   nBiases=design[,uniqueN(genomic)]
   Decays=design[,uniqueN(decay)]
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
-  Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
+  Kdiag=round((dmax-dmin)/1000*bf_per_distance)
   bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
   cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
   data = list( Dsets=design[,.N], Biases=nBiases, Decays=Decays,
@@ -112,10 +112,10 @@ csnorm_fit_fixed = function(biases, counts, design, dmin, dmax, lambda, bf_per_k
 #' Single-cpu fitting
 #' @keywords internal
 #' 
-csnorm_fit = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_decade=20, iter=10000,
+csnorm_fit = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_distance=1, iter=10000,
                       verbose=T, init=0, weight=array(1,dim=design[,.N]), ...) {
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
-  Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
+  Kdiag=round((dmax-dmin)/1000*bf_per_distance)
   bbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
   cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
   data = list( Dsets=design[,.N], Biases=design[,uniqueN(genomic)], Decays=design[,uniqueN(decay)],
@@ -153,7 +153,7 @@ csnorm_predict_all = function(cs, counts, verbose=T) {
   par=cs@par
   dmin=cs@settings$dmin
   dmax=cs@settings$dmax
-  Kdiag=round((log10(dmax)-log10(dmin))*cs@settings$bf_per_decade)
+  Kdiag=round((dmax-dmin)/1000*cs@settings$bf_per_distance)
   ncounts=counts[,.N]
   if (counts[,.N]==1) {
     cbegin=c(1,2)
@@ -193,7 +193,7 @@ csnorm_predict_all_parallel = function(cs, counts, verbose=T, ncores=1) {
 #' @keywords internal
 #' @export
 #' 
-run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subsampling.pc=100, init_alpha=1e-7) {
+run_serial = function(cs, init, bf_per_kb=1, bf_per_distance=1, iter=100000, subsampling.pc=100, init_alpha=1e-7) {
   #clean object if dirty
   cs@par=list() #in case we have a weird object
   cs@binned=list()
@@ -201,7 +201,7 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subs
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
   #add settings
-  cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter))
+  cs@settings = c(cs@settings, list(bf_per_kb=bf_per_kb, bf_per_distance=bf_per_distance, iter=iter))
   #fill counts matrix and sort data
   cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize, dmin=cs@settings$dmin)
   setkey(cs@biases,name,id,pos)
@@ -212,7 +212,7 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subs
   if (length(init)==1) {
     init.a=system.time(init.output <- capture.output(init.par <- csnorm_fit_fixed(
       counts=cs@counts, biases=cs@biases, design=cs@design, lambda=init[[1]],
-      bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade,
+      bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_distance=bf_per_distance,
       verbose=T, iter=iter, init_alpha=init_alpha)))
     init.op=list(par=init.par)
     #abort silently if initial guess went wrong
@@ -233,7 +233,7 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subs
   setkeyv(counts.sub,key(cs@counts))
   a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
     biases=cs@biases, counts = counts.sub, design=cs@design, dmin=dmin, dmax=dmax,
-    bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter, verbose = T,
+    bf_per_kb=bf_per_kb, bf_per_distance=bf_per_distance, iter=iter, verbose = T,
     init=init.op$par, weight=counts.sub[,.N,by=name]$N/cs@counts[,.N,by=name]$N, init_alpha=init_alpha)))
   cs@diagnostics=list(out=output, runtime=a[1]+a[4], op=op)
   #report statistics
@@ -258,12 +258,12 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subs
 #' @export
 #' 
 #' @examples
-run_exact = function(cs, bf_per_kb=1, bf_per_decade=20, lambdas=c(0.1,1,10), ncores=1, iter=100000,
+run_exact = function(cs, bf_per_kb=1, bf_per_distance=1, lambdas=c(0.1,1,10), ncores=1, iter=100000,
                      subsampling.pc=100, init_alpha=1e-7, prefix=NULL) {
   cs@binned=list() #erase old binned datasets if available
   registerDoParallel(cores=ncores)
   cs = foreach (lambda=lambdas, .combine=function(x,y){if (x@par$value<y@par$value){return(y)}else{return(x)}}) %dopar% {
-    cs =run_serial(cs, bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, init=lambda, iter=iter,
+    cs =run_serial(cs, bf_per_kb=bf_per_kb, bf_per_distance=bf_per_distance, init=lambda, iter=iter,
                subsampling.pc=subsampling.pc, init_alpha=init_alpha)
     if (!is.null(prefix)) save(cs, file=paste0(prefix,"_lambda",lambda,".RData"))
     cs
@@ -285,7 +285,7 @@ run_exact = function(cs, bf_per_kb=1, bf_per_decade=20, lambdas=c(0.1,1,10), nco
 check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10) {
   if (length(cs@par)==0) stop("Must normalize the datasets first")
   #build bins
-  dbins=c(0,10**seq(3,log10(cs@settings$dmax),length.out=decay.groups))
+  dbins=c(0,seq(3,cs@settings$dmax,length.out=decay.groups))
   gbins=cut2(c(cs@par$log_iota,cs@par$log_rho),g=genomic.groups,onlycuts=T)
   #build counts matrix 
   biases=copy(cs@biases[,.(name,id,pos)])
@@ -359,7 +359,7 @@ get_exact_logp = function(cs) {
   if (length(cs@par)==0) stop("Must normalize data first")
   cs@counts = fill_zeros(counts = cs@counts, biases = cs@biases, circularize=cs@settings$circularize, dmin=cs@settings$dmin)
   Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
-  Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
+  Kdiag=round((cs@settings$dmax-cs@settings$dmin)/1000*cs@settings$bf_per_distance)
   bbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
   cbegin=c(1,cs@counts[,.(name,row=.I)][name!=shift(name),row],cs@counts[,.N+1])
   data = list( Dsets=cs@design[,.N], Biases=cs@design[,uniqueN(genomic)], Decays=cs@design[,uniqueN(decay)],
