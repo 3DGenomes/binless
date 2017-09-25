@@ -77,7 +77,7 @@ void cts_to_signal_mat(const RawData<Signal>& raw, double eCprime, const Rcpp::N
     ncounts_i = wrap(ncounts);
     weight_i = 1/phihat_var_i;
     didx_i = bin2_i-bin1_i;
-    dgrp_i = floor(log10(bin2_i-bin1_i+1)*3);
+    dgrp_i = didx_i; //floor(log10(bin2_i-bin1_i+1)*3);
 
     binned.set_bin1(bin1_i);
     binned.set_bin2(bin2_i);
