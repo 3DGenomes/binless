@@ -298,7 +298,7 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
   #add other settings
   settings=list(outliers = get_outliers(cs, csg@cts, resolution),
                 nbins = csg@par$nbins,
-                dispersion = csg@par$dispersion,
+                dispersion = csg@par$alpha,
                 tol.val = tol.val,
                 nperf = 50,
                 GFLState = list(), #cold start

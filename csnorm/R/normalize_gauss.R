@@ -7,7 +7,7 @@ NULL
 fill_parameters_perf = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.genomic=T, fit.disp=T) {
   nBiases=cs@design[,uniqueN(genomic)]
   Decays=cs@design[,uniqueN(decay)]
-  init=list(a=0, b=dispersion)
+  init=list(alpha=dispersion)
   if (fit.decay==F) {
     Kdiag=cs@settings$Kdiag
     beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
@@ -38,7 +38,7 @@ csnorm_gauss_decay_muhat_data = function(cs, pseudocount=1e-2) {
   mcounts = rbind(mcounts[,.(name,dbin,category,count,weight=1)],
                   zdecay[,.(name,dbin,category=NA,count=0,weight=nzero)])
   #compute z-scores and sum counts
-  mcounts[,c("kappahat","var"):=list(log(count+pseudocount), 1/(count+pseudocount)+1/(cs@par$b*(count+pseudocount)^cs@par$a))]
+  mcounts[,c("kappahat","var"):=list(log(count+pseudocount), 1/(count+pseudocount)+1/cs@par$alpha)]
   csd = mcounts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
                    kappahat=weighted.mean(kappahat, weight/var),
                    std=1/sqrt(sum(weight/var)), weight=sum(weight)), keyby=c("name", "dbin")]
@@ -105,7 +105,7 @@ csnorm_gauss_common_muhat_mean = function(cs, zeros, sbins) {
     cts[,mu:=exp(lmu.nosig)]
   }
   ### finalize
-  cts[,c("z","var"):=list(count/mu-1,1/mu+1/(init$b*mu^init$a))]
+  cts[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
   #ggplot(cts[name=="T47D es 60 MboI 1"&cat=="contact R"])+geom_line(aes(dbin,log_decay,colour=count>0,group=count>0))
   return(cts)
 }
@@ -281,11 +281,11 @@ csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", update.eC=T) {
 #' @keywords internal
 #' 
 csnorm_gauss_genomic_muhat_data = function(cs, pseudocount=1e-2) {
+  dispersion=cs@par$alpha
   #biases
-  bts=rbind(cs@biases[,.(name,id,pos,cat="dangling L", etahat=log(dangling.L+pseudocount), std=1/(dangling.L+pseudocount))],
-            cs@biases[,.(name,id,pos,cat="dangling R", etahat=log(dangling.R+pseudocount), std=1/(dangling.R+pseudocount))],
-            cs@biases[,.(name,id,pos,cat="rejoined", etahat=log(rejoined+pseudocount), std=1/(rejoined+pseudocount))])
-  bts[,std:=sqrt(std+1/(cs@par$b*exp(cs@par$a*etahat)))]
+  bts=rbind(cs@biases[,.(name,id,pos,cat="dangling L", etahat=log(dangling.L+pseudocount), std=sqrt(1/(dangling.L+pseudocount)+1/dispersion))],
+            cs@biases[,.(name,id,pos,cat="dangling R", etahat=log(dangling.R+pseudocount), std=sqrt(1/(dangling.R+pseudocount)+1/dispersion))],
+            cs@biases[,.(name,id,pos,cat="rejoined", etahat=log(rejoined+pseudocount), std=sqrt(1/(rejoined+pseudocount)+1/dispersion))])
   setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
   #counts
@@ -299,7 +299,7 @@ csnorm_gauss_genomic_muhat_data = function(cs, pseudocount=1e-2) {
             cs@counts[contact.down>0, .(name,id=id2,pos=pos2, cat="contact R", count=contact.down, weight=1)],
             cs@counts[contact.up>0,   .(name,id=id2,pos=pos2, cat="contact L", count=contact.up, weight=1)],
             zbias[,.(name, id, pos, cat, count=0, weight=nzero)])
-  cts[,c("etahat","var"):=list(log(count+pseudocount),(1/(count+pseudocount)+1/(cs@par$b*exp(cs@par$a*log(count+pseudocount)))))]
+  cts[,c("etahat","var"):=list(log(count+pseudocount),(1/(count+pseudocount)+1/dispersion))]
   cts=cts[,.(etahat=weighted.mean(etahat,weight/var),std=sqrt(2/sum(weight/var)),weight=sum(weight)),
           keyby=c("id","pos","name","cat")]
   cts[,weight:=NULL] #not needed. Weights differ slightly because of dmin cutoff but it doesnt matter much
@@ -319,11 +319,11 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
   bsub=merge(cbind(cs@design[,.(name)],eRJ=init$eRJ,eDE=init$eDE), bsub, by="name",all.x=F,all.y=T)
   bsub[,c("lmu.DL","lmu.DR","lmu.RJ"):=list(eDE+log_iota,eDE+log_rho,eRJ+(log_iota+log_rho)/2)]
   bts=rbind(bsub[,.(name,id,pos,cat="dangling L", etahat=dangling.L/exp(lmu.DL)-1+lmu.DL,
-                    std=sqrt(1/exp(lmu.DL)+1/(cs@par$b*exp(cs@par$a*lmu.DL))))],
+                    std=sqrt(1/exp(lmu.DL)+1/init$alpha))],
             bsub[,.(name,id,pos,cat="dangling R", etahat=dangling.R/exp(lmu.DR)-1+lmu.DR,
-                    std=sqrt(1/exp(lmu.DR)+1/(cs@par$b*exp(cs@par$a*lmu.DR))))],
+                    std=sqrt(1/exp(lmu.DR)+1/init$alpha))],
             bsub[,.(name,id,pos,cat="rejoined", etahat=rejoined/exp(lmu.RJ)-1+lmu.RJ,
-                    std=sqrt(1/exp(lmu.RJ)+1/(cs@par$b*exp(cs@par$a*lmu.RJ))))])
+                    std=sqrt(1/exp(lmu.RJ)+1/init$alpha))])
   setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
   #counts
@@ -626,19 +626,19 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
                log_iota=cs@par$log_iota, log_rho=cs@par$log_rho,
                log_mean_cclose=counts[,log_mean_cclose], log_mean_cfar=counts[,log_mean_cfar],
                log_mean_cup=counts[,log_mean_cup], log_mean_cdown=counts[,log_mean_cdown])
-  init=list(a=cs@par$a, b=cs@par$b,
-            eC_sup=as.array(counts[,log(mean(contact.close/exp(log_mean_cclose))),by=name][,V1]),
+  init=list(eC_sup=as.array(counts[,log(mean(contact.close/exp(log_mean_cclose))),by=name][,V1]),
             eRJ=as.array(cs@biases[,.(name,frac=rejoined/exp((cs@par$log_iota+cs@par$log_rho)/2))][,log(mean(frac)),by=name][,V1]),
             eDE=as.array(cs@biases[,.(name,frac=(dangling.L/exp(cs@par$log_iota)+dangling.R/exp(cs@par$log_rho))/2)][
               ,log(mean(frac)),by=name][,V1]))
   init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],log_mean_cclose]))
+  init$alpha=max(0.001,1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu))
   init$mu=NULL
   out=capture.output(op<-optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, tol_param=cs@settings$tol.leg,
                                              data=data, iter=cs@settings$iter, tol_obj=cs@settings$tol.leg,
                                              verbose=verbose, init=init, init_alpha=cs@settings$init_alpha))
-  cs@par=modifyList(cs@par, op$par[c("eRJ","eDE","a","b")])
+  cs@par=modifyList(cs@par, op$par[c("eRJ","eDE","alpha")])
   #cs@par$eC=cs@par$eC+op$par$eC_sup
-  if (verbose==T) cat("  fit: dispersion a=",cs@par$a," b=",cs@par$b,"\n")
+  if (verbose==T) cat("  fit: dispersion",cs@par$alpha,"\n")
   #
   #compute log-posterior
   Krow=cs@settings$Krow
@@ -694,7 +694,7 @@ get_outliers = function(cs, cts, resolution) {
 csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.threshold=T) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
-  outliers = csnorm:::get_outliers(cs, cts, cs@settings$base.res)
+  outliers = get_outliers(cs, cts, cs@settings$base.res)
   #
   if (verbose==T) cat("  predict\n")
   #ggplot(mat[bin1==bin2])+geom_point(aes(bin1,phi,colour=bin1%in%cs@par$badbins))+facet_wrap(~name)
@@ -711,8 +711,8 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
   nbins=length(cs@settings$sbins)-1
   params = foreach(g=groupnames, .combine=rbind) %do% {
     csig=new("CSbsig", mat=cs@par$signal[name==g], cts=cts[name==g],
-             settings=list(outliers=outliers, nbins=nbins, dispersion=list(a=cs@par$a,b=cs@par$b),
-                           tol.val=cs@settings$tol.leg, nperf=50))
+             settings=list(outliers=outliers, nbins=nbins, dispersion=cs@par$alpha,
+                           tol.val=cs@settings$tol.leg, nperf=500, opt.every=10))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F)
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose,
                                 signif.threshold=signif.threshold, ncores=ncores)
@@ -756,17 +756,16 @@ has_converged = function(cs, laststep=NULL) {
                                params[step==laststep-1,.(leg,get(name))],by="leg")[
                                  leg==leg[.N],if(is.numeric(V2.y[[1]])){abs(fn(V2.x[[1]])-fn(V2.y[[1]]))}else{fn(V2.x[[1]])}]}
   conv.eC = getdiff("eC")
-  conv.a = getdiff("a")
-  conv.b = getdiff("b",fn=log10)
+  conv.alpha = getdiff("alpha")
   conv.ldiag = getdiff("lambda_diag",fn=log10)
   conv.liota = getdiff("lambda_iota",fn=log10)
   conv.lrho = getdiff("lambda_rho",fn=log10)
   if(!any(cs@par$signal$phi == 0)) {
     conv.l1 = getdiff("lambda1",fn=function(x){y=x;y[x>0]=log10(y[x>0]);y})
     conv.l2 = getdiff("lambda2",fn=log10)
-    conv.param = all(c(conv.eC,conv.a,conv.b,conv.ldiag,conv.liota,conv.lrho,conv.l1,conv.l2)<cs@settings$tol.obj)
+    conv.param = all(c(conv.eC,conv.alpha,conv.ldiag,conv.liota,conv.lrho,conv.l1,conv.l2)<cs@settings$tol.obj)
   } else {
-    conv.param = all(c(conv.eC,conv.a,conv.b,conv.ldiag,conv.liota,conv.lrho)<cs@settings$tol.obj)
+    conv.param = all(c(conv.eC,conv.alpha,conv.ldiag,conv.liota,conv.lrho)<cs@settings$tol.obj)
   }
   return(conv.obj | conv.param)
 }
@@ -889,8 +888,8 @@ plot_diagnostics = function(cs, start=1) {
   plot=ggplot(cs@diagnostics$params[step>=start,.(step,leg,value)])+
     geom_line(aes(step,value))+geom_point(aes(step,value))+facet_wrap(~leg, scales = "free")+
     theme(legend.position="bottom")
-  vars=foreach(var=c("eC","eRJ","eDE","a","b","lambda_iota","lambda_rho","lambda_diag", "lambda1", "lambda2", "eCprime"),
-               trans=(c(NA,NA,NA,NA,"log10","log10","log10","log10","log10","log10",NA)),.combine=rbind) %do% get_all_values(cs,var,trans)
+  vars=foreach(var=c("eC","eRJ","eDE","alpha","lambda_iota","lambda_rho","lambda_diag", "lambda1", "lambda2", "eCprime"),
+               trans=(c(NA,NA,NA,NA,"log10","log10","log10","log10","log10",NA)),.combine=rbind) %do% get_all_values(cs,var,trans)
   plot2=ggplot(vars[step>=start])+geom_line(aes(step,value))+
     geom_point(aes(step,value,colour=leg))+facet_wrap(~variable, scales = "free_y")
   return(list(plot=plot,plot2=plot2))
@@ -996,7 +995,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     #add settings
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
-                         iter=iter, init_alpha=init_alpha, init.disp_b=init.dispersion, init.disp_a=0, tol.obj=tol.obj,
+                         iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj,
                          tol.leg=tol.leg, signif.threshold=signif.threshold))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])

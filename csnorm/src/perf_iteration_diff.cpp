@@ -19,7 +19,7 @@ using namespace Rcpp;
 #include "graph_helpers.hpp" //get_patch_numbers
 
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
-                         List dispersion, int nouter, int nbins, List GFLState,
+                         double dispersion, int nouter, int nbins, List GFLState,
                          double lam2, double converge,
                          List outliers, NumericVector phi_ref_i, NumericVector beta_i) {
     //Classes that hold all the data. Other classes reference to it.
@@ -64,7 +64,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                         _["eCprime"]=0, _["lambda1"]=0);
 }
 
-List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, List dispersion,
+List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    int nouter, int nbins, List GFLState,
                    double lam2, double tol_val,
                    List outliers, NumericVector phi_ref_i,  NumericVector beta_i, double lambda1_min,

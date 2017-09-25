@@ -34,7 +34,7 @@ detect_binned_interactions = function(cs, resolution, group, threshold=0.95, nco
   prior.sd=10
   for (i in 1:niter) {
     cts[,c("z","var","signal.old"):=list(count/(signal*mu.nosig)-1,
-          1/(signal*mu.nosig)+1/(csg@par$dispersion$b*(signal*mu.nosig)^csg@par$dispersion$a),signal)]
+                                         (1/(signal*mu.nosig)+1/csg@par$alpha),signal)]
     cts[,phihat:=weighted.mean(z+log(signal), weight/var),by=c("name","bin1","bin2")]
     cts[,sigmasq:=1/sum(weight/var),by=c("name","bin1","bin2")]
     cts[,signal:=exp(phihat/(1+sigmasq/prior.sd^2))]
@@ -105,14 +105,13 @@ detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95,
       mat=mat[,.(name,bin1,bin2,phi.ref,delta,diffsig,diffsig.old)]
     }
     ctsref=mat[ctsref]
-    ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu.nosig)-1,
-              1/(exp(phi.ref)*mu.nosig)+1/(csg@par$dispersion$b*(exp(phi.ref)*mu.nosig)^csg@par$dispersion$a))]
+    ctsref[,c("z","var"):=list(count/(exp(phi.ref)*mu.nosig)-1,(1/(exp(phi.ref)*mu.nosig)+1/csg@par$alpha))]
     mat=mat[ctsref[,.(phihat.ref=weighted.mean(z+phi.ref, weight/var),
                       sigmasq.ref=1/sum(weight/var)),keyby=c("name","bin1","bin2")]]
     #
     cts=mat[cts]
     cts[,c("z","var"):=list(count/(exp(phi.ref+delta)*mu.nosig)-1,
-              1/(exp(phi.ref+delta)*mu.nosig)+1/(csg@par$dispersion$b*(exp(phi.ref+delta)*mu.nosig)^csg@par$dispersion$a))]
+                            (1/(exp(phi.ref+delta)*mu.nosig)+1/csg@par$alpha))]
     mat=mat[cts[,.(phihat=weighted.mean(z+phi.ref+delta, weight/var),
                    sigmasq=1/sum(weight/var)),by=c("name","bin1","bin2")]]
     mat[,deltahat:=phihat-phihat.ref]

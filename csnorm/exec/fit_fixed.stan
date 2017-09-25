@@ -138,8 +138,7 @@ parameters {
   vector[Krow-1] beta_rho[Biases];
   positive_ordered[Kdiag-1] beta_diag[Decays];
   //dispersion
-  real a;
-  real<lower=0> b;
+  real<lower=0> alpha;
 }
 transformed parameters {
   //iota
@@ -232,25 +231,25 @@ transformed parameters {
 model {
   //// likelihoods
   //biases
-  rejoined  ~ neg_binomial_2_log(log_mean_RJ, b*exp(a*log_mean_RJ));
-  danglingL ~ neg_binomial_2_log(log_mean_DL, b*exp(a*log_mean_DL));
-  danglingR ~ neg_binomial_2_log(log_mean_DR, b*exp(a*log_mean_DR));
+  rejoined  ~ neg_binomial_2_log(log_mean_RJ, alpha);
+  danglingL ~ neg_binomial_2_log(log_mean_DL, alpha);
+  danglingR ~ neg_binomial_2_log(log_mean_DR, alpha);
   
   //counts: Close, Far, Up, Down
   for (d in 1:Dsets) {
-    target += weight[d]*neg_binomial_2_log_lpmf(counts_close[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)], b*exp(a*log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)]));
-    target += weight[d]*neg_binomial_2_log_lpmf(counts_far[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)], b*exp(a*log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)]));
-    target += weight[d]*neg_binomial_2_log_lpmf(counts_up[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cup[cbegin[d]:(cbegin[d+1]-1)], b*exp(a*log_mean_cup[cbegin[d]:(cbegin[d+1]-1)]));
-    target += weight[d]*neg_binomial_2_log_lpmf(counts_down[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)], b*exp(a*log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)]));
+    target += weight[d]*neg_binomial_2_log_lpmf(counts_close[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cclose[cbegin[d]:(cbegin[d+1]-1)], alpha);
+    target += weight[d]*neg_binomial_2_log_lpmf(counts_far[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cfar[cbegin[d]:(cbegin[d+1]-1)], alpha);
+    target += weight[d]*neg_binomial_2_log_lpmf(counts_up[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cup[cbegin[d]:(cbegin[d+1]-1)], alpha);
+    target += weight[d]*neg_binomial_2_log_lpmf(counts_down[cbegin[d]:(cbegin[d+1]-1)] | log_mean_cdown[cbegin[d]:(cbegin[d+1]-1)], alpha);
   }
   
   //// Priors
   //P-spline prior on the differences (K-2 params)
   //warning on jacobian can be ignored
   //see GAM, Wood (2006), section 4.8.2 (p.187)
-  for (d in 1:Biases) {
-    beta_iota_diff[XBDset[d]] ~ normal(0, 1/(lgfac*lambda_iota[d]));
-    beta_rho_diff[XBDset[d]] ~ normal(0, 1/(lgfac*lambda_rho[d]));
+  for (b in 1:Biases) {
+    beta_iota_diff[XBDset[b]] ~ normal(0, 1/(lgfac*lambda_iota[b]));
+    beta_rho_diff[XBDset[b]] ~ normal(0, 1/(lgfac*lambda_rho[b]));
   }
   for (d in 1:Decays)
     beta_diag_diff[XDDset[d]] ~ normal(0, 1/(ldfac*lambda_diag[d]));

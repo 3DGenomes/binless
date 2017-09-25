@@ -364,14 +364,13 @@ dset_statistics = function(biases,counts){
 #' @param num_rsites Number of restriction sites
 #' @param genome_size Size of the genome
 #' @param eC,eRJ,eDE Exposure for counts, rejoined and dangling ends
-#' @param a dispersion parameter
-#' @param b dispersion parameter
+#' @param alpha Dispersion
 #'
 #' @return a list of biases and counts, similar to \code{\link{prepare_for_sparse_cs_norm}}
 #' @export
 #'
 #' @examples
-generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1000000, eC=-4.4, eRJ=3, eDE=1, a=1, b=5,
+generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1000000, eC=-4.4, eRJ=3, eDE=1, alpha=2,
                                  condition="WT", replicate="1", enzyme="NA",
                                  name = paste("Fake", condition, enzyme, replicate), dmin=1000, signal=F) {
   if (is.null(biases.ref)) {
@@ -394,9 +393,9 @@ generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1
   biases[,true_log_mean_DL:=eDE+true_log_iota]
   biases[,true_log_mean_DR:=eDE+true_log_rho]
   #draw dangling/rejoined
-  biases[,dangling.L:=rnbinom(.N, mu=exp(true_log_mean_DL), size=b*exp(a*true_log_mean_DL))]
-  biases[,dangling.R:=rnbinom(.N, mu=exp(true_log_mean_DR), size=b*exp(a*true_log_mean_DR))]
-  biases[,rejoined:=rnbinom(.N, mu=exp(true_log_mean_RJ), size=b*exp(a*true_log_mean_RJ))]
+  biases[,dangling.L:=rnbinom(.N, mu=exp(true_log_mean_DL), size=alpha)]
+  biases[,dangling.R:=rnbinom(.N, mu=exp(true_log_mean_DR), size=alpha)]
+  biases[,rejoined:=rnbinom(.N, mu=exp(true_log_mean_RJ), size=alpha)]
   #report rsites in counts
   counts=CJ(id1=biases[,id],id2=biases[,id])[id2>id1]
   counts=merge(counts, biases[,.(id1=id,pos,true_log_iota,true_log_rho)], by="id1")
@@ -426,10 +425,10 @@ generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1
   counts[,true_log_mean_cup:=base_count+true_phi+true_log_iota1+true_log_iota2]
   counts[,true_log_mean_cdown:=base_count+true_phi+true_log_rho1+true_log_rho2]
   #draw counts
-  counts[,contact.close:=rnbinom(.N, mu=exp(true_log_mean_cclose), size=b*exp(a*true_log_mean_cclose))]
-  counts[,contact.far:=rnbinom(.N, mu=exp(true_log_mean_cfar), size=b*exp(a*true_log_mean_cfar))]
-  counts[,contact.up:=rnbinom(.N, mu=exp(true_log_mean_cup), size=b*exp(a*true_log_mean_cup))]
-  counts[,contact.down:=rnbinom(.N, mu=exp(true_log_mean_cdown), size=b*exp(a*true_log_mean_cdown))]
+  counts[,contact.close:=rnbinom(.N, mu=exp(true_log_mean_cclose), size=alpha)]
+  counts[,contact.far:=rnbinom(.N, mu=exp(true_log_mean_cfar), size=alpha)]
+  counts[,contact.up:=rnbinom(.N, mu=exp(true_log_mean_cup), size=alpha)]
+  counts[,contact.down:=rnbinom(.N, mu=exp(true_log_mean_cdown), size=alpha)]
   #
   #counts[,bin1:=round(pos1/10000)]
   #counts[,bin2:=round(pos2/10000)]

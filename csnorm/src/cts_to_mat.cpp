@@ -35,7 +35,7 @@ void cts_to_signal_mat(const RawData<Signal>& raw, double eCprime, const Rcpp::N
     //extract data from holder
     const DataFrame& cts = raw.get_cts();
     int nbins = raw.get_nbins();
-    Rcpp::List dispersion = raw.get_dispersion();
+    double dispersion = raw.get_dispersion();
     const std::vector<double> phi = Rcpp::as<std::vector<double> >(beta_phi);
     const List& outliers = raw.get_outliers();
 
@@ -58,7 +58,7 @@ void cts_to_signal_mat(const RawData<Signal>& raw, double eCprime, const Rcpp::N
     //build mat from cts
     double* pphi = const_cast<double*>(&phi[0]);
     cts_to_signal_mat_core(N, &cts_bin1[0], &cts_bin2[0], &count[0], &lmu_nosig[0],
-                           &weight[0], nbins, dispersion["a"], dispersion["b"],
+                           &weight[0], nbins, dispersion,
                            pphi, eCprime, &phihat[0], &phihat_var[0], &ncounts[0], &bin1[0], &bin2[0]);
     //remove outliers
     remove_outliers(bin1, bin2, phihat_var, outliers);

@@ -95,8 +95,7 @@ get_nzeros_binning = function(cs, resolution, ncores=1) {
 #' fast IRLS and zero counts approximation
 #'
 #' @param cts
-#' @param a dispersion parameter
-#' @param b dispersion parameter
+#' @param dispersion
 #' @param ncores integer. Number of cores for zero binning
 #' @param niter integer. Maximum number of IRLS iterations
 #' @param tol numeric. Convergence tolerance for IRLS objective
@@ -107,7 +106,7 @@ get_nzeros_binning = function(cs, resolution, ncores=1) {
 #' @export
 #'
 #' @examples
-csnorm_predict_binned_matrices_irls = function(cts, a, b, ncores=1, niter=100, tol=1e-3, verbose=T) {
+csnorm_predict_binned_matrices_irls = function(cts, dispersion, ncores=1, niter=100, tol=1e-3, verbose=T) {
   #matrices
   if (verbose==T) cat("   Other matrices\n")
   cts[,c("decay","biases"):=list(exp(log_decay),exp(log_bias))]
@@ -116,36 +115,36 @@ csnorm_predict_binned_matrices_irls = function(cts, a, b, ncores=1, niter=100, t
              biasmat=sum(biases*weight)/sum(weight),
              decaymat=sum(decay*weight)/sum(weight),
              expected=sum(mu*weight),
-             expected.sd=sqrt(sum((mu+1/(b*mu^(a-2)))*weight)),
+             expected.sd=sqrt(sum((mu+mu^2/dispersion)*weight)),
              residual=sum(count*weight)/sum(mu*weight),
-             lpdf0=sum(dnbinom(count, mu=mu, size=b*mu^a, log=T)*weight))
+             lpdf0=sum(dnbinom(count,mu=mu, size=dispersion, log=T)*weight))
           ,keyby=c("name","bin1","bin2")]
   #signal matrix
   if (verbose==T) cat("   Signal matrix\n")
   cts[,c("signal","mu.nosig"):=list(1,exp(lmu.nosig))]
   for (i in 1:niter) {
-    cts[,c("z","var","signal.old"):=list(count/(signal*mu.nosig)-1,1/(signal*mu.nosig)+1/(b*(signal*mu.nosig)^a),signal)]
+    cts[,c("z","var","signal.old"):=list(count/(signal*mu.nosig)-1,(1/(signal*mu.nosig)+1/dispersion),signal)]
     cts[,signal:=exp(weighted.mean(z+log(signal), weight/var)),by=c("name","bin1","bin2")]
     cts[,signal.sd:=signal[1]*sqrt(1/sum(weight/var)),by=c("name","bin1","bin2")]
     if(cts[,all(abs(signal-signal.old)<tol)]) break
   }
   if (i==niter) cat("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
   mats = cts[,.(signal=signal[1],signal.sd=signal.sd[1],
-                lpdfs=sum(dnbinom(count,mu=mu.nosig*signal, size=b*(mu.nosig*signal)^a, log=T)*weight))
+                lpdfs=sum(dnbinom(count,mu=mu.nosig*signal, size=dispersion, log=T)*weight))
              ,keyby=c("name","bin1","bin2")]
   #normalized matrix
   if (verbose==T) cat("   'Normalized' matrix\n")
   cts[,normalized:=decay]
   for (i in 1:niter) {
     cts[,c("z","var","normalized.old"):=list(count/(normalized*mu.nosig/decay)-1,
-                                             1/(normalized*mu.nosig/decay)+1/(b*(normalized*mu.nosig/decay)^a),normalized)]
+                                             (1/(normalized*mu.nosig/decay)+1/dispersion),normalized)]
     cts[,normalized:=exp(weighted.mean(z+log(normalized), weight/var)),by=c("name","bin1","bin2")]
     cts[,normalized.sd:=normalized[1]*sqrt(1/sum(weight/var)),by=c("name","bin1","bin2")]
     if(cts[,all(abs(normalized-normalized.old)<tol)]) break
   }
   if (i==niter) cat("Warning: Maximum number of IRLS iterations reached for normalized estimation!\n")
   matr = cts[,.(normalized=normalized[1],normalized.sd=normalized.sd[1],
-                lpdfr=sum(dnbinom(count,mu=mu.nosig*normalized/decay, size=b*(mu.nosig*normalized/decay)^a, log=T)*weight))
+                lpdfr=sum(dnbinom(count,mu=mu.nosig*normalized/decay, size=dispersion, log=T)*weight))
              ,keyby=c("name","bin1","bin2")]
   mat=mat[mats[matr]]
   mat[observed==0,c("signal","normalized","signal.sd","normalized.sd"):=list(0,0,NA,NA)]
@@ -204,7 +203,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   setkeyv(cts,c("name","bin1","bin2"))
   #
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
-  mat = csnorm_predict_binned_matrices_irls(copy(cts), cs@par$a, cs@par$b, ncores=ncores, niter=niter, tol=tol, verbose=verbose)
+  mat = csnorm_predict_binned_matrices_irls(copy(cts), cs@par$alpha, ncores=ncores, niter=niter, tol=tol, verbose=verbose)
   setkey(mat,name,bin1,bin2)
   #
   if (verbose==T) cat("*** write begin/end positions\n")
@@ -222,7 +221,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   mat[,end2:=as.integer(as.character(bin2.end))]
   ### store matrices
   csg=new("CSgroup", mat=mat, interactions=list(), resolution=resolution, group=group,
-          cts=cts, par=list(dispersion=list(a=cs@par$a, b=cs@par$b), dmin=cs@settings$dmin, nbins=length(sbins)-1, sbins=sbins),
+          cts=cts, par=list(alpha=cs@par$alpha, dmin=cs@settings$dmin, nbins=length(sbins)-1, sbins=sbins),
           names=groups)
   cs@groups=append(cs@groups,list(csg))
   return(cs)
