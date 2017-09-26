@@ -44,7 +44,7 @@ gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
 
 #' compute BIC for a given value of lambda2, optimizing lambda1 and eCprime (performance iteration, persistent state)
 #' @keywords internal
-gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, positive=T, fixed=F) {
+gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F) {
   #state = perf.c[c("phi.ref","beta")]
   #submat = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta)]
   #
@@ -60,12 +60,12 @@ gfl_BIC = function(csig, lambda2, lambda1.min=0, refine.num=50, constrained=T, p
   if (is.null(ctsg.ref)) {
     perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2,
                                       tol.val, outliers,
-                                      state$beta, lambda1.min, refine.num, constrained, fixed)
+                                      state$beta, constrained, fixed)
   } else {
     stopifnot(constrained==T) #for now
     perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2,
                                       tol.val, outliers,
-                                      state$phi.ref, state$beta, lambda1.min, refine.num, constrained)
+                                      state$phi.ref, state$beta, constrained)
   }
   return(perf.c)
 }

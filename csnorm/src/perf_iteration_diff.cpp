@@ -67,8 +67,7 @@ List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
 List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    int nouter, int nbins, List GFLState,
                    double lam2, double tol_val,
-                   List outliers, NumericVector phi_ref_i,  NumericVector beta_i, double lambda1_min,
-                   int refine_num, bool constrained) {
+                   List outliers, NumericVector phi_ref_i,  NumericVector beta_i, bool constrained) {
     
     //Classes that hold all the data. Other classes reference to it.
     RawData<Difference> raw(nbins, dispersion, cts, ref, outliers);

@@ -60,7 +60,7 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
 
 List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins, List GFLState,
                      double lam2,  double tol_val,
-                     List outliers, NumericVector beta_i, double lambda1_min, int refine_num,
+                     List outliers, NumericVector beta_i,
                      bool constrained, bool fixed) {
     Timer timer("wgfl_signal_BIC");
     timer.start_timer("1. lambda2");
