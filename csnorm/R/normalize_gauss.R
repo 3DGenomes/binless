@@ -711,8 +711,9 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
   nbins=length(cs@settings$sbins)-1
   params = foreach(g=groupnames, .combine=rbind) %do% {
     csig=new("CSbsig", mat=cs@par$signal[name==g], cts=cts[name==g],
-             settings=list(outliers=outliers, nbins=nbins, dispersion=cs@par$alpha,
-                           tol.val=cs@settings$tol.leg, nperf=500, opt.every=10))
+             settings=list(outliers=outliers,
+                           nbins=nbins, dispersion=cs@par$alpha,
+                           tol.val=cs@settings$tol.leg, nperf=50))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F)
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose,
                                 signif.threshold=signif.threshold, ncores=ncores)

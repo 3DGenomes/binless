@@ -210,9 +210,9 @@ optimize_lambda2_simplified = function(csig, n.SD=1, constrained=T, positive=T, 
 gfl_compute_initial_state = function(csig, diff=F) {
   matg = csig@mat
   if (diff==F) {
-    state = list(beta=matg[,phi], lambda1=0.05, eCprime=0)
+    state = list(beta=matg[,phi], lambda1=0.05, eCprime=0, GFLState = list())
   } else {
-    state = list(phi.ref=matg[,phi.ref], beta=matg[,delta])
+    state = list(phi.ref=matg[,phi.ref], beta=matg[,delta, GFLState = list()])
   }
   return(state)
 }
@@ -301,8 +301,6 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
                 dispersion = csg@par$alpha,
                 tol.val = tol.val,
                 nperf = 50,
-                GFLState = list(), #cold start
-                diag.rm = diag.rm,
                 min.patchsize = 4,
                 min.l10FC = 0.5)
   cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
