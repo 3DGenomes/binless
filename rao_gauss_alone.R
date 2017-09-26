@@ -28,17 +28,24 @@ if (restart==F) {
                  ngibbs = 20, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
                  ncounts = 1000000, ncores=ncores, base.res=base.res, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T)
 } else {
-  load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_grpall.RData"))
+  load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_grpsmart2.RData"))
   cs = run_gauss(cs, restart=T, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
                  ngibbs = 10, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
                  ncounts = 1000000, ncores=ncores, base.res=base.res, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T)
 }
-save(cs,file=paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_grpall.RData"))
+save(cs,file=paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_grpsmart2.RData"))
+
+for (resolution in c(2500,5000,10000)) {
+  cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
+  cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
+  save(cs,file=paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_grpsmart2.RData"))
+}
 
 if (F) {
   
   base.res=2500
   #load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,".RData"))
+  load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_grpsmart.RData"))
   load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_grpall.RData"))
   load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_newdisp.RData"))
   load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_newdisp_grpall.RData"))
