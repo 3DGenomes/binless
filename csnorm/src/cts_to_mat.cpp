@@ -37,7 +37,7 @@ void cts_to_signal_mat(const RawData<Signal>& raw, double eCprime, const Rcpp::N
     int nbins = raw.get_nbins();
     double dispersion = raw.get_dispersion();
     const std::vector<double> phi = Rcpp::as<std::vector<double> >(beta_phi);
-    const List& outliers = raw.get_outliers();
+    const List& metadata = raw.get_metadata();
 
     //inputs
     int N = cts.nrows();
@@ -61,10 +61,10 @@ void cts_to_signal_mat(const RawData<Signal>& raw, double eCprime, const Rcpp::N
                            &weight[0], nbins, dispersion,
                            pphi, eCprime, &phihat[0], &phihat_var[0], &ncounts[0], &bin1[0], &bin2[0]);
     //remove outliers
-    remove_outliers(bin1, bin2, phihat_var, outliers);
+    remove_outliers(bin1, bin2, phihat_var, metadata);
                            
     //report back
-    IntegerVector bin1_i, bin2_i, didx_i, dgrp_i;
+    IntegerVector bin1_i, bin2_i, didx_i;
     NumericVector phihat_i, phihat_var_i, ncounts_i, weight_i;
     bin1_i = wrap(bin1);
     bin2_i = wrap(bin2);
@@ -77,7 +77,11 @@ void cts_to_signal_mat(const RawData<Signal>& raw, double eCprime, const Rcpp::N
     ncounts_i = wrap(ncounts);
     weight_i = 1/phihat_var_i;
     didx_i = bin2_i-bin1_i;
-    dgrp_i = didx_i; //floor(log10(bin2_i-bin1_i+1)*3);
+    IntegerVector diag_grps = metadata["diag.grp"];
+    IntegerVector dgrp_i(didx_i.size());
+    for (unsigned i=0; i<didx_i.size(); ++i) {
+        dgrp_i(i) = diag_grps(didx_i(i));
+    }
 
     binned.set_bin1(bin1_i);
     binned.set_bin2(bin2_i);
@@ -94,12 +98,12 @@ void cts_to_diff_mat(const RawData<Difference>& raw, const Rcpp::NumericVector& 
     //assume eCprime = 0 for difference step
     const double eCprime=0;
     //compute ref matrix
-    RawData<Signal> sraw_ref(raw.get_nbins(), raw.get_dispersion(), raw.get_ref(), raw.get_outliers());
+    RawData<Signal> sraw_ref(raw.get_nbins(), raw.get_dispersion(), raw.get_ref(), raw.get_metadata());
     BinnedData<Signal> sbinned_ref;
     cts_to_signal_mat(sraw_ref, eCprime, phi_ref, sbinned_ref);
     //compute other matrix
     Rcpp::NumericVector phi_oth = phi_ref+beta_delta; //unthresholded
-    RawData<Signal> sraw_oth(raw.get_nbins(), raw.get_dispersion(), raw.get_cts(), raw.get_outliers());
+    RawData<Signal> sraw_oth(raw.get_nbins(), raw.get_dispersion(), raw.get_cts(), raw.get_metadata());
     BinnedData<Signal> sbinned_oth;
     cts_to_signal_mat(sraw_oth, eCprime, phi_oth, sbinned_oth);
     //report

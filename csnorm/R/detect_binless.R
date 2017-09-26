@@ -7,17 +7,17 @@ gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
   ctsg=csig@cts
   nbins=csig@settings$nbins
   dispersion=csig@settings$dispersion
-  outliers=csig@settings$outliers
+  metadata=csig@settings$metadata
   tol.val=csig@settings$tol.val
   state=csig@state
   stopifnot(length(state)>0) #warm start only
   if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
   nperf=csig@settings$nperf
   if (is.null(ctsg.ref)) {
-    perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2, tol.val/20, outliers, state$beta)
+    perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2, tol.val/20, metadata, state$beta)
   } else {
     stopifnot(eCprime==0)
-    perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2, tol.val/20, outliers,
+    perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2, tol.val/20, metadata,
                                             state$phi.ref, state$beta)
   }
   return(perf.c)
@@ -51,7 +51,7 @@ gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F) {
   ctsg=csig@cts
   nbins=csig@settings$nbins
   dispersion=csig@settings$dispersion
-  outliers=csig@settings$outliers
+  metadata=csig@settings$metadata
   tol.val=csig@settings$tol.val
   state=csig@state
   stopifnot(length(state)>0) #warm start only
@@ -59,12 +59,12 @@ gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F) {
   nperf=csig@settings$nperf
   if (is.null(ctsg.ref)) {
     perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2,
-                                      tol.val, outliers,
+                                      tol.val, metadata,
                                       state$beta, constrained, fixed)
   } else {
     stopifnot(constrained==T) #for now
     perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2,
-                                      tol.val, outliers,
+                                      tol.val, metadata,
                                       state$phi.ref, state$beta, constrained)
   }
   return(perf.c)
@@ -296,7 +296,7 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
   stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
   diag.rm = ceiling(cs@settings$dmin/resolution)
   #add other settings
-  settings=list(outliers = get_outliers(cs, csg@cts, resolution),
+  settings=list(metadata = get_signal_metadata(cs, csg@cts, resolution),
                 nbins = csg@par$nbins,
                 dispersion = csg@par$alpha,
                 tol.val = tol.val,

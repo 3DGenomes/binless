@@ -7,11 +7,11 @@ using namespace Rcpp;
 
 List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins, List GFLState,
                            double lam2, double converge,
-                           const List outliers, NumericVector phi_i);
+                           const List metadata, NumericVector phi_i);
 
 List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins, List GFLState,
                      double lam2, double tol_val,
-                     List outliers, NumericVector beta_i, bool constrained, bool fixed);
+                     List metadata, NumericVector beta_i, bool constrained, bool fixed);
 
 
 #endif

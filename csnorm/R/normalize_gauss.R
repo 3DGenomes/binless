@@ -663,10 +663,12 @@ csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
   return(cts)
 }
 
-#get outliers, which should be discarded for signal detection
+#get metadata for signal calculation
+#consists of outliers, which should be discarded for signal detection,
+#and information relative to constraining the signal wrt the decay
 #' @keywords internal
 #' 
-get_outliers = function(cs, cts, resolution) {
+get_signal_metadata = function(cs, cts, resolution) {
   #biases
   bad.biases=rbind(cts[,.(bin1,bin2,weight,var,z)],cts[,.(bin1=bin2,bin2=bin1,weight,var,z)])[
     ,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=bin1]
@@ -685,7 +687,12 @@ get_outliers = function(cs, cts, resolution) {
   #ggplot(bad.decays)+geom_point(aes(diag.idx,z,colour=is.out))
   bad.diagonals=bad.decays[is.out==T,diag.idx]
   if (bad.decays[,sum(is.out)/.N>0.1]) cat(" Warning: removing ",bad.decays[,100*sum(is.out)/.N],"% of all counter diagonals!\n")
-  return(list(bad.diagonals=bad.diagonals,bad.rows=bad.rows))
+  #orthogonality
+  dx = 1.01*(log10(cs@settings$dmax)-log10(cs@settings$dmin))/(cs@settings$Kdiag-3)
+  orth=data.table(diag.idx=0:cts[,max(diag.idx)],
+                  segment=ceiling((log10(0:cts[,max(diag.idx)]*resolution)-log10(cs@settings$dmin))/dx))
+  orth[,rank:=frank(segment,ties.method = "dense")-1]
+  return(list(bad.diagonals=bad.diagonals,bad.rows=bad.rows, diag.grp=orth[,rank]))
 }
 
 #' fit signal using sparse fused lasso
@@ -694,7 +701,7 @@ get_outliers = function(cs, cts, resolution) {
 csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.threshold=T) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
-  outliers = get_outliers(cs, cts, cs@settings$base.res)
+  metadata = csnorm:::get_signal_metadata(cs, cts, cs@settings$base.res)
   #
   if (verbose==T) cat("  predict\n")
   #ggplot(mat[bin1==bin2])+geom_point(aes(bin1,phi,colour=bin1%in%cs@par$badbins))+facet_wrap(~name)
@@ -711,7 +718,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
   nbins=length(cs@settings$sbins)-1
   params = foreach(g=groupnames, .combine=rbind) %do% {
     csig=new("CSbsig", mat=cs@par$signal[name==g], cts=cts[name==g],
-             settings=list(outliers=outliers,
+             settings=list(metadata=metadata,
                            nbins=nbins, dispersion=cs@par$alpha,
                            tol.val=cs@settings$tol.leg, nperf=50))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F)

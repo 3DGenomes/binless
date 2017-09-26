@@ -22,9 +22,9 @@ using namespace Rcpp;
 
 List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins, List GFLState,
                            double lam2, double converge,
-                           const List outliers, NumericVector beta_i) {
+                           const List metadata, NumericVector beta_i) {
     //Class that holds all the data. Other classes reference to it.
-    RawData<Signal> raw(nbins, dispersion, cts, outliers);
+    RawData<Signal> raw(nbins, dispersion, cts, metadata);
     BinnedData<Signal> binned; //stored here, but will be populated by WeightsUpdater
     //setup computation of fused lasso solution
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
@@ -60,12 +60,12 @@ List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, i
 
 List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins, List GFLState,
                      double lam2,  double tol_val,
-                     List outliers, NumericVector beta_i,
+                     List metadata, NumericVector beta_i,
                      bool constrained, bool fixed) {
     Timer timer("wgfl_signal_BIC");
     timer.start_timer("1. lambda2");
     //Class that holds all the data. Other classes reference to it.
-    RawData<Signal> raw(nbins, dispersion, cts, outliers);
+    RawData<Signal> raw(nbins, dispersion, cts, metadata);
     BinnedData<Signal> binned; //stored here, but will be populated by WeightsUpdater
     //setup computation of fused lasso solution
     bool converged = true;

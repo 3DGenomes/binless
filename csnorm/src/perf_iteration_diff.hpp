@@ -8,12 +8,12 @@ using namespace Rcpp;
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
                          double dispersion, int nouter, int nbins, List GFLState,
                          double lam2, double converge,
-                         List outliers, NumericVector phi_ref_i, NumericVector beta_i);
+                         List metadata, NumericVector phi_ref_i, NumericVector beta_i);
 
 List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    int nouter, int nbins, List GFLState,
                    double lam2,  double tol_val,
-                   List outliers, NumericVector phi_ref_i, NumericVector beta_i, bool constrained);
+                   List metadata, NumericVector phi_ref_i, NumericVector beta_i, bool constrained);
 
 #endif
 
