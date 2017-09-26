@@ -59,13 +59,10 @@ gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F) {
   nperf=csig@settings$nperf
   if (is.null(ctsg.ref)) {
     perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2,
-                                      tol.val, metadata,
-                                      state$beta, constrained, fixed)
+                                      tol.val, metadata, state$beta, constrained, fixed)
   } else {
-    stopifnot(constrained==T) #for now
     perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2,
-                                      tol.val, metadata,
-                                      state$phi.ref, state$beta, constrained)
+                                      tol.val, metadata, state$phi.ref, state$beta, constrained)
   }
   return(perf.c)
 }
@@ -212,7 +209,7 @@ gfl_compute_initial_state = function(csig, diff=F) {
   if (diff==F) {
     state = list(beta=matg[,phi], lambda1=0.05, eCprime=0, GFLState = list())
   } else {
-    state = list(phi.ref=matg[,phi.ref], beta=matg[,delta, GFLState = list()])
+    state = list(phi.ref=matg[,phi.ref], beta=matg[,delta], GFLState = list())
   }
   return(state)
 }
@@ -358,7 +355,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F)
-    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=T, verbose=verbose,
+    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=F, verbose=verbose,
                                 signif.threshold=signif.threshold, ncores=ncores)
   }
   #display param info
@@ -424,7 +421,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=T)
-    csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=T, verbose=verbose,
+    csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=F, verbose=verbose,
                                 signif.threshold=signif.threshold, ncores=ncores)
   }
   #display param info

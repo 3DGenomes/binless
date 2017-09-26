@@ -105,12 +105,15 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     binned.set_patchno(patchno);
     
     //optimize lambda1 assuming eCprime=0
-    if (!constrained) stop("expected constrained==T when fixed==T");
     NumericVector opt;
     {
-        auto est = make_SparsityEstimator<CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
-        opt = est.optimize();
-        
+        if (constrained) {
+          auto est = make_SparsityEstimator<CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
+          opt = est.optimize();
+        } else {
+          auto est = make_SparsityEstimator<CVkSD<1>, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
+          opt = est.optimize();
+        }
     }
     double lam1 = opt["lambda1"];
     
