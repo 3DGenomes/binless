@@ -130,7 +130,7 @@ csnorm_generate_cubic_spline = function(cutsites, Krow, sparse=F) {
   splinedegree=3 #Cubic spline
   dx = 1.01*(max(cutsites)-min(cutsites))/(Krow-splinedegree)
   t = min(cutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
-  return(spline.des(cutsites, knots = t, outer.ok = T, sparse=sparse)$design)
+  return(splineDesign(cutsites, knots = t, ord = splinedegree + 1, outer.ok = F, sparse=sparse))
 }
   
 #' Optimize decay parameters
