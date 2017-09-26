@@ -690,7 +690,7 @@ get_signal_metadata = function(cs, cts, resolution) {
   #orthogonality
   dx = 1.01*(log10(cs@settings$dmax)-log10(cs@settings$dmin))/(cs@settings$Kdiag-3)
   orth=data.table(diag.idx=0:cts[,max(diag.idx)],
-                  segment=ceiling((log10(0:cts[,max(diag.idx)]*resolution)-log10(cs@settings$dmin))/dx))
+                  segment=ceiling((log10(0:cts[,max(diag.idx)]*resolution)-log10(cs@settings$dmin))/(dx/2))) #double constraint
   orth[,rank:=frank(segment,ties.method = "dense")-1]
   return(list(bad.diagonals=bad.diagonals,bad.rows=bad.rows, diag.grp=orth[,rank]))
 }
