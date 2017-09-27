@@ -592,26 +592,54 @@ csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", update.exposure
   return(cs)
 }
 
+#' Compute means for a given counts matrix
+#' @keywords internal
+csnorm_compute_means = function(cs, counts) {
+  #compute background
+  init=cs@par
+  cpos=copy(counts)
+  bsub=cs@biases[,.(id)]
+  bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
+  cpos=merge(bsub[,.(id1=id,log_iota,log_rho)],cpos,by="id1",all.x=F,all.y=T)
+  cpos=merge(bsub[,.(id2=id,log_iota,log_rho)],cpos,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
+  cpos=merge(cbind(cs@design[,.(name)],eC=init$eC), cpos, by="name",all.x=F,all.y=T)
+  cpos[,c("bin1","bin2","dbin"):=
+         list(cut(pos1, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+              cut(pos2, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+              cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
+  cpos=merge(cpos,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
+  #compute signal
+  if (cs@par$signal[,.N]>0 && length(cs@settings$sbins)>2) {
+    signal = csnorm:::get_signal_matrix(cs, resolution = cs@settings$base.res, groups=cs@experiments[,.(name,groupname=name)])
+    signal = rbind(signal[,.(name,bin1,bin2,phi)],signal[bin1!=bin2,.(name,bin1=bin2,bin2=bin1,phi)])
+    cpos = signal[cpos,,on=c("name","bin1","bin2")]
+  } else {
+    cpos[,phi:=0]
+  }
+  #assemble
+  cpos[,log_mu.base:=eC + log_decay + phi]
+  cpos[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_iota1+log_rho2,
+                                                           log_mu.base+log_rho1 +log_rho2,
+                                                           log_mu.base+log_rho1 +log_iota2,
+                                                           log_mu.base+log_iota1+log_iota2)]
+  
+  cpos=cpos[,.(id1,id2,name,pos1,pos2,distance,contact.close,contact.far,contact.up,contact.down,
+               log_decay,lmu.close,lmu.far,lmu.up,lmu.down)]
+  setkeyv(cpos,key(cs@counts))
+  cpos
+}
+
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
 #' 
-csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T, ncores=ncores) {
+csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T) {
   if (verbose==T) cat(" Dispersion\n")
   #predict all means and put into table
-  counts=csnorm:::csnorm_predict_all_parallel(cs,counts,ncores = ncores)
-  setkeyv(counts,key(cs@counts))
+  counts = csnorm:::csnorm_compute_means(cs,counts)
   stopifnot(cs@biases[,.N]==length(cs@par$log_iota))
-  #add signal contribution if available
-  if (length(cs@settings$sbins)>2) {
-    counts[,bin1:=cut(pos1, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
-    counts[,bin2:=cut(pos2, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
-    counts=cs@par$signal[,.(name,bin1,bin2,phi)][counts,,on=key(cs@par$signal)]
-    counts[,c("log_mean_cclose","log_mean_cfar","log_mean_cup","log_mean_cdown"):=
-             list(log_mean_cclose+phi,log_mean_cfar+phi,log_mean_cup+phi,log_mean_cdown+phi)]
-  }
-  if (verbose==T) cat("  predict\n")
   #
   #fit dispersion and exposures
+  if (verbose==T) cat("  predict\n")
   bbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
   cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
   data = list( Dsets=cs@design[,.N], Biases=cs@design[,uniqueN(genomic)], Decays=cs@design[,uniqueN(decay)],
@@ -624,13 +652,13 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
                weight=as.array(weight[,wt]),
                log_iota=cs@par$log_iota, log_rho=cs@par$log_rho,
-               log_mean_cclose=counts[,log_mean_cclose], log_mean_cfar=counts[,log_mean_cfar],
-               log_mean_cup=counts[,log_mean_cup], log_mean_cdown=counts[,log_mean_cdown])
-  init=list(eC_sup=as.array(counts[,log(mean(contact.close/exp(log_mean_cclose))),by=name][,V1]),
+               log_mean_cclose=counts[,lmu.close], log_mean_cfar=counts[,lmu.far],
+               log_mean_cup=counts[,lmu.up], log_mean_cdown=counts[,lmu.down])
+  init=list(eC_sup=as.array(counts[,log(mean(contact.close/exp(lmu.close))),by=name][,V1]),
             eRJ=as.array(cs@biases[,.(name,frac=rejoined/exp((cs@par$log_iota+cs@par$log_rho)/2))][,log(mean(frac)),by=name][,V1]),
             eDE=as.array(cs@biases[,.(name,frac=(dangling.L/exp(cs@par$log_iota)+dangling.R/exp(cs@par$log_rho))/2)][
               ,log(mean(frac)),by=name][,V1]))
-  init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],log_mean_cclose]))
+  init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],lmu.close]))
   init$alpha=max(0.001,1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu))
   init$mu=NULL
   out=capture.output(op<-optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, tol_param=cs@settings$tol.leg,
@@ -1064,8 +1092,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     init.mean="mean"
     #fit dispersion
     if (fit.disp==T) {
-      a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight,
-                                                           ncores = ncores))
+      a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
       if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
     }
