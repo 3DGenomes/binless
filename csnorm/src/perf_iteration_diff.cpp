@@ -15,7 +15,6 @@ using namespace Rcpp;
 #include "SparsityEstimator.hpp"
 
 #include "util.hpp" //SQUARE
-#include "cts_to_mat.hpp" //cts_to_diff_mat
 #include "graph_helpers.hpp" //get_patch_numbers
 
 List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
@@ -99,6 +98,10 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
             converged = false;
         }
     }
+    
+    //store GFL state for next round
+    List new_GFLState = flo.get_state();
+    
     //compute patches
     IntegerVector patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
                                               binned.get_bin2(), binned.get_beta_delta());
@@ -125,17 +128,10 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     //compute phi_ref
     Rcpp::NumericVector phi_ref_r = compute_phi_ref(binned, delta);
     
-    //identify patches
-    patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
-                                binned.get_bin2(), delta);
-    
-    //count the positive ones and deduce dof
-    IntegerVector selected = patchno[abs(delta)>tol_val/2];
-    const int dof = unique(selected).size();
-
     //retrieve BIC from previous computation
     const double BIC = opt["BIC"];
     const double BIC_sd = opt["BIC.sd"];
+    const unsigned dof = opt["dof"];
 
     DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
                             _["bin2"]=binned.get_bin2(),
@@ -148,12 +144,12 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                             _["weight"]=binned.get_weight(),
                             _["diag.idx"]=binned.get_diag_idx(),
                             _["diag.grp"]=binned.get_diag_grp(),
-                            _["beta"]=beta_r,
+                            _["beta"]=binned.get_beta(),
                             _["delta"]=delta,
                             _["phi_ref"]=phi_ref_r,
-                            _["patchno"]=patchno);
+                            _["patchno"]=binned.get_patchno());
     return List::create(_["phi.ref"]=phi_ref_r,
-                        _["delta"]=delta, _["beta"]=beta_r, _["GFLState"]=flo.get_state(),
+                        _["delta"]=delta, _["beta"]=binned.get_beta(), _["GFLState"]=new_GFLState,
                         _["lambda2"]=lam2, _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd,
                         _["mat"]=mat, _["lambda1"]=lam1, _["eCprime"]=0, _["converged"]=converged);
 }

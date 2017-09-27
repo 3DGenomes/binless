@@ -15,7 +15,6 @@ using namespace Rcpp;
 #include "SparsityEstimator.hpp"
 
 #include "util.hpp" //SQUARE
-#include "cts_to_mat.hpp" //cts_to_signal_mat
 #include "graph_helpers.hpp" //get_patch_numbers
 
 #include "Timer.hpp"
@@ -130,18 +129,10 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     std::vector<double> beta_r = as<std::vector<double> >(binned.get_beta());
     std::vector<double> phi_r = soft_threshold(beta_r, eCprime, lam1);
 
-    //identify patches
-    NumericVector phi = wrap(phi_r);
-    patchno = get_patch_numbers(nbins, tol_val, binned.get_bin1(),
-                                binned.get_bin2(), phi);
-
-    //count the positive ones and deduce dof
-    IntegerVector selected = patchno[abs(phi)>tol_val/2];
-    const int dof = unique(selected).size();
-
-    //retrieve BIC from previous computation
+    //retrieve BIC and dof from previous computation
     const double BIC = opt["BIC"];
     const double BIC_sd = opt["BIC.sd"];
+    const unsigned dof = opt["dof"];
     
     timer.print_times();
     
@@ -152,12 +143,12 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
                                       _["weight"]=binned.get_weight(),
                                       _["diag.idx"]=binned.get_diag_idx(),
                                       _["diag.grp"]=binned.get_diag_grp(),
-                                      _["beta"]=beta_r,
-                                      _["phi"]=phi,
-                                      _["patchno"]=patchno);
+                                      _["beta"]=binned.get_beta(),
+                                      _["phi"]=phi_r,
+                                      _["patchno"]=binned.get_patchno());
     
-    return List::create(_["phi"]=phi,
-                        _["beta"]=beta_r, _["lambda2"]=lam2, _["GFLState"]=new_GFLState,
+    return List::create(_["phi"]=phi_r,
+                        _["beta"]=binned.get_beta(), _["lambda2"]=lam2, _["GFLState"]=new_GFLState,
                         _["dof"]=dof, _["BIC"]=BIC, _["BIC.sd"]=BIC_sd, _["mat"]=mat, _["eCprime"]=eCprime,
                         _["lambda1"]=lam1, _["converged"]=converged);
 }
