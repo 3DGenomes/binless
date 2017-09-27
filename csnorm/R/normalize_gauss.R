@@ -716,7 +716,8 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
   #perform fused lasso on signal
   groupnames=cts[,unique(name)]
   nbins=length(cs@settings$sbins)-1
-  params = foreach(g=groupnames, .combine=rbind) %do% {
+  registerDoParallel(cores=min(ncores,length(groupnames)))
+  params = foreach(g=groupnames, .combine=rbind) %dopar% {
     csig=new("CSbsig", mat=cs@par$signal[name==g], cts=cts[name==g],
              settings=list(metadata=metadata,
                            nbins=nbins, dispersion=cs@par$alpha,
@@ -725,6 +726,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose,
                                 signif.threshold=signif.threshold, ncores=ncores)
   }
+  stopImplicitCluster()
   #compute matrix at new params
   mat = rbindlist(params[,mat])
   #store new signal in cs and update eC
@@ -815,6 +817,7 @@ get_nzeros = function(cs, sbins, ncores=1) {
       crossings[distance>=cs@settings$dmin,.(id1=i, pos1=p,bin1=b,ncross=.N),by=c("name","bin2","dbin","dir")]
     }
   }
+  stopImplicitCluster()
   #now merge with positive counts and deduce number of zeros
   zeros = rbind(
     merge(crossings,cts[cat=="contact L"],by=c("name","pos1","bin1","bin2","dbin","dir"),all=T)[
@@ -1079,6 +1082,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
       if (verbose==T) cat("Normalization has converged\n")
       break
     }
+    gc()
   }
   if (verbose==T) cat("Done\n")
   return(cs)

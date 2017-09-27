@@ -184,6 +184,7 @@ csnorm_predict_all_parallel = function(cs, counts, verbose=T, ncores=1) {
   registerDoParallel(cores = ncores)
   counts = foreach (i=0:(nchunks-1), .combine=rbind) %dopar%
     csnorm_predict_all(cs,counts[chunk==i],verbose=verbose)
+  stopImplicitCluster()
   counts[,chunk:=NULL]
   counts
 }
@@ -268,6 +269,7 @@ run_exact = function(cs, bf_per_kb=1, bf_per_decade=20, lambdas=c(0.1,1,10), nco
     if (!is.null(prefix)) save(cs, file=paste0(prefix,"_lambda",lambda,".RData"))
     cs
   }
+  stopImplicitCluster()
   return(cs)
 }
 

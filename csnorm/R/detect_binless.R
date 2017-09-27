@@ -115,13 +115,12 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, si
   reduction=3
   nrounds=3
   dt=data.table()
-  registerDoParallel(cores=ncores)
   for (i in 1:nrounds) {
     minlambda = max(minlambda,lambda2 - range/2)
     maxlambda = min(maxlambda,lambda2 + range/2)
     #cat("round ",i,": min=",minlambda," < lambda2=",lambda2, " < max=",maxlambda," range=",range,"\n")
     dt = rbind(dt,foreach (lam=log10(seq(minlambda, maxlambda, l=npoints)),
-                   .combine=rbind) %dopar% data.table(x=lam,y=obj(lam),i=paste(i)))
+                   .combine=rbind) %do% data.table(x=lam,y=obj(lam),i=paste(i)))
     lambda2 = dt[y==min(y),10^x]
     range=range/reduction
   }
@@ -350,7 +349,8 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
   groupnames=csi@cts[,unique(name)]
-  params = foreach(g=groupnames, .combine=rbind) %do% {
+  registerDoParallel(cores=min(ncores,length(groupnames)))
+  params = foreach(g=groupnames, .combine=rbind) %dopar% {
     csig = csi
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
@@ -358,6 +358,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=F, verbose=verbose,
                                 signif.threshold=signif.threshold, ncores=ncores)
   }
+  stopImplicitCluster()
   #display param info
   if (verbose==T)
     for (i in 1:params[,.N])
@@ -388,6 +389,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #store back
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
+  gc()
   return(cs)
 }
 
@@ -416,6 +418,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
   groupnames=csi@cts[,unique(name)]
+  registerDoParallel(cores=min(ncores,length(groupnames)))
   params = foreach(g=groupnames, .combine=rbind) %do% {
     csig = csi
     csig@cts = csi@cts[name==g]
@@ -424,6 +427,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=F, verbose=verbose,
                                 signif.threshold=signif.threshold, ncores=ncores)
   }
+  stopImplicitCluster()
   #display param info
   if (verbose==T)
     for (i in 1:params[,.N])
@@ -452,6 +456,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #store back
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
+  gc()
   return(cs)
 }
   

@@ -73,6 +73,7 @@ get_nzeros_binning = function(cs, resolution, ncores=1) {
       crossings[distance>=cs@settings$dmin,.(bin1=b,ncross=.N),by=c("name","bin2","dbin")]
     }
   }
+  stopImplicitCluster()
   crossings=crossings[,.(ncross=sum(ncross)),keyby=c("name","bin1","bin2","dbin")]
   zeros = rbind(
     merge(crossings,cts[variable=="contact.close"],by=c("name","bin1","bin2","dbin"),all=T)[
