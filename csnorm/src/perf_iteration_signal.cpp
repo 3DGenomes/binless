@@ -78,13 +78,13 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     
     //do IRLS iterations until convergence
     //first, warm start
-    unsigned nwarm = (unsigned)(nouter/10.+1);
     auto irls = make_IRLSEstimator(converge, flo, wt);
-    irls.optimize(nwarm, beta, lam2);
+    irls.optimize(nouter, beta, lam2);
     unsigned step = irls.get_nouter();
     //cold start if failed
-    if (step>nwarm) {
+    if (step>nouter) {
         std::fill(beta.begin(), beta.end(), 0);
+        flo.reset();
         irls.optimize(nouter, beta, lam2);
         step = irls.get_nouter();
         if (step>nouter) {
