@@ -16,6 +16,8 @@ SparsityEstimator<Score,Offset,Sign,Degeneracy,Calculation,GaussianEstimator>::o
         //optimize bounds
         bounds_t bounds = BoundsOptimizer<Offset,Sign>::optimize_bounds(c);
         score_t val = ScoreComputer<Calculation,Score,GaussianEstimator>::evaluate(bounds);
+        /*Rcpp::Rcout << "SparsityEstimator: c= " << c << " LB= " << bounds.first <<  " UB= " << bounds.second
+                    << " val= " << Rcpp::as<double>(val["BIC"]) << " dof= " << Rcpp::as<unsigned>(val["dof"]) << "\n";*/
         values.push_back(val);
     }
     //pick the best one based on the scoring criterion

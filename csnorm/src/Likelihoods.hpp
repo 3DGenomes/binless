@@ -5,6 +5,7 @@
 
 #include "BinnedData.hpp"
 #include "Traits.hpp"
+#include "util.hpp"
 
 //Likelihood takes the data and unthresholded beta estimate, and returns
 //the squared deviations on each matrix bin, computed on the
@@ -26,6 +27,16 @@ public:
         Rcpp::NumericVector phi = Rcpp::wrap(soft_threshold(beta_phi_r, eCprime, lambda1));
         
         const Rcpp::NumericVector chisq = binned_.get_weight() * SQUARE(binned_.get_phihat() - (phi + eCprime));
+        
+        /*Rcpp::Rcout << "UB= " << UB << " LB= " << LB << " eCprime= " << eCprime << " lambda1= " << lambda1
+            << " max(beta)= " << (double)(Rcpp::max(beta_phi_))
+            << " min(beta)= " << (double)(Rcpp::min(beta_phi_))
+            << " max(phi)= " << (double)(Rcpp::max(phi))
+            << " min(phi)= " << (double)(Rcpp::min(phi))
+            << " sum(chisq)= " << (double)(Rcpp::sum(chisq)) << "\n";
+            Rcpp::Rcout << "beta_phi:\n";
+            for (auto i : Rcpp::as<std::vector<double> >(beta_phi_)) Rcpp::Rcout << i << "\n";
+            Rcpp::Rcout << "done beta_phi\n";*/
         return chisq;
     }
     
