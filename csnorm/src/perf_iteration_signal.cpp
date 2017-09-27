@@ -19,44 +19,6 @@ using namespace Rcpp;
 
 #include "Timer.hpp"
 
-List wgfl_signal_perf_warm(const DataFrame cts, double dispersion, int nouter, int nbins, List GFLState,
-                           double lam2, double converge,
-                           const List metadata, NumericVector beta_i) {
-    //Class that holds all the data. Other classes reference to it.
-    RawData<Signal> raw(nbins, dispersion, cts, metadata);
-    BinnedData<Signal> binned; //stored here, but will be populated by WeightsUpdater
-    //setup computation of fused lasso solution
-    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
-    flo.set_state(GFLState);
-    WeightsUpdater<Signal> wt(raw,binned); //size of the problem and input data
-    wt.setUp(); //for consistency. No-op, since there's no phi_ref to compute
-    
-    //do IRLS iterations until convergence
-    auto irls = make_IRLSEstimator(converge, flo, wt); //number of iterations, convergence criterion and workers
-    std::vector<double> beta = as<std::vector<double> >(beta_i);
-    irls.optimize(nouter, beta, lam2);
-    
-    //retrieve statistics
-    int res = flo.get_ninner();
-    unsigned step = irls.get_nouter();
-    beta = flo.get();
-    
-    DataFrame finalmat = DataFrame::create(_["bin1"]=binned.get_bin1(),
-                                           _["bin2"]=binned.get_bin2(),
-                                           _["phihat"]=binned.get_phihat(),
-                                           _["ncounts"]=binned.get_ncounts(),
-                                           _["weight"]=binned.get_weight(),
-                                           _["diag.idx"]=binned.get_diag_idx(),
-                                           _["diag.grp"]=binned.get_diag_grp(),
-                                           _["beta"]=beta,
-                                           _["phi"]=beta);
-    
-    return List::create(_["beta"]=wrap(beta),
-                        _["phi"]=wrap(beta), _["mat"]=finalmat,
-                        _["nouter"]=step, _["ninner"]=res,
-                        _["eCprime"]=0, _["lambda1"]=0);
-}
-
 List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins, List GFLState,
                      double lam2,  double tol_val,
                      List metadata, NumericVector beta_i,

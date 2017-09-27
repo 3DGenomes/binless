@@ -17,52 +17,6 @@ using namespace Rcpp;
 #include "util.hpp" //SQUARE
 #include "graph_helpers.hpp" //get_patch_numbers
 
-List wgfl_diff_perf_warm(const DataFrame cts, const DataFrame ref,
-                         double dispersion, int nouter, int nbins, List GFLState,
-                         double lam2, double converge,
-                         List metadata, NumericVector phi_ref_i, NumericVector beta_i) {
-    //Classes that hold all the data. Other classes reference to it.
-    RawData<Difference> raw(nbins, dispersion, cts, ref, metadata);
-    BinnedData<Difference> binned; //stored here, but will be populated by WeightsUpdater
-    //setup computation of fused lasso solution
-    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge); //size of the problem and convergence criterion
-    flo.set_state(GFLState);
-    WeightsUpdater<Difference> wt(raw,binned); //size of the problem and input data
-    std::vector<double> beta = as<std::vector<double> >(beta_i);
-    std::vector<double> phi_ref = as<std::vector<double> >(phi_ref_i);
-    wt.setUp(phi_ref, beta); //initial guess of phi_ref provided here
-                             //because we know the type of wt, but irls doesn't
-    
-    //do IRLS iterations until convergence
-    auto irls = make_IRLSEstimator(converge, flo, wt); //number of iterations, convergence criterion and workers
-    irls.optimize(nouter, beta, lam2);
-    
-    //retrieve statistics
-    int res = flo.get_ninner();
-    unsigned step = irls.get_nouter();
-    beta = flo.get();
-    
-    DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
-                                      _["bin2"]=binned.get_bin2(),
-                                      _["phihat"]=binned.get_phihat(),
-                                      _["phihat.var"]=1/binned.get_weight(),
-                                      _["phihat.ref"]=binned.get_phihat_ref(),
-                                      _["phihat.var.ref"]=1/binned.get_weight_ref(),
-                                      _["ncounts"]=binned.get_ncounts(),
-                                      _["deltahat"]=binned.get_deltahat(),
-                                      _["weight"]=binned.get_weight(),
-                                      _["diag.idx"]=binned.get_diag_idx(),
-                                      _["diag.grp"]=binned.get_diag_grp(),
-                                      _["beta"]=beta,
-                                      _["delta"]=beta,
-                                      _["phi_ref"]=binned.get_phi_ref());
-    
-    return List::create(_["beta"]=wrap(beta),
-                        _["phi.ref"]=binned.get_phi_ref(), _["delta"]=wrap(beta), _["mat"]=mat,
-                        _["nouter"]=step, _["ninner"]=res,
-                        _["eCprime"]=0, _["lambda1"]=0);
-}
-
 List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    int nouter, int nbins, List GFLState,
                    double lam2, double tol_val,

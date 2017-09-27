@@ -1,47 +1,6 @@
 #' @include csnorm.R
 NULL
 
-#' dispatch for fused lasso perf iteration: warm/cold signal/difference
-#' @keywords internal
-gfl_perf_iteration = function(csig, lambda1, lambda2, eCprime) {
-  ctsg=csig@cts
-  nbins=csig@settings$nbins
-  dispersion=csig@settings$dispersion
-  metadata=csig@settings$metadata
-  tol.val=csig@settings$tol.val
-  state=csig@state
-  stopifnot(length(state)>0) #warm start only
-  if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
-  nperf=csig@settings$nperf
-  if (is.null(ctsg.ref)) {
-    perf.c = csnorm:::wgfl_signal_perf_warm(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2, tol.val/20, metadata, state$beta)
-  } else {
-    stopifnot(eCprime==0)
-    perf.c = csnorm:::wgfl_diff_perf_warm(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2, tol.val/20, metadata,
-                                            state$phi.ref, state$beta)
-  }
-  return(perf.c)
-}
-
-#' compute sparse fused lasso matrix for a given value of lambda1, lambda2 and eCprime (performance iteration)
-#' @keywords internal
-gfl_get_matrix = function(csig, lambda1, lambda2, eCprime) {
-  if (csig@state$lambda1==lambda1 & csig@state$lambda2==lambda2 & (class(csig)=="CSbdiff" | csig@state$eCprime==eCprime)) {
-    perf.c = csig@state
-  } else {
-    if (eCprime != 0 | lambda1>0) cat("WARNING: returned matrix will be unthresholded! Requested eCprime= ", eCprime, " and lambda1= ", lambda1, "\n")
-    perf.c = csnorm:::gfl_perf_iteration(csig, lambda1, lambda2, eCprime)
-  }
-  if (class(csig)!="CSbdiff") {
-    matg = as.data.table(perf.c$mat)
-  } else {
-    matg = as.data.table(perf.c$mat)
-  }
-  setkey(matg,bin1,bin2)
-  #ggplot(matg)+geom_raster(aes(bin1,bin2,fill=valuehat))+geom_raster(aes(bin2,bin1,fill=value))+scale_fill_gradient2()
-  return(matg)
-}
-
 #' compute BIC for a given value of lambda2, optimizing lambda1 and eCprime (performance iteration, persistent state)
 #' @keywords internal
 gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F) {
@@ -231,12 +190,8 @@ csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, sig
   csig = csnorm:::optimize_lambda2_simplified(csig, n.SD=n.SD, constrained=constrained, positive=positive, fixed=fixed,
                                    signif.threshold=signif.threshold, ncores=ncores)
   csig@par$name=csig@cts[,name[1]]
-  #matg=csnorm:::gfl_get_matrix(csig, 0, csig@par$lambda2, 0)
-  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
-  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=abs(value-csig@par$eCprime)<=csig@par$lambda1)))
-  #matg=csnorm:::gfl_get_matrix(csig, csig@par$lambda1, csig@par$lambda2, csig@par$eCprime)
-  #print(ggplot(matg)+geom_raster(aes(bin1,bin2,fill=value))+scale_fill_gradient2())
-  matg = csnorm:::gfl_get_matrix(csig, csig@par$lambda1, csig@par$lambda2, csig@par$eCprime)
+  matg = as.data.table(csig@state$mat)
+  setkey(matg,bin1,bin2)
   matg[,name:=csig@par$name]
   params = as.data.table(csig@par)
   params[,c("state","mat"):=list(list(csig@state),list(matg))]
