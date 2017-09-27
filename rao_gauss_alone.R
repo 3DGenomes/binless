@@ -45,7 +45,7 @@ if (F) {
   
   base.res=2500
   #load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,".RData"))
-  load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_grpsmart.RData"))
+  load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_grpsmart2.RData"))
   load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_grpall.RData"))
   load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_newdisp.RData"))
   load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_newdisp_grpall.RData"))
@@ -72,8 +72,9 @@ if (F) {
   ggplot(signals[step>=step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_wrap(~name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
   ggplot(signals[step>=step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=pmax(-1,pmin(phihat,max(phi)))))+facet_wrap(~name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
   
+  exts=c("","_grpall","_newdisp","_newdisp_grpall","_newdisp_grpall_lindecay","_grpsmart","_grpsmart2")
   info = foreach(base.res=c(10000,5000,2500),.combine=rbind, .errorhandling="remove") %:%
-         foreach(ext=c("","_grpall","_newdisp","_newdisp_grpall","_newdisp_grpall_lindecay"),.combine=rbind) %dopar% {
+         foreach(ext=exts,.combine=rbind) %dopar% {
     load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,ext,".RData"))
     data.table(ori=sub,base.res=base.res,ext=ext,runtime=cs@diagnostics$params[,sum(runtime)],
                nsteps=cs@diagnostics$params[,max(step)],name=cs@experiments[,name],
@@ -82,7 +83,7 @@ if (F) {
   info
   
   mats = foreach(base.res=c(10000,5000,2500),.combine=rbind, .errorhandling="remove") %:%
-    foreach(ext=c("","_grpall","_newdisp","_newdisp_grpall","_newdisp_grpall_lindecay"),.combine=rbind) %dopar% {
+    foreach(ext=exts,.combine=rbind) %dopar% {
       load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,ext,".RData"))
       mat=cs@par$signal
       bin1.begin=mat[,bin1]
