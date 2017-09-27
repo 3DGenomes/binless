@@ -32,7 +32,7 @@ gfl_BIC_fixed = function(csig, lambda1, lambda2, eCprime) {
  stop("signif.threshold=F not implemented!") 
 }
 
-#' cross-validate lambda2
+#' cross-validate lambda2 assuming it is very rugged
 #' @keywords internal
 optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, signif.threshold=T, ncores=1) {
   obj = function(x) {
@@ -112,9 +112,9 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, si
   return(csig)
 }
 
-#' cross-validate lambda2
+#' cross-validate lambda2 assuming it is smooth
 #' @keywords internal
-optimize_lambda2_simplified = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, signif.threshold=T, ncores=1) {
+optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, signif.threshold=T) {
   obj = function(x) {
     if (signif.threshold==T) {
       csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed)
@@ -185,10 +185,10 @@ gfl_compute_initial_state = function(csig, diff=F) {
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, signif.threshold=T, ncores=1) {
+csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, signif.threshold=T) {
   n.SD=ifelse(fixed==T,1,0)
-  csig = csnorm:::optimize_lambda2_simplified(csig, n.SD=n.SD, constrained=constrained, positive=positive, fixed=fixed,
-                                   signif.threshold=signif.threshold, ncores=ncores)
+  csig = csnorm:::optimize_lambda2_smooth(csig, n.SD=n.SD, constrained=constrained, positive=positive, fixed=fixed,
+                                   signif.threshold=signif.threshold)
   csig@par$name=csig@cts[,name[1]]
   matg = as.data.table(csig@state$mat)
   setkey(matg,bin1,bin2)
@@ -311,7 +311,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
     csig@mat = csi@mat[name==g]
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F)
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=F, verbose=verbose,
-                                signif.threshold=signif.threshold, ncores=ncores)
+                                signif.threshold=signif.threshold)
   }
   stopImplicitCluster()
   #display param info
@@ -380,7 +380,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     csig@mat = csi@mat[name==g]
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=T)
     csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=F, verbose=verbose,
-                                signif.threshold=signif.threshold, ncores=ncores)
+                                signif.threshold=signif.threshold)
   }
   stopImplicitCluster()
   #display param info

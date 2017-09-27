@@ -752,7 +752,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
                            tol.val=cs@settings$tol.leg, nperf=50))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F)
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose,
-                                signif.threshold=signif.threshold, ncores=ncores)
+                                signif.threshold=signif.threshold)
   }
   stopImplicitCluster()
   #compute matrix at new params
