@@ -316,7 +316,6 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #store back
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
-  gc()
   return(cs)
 }
 
@@ -383,7 +382,6 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #store back
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
-  gc()
   return(cs)
 }
   

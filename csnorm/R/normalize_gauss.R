@@ -1112,7 +1112,6 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
       if (verbose==T) cat("Normalization has converged\n")
       break
     }
-    gc()
   }
   if (verbose==T) cat("Done\n")
   return(cs)
