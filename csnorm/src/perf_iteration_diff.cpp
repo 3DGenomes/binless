@@ -12,6 +12,7 @@ using namespace Rcpp;
 #include "RawData.hpp"
 #include "BinnedData.hpp"
 #include "Traits.hpp"
+#include "FixedSparsity.hpp"
 #include "EstimatedSparsity.hpp"
 
 #include "util.hpp" //SQUARE
@@ -20,7 +21,8 @@ using namespace Rcpp;
 List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                    int nouter, int nbins, List GFLState,
                    double lam2, double tol_val,
-                   List metadata, NumericVector phi_ref_i,  NumericVector beta_i, bool constrained) {
+                   List metadata, NumericVector phi_ref_i,  NumericVector beta_i, bool constrained,
+                   bool lambda1_fixed, double lambda1_fix_value) {
     
     //Classes that hold all the data. Other classes reference to it.
     RawData<Difference> raw(nbins, dispersion, cts, ref, metadata);
@@ -63,7 +65,15 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     
     //optimize lambda1 assuming eCprime=0
     NumericVector opt;
-    {
+    if (lambda1_fixed) {
+        if (constrained) {
+            auto est = make_FixedSparsity<CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
+            opt = est.optimize();
+        } else {
+            auto est = make_FixedSparsity<CVkSD<1>, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
+            opt = est.optimize();
+        }
+    } else {
         if (constrained) {
           auto est = make_EstimatedSparsity<CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
           opt = est.optimize();

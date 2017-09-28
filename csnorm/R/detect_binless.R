@@ -3,9 +3,8 @@ NULL
 
 #' compute BIC for a given value of lambda2, optimizing lambda1 and eCprime (performance iteration, persistent state)
 #' @keywords internal
-gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F) {
-  #state = perf.c[c("phi.ref","beta")]
-  #submat = as.data.table(perf.c$mat)[,.(bin1,bin2,phihat.ref,valuehat=deltahat,ncounts,weight,value=perf.c$delta)]
+gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA) {
+  stopifnot(fix.lambda1==F || fix.lambda1.at>0)
   #
   ctsg=csig@cts
   nbins=csig@settings$nbins
@@ -18,35 +17,19 @@ gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F) {
   nperf=csig@settings$nperf
   if (is.null(ctsg.ref)) {
     perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2,
-                                      tol.val, metadata, state$beta, constrained, fixed)
+                                      tol.val, metadata, state$beta, constrained, fixed, fix.lambda1, fix.lambda1.at)
   } else {
     perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2,
-                                      tol.val, metadata, state$phi.ref, state$beta, constrained)
+                                      tol.val, metadata, state$phi.ref, state$beta, constrained, fix.lambda1, fix.lambda1.at)
   }
   return(perf.c)
 }
 
-#' compute BIC for a given value of lambda1, lambda2 and eCprime (performance iteration, persistent state)
-#' @keywords internal
-gfl_BIC_fixed = function(csig, lambda1, lambda2, eCprime) {
- stop("signif.threshold=F not implemented!") 
-}
-
 #' cross-validate lambda2 assuming it is very rugged
 #' @keywords internal
-optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, signif.threshold=T, ncores=1) {
+optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA, ncores=1) {
   obj = function(x) {
-    if (signif.threshold==T) {
-      csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed)
-    } else {
-      a = csnorm:::gfl_BIC_fixed(csig, 0, lambda2=10^(x), 0)
-      if (positive==T) {
-        a$eCprime=min(a$beta)
-        a$phi=a$beta-min(a$beta)
-        a$mat$phi=a$phi
-      }
-      csig@state <<- a
-    }
+    csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
     #cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
     #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
@@ -107,27 +90,16 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, si
   if (lambda2==minlambda) cat("   Warning: lambda2 hit lower boundary.\n")
   obj(log10(lambda2))
   retvals = as.list(csig@state)[c("lambda2","lambda1","eCprime","BIC","BIC.sd","dof")]
-  if (fixed==T && abs(retvals$eCprime)>csig@settings$tol.val) cat("Warning: fixed = T but eCprime != 0\n") #only when signif.threshold==T
+  if (fixed==T && abs(retvals$eCprime)>csig@settings$tol.val) cat("Warning: fixed = T but eCprime != 0\n") #only when fix.lambda1==F
   csig@par=modifyList(csig@par,retvals)
   return(csig)
 }
 
 #' cross-validate lambda2 assuming it is smooth
 #' @keywords internal
-optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, signif.threshold=T) {
+optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA) {
   obj = function(x) {
-    if (signif.threshold==T) {
-      csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed)
-      #cat("optimize at ", 10^(x), " BIC= ", csig@state$BIC,"\n")
-    } else {
-      a = csnorm:::gfl_BIC_fixed(csig, 0, lambda2=10^(x), 0)
-      if (positive==T) {
-        a$eCprime=min(a$beta)
-        a$phi=a$beta-min(a$beta)
-        a$mat$phi=a$phi
-      }
-      csig@state <<- a
-    }
+    csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
     #cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
     #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
@@ -154,7 +126,7 @@ optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixe
   if (lambda2==minlambda) cat("   Warning: lambda2 hit lower boundary.\n")
   obj(log10(lambda2))
   retvals = as.list(csig@state)[c("lambda2","lambda1","eCprime","BIC","BIC.sd","dof")]
-  if (fixed==T && abs(retvals$eCprime)>csig@settings$tol.val) cat("Warning: fixed = T but eCprime != 0\n") #only when signif.threshold==T
+  if (fixed==T && abs(retvals$eCprime)>csig@settings$tol.val) cat("Warning: fixed = T but eCprime != 0\n") #only when fix.lambda1==F
   csig@par=modifyList(csig@par,retvals)
   return(csig)
 }
@@ -185,10 +157,10 @@ gfl_compute_initial_state = function(csig, diff=F) {
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, signif.threshold=T) {
+csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, fix.lambda1=F, fix.lambda1.at=0.1) {
   n.SD=ifelse(fixed==T,1,0)
   csig = csnorm:::optimize_lambda2_smooth(csig, n.SD=n.SD, constrained=constrained, positive=positive, fixed=fixed,
-                                   signif.threshold=signif.threshold)
+                                   fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
   csig@par$name=csig@cts[,name[1]]
   matg = as.data.table(csig@state$mat)
   setkey(matg,bin1,bin2)
@@ -288,7 +260,7 @@ prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val) {
 #' @export
 #' 
 #' @examples
-detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=cs@settings$tol.leg, verbose=T, signif.threshold=T){
+detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=cs@settings$tol.leg, verbose=T, fix.lambda1=F, fix.lambda1.at=NA){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
@@ -311,7 +283,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
     csig@mat = csi@mat[name==g]
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F)
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=F, verbose=verbose,
-                                signif.threshold=signif.threshold)
+                                fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
   }
   stopImplicitCluster()
   #display param info
@@ -358,7 +330,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
 #' @export
 #' 
 #' @examples
-detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.val=cs@settings$tol.leg, verbose=T, signif.threshold=T){
+detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.val=cs@settings$tol.leg, verbose=T, fix.lambda1=F, fix.lambda1.at=NA){
   if (verbose==T) cat("Binless difference detection with resolution=",resolution,
                       " group=", group," and ref=",as.character(ref),"\n")
   ### get CSgroup object
@@ -380,7 +352,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     csig@mat = csi@mat[name==g]
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=T)
     csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=F, verbose=verbose,
-                                signif.threshold=signif.threshold)
+                                fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
   }
   stopImplicitCluster()
   #display param info

@@ -7,7 +7,8 @@ using namespace Rcpp;
 
 List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbins, List GFLState,
                      double lam2, double tol_val,
-                     List metadata, NumericVector beta_i, bool constrained, bool fixed);
+                     List metadata, NumericVector beta_i, bool constrained, bool fixed,
+                     bool lambda1_fixed, double lambda1_fix_value);
 
 
 #endif

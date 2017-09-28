@@ -726,7 +726,7 @@ get_signal_metadata = function(cs, cts, resolution) {
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.threshold=T) {
+csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, fix.lambda1=F, fix.lambda1.at=NA) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   metadata = csnorm:::get_signal_metadata(cs, cts, cs@settings$base.res)
@@ -752,7 +752,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, signif.th
                            tol.val=cs@settings$tol.leg, nperf=50))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F)
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose,
-                                signif.threshold=signif.threshold)
+                                fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
   }
   stopImplicitCluster()
   #compute matrix at new params
@@ -1009,7 +1009,9 @@ load_stripped = function(fname, ncores=1) {
 #' @param tol.obj positive numeric (default 1e-1). Convergence tolerance on changes in the four likelihoods.
 #' @param tol.leg positive numeric (default 1e-5). Convergence tolerance on changes in the likelihood within each leg.
 #' @param ncores positive integer (default 1). Number of cores to use.
-#' @param signif.threshold whether to compute the significant signal (default TRUE) or to avoid soft-thresholding
+#' @param fix.lambda1 whether to set lambda1 to a given value, or to estimate it
+#' @param fix.lambda1.at if fix.lambda1==T, the approximate value where it is meant to be fixed. Might move a bit because
+#'   of the positivity and degeneracy constraints.
 #'   
 #' @return A csnorm object
 #' @export
@@ -1019,7 +1021,7 @@ load_stripped = function(fname, ncores=1) {
 run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
                      ngibbs = 20, iter=1000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
                      verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
-                     tol.obj=1e-2, tol.leg=1e-4, ncores=1, signif.threshold=T) {
+                     tol.obj=1e-2, tol.leg=1e-4, ncores=1, fix.lambda1=F, fix.lambda1.at=NA) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -1035,7 +1037,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
                          iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj,
-                         tol.leg=tol.leg, signif.threshold=signif.threshold))
+                         tol.leg=tol.leg, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
     stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
@@ -1100,7 +1102,8 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     if (fit.signal==T & i > 1) {
       update.exposures=F
       a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=fit.decay,
-                                                       ncores=ncores, signif.threshold=cs@settings$signif.threshold))
+                                                       ncores=ncores, fix.lambda1=cs@settings$fix.lambda1,
+                                                       fix.lambda1.at=cs@settings$fix.lambda1.at))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
       if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
     }
