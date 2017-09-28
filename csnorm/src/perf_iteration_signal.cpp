@@ -12,7 +12,7 @@ using namespace Rcpp;
 #include "RawData.hpp"
 #include "BinnedData.hpp"
 #include "Traits.hpp"
-#include "SparsityEstimator.hpp"
+#include "EstimatedSparsity.hpp"
 
 #include "util.hpp" //SQUARE
 #include "graph_helpers.hpp" //get_patch_numbers
@@ -68,18 +68,18 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     {
         if (constrained) {
             if (fixed) { // is eCprime fixed to 0?
-                auto est = make_SparsityEstimator<CVkSD<1>, ZeroOffset, PositiveSign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
+                auto est = make_EstimatedSparsity<CVkSD<1>, ZeroOffset, PositiveSign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
                 opt = est.optimize();
             } else {
-                auto est = make_SparsityEstimator<CV, EstimatedOffset, PositiveSign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
+                auto est = make_EstimatedSparsity<CV, EstimatedOffset, PositiveSign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
                 opt = est.optimize();
             }
         } else {
             if (fixed) { // is eCprime fixed to 0?
-                auto est = make_SparsityEstimator<CVkSD<1>, ZeroOffset, PositiveSign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
+                auto est = make_EstimatedSparsity<CVkSD<1>, ZeroOffset, PositiveSign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
                 opt = est.optimize();
             } else {
-                auto est = make_SparsityEstimator<CV, EstimatedOffset, PositiveSign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
+                auto est = make_EstimatedSparsity<CV, EstimatedOffset, PositiveSign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
                 opt = est.optimize();
             }
         }

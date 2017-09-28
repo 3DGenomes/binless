@@ -12,7 +12,7 @@ using namespace Rcpp;
 #include "RawData.hpp"
 #include "BinnedData.hpp"
 #include "Traits.hpp"
-#include "SparsityEstimator.hpp"
+#include "EstimatedSparsity.hpp"
 
 #include "util.hpp" //SQUARE
 #include "graph_helpers.hpp" //get_patch_numbers
@@ -65,10 +65,10 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     NumericVector opt;
     {
         if (constrained) {
-          auto est = make_SparsityEstimator<CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
+          auto est = make_EstimatedSparsity<CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
           opt = est.optimize();
         } else {
-          auto est = make_SparsityEstimator<CVkSD<1>, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
+          auto est = make_EstimatedSparsity<CVkSD<1>, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
           opt = est.optimize();
         }
     }

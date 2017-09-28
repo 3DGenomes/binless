@@ -1,5 +1,5 @@
-#ifndef SPARSITY_ESTIMATOR_HPP
-#define SPARSITY_ESTIMATOR_HPP
+#ifndef ESTIMATED_SPARSITY_HPP
+#define ESTIMATED_SPARSITY_HPP
 
 #include <Rcpp.h>
 #include <vector>
@@ -25,7 +25,7 @@ template<typename Score, //to choose between BIC, CV or CVkSD
          typename Degeneracy, //whether to forbid certain values in order to avoid degeneracies in the model
          typename Calculation, //whether it's a Signal or a Difference calculation
          typename GaussianEstimator> //the type of the fused lasso object used for initialization
-class SparsityEstimator : private CandidatesGenerator<Offset,Sign,Degeneracy>,
+class EstimatedSparsity : private CandidatesGenerator<Offset,Sign,Degeneracy>,
                           private BoundsOptimizer<Offset,Sign>,
                           private ScoreComputer<Calculation,Score,GaussianEstimator>,
                           private ScoreOptimizer<Score> {
@@ -35,7 +35,7 @@ class SparsityEstimator : private CandidatesGenerator<Offset,Sign,Degeneracy>,
     
 public:
     
-    SparsityEstimator(int nbins, double tol_val, const binned_t& binned, double lambda2,
+    EstimatedSparsity(int nbins, double tol_val, const binned_t& binned, double lambda2,
                       GaussianEstimator& gauss) :
      CandidatesGenerator<Offset,Sign,Degeneracy>(nbins, tol_val, binned),
      BoundsOptimizer<Offset,Sign>(binned),
@@ -51,14 +51,14 @@ private:
 
 //named constructor
 template<typename Score, typename Offset, typename Sign, typename Degeneracy, typename Calculation, typename GaussianEstimator>
-SparsityEstimator<Score, Offset, Sign, Degeneracy, Calculation, GaussianEstimator>
-make_SparsityEstimator(int nbins, double tol_val, const BinnedData<Calculation>& binned, double lambda2,
+EstimatedSparsity<Score, Offset, Sign, Degeneracy, Calculation, GaussianEstimator>
+make_EstimatedSparsity(int nbins, double tol_val, const BinnedData<Calculation>& binned, double lambda2,
                        GaussianEstimator& gauss) {
-    return SparsityEstimator<Score, Offset, Sign, Degeneracy, Calculation, GaussianEstimator>(nbins, tol_val, binned, lambda2, gauss);
+    return EstimatedSparsity<Score, Offset, Sign, Degeneracy, Calculation, GaussianEstimator>(nbins, tol_val, binned, lambda2, gauss);
 }
 
 
-#include "SparsityEstimator.ipp"
+#include "EstimatedSparsity.ipp"
 
 
 #endif
