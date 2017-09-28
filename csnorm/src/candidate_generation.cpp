@@ -3,7 +3,7 @@
 #include <algorithm>
 
 #include "graph_helpers.hpp" //get_patch_numbers
-#include "CandidatesGenerator.hpp"
+#include "candidate_generation.hpp"
 
 //return ascending list of the values of all detected patches in the matrix
 Rcpp::NumericVector get_patch_values(const Rcpp::NumericVector& value, const Rcpp::IntegerVector& patchno) {

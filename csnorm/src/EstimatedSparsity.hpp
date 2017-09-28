@@ -4,12 +4,12 @@
 #include <Rcpp.h>
 #include <vector>
 
-#include "CandidatesGenerator.hpp"
 #include "BoundsOptimizer.hpp"
 #include "ScoreComputer.hpp"
 #include "ScoreOptimizer.hpp"
 #include "util.hpp"
 #include "BinnedData.hpp"
+#include "candidate_generation.hpp"
 
 // A class that estimates lambda1 (and an offset if needed) based on various criteria
 /* We define and use upper bound UB = offset + lambda1 and lower bound LB = offset - lambda1
@@ -25,8 +25,7 @@ template<typename Score, //to choose between BIC, CV or CVkSD
          typename Degeneracy, //whether to forbid certain values in order to avoid degeneracies in the model
          typename Calculation, //whether it's a Signal or a Difference calculation
          typename GaussianEstimator> //the type of the fused lasso object used for initialization
-class EstimatedSparsity : private CandidatesGenerator<Offset,Sign,Degeneracy>,
-                          private BoundsOptimizer<Offset,Sign>,
+class EstimatedSparsity : private BoundsOptimizer<Offset,Sign>,
                           private ScoreComputer<Calculation,Score,GaussianEstimator>,
                           private ScoreOptimizer<Score> {
     
@@ -37,15 +36,16 @@ public:
     
     EstimatedSparsity(int nbins, double tol_val, const binned_t& binned, double lambda2,
                       GaussianEstimator& gauss) :
-     CandidatesGenerator<Offset,Sign,Degeneracy>(nbins, tol_val, binned),
      BoundsOptimizer<Offset,Sign>(binned),
      ScoreComputer<Calculation,Score,GaussianEstimator>(tol_val, binned, gauss, lambda2),
      ScoreOptimizer<Score>(),
+     UBcandidates_(get_UB_candidates<Offset,Sign,Degeneracy>(nbins, tol_val, binned)),
      lambda2_(lambda2) {}
     
      score_t optimize() const;
     
 private:
+    const Rcpp::NumericVector UBcandidates_;
     const double lambda2_;
 };
 
