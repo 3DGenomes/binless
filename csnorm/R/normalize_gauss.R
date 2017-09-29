@@ -726,7 +726,8 @@ get_signal_metadata = function(cs, cts, resolution) {
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, fix.lambda1=F, fix.lambda1.at=NA) {
+csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, fix.lambda1=F, fix.lambda1.at=NA,
+                               fix.lambda2=F, fix.lambda2.at=NA) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   metadata = csnorm:::get_signal_metadata(cs, cts, cs@settings$base.res)
@@ -744,7 +745,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, fix.lambd
   #perform fused lasso on signal
   groupnames=cts[,unique(name)]
   nbins=length(cs@settings$sbins)-1
-  csigs = foreach(g=groupnames, .combine=rbind) %do% {
+  csigs = foreach(g=groupnames, .combine=c) %do% {
     csig=new("CSbsig", mat=cs@par$signal[name==g], cts=cts[name==g],
              settings=list(metadata=metadata,
                            nbins=nbins, dispersion=cs@par$alpha,
@@ -753,9 +754,11 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, fix.lambd
     csig
   }
   registerDoParallel(cores=min(ncores,length(groupnames)))
-  params = foreach(csig=csigs, .combine=rbind, .export=c("constrained","verbose","fix.lambda1","fix.lambda1.at")) %dopar% {
+  params = foreach(csig=csigs, .combine=rbind, .export=c("constrained","verbose","fix.lambda1","fix.lambda1.at",
+                                                         "fix.lambda2","fix.lambda2.at")) %dopar% {
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose,
-                                fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+                                fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
+                                fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }
   stopImplicitCluster()
   #compute matrix at new params
@@ -1024,7 +1027,7 @@ load_stripped = function(fname, ncores=1) {
 run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
                      ngibbs = 20, iter=1000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
                      verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
-                     tol.obj=1e-2, tol.leg=1e-4, ncores=1, fix.lambda1=F, fix.lambda1.at=NA) {
+                     tol.obj=1e-2, tol.leg=1e-4, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -1040,7 +1043,8 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
                          iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj,
-                         tol.leg=tol.leg, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at))
+                         tol.leg=tol.leg, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
+                         fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
     stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
@@ -1104,9 +1108,11 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     #fit signal using sparse fused lasso
     if (fit.signal==T & i > 1) {
       update.exposures=F
-      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=fit.decay,
-                                                       ncores=ncores, fix.lambda1=cs@settings$fix.lambda1,
-                                                       fix.lambda1.at=cs@settings$fix.lambda1.at))
+      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=fit.decay, ncores=ncores,
+                                                       fix.lambda1=cs@settings$fix.lambda1,
+                                                       fix.lambda1.at=cs@settings$fix.lambda1.at,
+                                                       fix.lambda2=cs@settings$fix.lambda2,
+                                                       fix.lambda2.at=cs@settings$fix.lambda2.at))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
       if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
     }

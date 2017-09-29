@@ -4,7 +4,7 @@ NULL
 #' compute BIC for a given value of lambda2, optimizing lambda1 and eCprime (performance iteration, persistent state)
 #' @keywords internal
 gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA) {
-  stopifnot(fix.lambda1==F || fix.lambda1.at>0)
+  stopifnot(fix.lambda1==F || fix.lambda1.at>0) #otherwise eCprime cannot be determined
   #
   ctsg=csig@cts
   nbins=csig@settings$nbins
@@ -131,17 +131,13 @@ optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixe
   return(csig)
 }
 
-#' build initial state from phi / delta
-#' 
-#' @keywords internal
-gfl_compute_initial_state = function(csig, diff=F) {
-  matg = csig@mat
-  if (diff==F) {
-    state = list(beta=matg[,phi], lambda1=0.05, eCprime=0, GFLState = list())
-  } else {
-    state = list(phi.ref=matg[,phi.ref], beta=matg[,delta], GFLState = list())
-  }
-  return(state)
+evaluate_at_lambda2 = function(csig, lambda2, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA) {
+  csig@state = csnorm:::gfl_BIC(csig, lambda2=lambda2, constrained=constrained, positive=positive, fixed=fixed,
+                              fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+  retvals = as.list(csig@state)[c("lambda2","lambda1","eCprime","BIC","BIC.sd","dof")]
+  if (fixed==T && abs(retvals$eCprime)>csig@settings$tol.val) cat("Warning: fixed = T but eCprime != 0\n") #only when fix.lambda1==F
+  csig@par=modifyList(csig@par,retvals)
+  return(csig)
 }
 
 #' run fused lasso on one dataset contained in matg, fusing 'valuehat' into
@@ -157,10 +153,16 @@ gfl_compute_initial_state = function(csig, diff=F) {
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, fix.lambda1=F, fix.lambda1.at=0.1) {
-  n.SD=ifelse(fixed==T,1,0)
-  csig = csnorm:::optimize_lambda2_smooth(csig, n.SD=n.SD, constrained=constrained, positive=positive, fixed=fixed,
+csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, fix.lambda1=F, fix.lambda1.at=0.1, fix.lambda2=F, fix.lambda2.at=NA) {
+  if (fix.lambda2==F) {
+    n.SD=ifelse(fixed==T,1,0)
+    csig = csnorm:::optimize_lambda2_smooth(csig, n.SD=n.SD, constrained=constrained, positive=positive, fixed=fixed,
                                    fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+  } else {
+    stopifnot(fix.lambda2.at>0)
+    csig = csnorm:::evaluate_at_lambda2(csig, fix.lambda2.at, constrained=constrained, positive=positive, fixed=fixed,
+                                     fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+  }
   csig@par$name=csig@cts[,name[1]]
   matg = as.data.table(csig@state$mat)
   setkey(matg,bin1,bin2)
@@ -247,6 +249,19 @@ prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val) {
   return(csi)
 }
 
+#' build initial state from phi / delta
+#' 
+#' @keywords internal
+gfl_compute_initial_state = function(csig, diff=F) {
+  matg = csig@mat
+  if (diff==F) {
+    state = list(beta=matg[,phi], lambda1=0.05, eCprime=0, GFLState = list())
+  } else {
+    state = list(phi.ref=matg[,phi.ref], beta=matg[,delta], GFLState = list())
+  }
+  return(state)
+}
+
 #' Perform binless interaction detection using fused lasso
 #'
 #' @param cs 
@@ -260,7 +275,8 @@ prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val) {
 #' @export
 #' 
 #' @examples
-detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=cs@settings$tol.leg, verbose=T, fix.lambda1=F, fix.lambda1.at=NA){
+detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=cs@settings$tol.leg, verbose=T,
+                                       fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
@@ -283,7 +299,8 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
     csig@mat = csi@mat[name==g]
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F)
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=F, verbose=verbose,
-                                fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+                                fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
+                                fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }
   stopImplicitCluster()
   #display param info
@@ -329,7 +346,8 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
 #' @export
 #' 
 #' @examples
-detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.val=cs@settings$tol.leg, verbose=T, fix.lambda1=F, fix.lambda1.at=NA){
+detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.val=cs@settings$tol.leg, verbose=T,
+                                      fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA){
   if (verbose==T) cat("Binless difference detection with resolution=",resolution,
                       " group=", group," and ref=",as.character(ref),"\n")
   ### get CSgroup object
@@ -351,7 +369,8 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     csig@mat = csi@mat[name==g]
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=T)
     csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=F, verbose=verbose,
-                                fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+                                fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
+                                fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }
   stopImplicitCluster()
   #display param info
