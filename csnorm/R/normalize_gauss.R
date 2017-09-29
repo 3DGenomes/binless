@@ -744,13 +744,16 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, fix.lambd
   #perform fused lasso on signal
   groupnames=cts[,unique(name)]
   nbins=length(cs@settings$sbins)-1
-  registerDoParallel(cores=min(ncores,length(groupnames)))
-  params = foreach(g=groupnames, .combine=rbind) %dopar% {
+  csigs = foreach(g=groupnames, .combine=rbind) %do% {
     csig=new("CSbsig", mat=cs@par$signal[name==g], cts=cts[name==g],
              settings=list(metadata=metadata,
                            nbins=nbins, dispersion=cs@par$alpha,
                            tol.val=cs@settings$tol.leg, nperf=50))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F)
+    csig
+  }
+  registerDoParallel(cores=min(ncores,length(groupnames)))
+  params = foreach(csig=csigs, .combine=rbind, .export=c("constrained","verbose","fix.lambda1","fix.lambda1.at")) %dopar% {
     csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose,
                                 fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
   }
