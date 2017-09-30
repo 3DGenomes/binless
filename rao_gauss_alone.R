@@ -8,7 +8,7 @@ library(methods)
 library(igraph)
 
 args=commandArgs(trailingOnly=TRUE)
-sub="Tbx19_700k"
+sub="FOXP1ext_2.3M"
 bpk=30
 dfuse=5 #as.integer(args[2])
 bpd=10 #as.integer(args[4])
@@ -26,9 +26,13 @@ if (restart==F) {
   cs=merge_cs_norm_datasets(list(csd2), different.decays="none", dfuse=dfuse, qmin=qmin)
   cs = run_gauss(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
                  ngibbs = 20, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
-                 ncounts = 1000000, ncores=ncores, base.res=base.res, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T)
+                 ncounts = 1000000, ncores=ncores, base.res=base.res, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T,
+                 fix.lambda1=T, fix.lambda1.at=0.1, fix.lambda2=T, fix.lambda2.at=5)
+  #cs = run_gauss(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
+  #               ngibbs = 20, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
+  #               ncounts = 1000000, ncores=ncores, base.res=base.res, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T)
 } else {
-  load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_grpsmart2.RData"))
+  load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_grpsmart2_lambda1and2.RData"))
   cs = run_gauss(cs, restart=T, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
                  ngibbs = 10, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
                  ncounts = 1000000, ncores=ncores, base.res=base.res, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T)
@@ -38,7 +42,7 @@ save(cs,file=paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.r
 for (resolution in c(2500,5000,10000)) {
   cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
   cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
-  save(cs,file=paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_grpsmart2.RData"))
+  save(cs,file=paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_grpsmart2_lambda1and2.RData"))
 }
 
 if (F) {

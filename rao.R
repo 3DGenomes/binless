@@ -55,12 +55,12 @@ foreach (chr=c("chrX","chr1","chr1","chr7","chr3","chr4","chr21","chr21","chr5",
 
 
 #here we plot the raw reads. We need to load the full csdata object, as only the one without the raw reads is returned.
-load("data/rao_HiCall_GM12878_Tbx19_700k_csdata_with_data.RData")
+load("data/rao_HiCall_GM12878_FOXP1big_5M_csdata_with_data.RData")
 data=get_raw_reads(csd@data, csd@biases[,min(pos)], csd@biases[,max(pos)])
 plot_binned(data, resolution=10000, b1=csd@biases[,min(pos)], e1=csd@biases[,max(pos)])
 plot_raw(data[rbegin2<min(rbegin1)+10000])
 
-load("data/rao_HiCall_IMR90_Tbx19_700k_csdata_with_data.RData")
+load("data/rao_HiCall_IMR90_FOXP1big_5M_csdata_with_data.RData")
 data2=get_raw_reads(csd@data, csd@biases[,min(pos)], csd@biases[,max(pos)])
 plot_binned(data2, resolution=10000, b1=csd@biases[,min(pos)], e1=csd@biases[,max(pos)])
 plot_raw(data2[rbegin2<min(rbegin1)+10000])
