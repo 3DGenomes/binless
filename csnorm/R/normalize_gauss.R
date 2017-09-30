@@ -745,7 +745,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, fix.lambd
   #perform fused lasso on signal
   groupnames=cts[,unique(name)]
   nbins=length(cs@settings$sbins)-1
-  csigs = foreach(g=groupnames, .combine=c) %do% {
+  csigs = foreach(g=groupnames) %do% {
     csig=new("CSbsig", mat=cs@par$signal[name==g], cts=cts[name==g],
              settings=list(metadata=metadata,
                            nbins=nbins, dispersion=cs@par$alpha,
