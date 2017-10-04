@@ -4,7 +4,8 @@ NULL
 #' compute BIC for a given value of lambda2, optimizing lambda1 and eCprime (performance iteration, persistent state)
 #' @keywords internal
 gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA) {
-  stopifnot(fix.lambda1==F || fix.lambda1.at>0) #otherwise eCprime cannot be determined
+  stopifnot(fix.lambda1==F || fix.lambda1.at>=0) #otherwise eCprime cannot be determined
+  stopifnot(fixed==T || positive==T) #the case positive==F && fixed==F is not implemented
   #
   ctsg=csig@cts
   nbins=csig@settings$nbins
@@ -17,7 +18,7 @@ gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F, fix.lambda
   nperf=csig@settings$nperf
   if (is.null(ctsg.ref)) {
     perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2,
-                                      tol.val, metadata, state$beta, constrained, fixed, fix.lambda1, fix.lambda1.at)
+                                      tol.val, metadata, state$beta, constrained, fixed, positive, fix.lambda1, fix.lambda1.at)
   } else {
     perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2,
                                       tol.val, metadata, state$phi.ref, state$beta, constrained, fix.lambda1, fix.lambda1.at)
@@ -35,9 +36,20 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
     return(csig@state$BIC)
   }
   #
-  #dt.free = foreach (lam=10^(seq(1.1,1.3,length.out=100)),.combine=rbind) %do% {
-  #  obj(log10(lam))
-  #  as.data.table(csig@state$mat)[,.(lambda2=lam,lambda1=csig@state$lambda1,eCprime=csig@state$eCprime,bin1,bin2,phihat,phi,beta)]
+  #dt = foreach (lam=c(1,2,5,10),.combine=rbind) %:%
+  #  foreach (l1min=c(0,0.1,1), .combine=rbind) %dopar% {
+  #    fix.lambda1.at=l1min
+  #    state = csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+  #    mat=as.data.table(state$mat)
+  #    info=as.data.table(state[c("lambda2","lambda1","eCprime","dof","BIC","BIC.sd","converged")])
+  #    cbind(mat,info)
+  #  }
+  #dt3 = foreach (lam=10^seq(-2,0,length.out=10),.combine=rbind) %dopar% {
+  #  fix.lambda1.at=0
+  #  state = csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+  #  mat=as.data.table(state$mat)
+  #  info=as.data.table(state[c("lambda2","lambda1","eCprime","dof","BIC","BIC.sd","converged")])
+  #  cbind(mat,info)
   #}
   #dt.fix = foreach (lam=10^(seq(log10(12.8),log10(13.3),length.out=20)),.combine=rbind) %dopar% {
   #  csig@state <<- csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed)
