@@ -31,7 +31,7 @@ public:
         double precision = converge_+1;
         std::vector<double> beta_old = beta;
         /*Rcpp::Rcout << " Perf iteration: start with lam2= " << lambda2 << " alpha= "
-                    << gauss_.get_alpha() << " phi[0]= " << beta_[0] << "\n";*/
+                    << gauss_.get_alpha() << " phi[0]= " << beta[0] << "\n";*/
         do {
           //update weights
           Timer::start_timer("weight");
@@ -48,10 +48,10 @@ public:
           beta_old = beta;
           /*Rcpp::Rcout << " Iteration " << counter_ << " / " << nouter << " with lam2= " << lambda2 << " alpha= "
             << gauss_.get_alpha() << " reached maxval= " << precision
-            << " after " << gauss_.get_ninner() << " steps " << " phi[0]= " << beta_[0] << "\n";*/
+            << " after " << gauss_.get_ninner() << " steps " << " phi[0]= " << beta[0] << "\n";*/
         } while (counter_ <= nouter && precision > converge_ );
         /*Rcpp::Rcout << " Perf iteration: end with lam2= " << lambda2 << " alpha= "
-        << gauss_.get_alpha() << " phi[0]= " << beta_[0] << "\n";*/
+        << gauss_.get_alpha() << " phi[0]= " << beta[0] << "\n";*/
         Timer::start_timer("weight");
         wt_.update(beta); //store last beta and update weights
         Timer::print_times();
