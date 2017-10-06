@@ -209,6 +209,19 @@ std::vector<double> fast_compute_log_decay(const FastData& data) {
     return log_decay;
 }
 
+double fast_precision(const std::vector<double>& weights, const std::vector<double>& weights_old) {
+    double delta = std::abs(weights[0]-weights_old[0]);
+    double maxval = weights[0];
+    double minval = weights[0];
+    const unsigned N = weights.size();
+    for (unsigned i=1; i < N; ++i) {
+        delta = std::max(std::abs(weights[i]-weights_old[i]), delta);
+        minval = std::min(weights[i],minval);
+        maxval = std::max(weights[i],maxval);
+    }
+    return delta/(maxval-minval);
+}
+
 List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double lam2, double tol_val) {
     //initialize return values, exposures and fused lasso optimizer
     Rcpp::Rcout << "init\n";
@@ -229,6 +242,7 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
         //compute signal
         Rcpp::Rcout << " signal\n";
         auto signal = fast_compute_signal(out, flo, lam2);
+        double precision = fast_precision(signal.weights,out.get_signal_weights());
         out.set_log_signal(signal.beta);
         out.set_signal_phihat(signal.phihat);
         out.set_signal_weights(signal.weights);
@@ -236,6 +250,12 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
         Rcpp::Rcout << " exposures\n";
         auto exposures = fast_compute_exposures(out);
         out.set_exposures(exposures);
+        //check convergence
+        Rcpp::Rcout << " reached relative precision " << precision << "\n";
+        if (precision < tol_val) {
+            Rcpp::Rcout << "converged\n";
+            break;
+        }
     }
     Rcpp::Rcout << "done\n";
     //finalize and return
