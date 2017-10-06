@@ -50,4 +50,11 @@ if (F) {
   #binless and observed
   ggplot(out$mat)+geom_raster(aes(bin1,bin2,fill=binless))+geom_raster(aes(bin2,bin1,fill=log(observed)*max(binless)/log(max(observed))))+
     facet_wrap(~name)+coord_fixed()+scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"), na.value = "white")
+  
+  #diagnostics
+  b=rbindlist(out$diagnostics,use=T,idcol = "step")
+  ggplot(b[,.SD[1],by=c("step","bin1"),.SDcols="biases"][bin1>10&bin1<40])+geom_line(aes(step,biases,colour=bin1,group=bin1))
+  ggplot(b[,.(step,d=bin2-bin1,decay)][,.SD[1],by=c("step","d")][d<100])+geom_line(aes(d,decay,colour=step,group=step))
+  
+  
 }

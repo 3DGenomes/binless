@@ -281,6 +281,7 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
     out.set_exposures(fast_compute_exposures(out));
     const double converge = tol_val/20.;
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge);
+    std::vector<DataFrame> diagnostics;
     for (unsigned step=1; step <= ngibbs; ++step) {
         Rcpp::Rcout << "step " << step << "\n";
         //compute biases
@@ -312,6 +313,7 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
         Rcpp::Rcout << " exposures\n";
         auto exposures = fast_compute_exposures(out);
         out.set_exposures(exposures);
+        diagnostics.push_back(out.get_as_dataframe());
         if (converged) {
             Rcpp::Rcout << "converged or reached last step\n";
             break;
@@ -320,7 +322,8 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
     Rcpp::Rcout << "done\n";
     //finalize and return
     return Rcpp::List::create(_["mat"]=out.get_as_dataframe(), _["log_biases"]=out.get_log_biases(),
-                              _["log_decay"]=out.get_log_decay(), _["exposures"]=out.get_exposures());
+                              _["log_decay"]=out.get_log_decay(), _["exposures"]=out.get_exposures(),
+                              _["diagnostics"]=diagnostics);
 }
 
 
