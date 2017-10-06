@@ -62,6 +62,8 @@ std::vector<double> fast_compute_log_decay(const FastData& data);
 template<typename Lasso>
 SignalTriplet fast_compute_signal(const FastData& data, Lasso& flo, double lam2);
 double fast_precision(const std::vector<double>& weights, const std::vector<double>& weights_old);
+std::vector<double> fast_remove_signal_degeneracy(const FastData& data);
+std::vector<double> fast_shift_signal(const FastData& data);
 
 List fast_binless(const DataFrame obs, unsigned nbins, unsigned nouter, double lam2, double tol_val);
 

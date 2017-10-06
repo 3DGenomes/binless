@@ -75,6 +75,7 @@ Rcpp::DataFrame FastData::get_as_dataframe() const {
                                    _["biases"]=biasmat,
                                    _["decay"]=decaymat,
                                    _["signal"]=log_signal_,
+                                   _["signal_constr"]=fast_remove_signal_degeneracy(*this),
                                    _["binless"]=binless,
                                    _["phihat"]=phihat_,
                                    _["weights"]=weights_ );
@@ -222,6 +223,57 @@ double fast_precision(const std::vector<double>& weights, const std::vector<doub
     return delta/(maxval-minval);
 }
 
+std::vector<double> fast_remove_signal_degeneracy(const FastData& data) {
+    auto dbin1 = data.get_bin1();
+    auto dbin2 = data.get_bin2();
+    auto dname = data.get_name();
+    std::vector<double> log_signal = data.get_log_signal();
+    double max_signal = *std::max_element(log_signal.begin(),log_signal.end());
+    //get minimum signal per row and per counter diagonal
+    std::vector<std::vector<double> > min_per_row(data.get_nbins(),std::vector<double>(data.get_ndatasets(),max_signal));
+    std::vector<std::vector<double> > min_per_diag(data.get_nbins(),std::vector<double>(data.get_ndatasets(),max_signal));
+    for (unsigned i=0; i<data.get_N(); ++i) {
+        unsigned name = dname[i]-1;
+        unsigned bin1 = dbin1[i]-1; //offset by 1 for vector indexing
+        unsigned bin2 = dbin2[i]-1;
+        min_per_diag[bin2-bin1][name] = std::min(min_per_diag[bin2-bin1][name], log_signal[i]);
+        min_per_row[bin1][name] = std::min(min_per_row[bin1][name], log_signal[i]);
+        if (bin1!=bin2) {
+            min_per_row[bin2][name] = std::min(min_per_row[bin2][name], log_signal[i]);
+        }
+    }
+    //remove from each signal row and counter diagonal
+    double max_adjust;
+    for (unsigned i=0; i<data.get_N(); ++i) {
+        unsigned name = dname[i]-1;
+        unsigned bin1 = dbin1[i]-1; //offset by 1 for vector indexing
+        unsigned bin2 = dbin2[i]-1;
+        double adjust = std::max(std::max(min_per_row[bin1][name],min_per_row[bin2][name]),min_per_diag[bin2-bin1][name]);
+        log_signal[i] = std::max(log_signal[i]-adjust,0.);
+        max_adjust = (i==0) ? adjust : std::max(adjust,max_adjust);
+    }
+    Rcpp::Rcout << " max adjustment for constraint: " << max_adjust << "\n";
+    return log_signal;
+}
+
+std::vector<double> fast_shift_signal(const FastData& data) {
+    auto dname = data.get_name();
+    std::vector<double> log_signal = data.get_log_signal();
+    double max_signal = *std::max_element(log_signal.begin(),log_signal.end());
+    //get minimum signal per dataset
+    std::vector<double> min_per_dset(data.get_ndatasets(),max_signal);
+    for (unsigned i=0; i<data.get_N(); ++i) {
+        unsigned name = dname[i]-1;
+        min_per_dset[name] = std::min(min_per_dset[name], log_signal[i]);
+    }
+    //shift signals
+    for (unsigned i=0; i<data.get_N(); ++i) {
+        unsigned name = dname[i]-1;
+        log_signal[i] = std::max(log_signal[i]-min_per_dset[name],0.);
+    }
+    return log_signal;
+}
+
 List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double lam2, double tol_val) {
     //initialize return values, exposures and fused lasso optimizer
     Rcpp::Rcout << "init\n";
@@ -239,21 +291,29 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
         Rcpp::Rcout << " decay\n";
         auto decay = fast_compute_log_decay(out);
         out.set_log_decay(decay);
-        //compute signal
+        //compute signal and precision
         Rcpp::Rcout << " signal\n";
         auto signal = fast_compute_signal(out, flo, lam2);
         double precision = fast_precision(signal.weights,out.get_signal_weights());
+        Rcpp::Rcout << " reached relative precision " << precision << "\n";
+        bool converged = precision < tol_val;
         out.set_log_signal(signal.beta);
         out.set_signal_phihat(signal.phihat);
         out.set_signal_weights(signal.weights);
+        if (converged || step == ngibbs) {
+            auto adjust = fast_shift_signal(out);
+            out.set_log_signal(adjust);
+            } else {
+            auto adjust = fast_remove_signal_degeneracy(out);
+            Rcpp::Rcout << "adjust precision: " << fast_precision(out.get_log_signal(),adjust) << "\n";
+            out.set_log_signal(adjust);
+        }
         //compute exposures
         Rcpp::Rcout << " exposures\n";
         auto exposures = fast_compute_exposures(out);
         out.set_exposures(exposures);
-        //check convergence
-        Rcpp::Rcout << " reached relative precision " << precision << "\n";
-        if (precision < tol_val) {
-            Rcpp::Rcout << "converged\n";
+        if (converged) {
+            Rcpp::Rcout << "converged or reached last step\n";
             break;
         }
     }
