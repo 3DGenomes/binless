@@ -46,7 +46,7 @@ std::vector<double> FastData::get_log_expected() const {
     }
     return log_expected;
 }
-
+ 
 Rcpp::DataFrame FastData::get_as_dataframe() const {
     //bias, decay, signal with decay and exposures, and expected matrix (w/ offset)
     std::vector<double> biasmat,decaymat,binless,expected;
@@ -67,17 +67,17 @@ Rcpp::DataFrame FastData::get_as_dataframe() const {
         binless.push_back(decay + signal);
         expected.push_back(std::exp(bi + bj + decay + signal + exposure));
     }
-    return Rcpp::DataFrame::create(_["name"]=get_name(),
-                                   _["bin1"]=get_bin1(),
-                                   _["bin2"]=get_bin2(),
-                                   _["observed"]=get_observed(),
+    return Rcpp::DataFrame::create(_["name"]=name_,
+                                   _["bin1"]=bin1_,
+                                   _["bin2"]=bin2_,
+                                   _["observed"]=observed_,
                                    _["expected"]=expected,
                                    _["biases"]=biasmat,
                                    _["decay"]=decaymat,
-                                   _["signal"]=get_log_signal(),
+                                   _["signal"]=log_signal_,
                                    _["binless"]=binless,
-                                   _["phihat"]=get_signal_phihat(),
-                                   _["weights"]=get_signal_weights() );
+                                   _["phihat"]=phihat_,
+                                   _["weights"]=weights_ );
 }
 
 
@@ -117,10 +117,10 @@ ResidualsPair get_poisson_residuals(const FastData& data) {
     }
     return ResidualsPair{residuals,weights};
 }
-
+ 
 std::vector<double> fast_compute_exposures(const FastData& data) {
     //get residuals
-    ResidualsPair z = get_normal_residuals(data);
+    ResidualsPair z = get_poisson_residuals(data);
     //average by name
     std::vector<double> exposures(data.get_ndatasets(),0);
     std::vector<double> weightsums(data.get_ndatasets(),0);
@@ -140,7 +140,7 @@ std::vector<double> fast_compute_exposures(const FastData& data) {
 
 std::vector<double> fast_compute_log_biases(const FastData& data) {
     //get residuals
-    ResidualsPair z = get_normal_residuals(data);
+    ResidualsPair z = get_poisson_residuals(data);
     //sum them along the rows/columns
     auto dbin1 = data.get_bin1();
     auto dbin2 = data.get_bin2();
@@ -179,7 +179,7 @@ std::vector<double> fast_compute_log_biases(const FastData& data) {
 
 std::vector<double> fast_compute_log_decay(const FastData& data) {
     //get residuals
-    ResidualsPair z = get_normal_residuals(data);
+    ResidualsPair z = get_poisson_residuals(data);
     //sum them along the diagonals
     auto dbin1 = data.get_bin1();
     auto dbin2 = data.get_bin2();
@@ -216,7 +216,7 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
     out.set_exposures(fast_compute_exposures(out));
     const double converge = tol_val/20.;
     FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge);
-    for (unsigned step=0; step < ngibbs; ++step) {
+    for (unsigned step=1; step <= ngibbs; ++step) {
         Rcpp::Rcout << "step " << step << "\n";
         //compute biases
         Rcpp::Rcout << " biases\n";
