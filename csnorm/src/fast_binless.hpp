@@ -60,7 +60,7 @@ std::vector<double> fast_compute_exposures(const FastData& data);
 std::vector<double> fast_compute_log_biases(const FastData& data);
 std::vector<double> fast_compute_log_decay(const FastData& data);
 template<typename Lasso>
-SignalTriplet fast_compute_signal(const FastData& data, Lasso& flo, double lam2);
+SignalTriplet fast_compute_signal(const FastData& data, std::vector<Lasso>& flo, double lam2);
 double fast_precision(const std::vector<double>& weights, const std::vector<double>& weights_old);
 std::vector<double> fast_remove_signal_degeneracy(const FastData& data);
 std::vector<double> fast_shift_signal(const FastData& data);

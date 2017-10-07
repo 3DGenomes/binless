@@ -1,6 +1,6 @@
 
 template<typename Lasso>
-SignalTriplet fast_compute_signal(const FastData& data, Lasso& flo, double lam2) {
+SignalTriplet fast_compute_signal(const FastData& data, std::vector<Lasso>& flos, double lam2) {
     //get residuals
     ResidualsPair z = get_poisson_residuals(data);
     //build signal matrix
@@ -20,9 +20,9 @@ SignalTriplet fast_compute_signal(const FastData& data, Lasso& flo, double lam2)
         //run fused lasso
         std::vector<double> y(phihat.cbegin() + dset*data.get_ncells(), phihat.cbegin() + (dset+1)*data.get_ncells());
         std::vector<double> wt(weights.cbegin() + dset*data.get_ncells(), weights.cbegin() + (dset+1)*data.get_ncells());
-        flo.optimize(y, wt, lam2);
+        flos[dset].optimize(y, wt, lam2);
         //subtract average and return
-        std::vector<double> beta = flo.get();
+        std::vector<double> beta = flos[dset].get();
         double avg = std::accumulate(beta.begin(),beta.end(),0.)/beta.size();
         for (unsigned i=0; i<data.get_ncells(); ++i) {
             beta[i] = beta[i] - avg;

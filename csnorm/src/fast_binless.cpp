@@ -280,7 +280,8 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
     FastData out(obs, nbins);
     out.set_exposures(fast_compute_exposures(out));
     const double converge = tol_val/20.;
-    FusedLassoGaussianEstimator<GFLLibrary> flo(nbins, converge);
+    std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
+                                                               FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge));
     std::vector<DataFrame> diagnostics;
     for (unsigned step=1; step <= ngibbs; ++step) {
         Rcpp::Rcout << "step " << step << "\n";
@@ -292,21 +293,22 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
         Rcpp::Rcout << " decay\n";
         auto decay = fast_compute_log_decay(out);
         out.set_log_decay(decay);
-        //compute signal and precision
+        //compute signal
         Rcpp::Rcout << " signal\n";
-        auto signal = fast_compute_signal(out, flo, lam2);
-        double precision = fast_precision(signal.weights,out.get_signal_weights());
-        Rcpp::Rcout << " reached relative precision " << precision << "\n";
-        bool converged = precision < tol_val;
+        auto old_weights = out.get_signal_weights();
+        auto signal = fast_compute_signal(out, flos, lam2);
         out.set_log_signal(signal.beta);
         out.set_signal_phihat(signal.phihat);
         out.set_signal_weights(signal.weights);
+        //compute precision and convergence
+        double precision = fast_precision(out.get_signal_weights(),old_weights);
+        Rcpp::Rcout << " reached relative precision " << precision << "\n";
+        bool converged = precision < tol_val;
         if (converged || step == ngibbs) {
             auto adjust = fast_shift_signal(out);
             out.set_log_signal(adjust);
-            } else {
+        } else {
             auto adjust = fast_remove_signal_degeneracy(out);
-            Rcpp::Rcout << "adjust precision: " << fast_precision(out.get_log_signal(),adjust) << "\n";
             out.set_log_signal(adjust);
         }
         //compute exposures
