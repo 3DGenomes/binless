@@ -7,7 +7,7 @@ setwd("/Users/yannick/Documents/simulations/cs_norm")
 
 load("foxp1ext_observed.RData")
 
-nouter=5
+nouter=20
 lam2=5
 tol_val=1e-3
 out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], nouter, lam2, tol_val)
@@ -16,7 +16,6 @@ save(out,file="out.dat")
 
 if (F) {
   #TODO: smooth decay
-  #TODO: see if weight update inside each op makes it faster
   #TODO: difference calculation
   #TODO: negative binomial
   a=as.data.table(out$mat)
@@ -65,5 +64,11 @@ if (F) {
   ggplot(b[name==name[1]])+geom_raster(aes(bin1,bin2,fill=signal))+geom_raster(aes(bin2,bin1,fill=signal))+
     facet_wrap(~step)+coord_fixed()+scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"))
   
-  
+  k=0.9
+  smoothed=decay[,log_decay[1:2]]
+  for (i in 3:decay[,.N]) {
+    smoothed=c(smoothed,k*tail(smoothed,1)+(1-k)*decay[i,log_decay])
+  }
+  decay[,smoothed:=smoothed]
+  ggplot(decay)+geom_point(aes(distance,log_decay))+geom_line(aes(distance,smoothed),colour="red")
 }

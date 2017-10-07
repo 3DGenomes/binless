@@ -4,10 +4,10 @@ using namespace Rcpp;
 #include <vector>
 #include <algorithm>
 
-#include "FastData.hpp"
+#include "FastSignalData.hpp"
 
 
-FastData::FastData(const DataFrame& obs, unsigned nbins) :
+FastSignalData::FastSignalData(const DataFrame& obs, unsigned nbins) :
 name_(Rcpp::as<std::vector<unsigned> >(obs["name"])),
 bin1_(Rcpp::as<std::vector<unsigned> >(obs["bin1"])),
 bin2_(Rcpp::as<std::vector<unsigned> >(obs["bin2"])),
@@ -27,7 +27,7 @@ exposures_(std::vector<double>(ndatasets_,0)) {
       Rcpp::stop("bins should range from 1 to the number of bins");
 }
 
-std::vector<double> FastData::get_log_expected() const {
+std::vector<double> FastSignalData::get_log_expected() const {
     std::vector<double> log_expected;
     log_expected.reserve(get_N());
     for (unsigned i=0; i<get_N(); ++i) {
@@ -45,7 +45,7 @@ std::vector<double> FastData::get_log_expected() const {
     return log_expected;
 }
  
-Rcpp::DataFrame FastData::get_as_dataframe() const {
+Rcpp::DataFrame FastSignalData::get_as_dataframe() const {
     //bias, decay, signal with decay and exposures, and expected matrix (w/ offset)
     std::vector<double> biasmat,decaymat,binless,expected;
     biasmat.reserve(get_N());

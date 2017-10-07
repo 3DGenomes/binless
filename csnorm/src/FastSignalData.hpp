@@ -1,13 +1,13 @@
-#ifndef FAST_DATA_HPP
-#define FAST_DATA_HPP
+#ifndef FAST_SIGNAL_DATA_HPP
+#define FAST_SIGNAL_DATA_HPP
 
 #include <Rcpp.h>
 using namespace Rcpp;
 #include <vector>
 
-class FastData {
+class FastSignalData {
 public:
-    FastData(const DataFrame& obs, unsigned nbins);
+    FastSignalData(const DataFrame& obs, unsigned nbins);
     
     unsigned get_N() const { return N_; }
     unsigned get_nbins() const { return nbins_; }

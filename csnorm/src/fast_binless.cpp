@@ -10,7 +10,7 @@ using namespace Rcpp;
 
 
 //residuals: normal with log-link, 0 drops data
-ResidualsPair get_normal_residuals(const FastData& data) {
+ResidualsPair get_normal_residuals(const FastSignalData& data) {
     std::vector<double> residuals;
     std::vector<double> weights;
     residuals.reserve(data.get_N());
@@ -30,7 +30,7 @@ ResidualsPair get_normal_residuals(const FastData& data) {
 }
 
 //residuals: poisson with log-link
-ResidualsPair get_poisson_residuals(const FastData& data) {
+ResidualsPair get_poisson_residuals(const FastSignalData& data) {
     std::vector<double> residuals;
     std::vector<double> weights;
     residuals.reserve(data.get_N());
@@ -45,7 +45,7 @@ ResidualsPair get_poisson_residuals(const FastData& data) {
     return ResidualsPair{residuals,weights};
 }
  
-std::vector<double> fast_compute_exposures(const FastData& data) {
+std::vector<double> fast_compute_exposures(const FastSignalData& data) {
     //get residuals
     ResidualsPair z = get_poisson_residuals(data);
     //average by name
@@ -65,7 +65,7 @@ std::vector<double> fast_compute_exposures(const FastData& data) {
     return exposures;
 }
 
-std::vector<double> fast_compute_log_biases(const FastData& data) {
+std::vector<double> fast_compute_log_biases(const FastSignalData& data) {
     //get residuals
     ResidualsPair z = get_poisson_residuals(data);
     //sum them along the rows/columns
@@ -104,7 +104,7 @@ std::vector<double> fast_compute_log_biases(const FastData& data) {
 }
 
 
-std::vector<double> fast_compute_log_decay(const FastData& data) {
+std::vector<double> fast_compute_log_decay(const FastSignalData& data) {
     //get residuals
     ResidualsPair z = get_poisson_residuals(data);
     //sum them along the diagonals
@@ -149,7 +149,7 @@ double fast_precision(const std::vector<double>& weights, const std::vector<doub
     return delta/(maxval-minval);
 }
 
-std::vector<double> fast_remove_signal_degeneracy(const FastData& data) {
+std::vector<double> fast_remove_signal_degeneracy(const FastSignalData& data) {
     auto dbin1 = data.get_bin1();
     auto dbin2 = data.get_bin2();
     auto dname = data.get_name();
@@ -182,7 +182,7 @@ std::vector<double> fast_remove_signal_degeneracy(const FastData& data) {
     return log_signal;
 }
 
-std::vector<double> fast_shift_signal(const FastData& data) {
+std::vector<double> fast_shift_signal(const FastSignalData& data) {
     auto dname = data.get_name();
     std::vector<double> log_signal = data.get_log_signal();
     double max_signal = *std::max_element(log_signal.begin(),log_signal.end());
@@ -203,7 +203,7 @@ std::vector<double> fast_shift_signal(const FastData& data) {
 List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double lam2, double tol_val) {
     //initialize return values, exposures and fused lasso optimizer
     Rcpp::Rcout << "init\n";
-    FastData out(obs, nbins);
+    FastSignalData out(obs, nbins);
     out.set_exposures(fast_compute_exposures(out));
     const double converge = tol_val/20.;
     std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
@@ -251,8 +251,5 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
     //finalize and return
     return Rcpp::List::create(_["mat"]=out.get_as_dataframe(), _["log_biases"]=out.get_log_biases(),
                               _["log_decay"]=out.get_log_decay(), _["exposures"]=out.get_exposures(),
-                              _["diagnostics"]=diagnostics);
+                              _["diagnostics"]=diagnostics, _["nbins"]=nbins);
 }
-
-
-

@@ -1,6 +1,6 @@
 
 template<typename Lasso>
-SignalTriplet fast_compute_signal(const FastData& data, std::vector<Lasso>& flos, double lam2) {
+SignalTriplet fast_compute_signal(const FastSignalData& data, std::vector<Lasso>& flos, double lam2) {
     //get residuals
     ResidualsPair z = get_poisson_residuals(data);
     //build signal matrix
