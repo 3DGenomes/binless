@@ -9,6 +9,7 @@ using namespace Rcpp;
 #include "FusedLassoGaussianEstimator.hpp"
 
 struct ResidualsPair { std::vector<double> residuals,weights; };
+struct PrecisionPair { double abs,rel; };
 struct SignalTriplet { std::vector<double> phihat, weights, beta; };
 struct DifferenceQuadruplet { std::vector<double> deltahat,weights,delta,phi_ref; };
 
@@ -25,7 +26,7 @@ SignalTriplet fast_compute_signal(const FastSignalData& data, std::vector<Lasso>
 template<typename Lasso>
 DifferenceQuadruplet fast_compute_difference(const FastDifferenceData& data, std::vector<Lasso>& flos, double lam2, unsigned ref);
 
-double fast_precision(const std::vector<double>& weights, const std::vector<double>& weights_old);
+PrecisionPair fast_precision(const std::vector<double>& weights, const std::vector<double>& weights_old);
 std::vector<double> fast_remove_signal_degeneracy(const FastSignalData& data);
 std::vector<double> fast_shift_signal(const FastSignalData& data);
 

@@ -99,7 +99,7 @@ std::vector<double> fast_compute_log_decay(const FastSignalData& data) {
     return log_decay;
 }
 
-double fast_precision(const std::vector<double>& weights, const std::vector<double>& weights_old) {
+PrecisionPair fast_precision(const std::vector<double>& weights, const std::vector<double>& weights_old) {
     double delta = std::abs(weights[0]-weights_old[0]);
     double maxval = weights[0];
     double minval = weights[0];
@@ -109,7 +109,7 @@ double fast_precision(const std::vector<double>& weights, const std::vector<doub
         minval = std::min(weights[i],minval);
         maxval = std::max(weights[i],maxval);
     }
-    return delta/(maxval-minval);
+    return PrecisionPair{delta,delta/(maxval-minval)};
 }
 
 std::vector<double> fast_remove_signal_degeneracy(const FastSignalData& data) {
@@ -186,11 +186,11 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
         out.set_signal_phihat(signal.phihat);
         out.set_signal_weights(signal.weights);
         //compute precision and convergence
-        double precision = fast_precision(out.get_signal_weights(),old_weights);
-        Rcpp::Rcout << " : reached relative precision " << precision << "\n";
-        bool converged = precision <= tol_val && current_tol_val <= tol_val*1.01;
+        auto precision = fast_precision(out.get_signal_weights(),old_weights);
+        Rcpp::Rcout << " : reached precision abs = " << precision.abs << " rel = " << precision.rel << "\n";
+        bool converged = precision.rel <= tol_val && current_tol_val <= tol_val*1.01;
         //update tolerance
-        current_tol_val = std::max(tol_val, precision);
+        current_tol_val = std::min(current_tol_val,std::max(tol_val, precision.abs));
         for (unsigned i=0; i<out.get_ndatasets(); ++i) flos[i].set_tol(current_tol_val/20);
         //shift signal
         if (converged || step == ngibbs) {

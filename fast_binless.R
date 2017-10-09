@@ -7,9 +7,9 @@ setwd("/Users/yannick/Documents/simulations/cs_norm")
 
 load("foxp1ext_observed.RData")
 
-nouter=20
+nouter=50
 lam2=5
-tol_val=1e-3
+tol_val=1e-1
 out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], nouter, lam2, tol_val)
 save(out,file="out.dat")
 
@@ -63,13 +63,6 @@ if (F) {
   #binless and observed
   ggplot(out$mat)+geom_raster(aes(bin1,bin2,fill=binless))+geom_raster(aes(bin2,bin1,fill=log(observed)*max(binless)/log(max(observed))))+
     facet_wrap(~name)+coord_fixed()+scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"), na.value = "white")
-  
-  #diagnostics
-  b2=rbindlist(out$diagnostics,use=T,idcol = "step")
-  ggplot(b[,.SD[1],by=c("step","bin1"),.SDcols="biases"][bin1>10&bin1<40])+geom_line(aes(step,biases,colour=bin1,group=bin1))
-  ggplot(b[,.(step,d=bin2-bin1,decay)][,.SD[1],by=c("step","d")][d<100])+geom_line(aes(d,decay,colour=step,group=step))
-  ggplot(b[name==name[1]])+geom_raster(aes(bin1,bin2,fill=signal))+geom_raster(aes(bin2,bin1,fill=signal))+
-    facet_wrap(~step)+coord_fixed()+scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"))
   
   #differences: log(observed)
   ggplot(diff)+geom_raster(aes(bin1,bin2,fill=log(observed)))+
