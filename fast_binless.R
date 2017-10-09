@@ -9,7 +9,7 @@ load("foxp1ext_observed.RData")
 
 nouter=20
 lam2=5
-tol_val=1e-2
+tol_val=1e-3
 out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], nouter, lam2, tol_val)
 save(out,file="out.dat")
 
