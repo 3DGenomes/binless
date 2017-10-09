@@ -141,7 +141,6 @@ std::vector<double> fast_remove_signal_degeneracy(const FastSignalData& data) {
         log_signal[i] = std::max(log_signal[i]-adjust,0.);
         max_adjust = (i==0) ? adjust : std::max(adjust,max_adjust);
     }
-    Rcpp::Rcout << " max adjustment for constraint: " << max_adjust << "\n";
     return log_signal;
 }
 
@@ -173,17 +172,14 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
                                                                FusedLassoGaussianEstimator<GFLLibrary>(nbins, current_tol_val/20.));
     std::vector<DataFrame> diagnostics;
     for (unsigned step=1; step <= ngibbs; ++step) {
-        Rcpp::Rcout << "step " << step << "\n";
+        Rcpp::Rcout << "step " << step;
         //compute biases
-        Rcpp::Rcout << " biases\n";
         auto biases = fast_compute_log_biases(out);
         out.set_log_biases(biases);
         //compute decay
-        Rcpp::Rcout << " decay\n";
         auto decay = fast_compute_log_decay(out);
         out.set_log_decay(decay);
         //compute signal
-        Rcpp::Rcout << " signal\n";
         auto old_weights = out.get_signal_weights();
         auto signal = fast_compute_signal(out, flos, lam2);
         out.set_log_signal(signal.beta);
@@ -191,7 +187,7 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
         out.set_signal_weights(signal.weights);
         //compute precision and convergence
         double precision = fast_precision(out.get_signal_weights(),old_weights);
-        Rcpp::Rcout << " reached relative precision " << precision << "\n";
+        Rcpp::Rcout << " : reached relative precision " << precision << "\n";
         bool converged = precision <= tol_val && current_tol_val <= tol_val*1.01;
         //update tolerance
         current_tol_val = std::max(tol_val, precision);
@@ -205,12 +201,11 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
             out.set_log_signal(adjust);
         }
         //compute exposures
-        Rcpp::Rcout << " exposures\n";
         auto exposures = fast_compute_exposures(out);
         out.set_exposures(exposures);
         diagnostics.push_back(out.get_as_dataframe());
         if (converged) {
-            Rcpp::Rcout << "converged or reached last step\n";
+            Rcpp::Rcout << "converged\n";
             break;
         }
     }
