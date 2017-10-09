@@ -13,5 +13,6 @@ RCPP_MODULE(csnorm_cpp) {
     function("wgfl_diff_BIC", &wgfl_diff_BIC, "documentation for wgfl_diff_BIC ");
     
     function("fast_binless", &fast_binless, "documentation for fast_binless ");
+    function("fast_binless_difference", &fast_binless_difference, "documentation for fast_binless_difference ");
 }
 

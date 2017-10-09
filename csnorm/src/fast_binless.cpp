@@ -7,43 +7,6 @@ using namespace Rcpp;
 #include "fast_binless.hpp"
 #include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
-
-
-//residuals: normal with log-link, 0 drops data
-ResidualsPair get_normal_residuals(const FastSignalData& data) {
-    std::vector<double> residuals;
-    std::vector<double> weights;
-    residuals.reserve(data.get_N());
-    weights.reserve(data.get_N());
-    auto log_expected = data.get_log_expected();
-    auto observed = data.get_observed();
-    for (unsigned i=0; i<data.get_N(); ++i) {
-        if (observed[i]>0) {
-            residuals.push_back( log(observed[i]) - log_expected[i] );
-            weights.push_back( 1 );
-        } else {
-            residuals.push_back(  0 );
-            weights.push_back( 0 );
-        }
-    }
-    return ResidualsPair{residuals,weights};
-}
-
-//residuals: poisson with log-link
-ResidualsPair get_poisson_residuals(const FastSignalData& data) {
-    std::vector<double> residuals;
-    std::vector<double> weights;
-    residuals.reserve(data.get_N());
-    weights.reserve(data.get_N());
-    auto log_expected = data.get_log_expected();
-    auto observed = data.get_observed();
-    for (unsigned i=0; i<data.get_N(); ++i) {
-        double expected_i = std::exp(log_expected[i]);
-        residuals.push_back( (observed[i]/expected_i) - 1);
-        weights.push_back( expected_i );
-    }
-    return ResidualsPair{residuals,weights};
-}
  
 std::vector<double> fast_compute_exposures(const FastSignalData& data) {
     //get residuals
@@ -253,3 +216,31 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
                               _["log_decay"]=out.get_log_decay(), _["exposures"]=out.get_exposures(),
                               _["diagnostics"]=diagnostics, _["nbins"]=nbins);
 }
+ 
+Rcpp::DataFrame fast_binless_difference(const List obs, double lam2, double tol_val, unsigned ref) {
+    //read normalization data
+    const unsigned nbins = obs["nbins"];
+    const Rcpp::DataFrame mat = Rcpp::as<Rcpp::DataFrame>(obs["mat"]);
+    FastDifferenceData out(mat, nbins, ref);
+    auto signal = Rcpp::as<std::vector<double> >(mat["signal"]);
+    out.set_log_signal(signal); //fills-in phi_ref and delta
+    auto log_decay = Rcpp::as<std::vector<double> >(obs["log_decay"]);
+    out.set_log_decay(log_decay);
+    auto log_biases = Rcpp::as<std::vector<double> >(obs["log_biases"]);
+    out.set_log_biases(log_biases);
+    auto exposures = Rcpp::as<std::vector<double> >(obs["exposures"]);
+    out.set_exposures(exposures);
+    const double converge = tol_val/20.;
+    std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
+                                                               FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge));
+    //compute differences
+    auto old_weights = out.get_difference_weights();
+    auto diff = fast_compute_difference(out, flos, lam2, ref);
+    out.set_log_difference(diff.delta);
+    out.set_deltahat(diff.deltahat);
+    out.set_difference_weights(diff.weights);
+    out.set_phi_ref(diff.phi_ref);
+    //finalize and return
+    return out.get_as_dataframe();
+}
+

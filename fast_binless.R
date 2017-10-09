@@ -9,10 +9,18 @@ load("foxp1ext_observed.RData")
 
 nouter=20
 lam2=5
-tol_val=1e-3
-out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], nouter, lam2, tol_val)
+tol_val=1e-2
+#out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], nouter, lam2, tol_val)
+#save(out,file="out.dat")
 
-save(out,file="out.dat")
+load("out.dat")
+diff=as.data.table(csnorm:::fast_binless_difference(out, lam2, tol_val, 1))
+save(out,diff,file="out.dat")
+
+#to debug:
+#dsymutil /Library/Frameworks/R.framework/Versions/3.3/Resources/library/csnorm/libs/csnorm.so
+#R -d "valgrind --dsymutil=yes" -f fast_binless.R 2>&1 | tee valgrind.out
+
 
 if (F) {
   #TODO: smooth decay
@@ -64,11 +72,53 @@ if (F) {
   ggplot(b[name==name[1]])+geom_raster(aes(bin1,bin2,fill=signal))+geom_raster(aes(bin2,bin1,fill=signal))+
     facet_wrap(~step)+coord_fixed()+scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"))
   
-  k=0.9
-  smoothed=decay[,log_decay[1:2]]
-  for (i in 3:decay[,.N]) {
-    smoothed=c(smoothed,k*tail(smoothed,1)+(1-k)*decay[i,log_decay])
-  }
-  decay[,smoothed:=smoothed]
-  ggplot(decay)+geom_point(aes(distance,log_decay))+geom_line(aes(distance,smoothed),colour="red")
+  #differences: log(observed)
+  ggplot(diff)+geom_raster(aes(bin1,bin2,fill=log(observed)))+
+    geom_raster(aes(bin2,bin1,fill=log(observed)))+facet_wrap(~name)+
+    scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"),na.value = "white")+coord_fixed()
+  #differences: phi_ref vs phihat
+  ggplot(diff)+geom_raster(aes(bin1,bin2,fill=pmin(phi_ref,5)))+
+    geom_raster(aes(bin2,bin1,fill=pmin(phihat,5)),data=out$mat)+facet_wrap(~name)+
+    scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"))+coord_fixed()
+  #differences: delta
+  ggplot(diff)+geom_raster(aes(bin1,bin2,fill=delta))+
+    geom_raster(aes(bin2,bin1,fill=delta))+facet_wrap(~name)+
+    scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"))+coord_fixed()
+  
+  
+  iter=diff[,.(name,bin1,bin2,observed,I=.I-1)]
+  a=fread("test.dat")
+  a=dcast(a, V2~V1)
+  setnames(a,"V2","I")
+  iter=merge(a,iter,by="I")
+
+  #phihat diff vs signal
+  ggplot(diff)+geom_raster(aes(bin1,bin2,fill=pmin(phihat,5)),data=iter)+
+    geom_raster(aes(bin2,bin1,fill=pmin(phihat,5)),data=out$mat)+facet_wrap(~name)+
+    scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"))+coord_fixed()
+  #phihat_ref diff vs phihat signal
+  ggplot(diff)+geom_raster(aes(bin1,bin2,fill=pmin(phihat_ref,5)),data=iter)+
+    geom_raster(aes(bin2,bin1,fill=pmin(phihat,5)),data=out$mat)+facet_wrap(~name)+
+    scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"))+coord_fixed()
+  #weights diff vs signal
+  ggplot(diff)+geom_raster(aes(bin1,bin2,fill=pmin(weights,5)),data=iter)+
+    geom_raster(aes(bin2,bin1,fill=pmin(weights,5)),data=out$mat)+facet_wrap(~name)+
+    scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"))+coord_fixed()
+  #weights_ref vs weights
+  ggplot(diff)+geom_raster(aes(bin1,bin2,fill=pmin(weights,5)),data=iter)+
+    geom_raster(aes(bin2,bin1,fill=pmin(weights_ref,5)),data=iter)+facet_wrap(~name)+
+    scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"))+coord_fixed()
+  #phihat vs deltahat
+  ggplot(diff)+geom_raster(aes(bin1,bin2,fill=pmin(phihat,5)),data=iter)+
+    geom_raster(aes(bin2,bin1,fill=pmin(deltahat,5)),data=iter)+facet_wrap(~name)+
+    scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"))+coord_fixed()
+  #delta vs deltahat
+  ggplot(diff)+geom_raster(aes(bin1,bin2,fill=delta),data=iter)+
+    geom_raster(aes(bin2,bin1,fill=pmin(deltahat,5)),data=iter)+facet_wrap(~name)+
+    scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"))+coord_fixed()
+  #phi_ref vs phihat_ref
+  ggplot(diff)+geom_raster(aes(bin1,bin2,fill=pmin(phi_ref,5)),data=iter)+
+    geom_raster(aes(bin2,bin1,fill=pmin(phihat_ref,5)),data=iter)+facet_wrap(~name)+
+    scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"))+coord_fixed()
+  
 }
