@@ -193,9 +193,10 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
         double precision = fast_precision(out.get_signal_weights(),old_weights);
         Rcpp::Rcout << " reached relative precision " << precision << "\n";
         bool converged = precision <= tol_val && current_tol_val <= tol_val*1.01;
+        //update tolerance
         current_tol_val = std::max(tol_val, precision);
         for (unsigned i=0; i<out.get_ndatasets(); ++i) flos[i].set_tol(current_tol_val/20);
-        
+        //shift signal
         if (converged || step == ngibbs) {
             auto adjust = fast_shift_signal(out);
             out.set_log_signal(adjust);
@@ -222,6 +223,7 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
  
 Rcpp::DataFrame fast_binless_difference(const List obs, double lam2, double tol_val, unsigned ref) {
     //read normalization data
+    Rcpp::Rcout << "init\n";
     const unsigned nbins = obs["nbins"];
     const Rcpp::DataFrame mat = Rcpp::as<Rcpp::DataFrame>(obs["mat"]);
     FastDifferenceData out(mat, nbins, ref);
@@ -237,6 +239,7 @@ Rcpp::DataFrame fast_binless_difference(const List obs, double lam2, double tol_
     std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
                                                                FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge));
     //compute differences
+    Rcpp::Rcout << "compute\n";
     auto old_weights = out.get_difference_weights();
     auto diff = fast_compute_difference(out, flos, lam2, ref);
     out.set_log_difference(diff.delta);
@@ -244,6 +247,7 @@ Rcpp::DataFrame fast_binless_difference(const List obs, double lam2, double tol_
     out.set_difference_weights(diff.weights);
     out.set_phi_ref(diff.phi_ref);
     //finalize and return
+    Rcpp::Rcout << "done\n";
     return out.get_as_dataframe();
 }
 
