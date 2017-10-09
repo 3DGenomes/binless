@@ -5,9 +5,18 @@ library(scales)
 
 setwd("/Users/yannick/Documents/simulations/cs_norm")
 
-load("foxp1ext_observed.RData")
+#load("foxp1ext_observed.RData")
+#load("pauli_mat.RData")
 
-nouter=25
+load("data/rao_HiCall_GM12878_FOXP1ext_2.3M_csdata.RData")
+csd1=csd
+load("data/rao_HiCall_IMR90_FOXP1ext_2.3M_csdata.RData")
+csd2=csd
+cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
+#now we bin the raw data at the base resolution we want, and put it in a data table
+mat=csnorm:::bin_data(cs,resolution=8000)
+
+nouter=20
 lam2=5
 tol_val=1e-1
 out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], nouter, lam2, tol_val)
