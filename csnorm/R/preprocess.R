@@ -88,25 +88,40 @@ get_raw_reads = function(data, b1, e1, b2=NULL, e2=NULL) {
 #' Bin a reads data.table into a matrix of a given resolution
 #'
 #' @return a data.table representing the binned data
-#' @keywords internal
+#' @export
 #'
 #' @examples
-
-bin_data = function(data, resolution, b1=NULL, b2=NULL) {
-  if (is.null(b1)) b1=data[,min(begin1)]-1
-  if (is.null(b2)) b2=data[,min(begin2)]-1
-  bins1=seq(b1,data[,max(begin1)]+resolution,resolution)
-  bins2=seq(b2,data[,max(begin2)]+resolution,resolution)
+bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
+  counts=data.table()
+  if (class(obj)[1] == "data.table") {
+    if (is.null(b1)) b1=obj[,min(begin1)]-1
+    if (is.null(b2)) b2=obj[,min(begin2)]-1
+    bins1=seq(b1,obj[,max(begin1)]+resolution,resolution)
+    bins2=seq(b2,obj[,max(begin2)]+resolution,resolution)
+    #
+    counts = obj[,.(begin1,begin2,bin1=cut2(begin1, bins1, oneval=F, onlycuts=T, digits=10),
+                  bin2=cut2(begin2, bins2, oneval=F, onlycuts=T, digits=10))
+               ][,.(observed=.N),by=c("bin1","bin2")]
+  } else if (class(obj)[1] == "CSnorm") {
+    if (!is.null(b1)) stop("b1 must be NULL when passing CSnorm object")
+    if (!is.null(b2)) stop("b2 must be NULL when passing CSnorm object")
+    bin_borders=cs@biases[,seq(min(pos)-1,max(pos)+1+resolution,resolution)]
+    bins=cut(head(bin_borders,n=length(bin_borders)-1)+resolution/2, bin_borders,
+             ordered_result=T, right=F, include.lowest=T,dig.lab=12)
+    counts=CJ(name=cs@experiments[,name],bin1=bins,bin2=bins)[bin2>=bin1]
+    poscounts=cs@counts[,.(name,bin1=cut(pos1, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+                                bin2=cut(pos2, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+                           observed=contact.close+contact.far+contact.up+contact.down)][
+                             ,.(observed=sum(observed)),keyby=key(counts)]
+    counts=poscounts[counts]
+    counts[is.na(observed),observed:=0]
+  }
   #
-  sub = data[,.(begin1,begin2,bin1=cut2(begin1, bins1, oneval=F, onlycuts=T, digits=10),
-                bin2=cut2(begin2, bins2, oneval=F, onlycuts=T, digits=10))
-             ][,.N,by=c("bin1","bin2")]
-  #
-  sub[,begin1:=do.call(as.integer, tstrsplit(as.character(bin1), "[[,]")[2])]
-  sub[,end1:=do.call(as.integer, tstrsplit(as.character(bin1), "[],)]")[2])]
-  sub[,begin2:=do.call(as.integer, tstrsplit(as.character(bin2), "[[,]")[2])]
-  sub[,end2:=do.call(as.integer, tstrsplit(as.character(bin2), "[],)]")[2])]
-  return(sub)
+  counts[,begin1:=do.call(as.integer, tstrsplit(as.character(bin1), "[[,]")[2])]
+  counts[,end1:=do.call(as.integer, tstrsplit(as.character(bin1), "[],)]")[2])]
+  counts[,begin2:=do.call(as.integer, tstrsplit(as.character(bin2), "[[,]")[2])]
+  counts[,end2:=do.call(as.integer, tstrsplit(as.character(bin2), "[],)]")[2])]
+  return(counts)
 }
 
 #' Plot reads in binned form at a given resolution
@@ -127,7 +142,7 @@ plot_binned = function(dt, resolution, b1, e1, b2=NULL, e2=NULL, diagonal=F, rsi
   if (is.null(e2)) e2=e1
   binned = bin_data(dt, resolution, b1=b1, b2=b2)
   #
-  p=ggplot(binned, aes(begin1,begin2, fill=log(N)))+geom_raster()+
+  p=ggplot(binned, aes(begin1,begin2, fill=log(observed)))+geom_raster()+
     coord_cartesian(xlim=c(b1,e1),ylim=c(b2,e2))+
     scale_fill_gradient(low="white", high="black")
   if (diagonal) p = p+stat_function(fun=function(x){x})
