@@ -7,14 +7,14 @@ setwd("/Users/yannick/Documents/simulations/cs_norm")
 
 load("foxp1ext_observed.RData")
 
-nouter=50
+nouter=25
 lam2=5
 tol_val=1e-1
 out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], nouter, lam2, tol_val)
-save(out,file="out.dat")
+#save(out,file="out.dat")
 
-diff=as.data.table(csnorm:::fast_binless_difference(out, lam2, tol_val, 1))
-save(out,diff,file="out.dat")
+#diff=as.data.table(csnorm:::fast_binless_difference(out, lam2, tol_val, 1))
+#save(out,diff,file="out.dat")
 
 #to debug:
 #dsymutil /Library/Frameworks/R.framework/Versions/3.3/Resources/library/csnorm/libs/csnorm.so
