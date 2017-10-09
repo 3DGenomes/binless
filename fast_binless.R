@@ -10,12 +10,12 @@ load("foxp1ext_observed.RData")
 nouter=20
 lam2=5
 tol_val=1e-2
-#out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], nouter, lam2, tol_val)
-#save(out,file="out.dat")
+out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], nouter, lam2, tol_val)
+save(out,file="out.dat")
 
-load("out.dat")
-diff=as.data.table(csnorm:::fast_binless_difference(out, lam2, tol_val, 1))
-save(out,diff,file="out.dat")
+#load("out.dat")
+#diff=as.data.table(csnorm:::fast_binless_difference(out, lam2, tol_val, 1))
+#save(out,diff,file="out.dat")
 
 #to debug:
 #dsymutil /Library/Frameworks/R.framework/Versions/3.3/Resources/library/csnorm/libs/csnorm.so

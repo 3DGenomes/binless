@@ -20,15 +20,18 @@ public:
     //initialize the problem with a triangle grid with nrows
     //requesting precision to be below a given convergence criterion
     //final beta value will be clamped if clamp>0
-    FusedLassoGaussianEstimator(unsigned nrows, double converge) : Library(nrows, converge),
+    FusedLassoGaussianEstimator(unsigned nrows, double tol) : Library(nrows), tol_(tol),
     clamp_(Settings<FusedLassoGaussianEstimator<Library> >::get_clamp()) {}
     
     //run the optimization on the given data. The objective is
     // sum_i w_i(y_i-beta_i)^2 + lambda2 * sum_ij |beta_i-beta_j|
     // y, w and lambda2 are held constant, while beta starts at beta_init
     void optimize(const std::vector<double>& y, const std::vector<double>& w, double lambda2) {
-        Library::optimize(y, w, lambda2);
+        Library::optimize(y, w, lambda2, tol_);
     }
+    
+    double get_tol() const { return tol_; }
+    void set_tol(double tol) { tol_ = tol; }
     
     //return soft-thresholded value, corresponding to the problem
     // sum_i w_i(y_i-offset-beta_i)^2 + lambda2 * sum_ij |beta_i-beta_j| + lambda1 * sum_i |beta_i|
@@ -50,6 +53,7 @@ private:
         return beta;
     }
     
+    double tol_;
     const double clamp_;
     
 };

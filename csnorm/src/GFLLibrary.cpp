@@ -55,12 +55,12 @@ void GFLLibrary::reset() {
     u_ = std::vector<double>(tsz_,0);
 }
 
-void GFLLibrary::optimize(const std::vector<double>& y, const std::vector<double>& w, double lambda2) {
+void GFLLibrary::optimize(const std::vector<double>& y, const std::vector<double>& w, double lambda2, double converge) {
     //perform optimization on the C side
     double* py = const_cast<double*>(&y[0]);
     double* pw = const_cast<double*>(&w[0]);
     int counter = graph_fused_lasso_weight_warm (N_, py, pw, ntrails_, &trails_[0], &breakpoints_[0],
-                                               lambda2, &alpha_, inflate_, ninner_, converge_,
+                                               lambda2, &alpha_, inflate_, ninner_, converge,
                                                &beta_[0], &z_[0], &u_[0]);
     //Rcpp::Rcout << "GFLLibrary: " << counter << " steps\n";
     counter_ += counter;
