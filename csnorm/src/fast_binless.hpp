@@ -20,7 +20,9 @@ ResidualsPair get_poisson_residuals(const FastData& data);
 
 std::vector<double> fast_compute_poisson_exposures(const FastSignalData& data);
 std::vector<double> fast_compute_exposures(const FastSignalData& data);
+std::vector<double> fast_compute_poisson_log_biases(const FastSignalData& data);
 std::vector<double> fast_compute_log_biases(const FastSignalData& data);
+std::vector<double> fast_compute_poisson_log_decay(const FastSignalData& data);
 std::vector<double> fast_compute_log_decay(const FastSignalData& data);
 template<typename Lasso>
 SignalTriplet fast_compute_signal(const FastSignalData& data, std::vector<Lasso>& flo, double lam2);

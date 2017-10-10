@@ -8,18 +8,22 @@ using namespace Rcpp;
 #include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
 
+
+//here, exposures are log ( sum_i observed / sum_i expected ) with i summed over datasets
 std::vector<double> fast_compute_poisson_exposures(const FastSignalData& data) {
+    //get observed and expected
     std::vector<double> sum_obs(data.get_ndatasets(),0);
     std::vector<double> sum_exp(data.get_ndatasets(),0);
     auto log_expected = data.get_log_expected();
     auto observed = data.get_observed();
+    //sum them for each dataset
     auto names = data.get_name();
     for (unsigned i=0; i<data.get_N(); ++i) {
         unsigned name = names[i]-1; //offset by 1 for vector indexing
         sum_obs[name] += observed[i];
         sum_exp[name] += std::exp(log_expected[i]);
     }
-    //add current estimates
+    //compute exposure
     std::vector<double> exposures;
     exposures.reserve(data.get_ndatasets());
     for (unsigned i=0; i<data.get_ndatasets(); ++i) {
@@ -28,6 +32,7 @@ std::vector<double> fast_compute_poisson_exposures(const FastSignalData& data) {
     return exposures;
 }
 
+//one IRLS iteration for exposures, with a poisson model
 std::vector<double> fast_compute_exposures(const FastSignalData& data) {
     //get residuals
     ResidualsPair z = get_poisson_residuals(data);
@@ -48,6 +53,42 @@ std::vector<double> fast_compute_exposures(const FastSignalData& data) {
     return exposures;
 }
 
+//here, biases are log ( sum_i observed / sum_i expected ) with i summed over rows/columns
+std::vector<double> fast_compute_poisson_log_biases(const FastSignalData& data) {
+    //get observed and expected data
+    std::vector<double> sum_obs(data.get_nbins(),0);
+    std::vector<double> sum_exp(data.get_nbins(),0);
+    auto log_expected = data.get_log_expected();
+    auto observed = data.get_observed();
+    //sum them along the rows/columns
+    auto dbin1 = data.get_bin1();
+    auto dbin2 = data.get_bin2();
+    for (unsigned i=0; i<data.get_N(); ++i) {
+        unsigned bin1 = dbin1[i]-1; //offset by 1 for vector indexing
+        unsigned bin2 = dbin2[i]-1;
+        double expected = std::exp(log_expected[i]);
+        sum_obs[bin1] += observed[i];
+        sum_exp[bin1] += expected;
+        if (bin1!=bin2) {
+            sum_obs[bin2] += observed[i];
+            sum_exp[bin2] += expected;
+        }
+    }
+    //compute log_bias
+    std::vector<double> log_bias;
+    log_bias.reserve(data.get_nbins());
+    for (unsigned i=0; i<data.get_nbins(); ++i) {
+        log_bias.push_back(std::log(sum_obs[i]/sum_exp[i]));
+    }
+    //center log_bias
+    double avg = std::accumulate(log_bias.begin(), log_bias.end(), 0.)/log_bias.size();
+    for (unsigned i=0; i<data.get_nbins(); ++i) {
+        log_bias[i] -= avg;
+    }
+    return log_bias;
+}
+
+//one IRLS iteration for log biases, with a poisson model
 std::vector<double> fast_compute_log_biases(const FastSignalData& data) {
     //get residuals
     ResidualsPair z = get_poisson_residuals(data);
@@ -87,6 +128,41 @@ std::vector<double> fast_compute_log_biases(const FastSignalData& data) {
 }
 
 
+//here, log decay is log ( sum_i observed / sum_i expected ) with i summed over counter diagonals
+std::vector<double> fast_compute_poisson_log_decay(const FastSignalData& data) {
+    //get observed and expected data
+    std::vector<double> sum_obs(data.get_nbins(),0);
+    std::vector<double> sum_exp(data.get_nbins(),0);
+    auto log_expected = data.get_log_expected();
+    auto observed = data.get_observed();
+    //sum them along the counter diagonals
+    auto dbin1 = data.get_bin1();
+    auto dbin2 = data.get_bin2();
+    for (unsigned i=0; i<data.get_N(); ++i) {
+        unsigned dist = dbin2[i]-dbin1[i];
+        double expected = std::exp(log_expected[i]);
+        sum_obs[dist] += observed[i];
+        sum_exp[dist] += expected;
+    }
+    //compute log_decay
+    std::vector<double> log_decay;
+    log_decay.reserve(data.get_nbins());
+    for (unsigned i=0; i<data.get_nbins(); ++i) {
+        if (sum_obs[i]==0) {
+            Rcpp::Rcout << "counter diag " << i << " is zero!\n";
+            Rcpp::stop(" Aborting...");
+        }
+        log_decay.push_back(std::log(sum_obs[i]/sum_exp[i]));
+    }
+    //center log_decay
+    double avg = std::accumulate(log_decay.begin(), log_decay.end(), 0.)/log_decay.size();
+    for (unsigned i=0; i<data.get_nbins(); ++i) {
+        log_decay[i] -= avg;
+    }
+    return log_decay;
+}
+
+//one IRLS iteration for log decay, with a poisson model
 std::vector<double> fast_compute_log_decay(const FastSignalData& data) {
     //get residuals
     ResidualsPair z = get_poisson_residuals(data);
@@ -195,17 +271,20 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
     for (unsigned step=1; step <= ngibbs; ++step) {
         Rcpp::Rcout << "step " << step;
         //compute biases
-        auto biases = fast_compute_log_biases(out);
+        auto biases = fast_compute_poisson_log_biases(out);
         out.set_log_biases(biases);
+        Rcpp::Rcout << "biases\n ";
         //compute decay
-        auto decay = fast_compute_log_decay(out);
+        auto decay = fast_compute_poisson_log_decay(out);
         out.set_log_decay(decay);
+        Rcpp::Rcout << "decay\n ";
         //compute signal
         auto old_weights = out.get_signal_weights();
         auto signal = fast_compute_signal(out, flos, lam2);
         out.set_log_signal(signal.beta);
         out.set_signal_phihat(signal.phihat);
         out.set_signal_weights(signal.weights);
+        Rcpp::Rcout << "signal\n ";
         //compute precision and convergence
         auto precision = fast_precision(out.get_signal_weights(),old_weights);
         Rcpp::Rcout << " : reached precision abs = " << precision.abs << " rel = " << precision.rel << "\n";

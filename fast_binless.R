@@ -14,9 +14,9 @@ load("data/rao_HiCall_IMR90_FOXP1ext_2.3M_csdata.RData")
 csd2=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
 #now we bin the raw data at the base resolution we want, and put it in a data table
-mat=csnorm:::bin_data(cs,resolution=8000)
+mat=csnorm:::bin_data(cs,resolution=5000)
 
-nouter=20
+nouter=1
 lam2=5
 tol_val=1e-1
 out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], nouter, lam2, tol_val)
