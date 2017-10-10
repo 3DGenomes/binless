@@ -261,6 +261,7 @@ std::vector<double> fast_shift_signal(const FastSignalData& data) {
 List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double lam2, double tol_val) {
     //initialize return values, exposures and fused lasso optimizer
     Rcpp::Rcout << "init\n";
+    const unsigned bg_steps = 5;
     FastSignalData out(obs, nbins);
     out.set_exposures(fast_compute_poisson_exposures(out));
     out.set_log_decay(fast_compute_poisson_log_decay(out));
@@ -271,21 +272,28 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
     //std::vector<DataFrame> diagnostics;
     for (unsigned step=1; step <= ngibbs; ++step) {
         Rcpp::Rcout << "step " << step;
+        std::vector<double> expected,old_expected;
         //compute biases
         auto biases = fast_compute_log_biases(out);
         out.set_log_biases(biases);
         //compute decay
         auto decay = fast_compute_log_decay(out);
+        if (step <= bg_steps) old_expected = out.get_log_expected();
         out.set_log_decay(decay);
+        if (step <= bg_steps) expected = out.get_log_expected();
         //compute signal
-        auto old_weights = out.get_signal_weights();
-        auto signal = fast_compute_signal(out, flos, lam2);
-        out.set_log_signal(signal.beta);
-        out.set_signal_phihat(signal.phihat);
-        out.set_signal_weights(signal.weights);
+        if (step > bg_steps) {
+            old_expected = out.get_log_expected();
+            auto signal = fast_compute_signal(out, flos, lam2);
+            out.set_log_signal(signal.beta);
+            out.set_signal_phihat(signal.phihat);
+            out.set_signal_weights(signal.weights);
+            expected = out.get_log_expected();
+        }
         //compute precision and convergence
-        auto precision = fast_precision(out.get_signal_weights(),old_weights);
+        auto precision = fast_precision(expected,old_expected);
         Rcpp::Rcout << " : reached precision abs = " << precision.abs << " rel = " << precision.rel << "\n";
+        Rcpp::Rcout << "converged " << (precision.rel <= tol_val) << " " << (current_tol_val <= tol_val*1.01) << " curr= " << current_tol_val << "\n";
         bool converged = precision.rel <= tol_val && current_tol_val <= tol_val*1.01;
         //update tolerance
         current_tol_val = std::min(current_tol_val,std::max(tol_val, precision.abs));
@@ -298,10 +306,10 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
             auto adjust = fast_remove_signal_degeneracy(out);
             out.set_log_signal(adjust);
         }
-        //bool converged = false;
         //compute exposures
         auto exposures = fast_compute_exposures(out);
         out.set_exposures(exposures);
+        Rcpp::Rcout << "exp  " << exposures[0] << "\n";
         //diagnostics.push_back(out.get_as_dataframe());
         if (converged) {
             Rcpp::Rcout << "converged\n";
