@@ -265,7 +265,6 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
     out.set_exposures(fast_compute_poisson_exposures(out));
     out.set_log_decay(fast_compute_poisson_log_decay(out));
     out.set_log_biases(fast_compute_poisson_log_biases(out));
-    Rcpp::Rcout << "exposures " << out.get_exposures()[0] << "\n";
     double current_tol_val = 1.;
     std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
                                                                FusedLassoGaussianEstimator<GFLLibrary>(nbins, current_tol_val/20.));
@@ -275,18 +274,15 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
         //compute biases
         auto biases = fast_compute_log_biases(out);
         out.set_log_biases(biases);
-        Rcpp::Rcout << "biases\n ";
         //compute decay
         auto decay = fast_compute_log_decay(out);
         out.set_log_decay(decay);
-        Rcpp::Rcout << "decay\n ";
         //compute signal
         auto old_weights = out.get_signal_weights();
         auto signal = fast_compute_signal(out, flos, lam2);
         out.set_log_signal(signal.beta);
         out.set_signal_phihat(signal.phihat);
         out.set_signal_weights(signal.weights);
-        Rcpp::Rcout << "signal\n ";
         //compute precision and convergence
         auto precision = fast_precision(out.get_signal_weights(),old_weights);
         Rcpp::Rcout << " : reached precision abs = " << precision.abs << " rel = " << precision.rel << "\n";
@@ -306,7 +302,6 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
         //compute exposures
         auto exposures = fast_compute_exposures(out);
         out.set_exposures(exposures);
-        Rcpp::Rcout << "exposures " << out.get_exposures()[0] << "\n";
         //diagnostics.push_back(out.get_as_dataframe());
         if (converged) {
             Rcpp::Rcout << "converged\n";

@@ -34,7 +34,6 @@ ResidualsPair get_poisson_residuals(const FastData& data) {
         double expected_i = std::exp(log_expected[i]);
         residuals.push_back( (observed[i]/expected_i) - 1);
         weights.push_back( expected_i );
-        if (i==0) Rcpp::Rcout << "residuals " << residuals.back() << " weights " << weights.back() << " observed "<< observed[i] << "\n";
     }
     return ResidualsPair{residuals,weights};
 }
