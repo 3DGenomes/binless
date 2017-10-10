@@ -8,24 +8,28 @@ setwd("/Users/yannick/Documents/simulations/cs_norm")
 #load("foxp1ext_observed.RData")
 #load("pauli_mat.RData")
 
-#load("data/rao_HiCall_GM12878_FOXP1ext_2.3M_csdata.RData")
-#csd1=csd
-#load("data/rao_HiCall_IMR90_FOXP1ext_2.3M_csdata.RData")
-#csd2=csd
-#cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
+load("data/rao_HiCall_GM12878_FOXP1ext_2.3M_csdata.RData")
+csd1=csd
+load("data/rao_HiCall_IMR90_FOXP1ext_2.3M_csdata.RData")
+csd2=csd
+cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
 #now we bin the raw data at the base resolution we want, and put it in a data table
-#mat=csnorm:::bin_data(cs,resolution=5000)
-#mat[bin1==min(bin1)&bin2==max(bin2),observed:=observed+1]
+mat=csnorm:::bin_data(cs,resolution=2000)
+mat[bin1==min(bin1)&bin2==max(bin2),observed:=observed+as.integer(1)]
+mat[unclass(bin2)-unclass(bin1)==1122,observed:=observed+as.integer(1)]
+mat[unclass(bin2)-unclass(bin1)==1131,observed:=observed+as.integer(1)]
+mat[unclass(bin2)-unclass(bin1)>=1136,observed:=observed+as.integer(1)]
 
-load("mat.RData")
-nouter=50
-bg_steps=2
+load("mat9k.RData")
+nouter=1
+bg_steps=10
 lam2=5
 tol_val=1e-1
-out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], nouter, lam2, tol_val, bg_steps)
+out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], lam2, nouter, tol_val, bg_steps)
 #save(out,file="out.dat")
 
-#diff=as.data.table(csnorm:::fast_binless_difference(out, lam2, tol_val, 1))
+#ref=1
+#diff=as.data.table(csnorm:::fast_binless_difference(out, lam2, ref, tol_val))
 #save(out,diff,file="out.dat")
 
 #to debug:
