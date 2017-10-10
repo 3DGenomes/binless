@@ -18,6 +18,7 @@ ResidualsPair get_normal_residuals(const FastData& data);
 template<typename FastData>
 ResidualsPair get_poisson_residuals(const FastData& data);
 
+std::vector<double> fast_compute_poisson_exposures(const FastSignalData& data);
 std::vector<double> fast_compute_exposures(const FastSignalData& data);
 std::vector<double> fast_compute_log_biases(const FastSignalData& data);
 std::vector<double> fast_compute_log_decay(const FastSignalData& data);

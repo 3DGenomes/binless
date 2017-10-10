@@ -7,7 +7,27 @@ using namespace Rcpp;
 #include "fast_binless.hpp"
 #include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
- 
+
+std::vector<double> fast_compute_poisson_exposures(const FastSignalData& data) {
+    std::vector<double> sum_obs(data.get_ndatasets(),0);
+    std::vector<double> sum_exp(data.get_ndatasets(),0);
+    auto log_expected = data.get_log_expected();
+    auto observed = data.get_observed();
+    auto names = data.get_name();
+    for (unsigned i=0; i<data.get_N(); ++i) {
+        unsigned name = names[i]-1; //offset by 1 for vector indexing
+        sum_obs[name] += observed[i];
+        sum_exp[name] += std::exp(log_expected[i]);
+    }
+    //add current estimates
+    std::vector<double> exposures;
+    exposures.reserve(data.get_ndatasets());
+    for (unsigned i=0; i<data.get_ndatasets(); ++i) {
+        exposures.push_back(std::log(sum_obs[i]/sum_exp[i]));
+    }
+    return exposures;
+}
+
 std::vector<double> fast_compute_exposures(const FastSignalData& data) {
     //get residuals
     ResidualsPair z = get_poisson_residuals(data);
@@ -166,7 +186,8 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
     //initialize return values, exposures and fused lasso optimizer
     Rcpp::Rcout << "init\n";
     FastSignalData out(obs, nbins);
-    out.set_exposures(fast_compute_exposures(out));
+    out.set_exposures(fast_compute_poisson_exposures(out));
+    Rcpp::Rcout << "exposures " << out.get_exposures()[0] << "\n";
     double current_tol_val = 1.;
     std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
                                                                FusedLassoGaussianEstimator<GFLLibrary>(nbins, current_tol_val/20.));
@@ -192,6 +213,7 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
         //update tolerance
         current_tol_val = std::min(current_tol_val,std::max(tol_val, precision.abs));
         for (unsigned i=0; i<out.get_ndatasets(); ++i) flos[i].set_tol(current_tol_val/20);
+        //bool converged = false;
         //shift signal
         if (converged || step == ngibbs) {
             auto adjust = fast_shift_signal(out);
@@ -203,6 +225,7 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
         //compute exposures
         auto exposures = fast_compute_exposures(out);
         out.set_exposures(exposures);
+        Rcpp::Rcout << "exposures " << out.get_exposures()[0] << "\n";
         //diagnostics.push_back(out.get_as_dataframe());
         if (converged) {
             Rcpp::Rcout << "converged\n";
@@ -216,7 +239,7 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
                               //_["diagnostics"]=diagnostics,
                               _["nbins"]=nbins);
 }
- 
+
 Rcpp::DataFrame fast_binless_difference(const List obs, double lam2, double tol_val, unsigned ref) {
     //read normalization data
     Rcpp::Rcout << "init\n";
