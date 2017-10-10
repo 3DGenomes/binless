@@ -177,13 +177,17 @@ std::vector<double> fast_step_log_decay(const FastSignalData& data) {
         log_decay[bin2-bin1] += z.residuals[i]*z.weights[i];
         weightsums[bin2-bin1] += z.weights[i];
     }
-    //add current bias and compute weighted average
-    double avg=0;
-    double wsum=0;
+    //add current bias and forbid increase past first diagonal
     auto dlog_decay = data.get_log_decay();
     for (unsigned i=0; i<data.get_nbins(); ++i) {
         log_decay[i] = (weightsums[i]>0) ? log_decay[i]/weightsums[i] : 0;
         log_decay[i] += dlog_decay[i];
+        if (i>=2 && log_decay[i]>log_decay[i-1]) log_decay[i] = log_decay[i-1];
+    }
+    //compute weighted mean
+    double avg=0;
+    double wsum=0;
+    for (unsigned i=0; i<data.get_nbins(); ++i) {
         avg += log_decay[i]*weightsums[i];
         wsum += weightsums[i];
     }
@@ -292,8 +296,11 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
         //compute precision and convergence
         auto precision = fast_precision(expected,old_expected);
         Rcpp::Rcout << " : reached precision abs = " << precision.abs << " rel = " << precision.rel << "\n";
-        Rcpp::Rcout << "converged " << (precision.rel <= tol_val) << " " << (current_tol_val <= tol_val*1.01) << " curr= " << current_tol_val << "\n";
         bool converged = precision.rel <= tol_val && current_tol_val <= tol_val*1.01;
+        if (converged && step <= bg_steps) {
+            converged = false;
+            bg_steps = step; //force signal computation at next step
+        }
         //update tolerance
         current_tol_val = std::min(current_tol_val,std::max(tol_val, precision.abs));
         for (unsigned i=0; i<out.get_ndatasets(); ++i) flos[i].set_tol(current_tol_val/20);
