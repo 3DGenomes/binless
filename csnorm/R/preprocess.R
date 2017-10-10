@@ -105,16 +105,17 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
   } else if (class(obj)[1] == "CSnorm") {
     if (!is.null(b1)) stop("b1 must be NULL when passing CSnorm object")
     if (!is.null(b2)) stop("b2 must be NULL when passing CSnorm object")
-    bin_borders=cs@biases[,seq(min(pos)-1,max(pos)+1+resolution,resolution)]
+    bin_borders=cs@biases[,seq(min(pos)-1,max(pos)+1,resolution)] #we discard the last incomplete bin
     bins=cut(head(bin_borders,n=length(bin_borders)-1)+resolution/2, bin_borders,
              ordered_result=T, right=F, include.lowest=T,dig.lab=12)
     counts=CJ(name=cs@experiments[,name],bin1=bins,bin2=bins)[bin2>=bin1]
     poscounts=cs@counts[,.(name,bin1=cut(pos1, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                                 bin2=cut(pos2, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                            observed=contact.close+contact.far+contact.up+contact.down)][
-                             ,.(observed=sum(observed)),keyby=key(counts)]
+                             (!is.na(bin1))&(!is.na(bin2)),.(observed=sum(observed)),keyby=key(counts)]
     counts=poscounts[counts]
     counts[is.na(observed),observed:=0]
+    counts[bin1==min(bin1)&bin2==max(bin2),observed:=observed+as.integer(1)] #otherwise fitted decay can be degenerate
   }
   #
   counts[,begin1:=do.call(as.integer, tstrsplit(as.character(bin1), "[[,]")[2])]
