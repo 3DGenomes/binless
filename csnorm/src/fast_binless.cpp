@@ -263,6 +263,8 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
     Rcpp::Rcout << "init\n";
     FastSignalData out(obs, nbins);
     out.set_exposures(fast_compute_poisson_exposures(out));
+    out.set_log_decay(fast_compute_poisson_log_decay(out));
+    out.set_log_biases(fast_compute_poisson_log_biases(out));
     Rcpp::Rcout << "exposures " << out.get_exposures()[0] << "\n";
     double current_tol_val = 1.;
     std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
@@ -271,11 +273,11 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
     for (unsigned step=1; step <= ngibbs; ++step) {
         Rcpp::Rcout << "step " << step;
         //compute biases
-        auto biases = fast_compute_poisson_log_biases(out);
+        auto biases = fast_compute_log_biases(out);
         out.set_log_biases(biases);
         Rcpp::Rcout << "biases\n ";
         //compute decay
-        auto decay = fast_compute_poisson_log_decay(out);
+        auto decay = fast_compute_log_decay(out);
         out.set_log_decay(decay);
         Rcpp::Rcout << "decay\n ";
         //compute signal
@@ -292,7 +294,6 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
         //update tolerance
         current_tol_val = std::min(current_tol_val,std::max(tol_val, precision.abs));
         for (unsigned i=0; i<out.get_ndatasets(); ++i) flos[i].set_tol(current_tol_val/20);
-        //bool converged = false;
         //shift signal
         if (converged || step == ngibbs) {
             auto adjust = fast_shift_signal(out);
@@ -301,6 +302,7 @@ List fast_binless(const DataFrame obs, unsigned nbins, unsigned ngibbs, double l
             auto adjust = fast_remove_signal_degeneracy(out);
             out.set_log_signal(adjust);
         }
+        //bool converged = false;
         //compute exposures
         auto exposures = fast_compute_exposures(out);
         out.set_exposures(exposures);

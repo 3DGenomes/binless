@@ -18,7 +18,7 @@ setwd("/Users/yannick/Documents/simulations/cs_norm")
 #mat[bin1==min(bin1)&bin2==max(bin2),observed:=observed+1]
 
 load("mat.RData")
-nouter=1
+nouter=5
 lam2=5
 tol_val=1e-1
 out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], nouter, lam2, tol_val)
