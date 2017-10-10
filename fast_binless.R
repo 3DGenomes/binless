@@ -19,9 +19,10 @@ setwd("/Users/yannick/Documents/simulations/cs_norm")
 
 load("mat.RData")
 nouter=20
+bg_steps=5
 lam2=5
 tol_val=1e-1
-out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], nouter, lam2, tol_val)
+out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], nouter, lam2, tol_val, bg_steps)
 #save(out,file="out.dat")
 
 #diff=as.data.table(csnorm:::fast_binless_difference(out, lam2, tol_val, 1))

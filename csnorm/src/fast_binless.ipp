@@ -39,7 +39,7 @@ ResidualsPair get_poisson_residuals(const FastData& data) {
 }
 
 template<typename Lasso>
-SignalTriplet fast_compute_signal(const FastSignalData& data, std::vector<Lasso>& flos, double lam2) {
+SignalTriplet fast_step_signal(const FastSignalData& data, std::vector<Lasso>& flos, double lam2) {
     //get residuals
     ResidualsPair z = get_poisson_residuals(data);
     //build signal matrix
@@ -73,7 +73,7 @@ SignalTriplet fast_compute_signal(const FastSignalData& data, std::vector<Lasso>
 
 
 template<typename Lasso>
-DifferenceQuadruplet fast_compute_difference(const FastDifferenceData& data, std::vector<Lasso>& flos, double lam2, unsigned ref) {
+DifferenceQuadruplet fast_step_difference(const FastDifferenceData& data, std::vector<Lasso>& flos, double lam2, unsigned ref) {
     //get residuals
     ResidualsPair z = get_poisson_residuals(data);
     //build difference matrices
