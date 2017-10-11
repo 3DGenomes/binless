@@ -1,28 +1,6 @@
 #' @include csnorm.R
 NULL
 
-#' Compute decay etahat and weights using data as initial guess. Signal is assumed to be zero.
-#' @keywords internal
-#' 
-csnorm_gauss_decay_muhat_data = function(cs, pseudocount=1e-2) {
-  #bin distances
-  dbins=cs@settings$dbins
-  mcounts=melt(cs@counts,measure.vars=c("contact.close","contact.far","contact.up","contact.down"),
-               variable.name = "category", value.name = "count")[count>0,.(name,distance,category,count)]
-  mcounts[,dbin:=cut(distance,dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-  #add zero counts
-  zdecay = cs@zeros[,.(nzero=sum(nzero)/2),keyby=c("name","dbin")] #each contact is counted twice
-  mcounts = rbind(mcounts[,.(name,dbin,category,count,weight=1)],
-                  zdecay[,.(name,dbin,category=NA,count=0,weight=nzero)])
-  #compute z-scores and sum counts
-  mcounts[,c("kappahat","var"):=list(log(count+pseudocount), 1/(count+pseudocount)+1/cs@par$alpha)]
-  csd = mcounts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
-                   kappahat=weighted.mean(kappahat, weight/var),
-                   std=1/sqrt(sum(weight/var)), weight=sum(weight)), keyby=c("name", "dbin")]
-  stopifnot(csd[,!is.na(distance)])
-  return(csd)
-}
-
 #' Compute means for positive and zero counts using previous params
 #' @keywords internal
 #' 
@@ -237,13 +215,9 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", update.eC=T) {
+csnorm_gauss_decay = function(cs, verbose=T, update.eC=T) {
   if (verbose==T) cat(" Decay\n")
-  if (init.mean=="mean") {
-    csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
-  } else {
-    csd = csnorm:::csnorm_gauss_decay_muhat_data(cs)
-  }
+  csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
   #run optimization
   op = csnorm:::csnorm_gauss_decay_optimize(csd, cs@design, cs@settings$Kdiag, cs@par$lambda_diag,
                                             verbose=verbose, max_perf_iteration=cs@settings$iter,
@@ -252,37 +226,6 @@ csnorm_gauss_decay = function(cs, verbose=T, init.mean="mean", update.eC=T) {
   if (update.eC==F) op$eC=NULL
   cs@par=modifyList(cs@par, op)
   return(cs)
-}
-
-#' Compute genomic etahat and weights using data as initial guess
-#' @keywords internal
-#' 
-csnorm_gauss_genomic_muhat_data = function(cs, pseudocount=1e-2) {
-  dispersion=cs@par$alpha
-  #biases
-  bts=rbind(cs@biases[,.(name,id,pos,cat="dangling L", etahat=log(dangling.L+pseudocount), std=sqrt(1/(dangling.L+pseudocount)+1/dispersion))],
-            cs@biases[,.(name,id,pos,cat="dangling R", etahat=log(dangling.R+pseudocount), std=sqrt(1/(dangling.R+pseudocount)+1/dispersion))],
-            cs@biases[,.(name,id,pos,cat="rejoined", etahat=log(rejoined+pseudocount), std=sqrt(1/(rejoined+pseudocount)+1/dispersion))])
-  setkey(bts,id,name,cat)
-  stopifnot(bts[,.N]==3*cs@biases[,.N])
-  #counts
-  zbias = cs@zeros[,.(id=id1,name,cat,nzero)][,.(nzero=sum(nzero)),keyby=c("id","name","cat")][cs@biases[,.(name,id,pos)]]
-  cts=rbind(cs@counts[contact.close>0,.(name,id=id1,pos=pos1, cat="contact R", count=contact.close, weight=1)],
-            cs@counts[contact.far>0,  .(name,id=id1,pos=pos1, cat="contact L", count=contact.far, weight=1)],
-            cs@counts[contact.down>0, .(name,id=id1,pos=pos1, cat="contact R", count=contact.down, weight=1)],
-            cs@counts[contact.up>0,   .(name,id=id1,pos=pos1, cat="contact L", count=contact.up, weight=1)],
-            cs@counts[contact.far>0,  .(name,id=id2,pos=pos2, cat="contact R", count=contact.far, weight=1)],
-            cs@counts[contact.close>0,.(name,id=id2,pos=pos2, cat="contact L", count=contact.close, weight=1)],
-            cs@counts[contact.down>0, .(name,id=id2,pos=pos2, cat="contact R", count=contact.down, weight=1)],
-            cs@counts[contact.up>0,   .(name,id=id2,pos=pos2, cat="contact L", count=contact.up, weight=1)],
-            zbias[,.(name, id, pos, cat, count=0, weight=nzero)])
-  cts[,c("etahat","var"):=list(log(count+pseudocount),(1/(count+pseudocount)+1/dispersion))]
-  cts=cts[,.(etahat=weighted.mean(etahat,weight/var),std=sqrt(2/sum(weight/var)),weight=sum(weight)),
-          keyby=c("id","pos","name","cat")]
-  cts[,weight:=NULL] #not needed. Weights differ slightly because of dmin cutoff but it doesnt matter much
-  setkeyv(cts,c("id","name","cat"))
-  stopifnot(cts[,.N]==2*cs@biases[,.N])
-  return(list(bts=bts,cts=cts))
 }
 
 #' Compute decay etahat and weights using previous mean
@@ -306,13 +249,12 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
   #counts
   cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   cts.common[,etaij:=eC+log_bias]
-  cts = cts.common[,.(etahat=weighted.mean(z+etaij, weight/var),std=sqrt(2/sum(weight/var))),
+  cts = cts.common[,.(etahat=weighted.mean(z+etaij, weight/var), std=sqrt(2/sum(weight/var))),
                    keyby=c("id1","name","cat")]
   cts = merge(cs@biases[,.(name,id,pos)],cts,by.x=c("name","id"),by.y=c("name","id1"))
   setkey(cts, id, name, cat)
   return(list(bts=bts,cts=cts))
 }
-
 
 csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
                                          original_lambda_iota, original_lambda_rho, verbose=T,
@@ -547,13 +489,9 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, verbose=T, init.mean="mean", update.exposures=T) {
+csnorm_gauss_genomic = function(cs, verbose=T, update.exposures=T) {
   if (verbose==T) cat(" Genomic\n")
-  if (init.mean=="mean") {
-    a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
-  } else {
-    a = csnorm:::csnorm_gauss_genomic_muhat_data(cs)
-  }
+  a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
   #run optimization
   op = csnorm:::csnorm_gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, cs@settings$sbins,
                                               cs@par$lambda_iota, cs@par$lambda_rho, verbose=verbose,
@@ -963,6 +901,49 @@ load_stripped = function(fname, ncores=1) {
 }
 
 
+#' Compute initial exposures assuming a poisson model
+#' @keywords internal
+#' 
+initial_guess_exposures = function(cs, pseudocount=1e-2) {
+  #biases
+  cs@par$eDE=as.array(cs@biases[,log(pseudocount+mean(dangling.L+dangling.R)/2),keyby=c("name")]$V1)
+  cs@par$eRJ=as.array(cs@biases[,log(pseudocount+mean(rejoined)),keyby=c("name")]$V1)
+  cs@par$eC=array(0,cs@experiments[,.N])
+  cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+  cs@par$eC = as.array(cts.common[,log(pseudocount+weighted.mean(count,weight)),keyby=c("name")]$V1)
+  return(cs)
+}
+
+#' Compute initial iota and rho biases assuming a poisson model
+#' @keywords internal
+#' 
+initial_guess_genomic = function(cs, pseudocount=1e-2) {
+  cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+  iotas=cts.common[cat=="contact L",log((pseudocount+weighted.mean(count,weight))/(weighted.mean(exp(lmu.nosig),weight))),keyby=c("name","id1")]
+  iotas[,V1:=V1-mean(V1),by=name]
+  cs@par$log_iota=as.array(iotas[,V1])
+  rhos=cts.common[cat=="contact R",log((pseudocount+weighted.mean(count,weight))/(weighted.mean(exp(lmu.nosig),weight))),keyby=c("name","id1")]
+  rhos[,V1:=V1-mean(V1),by=name]
+  cs@par$log_rho=as.array(rhos[,V1])
+  return(cs)
+}
+
+#' Compute initial iota and rho biases assuming a poisson model
+#' @keywords internal
+#' 
+initial_guess_decay = function(cs, pseudocount=1e-2) {
+  cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+  decay=cts.common[,.(log_decay=log((pseudocount+weighted.mean(count,weight))/(weighted.mean(exp(lmu.nosig),weight))),
+                      ncounts=sum(weight)),keyby=c("name","dbin")]
+  decay[,log_decay:=log_decay-weighted.mean(log_decay,ncounts),by=name]
+  decay[,ncounts:=NULL]
+  cs@par$decay=decay
+  return(cs)
+}
+
+#' Cleanup a CSnorm object, store settings and populate it with initial guesses of all required parameters
+#' @keywords internal
+#' 
 fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
                        bg.steps=5, iter=1000, fit.signal=T, verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
                        tol.obj=1e-2, tol.leg=1e-4, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
@@ -981,8 +962,10 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
     cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
     #initial guess
     if (verbose==T) cat("No initial guess provided\n")
-    cs@diagnostics=list()
-    cs@par=list(alpha=init.dispersion)
+    decay=CJ(name=cs@experiments[,name],dist=head(cs@settings$dbins,n=length(cs@settings$dbins)-1)*10**(stepsz/2))
+    decay[,dbin:=cut(dist, cs@settings$dbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
+    decay[,c("dist","log_decay"):=list(NULL,0)]
+    cs@par=list(alpha=init.dispersion, log_iota=array(0,cs@biases[,.N]), log_rho=array(0,cs@biases[,.N]), decay=decay)
     #prepare signal matrix
     if (fit.signal==T) {
       if(verbose==T) cat("Preparing for signal estimation\n")
@@ -998,6 +981,13 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
     #get number of zeros along cut sites and decay
     if(verbose==T) cat("Counting zeros\n")
     cs@zeros = csnorm:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
+    #set initial guess for exposures, decay and biases
+    if(verbose==T) cat("Initial guess: exposures\n")
+    cs = csnorm:::initial_guess_exposures(cs)
+    if(verbose==T) cat("Initial guess: decay\n")
+    cs = csnorm:::initial_guess_decay(cs)
+    if(verbose==T) cat("Initial guess: biases\n")
+    cs = csnorm:::initial_guess_genomic(cs)
     return(cs)
 }
 
@@ -1058,13 +1048,11 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
                      tol.obj = tol.obj, tol.leg = tol.leg, ncores = ncores, fix.lambda1 = fix.lambda1, fix.lambda1.at = fix.lambda1.at,
                      fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
     laststep=0
-    init.mean="data"
     #update eC everywhere in the first step
     update.exposures=T
   } else {
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
-    init.mean="mean"
     update.exposures=(fit.signal!=T)
   }
   #
@@ -1075,14 +1063,13 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
   for (i in (laststep + 1:ngibbs)) {
     if (verbose==T) cat("\n### Iteration",i,"\n")
     #fit diagonal decay given iota and rho
-    a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean, update.eC=update.exposures))
+    a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, update.eC=update.exposures))
     cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
     if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     #fit iota and rho given diagonal decay
-    a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean, update.exposures=update.exposures))
+    a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, update.exposures=update.exposures))
     cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
     if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
-    init.mean="mean"
     if (i > bg.steps) {
       #fit dispersion
       a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight))
