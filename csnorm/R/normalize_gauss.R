@@ -986,6 +986,46 @@ load_stripped = function(fname, ncores=1) {
 }
 
 
+fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
+                       iter=1000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
+                       verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
+                       tol.obj=1e-2, tol.leg=1e-4, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
+    #fresh start
+    cs@par=list() #in case we have a weird object
+    cs@groups=list()
+    #add settings
+    cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
+                    list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
+                         iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj,
+                         tol.leg=tol.leg, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
+                         fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at))
+    cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
+    cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
+    stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
+    cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
+    #initial guess
+    if (verbose==T) cat("No initial guess provided\n")
+    cs@diagnostics=list()
+    cs=csnorm:::fill_parameters_perf(cs, dispersion=init.dispersion, fit.decay=fit.decay,
+                                     fit.genomic=fit.genomic, fit.disp=fit.disp)
+    #prepare signal matrix
+    if (fit.signal==T) {
+      if(verbose==T) cat("Preparing for signal estimation\n")
+      stuff = csnorm:::prepare_first_signal_estimation(cs@biases, cs@experiments[,name], base.res)
+      cs@par$signal=stuff$signal
+      cs@settings$sbins=stuff$sbins
+    } else {
+      cs@settings$sbins=cs@biases[,c(min(pos)-1,max(pos)+1)]
+      cs@par$signal=cs@biases[,.(phi=0,bin1=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+                                 bin2=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)),by=name]
+      setkey(cs@par$signal,name,bin1,bin2)
+    }
+    #get number of zeros along cut sites and decay
+    if(verbose==T) cat("Counting zeros\n")
+    cs@zeros = csnorm:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
+    return(cs)
+}
+
 #' Cut-site normalization (normal approximation)
 #' 
 #' Alternates two approximations to the exact model, fitting the diagonal decay
@@ -1037,40 +1077,13 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
   setkey(cs@counts, id1, id2, name)
   if (restart==F) {
     #fresh start
-    cs@par=list() #in case we have a weird object
-    cs@groups=list()
-    #add settings
-    cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
-                    list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
-                         iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj,
-                         tol.leg=tol.leg, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
-                         fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at))
-    cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
-    cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
-    stepsz=1/(cs@settings$bins_per_bf*cs@settings$bf_per_decade)
-    cs@settings$dbins=10**seq(log10(cs@settings$dmin),log10(cs@settings$dmax)+stepsz,stepsz)
-    #initial guess
-    if (verbose==T) cat("No initial guess provided\n")
-    cs@diagnostics=list()
+    cs = fresh_start(cs, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, base.res = base.res,
+                     iter = iter, fit.decay = fit.decay, fit.genomic = fit.genomic, fit.signal = fit.signal, fit.disp = fit.disp,
+                     verbose = verbose, ncounts = ncounts, init_alpha = init_alpha, init.dispersion = init.dispersion,
+                     tol.obj = tol.obj, tol.leg = tol.leg, ncores = ncores, fix.lambda1 = fix.lambda1, fix.lambda1.at = fix.lambda1.at,
+                     fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
     laststep=0
     init.mean="data"
-    cs=csnorm:::fill_parameters_perf(cs, dispersion=init.dispersion, fit.decay=fit.decay,
-                                     fit.genomic=fit.genomic, fit.disp=fit.disp)
-    #prepare signal matrix
-    if (fit.signal==T) {
-      if(verbose==T) cat("Preparing for signal estimation\n")
-      stuff = csnorm:::prepare_first_signal_estimation(cs@biases, cs@experiments[,name], base.res)
-      cs@par$signal=stuff$signal
-      cs@settings$sbins=stuff$sbins
-    } else {
-      cs@settings$sbins=cs@biases[,c(min(pos)-1,max(pos)+1)]
-      cs@par$signal=cs@biases[,.(phi=0,bin1=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
-                                 bin2=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)),by=name]
-      setkey(cs@par$signal,name,bin1,bin2)
-    }
-    #get number of zeros along cut sites and decay
-    if(verbose==T) cat("Counting zeros\n")
-    cs@zeros = csnorm:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
     #update eC everywhere in the first step
     update.exposures=T
   } else {
