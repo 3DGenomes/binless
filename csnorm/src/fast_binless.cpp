@@ -266,11 +266,8 @@ List fast_binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngi
     //initialize return values, exposures and fused lasso optimizer
     Rcpp::Rcout << "init\n";
     FastSignalData out(obs, nbins);
-    Rcpp::Rcout << "init expected  " << out.get_log_expected()[0] << "\n";
     out.set_exposures(fast_compute_poisson_lsq_exposures(out));
-    Rcpp::Rcout << "exposures expected  " << out.get_log_expected()[0] << "\n";
     out.set_log_decay(fast_compute_poisson_lsq_log_decay(out));
-    Rcpp::Rcout << "decay expected  " << out.get_log_expected()[0] << "\n";
     out.set_log_biases(fast_compute_poisson_lsq_log_biases(out));
     double current_tol_val = 1.;
     std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
@@ -282,13 +279,11 @@ List fast_binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngi
         //compute biases
         auto biases = fast_step_log_biases(out);
         out.set_log_biases(biases);
-        Rcpp::Rcout << "biases expected  " << out.get_log_expected()[0] << "\n";
         //compute decay
         auto decay = fast_step_log_decay(out);
         if (step <= bg_steps) old_expected = out.get_log_expected();
         out.set_log_decay(decay);
         if (step <= bg_steps) expected = out.get_log_expected();
-        Rcpp::Rcout << "decay expected  " << out.get_log_expected()[0] << "\n";
         //compute signal
         if (step > bg_steps) {
             old_expected = out.get_log_expected();
@@ -320,8 +315,6 @@ List fast_binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngi
         //compute exposures
         auto exposures = fast_step_exposures(out);
         out.set_exposures(exposures);
-        Rcpp::Rcout << "final  " << out.get_log_expected()[0] << "\n";
-        Rcpp::Rcout << "exp  " << exposures[0] << "\n";
         //diagnostics.push_back(out.get_as_dataframe());
         if (converged) {
             Rcpp::Rcout << "converged\n";
