@@ -1,29 +1,6 @@
 #' @include csnorm.R
 NULL
 
-#' Compute decay etahat and weights using data as initial guess
-#' @keywords internal
-#' 
-fill_parameters_perf = function(cs, dispersion=10, lambda=1, fit.decay=T, fit.genomic=T, fit.disp=T) {
-  nBiases=cs@design[,uniqueN(genomic)]
-  Decays=cs@design[,uniqueN(decay)]
-  init=list(alpha=dispersion)
-  if (fit.decay==F) {
-    Kdiag=cs@settings$Kdiag
-    beta_diag=matrix(rep(seq(0.1,1,length.out = Kdiag-1), each=Decays), Decays, Kdiag-1)
-    init=c(init,list(beta_diag=beta_diag, lambda_diag=array(lambda,dim=Decays)))
-  }
-  if (fit.genomic==F) {
-    init=c(init,list(log_iota=array(0,dim=cs@biases[,.N]), log_rho=array(0,dim=cs@biases[,.N]),
-                     lambda_iota=array(lambda,dim=nBiases), lambda_rho=array(lambda,dim=nBiases)))
-  }
-  if (fit.genomic==F || fit.decay==F || fit.disp==F) {
-    init=c(init,list(eC=array(0,dim=cs@design[,.N]),  eRJ=array(0,dim=cs@design[,.N]),  eDE=array(0,dim=cs@design[,.N])))
-  }
-  cs@par=init
-  cs
-}
-
 #' Compute decay etahat and weights using data as initial guess. Signal is assumed to be zero.
 #' @keywords internal
 #' 
@@ -987,8 +964,7 @@ load_stripped = function(fname, ncores=1) {
 
 
 fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
-                       iter=1000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
-                       verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
+                       iter=1000, fit.signal=T, verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
                        tol.obj=1e-2, tol.leg=1e-4, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
     #fresh start
     cs@par=list() #in case we have a weird object
@@ -1006,8 +982,7 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
     #initial guess
     if (verbose==T) cat("No initial guess provided\n")
     cs@diagnostics=list()
-    cs=csnorm:::fill_parameters_perf(cs, dispersion=init.dispersion, fit.decay=fit.decay,
-                                     fit.genomic=fit.genomic, fit.disp=fit.disp)
+    cs@par=list(alpha=init.dispersion)
     #prepare signal matrix
     if (fit.signal==T) {
       if(verbose==T) cat("Preparing for signal estimation\n")
@@ -1047,7 +1022,7 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
 #'   condition.
 #' @param ngibbs positive integer. Number of gibbs sampling iterations.
 #' @param iter positive integer. Maximum number of optimization steps for each leg.
-#' @param fit.decay,fit.genomic,fit.signal,fit.disp boolean. Set to FALSE only for diagnostics.
+#' @param fit.signal boolean. Set to FALSE only for diagnostics.
 #' @param verbose Display progress if TRUE
 #' @param init_alpha positive numeric, default 1e-5. Initial step size of LBFGS
 #'   line search (dispersion leg).
@@ -1065,7 +1040,7 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
 #' @examples
 #' 
 run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
-                     ngibbs = 20, iter=1000, fit.decay=T, fit.genomic=T, fit.signal=T, fit.disp=T,
+                     ngibbs = 20, iter=1000, fit.signal=T,
                      verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
                      tol.obj=1e-2, tol.leg=1e-4, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
   #basic checks
@@ -1078,7 +1053,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
   if (restart==F) {
     #fresh start
     cs = fresh_start(cs, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, base.res = base.res,
-                     iter = iter, fit.decay = fit.decay, fit.genomic = fit.genomic, fit.signal = fit.signal, fit.disp = fit.disp,
+                     iter = iter, fit.signal = fit.signal,
                      verbose = verbose, ncounts = ncounts, init_alpha = init_alpha, init.dispersion = init.dispersion,
                      tol.obj = tol.obj, tol.leg = tol.leg, ncores = ncores, fix.lambda1 = fix.lambda1, fix.lambda1.at = fix.lambda1.at,
                      fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
@@ -1100,28 +1075,22 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
   for (i in (laststep + 1:ngibbs)) {
     if (verbose==T) cat("\n### Iteration",i,"\n")
     #fit diagonal decay given iota and rho
-    if (fit.decay==T) {
-      a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean, update.eC=update.exposures))
-      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
-      if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
-    }
+    a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, init.mean=init.mean, update.eC=update.exposures))
+    cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
+    if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     #fit iota and rho given diagonal decay
-    if (fit.genomic==T) {
-      a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean, update.exposures=update.exposures))
-      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
-      if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
-    }
+    a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, init.mean=init.mean, update.exposures=update.exposures))
+    cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
+    if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     init.mean="mean"
     #fit dispersion
-    if (fit.disp==T) {
-      a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight))
-      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
-      if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
-    }
+    a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight))
+    cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
+    if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
     #fit signal using sparse fused lasso
     if (fit.signal==T & i > 1) {
       update.exposures=F
-      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=fit.decay, ncores=ncores,
+      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=T, ncores=ncores,
                                                        fix.lambda1=cs@settings$fix.lambda1,
                                                        fix.lambda1.at=cs@settings$fix.lambda1.at,
                                                        fix.lambda2=cs@settings$fix.lambda2,
