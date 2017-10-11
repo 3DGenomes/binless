@@ -26,6 +26,7 @@ LinkingTo: StanHeaders (>= 2.11.0), rstan (>= 2.11.1), BH (>= 1.60.0), Rcpp (>=
 RoxygenNote: 6.0.1
 NeedsCompilation: yes
 Collate: 
+    'CppDocs.R'
     'csnorm.R'
     'accessors.R'
     'bin.R'

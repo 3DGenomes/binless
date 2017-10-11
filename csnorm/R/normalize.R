@@ -332,7 +332,7 @@ check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10) {
 #' parameters up to the initial condition.
 #' 
 #' @param prefix character. As provided to \code{\link{run_gauss}} or
-#' \code{\link{run_gauss_bam}} or \code{\link{run_exact}}.
+#' \code{\link{run_exact}}.
 #'   
 #' @return A CSnorm object
 #' @export

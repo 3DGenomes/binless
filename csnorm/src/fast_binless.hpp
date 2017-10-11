@@ -33,7 +33,7 @@ PrecisionPair fast_precision(const std::vector<double>& weights, const std::vect
 std::vector<double> fast_remove_signal_degeneracy(const FastSignalData& data);
 std::vector<double> fast_shift_signal(const FastSignalData& data);
 
-Rcpp::List fast_binless(const DataFrame obs, unsigned nbins, double lam2, unsigned nouter=20, double tol_val=1e-1, unsigned bg_steps=10);
+Rcpp::List fast_binless(const DataFrame obs, unsigned nbins, double lam2, unsigned nouter=20, double tol_val=1e-1, unsigned bg_steps=5);
 
 Rcpp::DataFrame fast_binless_difference(const List obs, double lam2, unsigned ref, double tol_val=1e-1);
 

@@ -15,7 +15,6 @@
 #'
 #' @section Normalization:
 #' \code{\link{run_gauss}}
-#' \code{\link{run_gauss_bam}}
 #' \code{\link{run_exact}}
 #'
 #' @section Postprocessing:
