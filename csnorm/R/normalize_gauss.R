@@ -964,7 +964,7 @@ load_stripped = function(fname, ncores=1) {
 
 
 fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
-                       iter=1000, fit.signal=T, verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
+                       bg.steps=5, iter=1000, fit.signal=T, verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
                        tol.obj=1e-2, tol.leg=1e-4, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
     #fresh start
     cs@par=list() #in case we have a weird object
@@ -972,7 +972,7 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
     #add settings
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
-                         iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj,
+                         bg.steps=bg.steps, iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj,
                          tol.leg=tol.leg, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                          fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
@@ -1040,7 +1040,7 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
 #' @examples
 #' 
 run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
-                     ngibbs = 20, iter=1000, fit.signal=T,
+                     ngibbs = 20, bg.steps=5, iter=1000, fit.signal=T,
                      verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
                      tol.obj=1e-2, tol.leg=1e-4, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
   #basic checks
@@ -1053,7 +1053,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
   if (restart==F) {
     #fresh start
     cs = fresh_start(cs, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, base.res = base.res,
-                     iter = iter, fit.signal = fit.signal,
+                     bg.steps = bg.steps, iter = iter, fit.signal = fit.signal,
                      verbose = verbose, ncounts = ncounts, init_alpha = init_alpha, init.dispersion = init.dispersion,
                      tol.obj = tol.obj, tol.leg = tol.leg, ncores = ncores, fix.lambda1 = fix.lambda1, fix.lambda1.at = fix.lambda1.at,
                      fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
@@ -1083,20 +1083,22 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
     if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     init.mean="mean"
-    #fit dispersion
-    a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight))
-    cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
-    if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
-    #fit signal using sparse fused lasso
-    if (fit.signal==T & i > 1) {
-      update.exposures=F
-      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=T, ncores=ncores,
-                                                       fix.lambda1=cs@settings$fix.lambda1,
-                                                       fix.lambda1.at=cs@settings$fix.lambda1.at,
-                                                       fix.lambda2=cs@settings$fix.lambda2,
-                                                       fix.lambda2.at=cs@settings$fix.lambda2.at))
-      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
-      if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
+    if (i > bg.steps) {
+      #fit dispersion
+      a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight))
+      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
+      if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
+      #fit signal using sparse fused lasso
+      if (fit.signal==T) {
+        update.exposures=F
+        a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=T, ncores=ncores,
+                                                         fix.lambda1=cs@settings$fix.lambda1,
+                                                         fix.lambda1.at=cs@settings$fix.lambda1.at,
+                                                         fix.lambda2=cs@settings$fix.lambda2,
+                                                         fix.lambda2.at=cs@settings$fix.lambda2.at))
+        cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
+        if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
+      }
     }
     #check for convergence
     if (i>1) if (has_converged(cs)) {
