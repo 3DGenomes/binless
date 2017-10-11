@@ -86,6 +86,10 @@ get_raw_reads = function(data, b1, e1, b2=NULL, e2=NULL) {
 }
 
 #' Bin a reads data.table into a matrix of a given resolution
+#' 
+#' @param obj a CSnorm object, or a data.table containing data to be binned
+#' @param resolution the target resolution
+#' @param b2,e2 (optional) if provided, give extradiagonal portion 
 #'
 #' @return a data.table representing the binned data
 #' @export
