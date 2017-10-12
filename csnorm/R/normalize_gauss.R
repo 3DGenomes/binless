@@ -596,11 +596,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' 
 csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
   cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros, sbins)
-  #put in triangular form
-  cts2 = cts[bin1>bin2]
-  setnames(cts2,c("bin1","bin2"),c("bin2","bin1"))
-  cts = rbind(cts[bin1<=bin2],cts2)[,.(name,bin1,bin2,count,lmu.nosig,z,mu,var,log_decay,weight=weight/2)] #each count appears twice
-  rm(cts2)
+  cts = cts[,.(name,bin1,bin2,count,lmu.nosig,z,mu,var,log_decay,weight)]
   stopifnot(cts[,all(bin1<=bin2)])
   setkey(cts,name,bin1,bin2)
   return(cts)
@@ -648,15 +644,6 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, fix.lambd
   metadata = csnorm:::get_signal_metadata(cs, cts, cs@settings$base.res)
   #
   if (verbose==T) cat("  predict\n")
-  #ggplot(mat[bin1==bin2])+geom_point(aes(bin1,phi,colour=bin1%in%cs@par$badbins))+facet_wrap(~name)
-  #ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phihat))+facet_wrap(~name)
-  #ggplot(mat[unclass(bin2)<23&unclass(bin1)>13])+geom_raster(aes(bin1,bin2,fill=phihat))+#geom_raster(aes(bin2,bin1,fill=phi))+
-  #  facet_wrap(~name)+scale_fill_gradient2()
-  #ggplot(mat[unclass(bin2)<23&unclass(bin1)>13])+geom_raster(aes(bin1,bin2,fill=weight))+
-  #  facet_wrap(~name)+scale_fill_gradient2()
-  #mat[unclass(bin2)<23&unclass(bin1)>13][bin1==bin2]
-  #ggplot(cts.cp)+geom_violin(aes(bin1,count))
-  #
   #perform fused lasso on signal
   groupnames=cts[,unique(name)]
   nbins=length(cs@settings$sbins)-1
@@ -1054,7 +1041,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
   } else {
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
-    update.exposures=(fit.signal!=T)
+    update.exposures = !(fit.signal==T && laststep > bg.steps)
   }
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
