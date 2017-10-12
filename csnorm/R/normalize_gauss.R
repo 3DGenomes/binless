@@ -715,7 +715,7 @@ has_converged = function(cs, laststep=NULL) {
                                params[step==laststep-1,.(leg,get(name))],by="leg")[
                                  leg==leg[.N],if(is.numeric(V2.y[[1]])){abs(fn(V2.x[[1]])-fn(V2.y[[1]]))}else{fn(V2.x[[1]])}]}
   conv.eC = getdiff("eC")
-  conv.alpha = getdiff("alpha")
+  conv.alpha = getdiff("alpha",fn=log10)
   conv.ldiag = getdiff("lambda_diag",fn=log10)
   conv.liota = getdiff("lambda_iota",fn=log10)
   conv.lrho = getdiff("lambda_rho",fn=log10)
