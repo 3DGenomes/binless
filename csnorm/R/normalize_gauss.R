@@ -950,6 +950,7 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
     #fresh start
     cs@par=list() #in case we have a weird object
     cs@groups=list()
+    cs@diagnostics=list()
     #add settings
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
@@ -1062,19 +1063,24 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
   #gibbs sampling
   for (i in (laststep + 1:ngibbs)) {
     if (verbose==T) cat("\n### Iteration",i,"\n")
-    #fit diagonal decay given iota and rho
-    a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, update.eC=update.exposures))
-    cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
-    if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
+    #
     #fit iota and rho given diagonal decay
     a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, update.exposures=update.exposures))
     cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
     if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
+    #
+    #fit diagonal decay given iota and rho
+    a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, update.eC=update.exposures))
+    cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
+    if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
+    #
     if (i > bg.steps) {
+      #
       #fit dispersion
       a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
       if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
+      #
       #fit signal using sparse fused lasso
       if (fit.signal==T) {
         update.exposures=F
@@ -1087,6 +1093,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
         if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
       }
     }
+    #
     #check for convergence
     if (i>1) if (has_converged(cs)) {
       if (verbose==T) cat("Normalization has converged\n")
