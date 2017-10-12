@@ -1074,24 +1074,22 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
     if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     #
-    if (i > bg.steps) {
-      #
-      #fit dispersion
-      a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight))
-      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
-      if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
+    #fit dispersion
+    a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight))
+    cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
+    if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
+    #
+    if (fit.signal==T && i > bg.steps) {
       #
       #fit signal using sparse fused lasso
-      if (fit.signal==T) {
-        update.exposures=F
-        a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=T, ncores=ncores,
-                                                         fix.lambda1=cs@settings$fix.lambda1,
-                                                         fix.lambda1.at=cs@settings$fix.lambda1.at,
-                                                         fix.lambda2=cs@settings$fix.lambda2,
-                                                         fix.lambda2.at=cs@settings$fix.lambda2.at))
-        cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
-        if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
-      }
+      update.exposures=F
+      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=T, ncores=ncores,
+                                                       fix.lambda1=cs@settings$fix.lambda1,
+                                                       fix.lambda1.at=cs@settings$fix.lambda1.at,
+                                                       fix.lambda2=cs@settings$fix.lambda2,
+                                                       fix.lambda2.at=cs@settings$fix.lambda2.at))
+      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
+      if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
     }
     #
     #check for convergence
