@@ -208,7 +208,8 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
   #make decay data table, reused at next call
   dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=decay_out$log_mean_counts,log_decay=decay_out$log_decay)]
   setkey(dmat,name,dbin)
-  decay_out$decay=dmat 
+  decay_out$decay=dmat
+  decay_out[c("beta_diag","beta_diag_diff","beta_diag_centered","log_mean_counts")]=NULL
   return(decay_out)
 }
 
@@ -481,6 +482,8 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
   bout=rbind(bout,cout)
   setkey(bout, id, name, cat)
   genomic_out$biases=bout
+  genomic_out[c("beta_iota_diff","beta_rho_diff","beta_iota","beta_rho","log_mean_RJ",
+                "log_mean_DL","log_mean_DR","log_mean_cleft","log_mean_cright")]=NULL
   return(genomic_out)
 }
 
@@ -671,6 +674,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, fix.lambd
   #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
   setkey(mat,name,bin1,bin2)
   cs@par$signal=mat[,.(name,bin1,bin2,phihat,weight,ncounts,phi,beta,diag.grp,diag.idx)]
+  cs@par$phi=mat[,phi]
   params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
   cs@par$eC=as.array(params[,eC+eCprime])
   cs@par$eCprime=as.array(params[,eCprime])
@@ -684,36 +688,26 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, fix.lambd
 #' Check whether a normalization has converged
 #' @export
 #' 
-has_converged = function(cs, laststep=NULL) {
+has_converged = function(cs) {
+  #return FALSE if legs have changed, and require at least 2 steps
   params=cs@diagnostics$params
-  if (is.null(laststep)) {
-    if (params[,step[.N]]<=2) return(F)
-    return(has_converged(cs, params[,step[.N]]) & has_converged(cs, params[,step[.N]-1]))
-  }
-  stopifnot(length(laststep)==1)
-  #check if legs have changed
+  laststep=params[,step[.N]]
   if (!setequal(params[step==laststep,.(leg)],params[step==laststep-1,.(leg)])) return(FALSE)
-  #objective convergence
-  delta = merge(params[step==laststep,.(leg,value)],params[step==laststep-1,.(leg,value)],
-                by="leg")[,abs(value.x-value.y)]
-  conv.obj = all(delta<cs@settings$tol.obj)
-  #parameter convergence
-  getdiff=function(name,fn=identity){merge(params[step==laststep,.(leg,get(name))],
+  if (laststep<=2) return(FALSE)
+  #check all legs present in the last step
+  #check if all quantities directly involved in building the expected matrix have converged
+  rel.precision=function(name,fn=identity){merge(params[step==laststep,.(leg,get(name))],
                                params[step==laststep-1,.(leg,get(name))],by="leg")[
-                                 leg==leg[.N],if(is.numeric(V2.y[[1]])){abs(fn(V2.x[[1]])-fn(V2.y[[1]]))}else{fn(V2.x[[1]])}]}
-  conv.eC = getdiff("eC")
-  conv.alpha = getdiff("alpha",fn=log10)
-  conv.ldiag = getdiff("lambda_diag",fn=log10)
-  conv.liota = getdiff("lambda_iota",fn=log10)
-  conv.lrho = getdiff("lambda_rho",fn=log10)
-  if(!any(cs@par$signal$phi == 0)) {
-    conv.l1 = getdiff("lambda1",fn=function(x){y=x;y[x>0]=log10(y[x>0]);y})
-    conv.l2 = getdiff("lambda2",fn=log10)
-    conv.param = all(c(conv.eC,conv.alpha,conv.ldiag,conv.liota,conv.lrho,conv.l1,conv.l2)<cs@settings$tol.obj)
-  } else {
-    conv.param = all(c(conv.eC,conv.alpha,conv.ldiag,conv.liota,conv.lrho)<cs@settings$tol.obj)
-  }
-  return(conv.obj | conv.param)
+                                 leg==leg[.N], max( abs(fn(V2.x[[1]])-fn(V2.y[[1]])) ) / ( max(fn(V2.x[[1]]))-min(fn(V2.x[[1]])) ) ]}
+  conv.log_iota = rel.precision("log_iota")
+  conv.log_rho = rel.precision("log_rho")
+  conv.log_decay = rel.precision("log_decay")
+  conv.phi = rel.precision("phi")
+  cat(" conv.log_iota ", conv.log_iota,
+      " conv.log_rho ", conv.log_rho, " conv.log_decay ", conv.log_decay, " conv.phi ", conv.phi, "\n")
+  conv.param = all(c(conv.log_iota,conv.log_rho,
+                     conv.log_decay,conv.phi)<cs@settings$tol.obj, na.rm=T)
+  return(conv.param)
 }
 
 #' count number of zeros in a given cut site, distance bin and signal bin
@@ -959,11 +953,13 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
       if(verbose==T) cat("Preparing for signal estimation\n")
       stuff = csnorm:::prepare_first_signal_estimation(cs@biases, cs@experiments[,name], base.res)
       cs@par$signal=stuff$signal
+      cs@par$phi=stuff$signal[,phi]
       cs@settings$sbins=stuff$sbins
     } else {
       cs@settings$sbins=cs@biases[,c(min(pos)-1,max(pos)+1)]
       cs@par$signal=cs@biases[,.(phi=0,bin1=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                                  bin2=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)),by=name]
+      cs@par$phi=cs@par$signal[,phi]
       setkey(cs@par$signal,name,bin1,bin2)
     }
     #get number of zeros along cut sites and decay

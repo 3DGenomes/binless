@@ -150,7 +150,6 @@ update_diagnostics = function(cs, step, leg, runtime) {
   params=data.table(step=step,leg=leg,value=cs@par$value,runtime=runtime)
   tmp=as.data.table(lapply(cs@par,list))
   #remove entries that are too heavy and redundant
-  if ("log_decay" %in% names(tmp)) tmp[,log_decay:=NULL]
   if ("biases" %in% names(tmp)) tmp[,biases:=NULL]
   #merge with previous
   params=cbind(params,tmp)
