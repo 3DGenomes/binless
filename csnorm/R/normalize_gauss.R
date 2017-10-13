@@ -64,13 +64,12 @@ csnorm_gauss_common_muhat_mean = function(cs, zeros, sbins) {
 #' Compute decay etahat and weights using previous mean
 #' @keywords internal
 #' 
-csnorm_gauss_decay_muhat_mean = function(cs) {
-  cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
-  cts[,kappaij:=eC+log_decay]
+csnorm_gauss_decay_muhat_mean = function(cs, cts.common) {
+  cts.common[,kappaij:=eC+log_decay]
   dbins=cs@settings$dbins
-  csd = cts[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
-               kappahat=weighted.mean(z+kappaij, weight/var),
-               std=1/sqrt(sum(weight/(2*var))), weight=sum(weight)/2), keyby=c("name", "dbin")] #each count appears twice
+  csd = cts.common[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
+                      kappahat=weighted.mean(z+kappaij, weight/var),
+                      std=1/sqrt(sum(weight/(2*var))), weight=sum(weight)/2), keyby=c("name", "dbin")] #each count appears twice
   return(csd)
 }
 
@@ -212,9 +211,9 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(cs, verbose=T, update.eC=T) {
+csnorm_gauss_decay = function(cs, cts.common, verbose=T, update.eC=T) {
   if (verbose==T) cat(" Decay\n")
-  csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs)
+  csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs, cts.common)
   #run optimization
   op = csnorm:::csnorm_gauss_decay_optimize(csd, cs@design, cs@settings$Kdiag, cs@par$lambda_diag,
                                             verbose=verbose, max_perf_iteration=cs@settings$iter,
@@ -231,7 +230,7 @@ csnorm_gauss_decay = function(cs, verbose=T, update.eC=T) {
 #' Compute decay etahat and weights using previous mean
 #' @keywords internal
 #' 
-csnorm_gauss_genomic_muhat_mean = function(cs) {
+csnorm_gauss_genomic_muhat_mean = function(cs, cts.common) {
   #biases
   init=cs@par
   bsub=copy(cs@biases)
@@ -247,7 +246,6 @@ csnorm_gauss_genomic_muhat_mean = function(cs) {
   setkey(bts,id,name,cat)
   stopifnot(bts[,.N]==3*cs@biases[,.N])
   #counts
-  cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   cts.common[,etaij:=eC+log_bias]
   cts = cts.common[,.(etahat=weighted.mean(z+etaij, weight/var), std=sqrt(2/sum(weight/var))),
                    keyby=c("id1","name","cat")]
@@ -491,9 +489,9 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, verbose=T, update.exposures=T) {
+csnorm_gauss_genomic = function(cs, cts.common, verbose=T, update.exposures=T) {
   if (verbose==T) cat(" Genomic\n")
-  a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs)
+  a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs, cts.common)
   #run optimization
   op = csnorm:::csnorm_gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, cs@settings$sbins,
                                               cs@par$lambda_iota, cs@par$lambda_rho, verbose=verbose,
@@ -603,16 +601,16 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
-  cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros, sbins)
+csnorm_gauss_signal_muhat_mean = function(cs, cts.common, zeros, sbins) {
+  cts = cts.common[bin1<=bin2]
   #put in triangular form
-  cts2 = cts[bin1>bin2]
+  cts2 = cts.common[bin1>bin2]
   setnames(cts2,c("bin1","bin2"),c("bin2","bin1"))
-  cts = rbind(cts[bin1<=bin2],cts2)[,.(name,bin1,bin2,dbin,count,lmu.nosig,z,mu,var,log_decay,weight=weight/2)] #each count appears twice
+  cts = rbind(cts,cts2)[,.(name,bin1,bin2,dbin,count,lmu.nosig,z,mu,var,log_decay,weight=weight/2)] #each count appears twice
   rm(cts2)
   cts = cts[,.(count=weighted.mean(count,weight/var),lmu.nosig=weighted.mean(lmu.nosig,weight/var),
                z=weighted.mean(z,weight/var),mu=exp(weighted.mean(log(mu),weight/var)),var=1/weighted.mean(1/var,weight),
-                      log_decay=weighted.mean(log_decay,weight/var),weight=sum(weight)),
+               log_decay=weighted.mean(log_decay,weight/var),weight=sum(weight)),
              by=c("name","bin1","bin2","dbin")]
   stopifnot(cts[,all(bin1<=bin2)])
   setkey(cts,name,bin1,bin2)
@@ -654,10 +652,10 @@ get_signal_metadata = function(cs, cts, resolution) {
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, fix.lambda1=F, fix.lambda1.at=NA,
+csnorm_gauss_signal = function(cs, cts.common, verbose=T, constrained=T, ncores=1, fix.lambda1=F, fix.lambda1.at=NA,
                                fix.lambda2=F, fix.lambda2.at=NA) {
   if (verbose==T) cat(" Signal\n")
-  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cts.common, cs@zeros, cs@settings$sbins)
   metadata = csnorm:::get_signal_metadata(cs, cts, cs@settings$base.res)
   #
   if (verbose==T) cat("  predict\n")
@@ -903,12 +901,11 @@ load_stripped = function(fname, ncores=1) {
 #' Compute initial exposures assuming a poisson model
 #' @keywords internal
 #' 
-initial_guess_exposures = function(cs, pseudocount=1e-2) {
+initial_guess_exposures = function(cs, cts.common, pseudocount=1e-2) {
   #biases
   cs@par$eDE=as.array(cs@biases[,log(pseudocount+mean(dangling.L+dangling.R)/2),keyby=c("name")]$V1)
   cs@par$eRJ=as.array(cs@biases[,log(pseudocount+mean(rejoined)),keyby=c("name")]$V1)
   cs@par$eC=array(0,cs@experiments[,.N])
-  cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   cs@par$eC = as.array(cts.common[,log(pseudocount+weighted.mean(count,weight)),keyby=c("name")]$V1)
   return(cs)
 }
@@ -916,8 +913,7 @@ initial_guess_exposures = function(cs, pseudocount=1e-2) {
 #' Compute initial iota and rho biases assuming a poisson model
 #' @keywords internal
 #' 
-initial_guess_genomic = function(cs, pseudocount=1e-2) {
-  cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+initial_guess_genomic = function(cs, cts.common, pseudocount=1e-2) {
   iotas=cts.common[cat=="contact L",log((pseudocount+weighted.mean(count,weight))/(weighted.mean(exp(lmu.nosig),weight))),keyby=c("name","id1")]
   iotas[,V1:=V1-mean(V1),by=name]
   cs@par$log_iota=as.array(iotas[,V1])
@@ -930,8 +926,7 @@ initial_guess_genomic = function(cs, pseudocount=1e-2) {
 #' Compute initial iota and rho biases assuming a poisson model
 #' @keywords internal
 #' 
-initial_guess_decay = function(cs, pseudocount=1e-2) {
-  cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+initial_guess_decay = function(cs, cts.common, pseudocount=1e-2) {
   decay=cts.common[,.(log_decay=log((pseudocount+weighted.mean(count,weight))/(weighted.mean(exp(lmu.nosig),weight))),
                       ncounts=sum(weight)),keyby=c("name","dbin")]
   decay[,log_decay:=log_decay-weighted.mean(log_decay,ncounts),by=name]
@@ -965,7 +960,8 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
     decay=CJ(name=cs@experiments[,name],dist=head(cs@settings$dbins,n=length(cs@settings$dbins)-1)*10**(stepsz/2))
     decay[,dbin:=cut(dist, cs@settings$dbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
     decay[,c("dist","log_decay"):=list(NULL,0)]
-    cs@par=list(alpha=init.dispersion, log_iota=array(0,cs@biases[,.N]), log_rho=array(0,cs@biases[,.N]),
+    cs@par=list(eC=array(0,cs@experiments[,.N]), eRJ=array(0,cs@experiments[,.N]), eDE=array(0,cs@experiments[,.N]), alpha=init.dispersion,
+                log_iota=array(0,cs@biases[,.N]), log_rho=array(0,cs@biases[,.N]),
                 decay=decay, log_decay=decay[,log_decay], tol_genomic=.1, tol_decay=.1, tol_disp=.1, tol_signal=1)
     #prepare signal matrix
     if (fit.signal==T) {
@@ -985,12 +981,14 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
     if(verbose==T) cat("Counting zeros\n")
     cs@zeros = csnorm:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
     #set initial guess for exposures, decay and biases
+    if(verbose==T) cat("Initial guess: residuals\n")
+    cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
     if(verbose==T) cat("Initial guess: exposures\n")
-    cs = csnorm:::initial_guess_exposures(cs)
+    cs = csnorm:::initial_guess_exposures(cs, cts.common)
     if(verbose==T) cat("Initial guess: decay\n")
-    cs = csnorm:::initial_guess_decay(cs)
+    cs = csnorm:::initial_guess_decay(cs, cts.common)
     if(verbose==T) cat("Initial guess: biases\n")
-    cs = csnorm:::initial_guess_genomic(cs)
+    cs = csnorm:::initial_guess_genomic(cs, cts.common)
     return(cs)
 }
 
@@ -1063,13 +1061,17 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
   for (i in (laststep + 1:ngibbs)) {
     if (verbose==T) cat("\n### Iteration",i,"\n")
     #
+    #compute residuals once for this round
+    if(verbose==T) cat(" Residuals\n")
+    cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+    #
     #fit iota and rho given diagonal decay
-    a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, update.exposures=update.exposures))
+    a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, cts.common, update.exposures=update.exposures))
     cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
     if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     #
     #fit diagonal decay given iota and rho
-    a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, update.eC=update.exposures))
+    a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, cts.common, update.eC=update.exposures))
     cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
     if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     #
@@ -1082,7 +1084,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
       #
       #fit signal using sparse fused lasso
       update.exposures=F
-      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, verbose=verbose, constrained=T, ncores=ncores,
+      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, cts.common, verbose=verbose, constrained=T, ncores=ncores,
                                                        fix.lambda1=cs@settings$fix.lambda1,
                                                        fix.lambda1.at=cs@settings$fix.lambda1.at,
                                                        fix.lambda2=cs@settings$fix.lambda2,
