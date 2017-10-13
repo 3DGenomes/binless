@@ -51,14 +51,10 @@ csnorm_gauss_common_muhat_mean = function(cs, zeros, sbins) {
   czero = czero[,.(name,id1,pos1,bin1,bin2,dbin,cat,dir,count=0,lmu.nosig,weight=nzero,log_bias,log_decay,eC)]
   cts=rbind(cpos,czero)
   ### add signal
-  if (cs@par$signal[,.N]>0 && all(!is.null(cts$phi))) {
-    signal = csnorm:::get_signal_matrix(cs, resolution = sbins[2]-sbins[1], groups=cs@experiments[,.(name,groupname=name)])
-    signal=rbind(signal[,.(name,bin1,bin2,phi)],signal[bin1!=bin2,.(name,bin1=bin2,bin2=bin1,phi)])
-    cts=signal[cts,,on=c("name","bin1","bin2")]
-    cts[,mu:=exp(lmu.nosig+phi)]
-  } else {
-    cts[,mu:=exp(lmu.nosig)]
-  }
+  signal = csnorm:::get_signal_matrix(cs, resolution = sbins[2]-sbins[1], groups=cs@experiments[,.(name,groupname=name)])
+  signal=rbind(signal[,.(name,bin1,bin2,phi)],signal[bin1!=bin2,.(name,bin1=bin2,bin2=bin1,phi)])
+  cts=signal[cts,,on=c("name","bin1","bin2")]
+  cts[,mu:=exp(lmu.nosig+phi)]
   ### finalize
   cts[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
   #ggplot(cts[name=="T47D es 60 MboI 1"&cat=="contact R"])+geom_line(aes(dbin,log_decay,colour=count>0,group=count>0))
@@ -154,7 +150,7 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     C=-bandSparse(Kdiag, Kdiag-1, k=c(0,-1),diagonals=list(diags[[1]],-diags[[1]]))
     Ct=rbind(matrix(0,nrow=Dsets,ncol=Kdiag), cbind(crossprod(X,W),C))
     
-    epsilon = 1
+    epsilon = Inf
     maxiter = 0
     
     while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
@@ -222,7 +218,10 @@ csnorm_gauss_decay = function(cs, verbose=T, update.eC=T) {
   #run optimization
   op = csnorm:::csnorm_gauss_decay_optimize(csd, cs@design, cs@settings$Kdiag, cs@par$lambda_diag,
                                             verbose=verbose, max_perf_iteration=cs@settings$iter,
-                                            convergence_epsilon=cs@settings$tol.leg)
+                                            convergence_epsilon = cs@par$tol_decay)
+  #restrict tolerance if needed
+  precision = max(abs(op$log_decay - cs@par$log_decay))
+  cs@par$tol_decay = min(cs@par$tol_decay, max(cs@settings$tol,precision/10))
   #update par slot
   if (update.eC==F) op$eC=NULL
   cs@par=modifyList(cs@par, op)
@@ -359,7 +358,7 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     tmp_X_S_m2_X = crossprod(Diagonal(x=sds)%*%X)
     tmp_Xt_W = crossprod(X,W)
     
-    epsilon = 1
+    epsilon = Inf
     maxiter = 0
     while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
       D = bdiag(lambda_iota*D1,lambda_rho*D1)
@@ -499,7 +498,10 @@ csnorm_gauss_genomic = function(cs, verbose=T, update.exposures=T) {
   op = csnorm:::csnorm_gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, cs@settings$sbins,
                                               cs@par$lambda_iota, cs@par$lambda_rho, verbose=verbose,
                                               max_perf_iteration=cs@settings$iter,
-                                              convergence_epsilon=cs@settings$tol.leg)
+                                              convergence_epsilon=cs@par$tol_genomic)
+  #restrict tolerance if needed
+  precision = max(max(abs(op$log_iota - cs@par$log_iota)), max(abs(op$log_rho - cs@par$log_rho)))
+  cs@par$tol_genomic = min(cs@par$tol_genomic, max(cs@settings$tol, precision/10))
   #update par slot
   if (update.exposures==F) {
     op$eC=NULL
@@ -579,9 +581,13 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],lmu.close]))
   init$alpha=max(0.001,1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu))
   init$mu=NULL
-  out=capture.output(op<-optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, tol_param=cs@settings$tol.leg,
-                                             data=data, iter=cs@settings$iter, tol_obj=cs@settings$tol.leg,
-                                             verbose=verbose, init=init, init_alpha=cs@settings$init_alpha))
+  out=capture.output(op<-optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, tol_param=cs@par$tol_disp,
+                                             data=data, iter=cs@settings$iter, verbose=verbose, init=init,
+                                             init_alpha=1e-9))
+  #restrict tolerance if needed
+  precision = max(abs(c(op$par[c("eRJ","eDE","alpha")],recursive=T) - c(cs@par[c("eRJ","eDE","alpha")],recursive=T)))
+  cs@par$tol_disp = min(cs@par$tol_disp, max(cs@settings$tol, precision/10))
+  #update parameters
   cs@par=modifyList(cs@par, op$par[c("eRJ","eDE","alpha")])
   #cs@par$eC=cs@par$eC+op$par$eC_sup
   if (verbose==T) cat("  fit: dispersion",cs@par$alpha,"\n")
@@ -599,7 +605,11 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' 
 csnorm_gauss_signal_muhat_mean = function(cs, zeros, sbins) {
   cts = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros, sbins)
-  cts = cts[,.(name,bin1,bin2,count,lmu.nosig,z,mu,var,log_decay,weight)]
+  #put in triangular form
+  cts2 = cts[bin1>bin2]
+  setnames(cts2,c("bin1","bin2"),c("bin2","bin1"))
+  cts = rbind(cts[bin1<=bin2],cts2)[,.(name,bin1,bin2,count,lmu.nosig,z,mu,var,log_decay,weight=weight/2)] #each count appears twice
+  rm(cts2)
   stopifnot(cts[,all(bin1<=bin2)])
   setkey(cts,name,bin1,bin2)
   return(cts)
@@ -654,7 +664,7 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, fix.lambd
     csig=new("CSbsig", mat=cs@par$signal[name==g], cts=cts[name==g],
              settings=list(metadata=metadata,
                            nbins=nbins, dispersion=cs@par$alpha,
-                           tol.val=cs@settings$tol.leg, nperf=50))
+                           tol.val=cs@par$tol_signal, nperf=50))
     csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F)
     csig
   }
@@ -673,6 +683,10 @@ csnorm_gauss_signal = function(cs, verbose=T, constrained=T, ncores=1, fix.lambd
   #  scale_fill_gradient2()
   #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
   setkey(mat,name,bin1,bin2)
+  #restrict tolerance if needed
+  precision = max(abs(mat[,phi]-cs@par$phi))
+  cs@par$tol_signal = min(cs@par$tol_signal, max(cs@settings$tol, precision/10))
+  #set new parameters
   cs@par$signal=mat[,.(name,bin1,bin2,phihat,weight,ncounts,phi,beta,diag.grp,diag.idx)]
   cs@par$phi=mat[,phi]
   params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
@@ -692,8 +706,8 @@ has_converged = function(cs) {
   #return FALSE if legs have changed, and require at least 2 steps
   params=cs@diagnostics$params
   laststep=params[,step[.N]]
-  if (!setequal(params[step==laststep,.(leg)],params[step==laststep-1,.(leg)])) return(FALSE)
   if (laststep<=2) return(FALSE)
+  if (!setequal(params[step==laststep,.(leg)],params[step==laststep-1,.(leg)])) return(FALSE)
   #check all legs present in the last step
   #check if all quantities directly involved in building the expected matrix have converged
   rel.precision=function(name,fn=identity){merge(params[step==laststep,.(leg,get(name))],
@@ -703,10 +717,10 @@ has_converged = function(cs) {
   conv.log_rho = rel.precision("log_rho")
   conv.log_decay = rel.precision("log_decay")
   conv.phi = rel.precision("phi")
-  cat(" conv.log_iota ", conv.log_iota,
-      " conv.log_rho ", conv.log_rho, " conv.log_decay ", conv.log_decay, " conv.phi ", conv.phi, "\n")
+  #cat(" conv.log_iota ", conv.log_iota,
+  #    " conv.log_rho ", conv.log_rho, " conv.log_decay ", conv.log_decay, " conv.phi ", conv.phi, "\n")
   conv.param = all(c(conv.log_iota,conv.log_rho,
-                     conv.log_decay,conv.phi)<cs@settings$tol.obj, na.rm=T)
+                     conv.log_decay,conv.phi)<cs@settings$tol, na.rm=T)
   return(conv.param)
 }
 
@@ -926,8 +940,8 @@ initial_guess_decay = function(cs, pseudocount=1e-2) {
 #' @keywords internal
 #' 
 fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
-                       bg.steps=5, iter=1000, fit.signal=T, verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
-                       tol.obj=1e-2, tol.leg=1e-4, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
+                       bg.steps=5, iter=1000, fit.signal=T, verbose=T, ncounts=1000000, init.dispersion=10,
+                       tol=1e-2, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
     #fresh start
     cs@par=list() #in case we have a weird object
     cs@groups=list()
@@ -935,8 +949,8 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
     #add settings
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
-                         bg.steps=bg.steps, iter=iter, init_alpha=init_alpha, init.dispersion=init.dispersion, tol.obj=tol.obj,
-                         tol.leg=tol.leg, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
+                         bg.steps=bg.steps, iter=iter, init.dispersion=init.dispersion, tol=tol,
+                         fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                          fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
@@ -947,7 +961,8 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
     decay=CJ(name=cs@experiments[,name],dist=head(cs@settings$dbins,n=length(cs@settings$dbins)-1)*10**(stepsz/2))
     decay[,dbin:=cut(dist, cs@settings$dbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
     decay[,c("dist","log_decay"):=list(NULL,0)]
-    cs@par=list(alpha=init.dispersion, log_iota=array(0,cs@biases[,.N]), log_rho=array(0,cs@biases[,.N]), decay=decay)
+    cs@par=list(alpha=init.dispersion, log_iota=array(0,cs@biases[,.N]), log_rho=array(0,cs@biases[,.N]),
+                decay=decay, log_decay=decay[,log_decay], tol_genomic=.1, tol_decay=.1, tol_disp=.1, tol_signal=1)
     #prepare signal matrix
     if (fit.signal==T) {
       if(verbose==T) cat("Preparing for signal estimation\n")
@@ -998,11 +1013,8 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
 #' @param iter positive integer. Maximum number of optimization steps for each leg.
 #' @param fit.signal boolean. Set to FALSE only for diagnostics.
 #' @param verbose Display progress if TRUE
-#' @param init_alpha positive numeric, default 1e-5. Initial step size of LBFGS
-#'   line search (dispersion leg).
 #' @param init.dispersion positive numeric. Value of the dispersion to use initially.
-#' @param tol.obj positive numeric (default 1e-1). Convergence tolerance on changes in the four likelihoods.
-#' @param tol.leg positive numeric (default 1e-5). Convergence tolerance on changes in the likelihood within each leg.
+#' @param tol positive numeric (default 1e-2). Convergence tolerance on relative changes in the computed biases.
 #' @param ncores positive integer (default 1). Number of cores to use.
 #' @param fix.lambda1 whether to set lambda1 to a given value, or to estimate it
 #' @param fix.lambda1.at if fix.lambda1==T, the approximate value where it is meant to be fixed. Might move a bit because
@@ -1015,8 +1027,8 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
 #' 
 run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
                      ngibbs = 20, bg.steps=5, iter=1000, fit.signal=T,
-                     verbose=T, ncounts=1000000, init_alpha=1e-7, init.dispersion=10,
-                     tol.obj=1e-2, tol.leg=1e-4, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
+                     verbose=T, ncounts=1000000, init.dispersion=10,
+                     tol=1e-2, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -1028,8 +1040,8 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     #fresh start
     cs = fresh_start(cs, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, base.res = base.res,
                      bg.steps = bg.steps, iter = iter, fit.signal = fit.signal,
-                     verbose = verbose, ncounts = ncounts, init_alpha = init_alpha, init.dispersion = init.dispersion,
-                     tol.obj = tol.obj, tol.leg = tol.leg, ncores = ncores, fix.lambda1 = fix.lambda1, fix.lambda1.at = fix.lambda1.at,
+                     verbose = verbose, ncounts = ncounts, init.dispersion = init.dispersion,
+                     tol = tol, ncores = ncores, fix.lambda1 = fix.lambda1, fix.lambda1.at = fix.lambda1.at,
                      fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
     laststep=0
     #update eC everywhere in the first step
@@ -1037,7 +1049,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
   } else {
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
-    update.exposures = !(fit.signal==T && laststep > bg.steps)
+    update.exposures = !(fit.signal==T && laststep > cs@settings$bg.steps)
   }
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
@@ -1062,7 +1074,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
     if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
     #
-    if (fit.signal==T && i > bg.steps) {
+    if (fit.signal==T && i > cs@settings$bg.steps) {
       #
       #fit signal using sparse fused lasso
       update.exposures=F
@@ -1076,9 +1088,13 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     }
     #
     #check for convergence
-    if (i>1) if (has_converged(cs)) {
-      if (verbose==T) cat("Normalization has converged\n")
-      break
+    if (has_converged(cs)) {
+      if (fit.signal == T && i <= cs@settings$bg.steps) {
+        cs@settings$bg.steps = i #compute signal at next step
+      } else {
+        if (verbose==T) cat("Normalization has converged\n")
+        break
+      }
     }
   }
   if (verbose==T) cat("Done\n")
