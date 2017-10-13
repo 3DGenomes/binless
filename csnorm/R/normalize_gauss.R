@@ -652,7 +652,8 @@ get_signal_metadata = function(cs, cts, resolution) {
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-csnorm_gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda2=F, fix.lambda2.at=NA) {
+csnorm_gauss_signal = function(cs, cts.common, verbose=T, constrained=T, ncores=1, fix.lambda1=F, fix.lambda1.at=NA,
+                               fix.lambda2=F, fix.lambda2.at=NA) {
   if (verbose==T) cat(" Signal\n")
   cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cts.common, cs@zeros, cs@settings$sbins)
   metadata = csnorm:::get_signal_metadata(cs, cts, cs@settings$base.res)
@@ -670,18 +671,20 @@ csnorm_gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda2=
     csig
   }
   registerDoParallel(cores=min(ncores,length(groupnames)))
-  params = foreach(csig=csigs, .combine=rbind, .export=c("verbose","fix.lambda2","fix.lambda2.at")) %dopar% {
-    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=F, verbose=verbose,
-                                fix.lambda1=T, fix.lambda1.at=0,
+  params = foreach(csig=csigs, .combine=rbind, .export=c("constrained","verbose","fix.lambda1","fix.lambda1.at",
+                                                         "fix.lambda2","fix.lambda2.at")) %dopar% {
+    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose,
+                                fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                                 fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }
   stopImplicitCluster()
-  #compute matrix at new params, and shift in order to avoid degeneracies with the decay
+  #compute matrix at new params
   mat = rbindlist(params[,mat])
-  mat = cs@design[mat,,on="name"]
+  #store new signal in cs and update eC
+  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+
+  #  scale_fill_gradient2()
+  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
   setkey(mat,name,bin1,bin2)
-  mat[,diag.grp:=unclass(bin2)-unclass(bin1)]
-  mat[,phi:=phi-min(phi),by=c("diag.grp","decay")]
   #restrict tolerance if needed
   precision = max(abs(mat[,phi]-cs@par$phi))
   cs@par$tol_signal = min(cs@par$tol_signal, max(cs@settings$tol, precision/10))
@@ -939,7 +942,7 @@ initial_guess_decay = function(cs, cts.common, pseudocount=1e-2) {
 #' 
 fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
                        bg.steps=5, iter=1000, fit.signal=T, verbose=T, ncounts=1000000, init.dispersion=10,
-                       tol=1e-2, ncores=1, fix.lambda2=F, fix.lambda2.at=NA) {
+                       tol=1e-2, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
     #fresh start
     cs@par=list() #in case we have a weird object
     cs@groups=list()
@@ -948,6 +951,7 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
                          bg.steps=bg.steps, iter=iter, init.dispersion=init.dispersion, tol=tol,
+                         fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                          fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
     cs@settings$Krow=round(cs@biases[,(max(pos)-min(pos))/1000*cs@settings$bf_per_kb])
@@ -1016,8 +1020,9 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
 #' @param init.dispersion positive numeric. Value of the dispersion to use initially.
 #' @param tol positive numeric (default 1e-2). Convergence tolerance on relative changes in the computed biases.
 #' @param ncores positive integer (default 1). Number of cores to use.
-#' @param fix.lambda2 whether to set lambda2 to a given value, or to estimate it
-#' @param fix.lambda2.at if fix.lambda2==T, the value where it is meant to be fixed.
+#' @param fix.lambda1 whether to set lambda1 to a given value, or to estimate it
+#' @param fix.lambda1.at if fix.lambda1==T, the approximate value where it is meant to be fixed. Might move a bit because
+#'   of the positivity and degeneracy constraints.
 #'   
 #' @return A csnorm object
 #' @export
@@ -1027,7 +1032,7 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
 run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
                      ngibbs = 20, bg.steps=5, iter=1000, fit.signal=T,
                      verbose=T, ncounts=1000000, init.dispersion=10,
-                     tol=1e-2, ncores=1, fix.lambda2=F, fix.lambda2.at=NA) {
+                     tol=1e-2, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -1040,7 +1045,8 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     cs = fresh_start(cs, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, base.res = base.res,
                      bg.steps = bg.steps, iter = iter, fit.signal = fit.signal,
                      verbose = verbose, ncounts = ncounts, init.dispersion = init.dispersion,
-                     tol = tol, ncores = ncores, fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
+                     tol = tol, ncores = ncores, fix.lambda1 = fix.lambda1, fix.lambda1.at = fix.lambda1.at,
+                     fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
     laststep=0
     #update eC everywhere in the first step
     update.exposures=T
@@ -1080,7 +1086,9 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
       #
       #fit signal using sparse fused lasso
       update.exposures=F
-      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, cts.common, verbose=verbose, ncores=ncores,
+      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, cts.common, verbose=verbose, constrained=T, ncores=ncores,
+                                                       fix.lambda1=cs@settings$fix.lambda1,
+                                                       fix.lambda1.at=cs@settings$fix.lambda1.at,
                                                        fix.lambda2=cs@settings$fix.lambda2,
                                                        fix.lambda2.at=cs@settings$fix.lambda2.at))
       cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
