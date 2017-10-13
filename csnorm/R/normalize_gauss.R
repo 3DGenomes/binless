@@ -721,6 +721,8 @@ has_converged = function(cs) {
   conv.phi = rel.precision("phi")
   #cat(" conv.log_iota ", conv.log_iota,
   #    " conv.log_rho ", conv.log_rho, " conv.log_decay ", conv.log_decay, " conv.phi ", conv.phi, "\n")
+  cat(" mean relative precision for this iteration: ",
+      mean(c(conv.log_iota,conv.log_rho,conv.log_decay,conv.phi), na.rm=T), "\n")
   conv.param = all(c(conv.log_iota,conv.log_rho,
                      conv.log_decay,conv.phi)<cs@settings$tol, na.rm=T)
   return(conv.param)
