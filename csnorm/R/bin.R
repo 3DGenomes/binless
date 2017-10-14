@@ -102,7 +102,7 @@ csnorm_predict_binned_matrices_irls = function(cts, dispersion, ncores=1, niter=
 #'
 #' @examples
 group_datasets = function(cs, resolution, group=c("condition","replicate","enzyme","experiment"),
-                          verbose=T, ncores=1, niter=100, tol=1e-3) {
+                          verbose=T, ncores=1, niter=100, tol=cs@settings$tol) {
   ### fetch and check inputs
   if (group!="all") group=match.arg(group, several.ok=T)
   if (get_cs_group_idx(cs, resolution=resolution, group=group, raise=F)>0)
@@ -177,7 +177,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
 #' @export
 #' 
 #' @examples
-bin_all_datasets = function(cs, resolution=10000, ncores=1, verbose=T, niter=100) {
+bin_all_datasets = function(cs, resolution=10000, ncores=1, verbose=T, niter=100, tol=cs@settings$tol) {
   group_datasets(cs, resolution=resolution, group="all", ncores=ncores, verbose=verbose, niter=niter)
 }
 
