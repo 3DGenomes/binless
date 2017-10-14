@@ -41,56 +41,6 @@ iterative_normalization = function(mat, niterations=100, namecol="name", verbose
   binned
 }
 
-#' count number of zeros in each rectangular bin
-#' @keywords internal
-#' 
-get_nzeros_binning = function(cs, resolution, ncores=1) {
-  stopifnot(cs@counts[id1>=id2,.N]==0)
-  #count left and right
-  cts=melt(cs@counts[,.(name,pos1,pos2,distance,contact.close,contact.down,contact.far,contact.up)],
-           id.vars=c("name","pos1","pos2","distance"))[value>0]
-  #retrieve bin borders
-  biases=cs@biases[,.(name,id,pos)]
-  bins=seq(biases[,min(pos)-1],biases[,max(pos)+1+resolution],resolution)
-  biases[,bin:=cut(pos, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
-  cts[,c("bin1","bin2","dbin"):=
-        list(cut(pos1, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
-             cut(pos2, bins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
-             cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
-  #count per bin
-  cts=cts[,.(nnz=.N),keyby=c("name","bin1","bin2","dbin","variable")]
-  #Count the number of crossings per distance bin
-  #looping over IDs avoids building NxN matrix
-  registerDoParallel(cores=ncores)
-  chunksize=cs@biases[,ceiling(.N/(10*ncores))]
-  nchunks=cs@biases[,ceiling(.N/chunksize)]
-  crossings = foreach(chunk=1:nchunks, .combine=rbind) %dopar% {
-    bs=biases[((chunk-1)*chunksize+1):min(.N,chunk*chunksize)]
-    foreach(n=bs[,name], p=bs[,pos], b=bs[,bin], .combine=rbind) %do% {
-      crossings = biases[name==n&pos>p,.(name,bin2=bin,distance=abs(pos-p))]
-      if (cs@settings$circularize>0)  crossings[,distance:=pmin(distance,cs@settings$circularize+1-distance)]
-      crossings[,dbin:=cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12)]
-      crossings[distance>=cs@settings$dmin,.(bin1=b,ncross=.N),by=c("name","bin2","dbin")]
-    }
-  }
-  stopImplicitCluster()
-  crossings=crossings[,.(ncross=sum(ncross)),keyby=c("name","bin1","bin2","dbin")]
-  zeros = rbind(
-    merge(crossings,cts[variable=="contact.close"],by=c("name","bin1","bin2","dbin"),all=T)[
-    ,.(name,bin1,bin2,dbin,cat="close",ncross,nnz)],
-    merge(crossings,cts[variable=="contact.far"],by=c("name","bin1","bin2","dbin"),all=T)[
-      ,.(name,bin1,bin2,dbin,cat="far",ncross,nnz)],
-    merge(crossings,cts[variable=="contact.down"],by=c("name","bin1","bin2","dbin"),all=T)[
-      ,.(name,bin1,bin2,dbin,cat="down",ncross,nnz)],
-    merge(crossings,cts[variable=="contact.up"],by=c("name","bin1","bin2","dbin"),all=T)[
-      ,.(name,bin1,bin2,dbin,cat="up",ncross,nnz)])
-  zeros[is.na(nnz),nnz:=0]
-  zeros[,nzero:=ncross-nnz]
-  stopifnot(zeros[is.na(ncross),.N==0])
-  stopifnot(zeros[nzero<0,.N==0])
-  return(zeros)
-}
-
 #' Perform binning of data
 #' 
 #' fast IRLS and zero counts approximation
