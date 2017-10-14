@@ -178,12 +178,18 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   if (verbose==T) cat("   Get zeros per bin\n")
   if (resolution < cs@settings$base.res)
     cat("Warning: resolution is smaller than base.res, results might be inconsistent\n")
-  sbins = seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
-  zeros = csnorm:::get_nzeros(cs, sbins, ncores=ncores)
+  if (resolution == cs@settings$base.res) {
+    sbins = cs@settings$sbins
+    zeros = cs@zeros
+  } else {
+    sbins = seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
+    zeros = csnorm:::get_nzeros(cs, sbins, ncores=ncores)
+  }
   #
   #predict means, put in triangular form, add biases, and add signal column if absent
   if (verbose==T) cat("   Predict means\n")
-  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, zeros, sbins)
+  cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros, sbins)
+  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cts.common, zeros, sbins)
   eCmat = cs@design[,.(name,eC=cs@par$eC)]
   cts = merge(cts, eCmat, by="name")
   cts[,log_bias:=lmu.nosig-log_decay-eC]
