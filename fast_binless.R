@@ -135,3 +135,56 @@ ggplot(diff)+geom_raster(aes(bin1,bin2,fill=delta))+
   scale_fill_gradient2(low=muted("blue"),mid="white",high=muted("red"))+coord_fixed()
 
 
+
+#cross-validation diagnostics
+lam2s=10**seq(-1,1.5,length.out=10)
+#lam2s=10**seq(0.9,-0.2,length.out=10)
+#lam2s=c(0,10**seq(0,-10,length.out=11))
+ret=csnorm:::fast_binless_eval_cv(out, lam2s, 0, tol_val)
+names(ret) = as.character(lam2s)
+ret = rbindlist(ret, use.names = T, idcol = "lam2")
+ret[,group:="all"]
+#
+retg1=csnorm:::fast_binless_eval_cv(out, lam2s, 1, tol_val)
+names(retg1) = as.character(lam2s)
+retg1 = rbindlist(retg1, use.names = T, idcol = "lam2")
+retg1[,group:="g1"]
+#
+retg2=csnorm:::fast_binless_eval_cv(out, lam2s, 2, tol_val)
+names(retg2) = as.character(lam2s)
+retg2 = rbindlist(retg2, use.names = T, idcol = "lam2")
+retg2[,group:="g2"]
+#
+retg=rbind(retg1,retg2)[phihat==-100]
+setkey(retg,lam2,name,bin1,bin2)
+retall=dcast(rbindlist(list(all=ret,cv=retg),use.names = T, idcol = "mode"), lam2+name+bin1+bin2+observed+biases+decay~mode,
+             value.var=c("expected","signal","binless","group","phihat","weights"))
+retall[,lam2:=ordered(lam2,lam2s)]
+retall[,sqerr_cv:=(phihat_all-signal_cv)**2]
+retall[,sqerr_all:=(phihat_all-signal_all)**2]
+#
+ggplot(retall[,.(CV=sum(weights_all*sqerr_cv),sumsq=sum(weights_all*sqerr_all)),by=lam2])+
+  geom_line(aes(lam2,CV,colour="CV",group=1))+geom_line(aes(lam2,sumsq,colour="sumsq",group=1))
+#
+ggplot(retall[,.(CV=sum(pmin(weights_all,10)*sqerr_cv),sumsq=sum(pmin(weights_all,10)*sqerr_all)),by=lam2])+
+  geom_line(aes(lam2,CV,colour="CV",group=1))+geom_line(aes(lam2,sumsq,colour="sumsq",group=1))
+#
+ggplot(retall[,.(CV=sum(weights_all*sqerr_cv/exp(decay)),sumsq=sum(weights_all*sqerr_all/exp(decay))),by=lam2])+
+  geom_line(aes(lam2,CV,colour="CV",group=1))+geom_line(aes(lam2,sumsq,colour="sumsq",group=1))
+#
+ggplot(retall[,.(CV=sum(sqerr_cv),sumsq=sum(sqerr_all)),by=lam2])+
+  geom_line(aes(lam2,CV,colour="CV",group=1))+geom_line(aes(lam2,sumsq,colour="sumsq",group=1))
+#
+ggplot(retall[,.(msq_wt=pmin(mean(weights_all*sqerr_cv),100),msq_flat=pmin(mean(sqerr_cv),100)),by=c("bin1","bin2","good")])+geom_raster(aes(bin1,bin2,fill=msq_wt))+
+  geom_raster(aes(bin2,bin1,fill=msq_flat))+coord_fixed()+scale_fill_gradient2()+facet_wrap(~good)
+#
+ggplot(ret)+geom_raster(aes(bin1,bin2,fill=pmin(phihat,max(signal))))+geom_raster(aes(bin2,bin1,fill=signal))+facet_wrap(~lam2)+coord_fixed()+scale_fill_gradient2()
+ggplot(ret)+geom_raster(aes(bin1,bin2,fill=observed))+geom_raster(aes(bin2,bin1,fill=binless))+facet_wrap(~lam2)+coord_fixed()+scale_fill_gradient2()
+ggplot(ret[lam2==lam2[.N]])+geom_raster(aes(bin1,bin2,fill=expected))+geom_raster(aes(bin2,bin1,fill=weights))+facet_wrap(~lam2)+coord_fixed()+scale_fill_gradient2()
+
+ggplot(retall[bin2<20])+geom_raster(aes(bin1,bin2,fill=group_cv))+geom_raster(aes(bin2,bin1,fill=group_all))+facet_wrap(~lam2)+coord_fixed()
+ggplot(retall[bin2<20])+geom_raster(aes(bin1,bin2,fill=signal_cv))+geom_raster(aes(bin2,bin1,fill=signal_all))+facet_wrap(~lam2)+coord_fixed()+scale_fill_gradient2()
+ggplot(retall)+geom_raster(aes(bin1,bin2,fill=signal_cv))+geom_raster(aes(bin2,bin1,fill=signal_all))+facet_wrap(~lam2)+coord_fixed()+scale_fill_gradient2()
+ggplot(retall[bin1>225&bin1<250&bin2>425&bin2<450])+geom_raster(aes(bin1,bin2-150,fill=signal_cv))+geom_raster(aes(bin2-150,bin1,fill=signal_all))+facet_wrap(~lam2)+coord_fixed()+scale_fill_gradient2()
+ggplot(retall[bin1>225&bin1<250&bin2>425&bin2<450])+geom_raster(aes(bin1,bin2-150,fill=phihat))+geom_raster(aes(bin2-150,bin1,fill=signal_all))+facet_wrap(~lam2)+coord_fixed()+scale_fill_gradient2()
+

@@ -329,6 +329,40 @@ List fast_binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngi
                               _["nbins"]=nbins);
 }
 
+Rcpp::List fast_binless_eval_cv(const List obs, const NumericVector lam2, unsigned group, double tol_val) {
+    //read normalization data
+    Rcpp::Rcout << "init\n";
+    const unsigned nbins = obs["nbins"];
+    const Rcpp::DataFrame mat = Rcpp::as<Rcpp::DataFrame>(obs["mat"]);
+    FastSignalData out(mat, nbins);
+    if (out.get_ndatasets() != 1) Rcpp::stop("Provide only 1 dataset!");
+    auto signal_ori = Rcpp::as<std::vector<double> >(mat["signal"]);
+    out.set_log_signal(signal_ori); //fills-in phi_ref and delta
+    auto log_decay = Rcpp::as<std::vector<double> >(obs["log_decay"]);
+    out.set_log_decay(log_decay);
+    auto log_biases = Rcpp::as<std::vector<double> >(obs["log_biases"]);
+    out.set_log_biases(log_biases);
+    auto exposures = Rcpp::as<std::vector<double> >(obs["exposures"]);
+    out.set_exposures(exposures);
+    const double converge = tol_val/20.;
+    std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(1, FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge));
+    //compute cv
+    Rcpp::Rcout << "compute\n";
+    std::vector<DataFrame> diagnostics;
+    for (unsigned i=0; i<lam2.size(); ++i) {
+        Rcpp::Rcout << "lambda2= " << lam2[i] << "\n";
+        out.set_log_signal(signal_ori); //fills-in phi_ref and delta
+        auto signal = fast_step_signal(out, flos, lam2[i], group);
+        out.set_log_signal(signal.beta);
+        out.set_signal_phihat(signal.phihat);
+        out.set_signal_weights(signal.weights);
+        diagnostics.push_back(out.get_as_dataframe());
+    }
+    //finalize and return
+    Rcpp::Rcout << "done\n";
+    return Rcpp::wrap(diagnostics);
+}
+
 Rcpp::DataFrame fast_binless_difference(const List obs, double lam2, unsigned ref, double tol_val) {
     //read normalization data
     Rcpp::Rcout << "init\n";
@@ -348,7 +382,6 @@ Rcpp::DataFrame fast_binless_difference(const List obs, double lam2, unsigned re
                                                                FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge));
     //compute differences
     Rcpp::Rcout << "compute\n";
-    auto old_weights = out.get_difference_weights();
     auto diff = fast_step_difference(out, flos, lam2, ref);
     out.set_log_difference(diff.delta);
     out.set_deltahat(diff.deltahat);
