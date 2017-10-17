@@ -15,5 +15,7 @@ Rcpp::NumericVector compute_phi_ref(const BinnedData<Difference>& binned,
                                     const Rcpp::NumericVector& delta);
 
 
+double get_maximum_admissible_weight(const Rcpp::NumericVector& w, double percentile);
+
 #endif
 

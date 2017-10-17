@@ -39,3 +39,16 @@ Rcpp::NumericVector compute_phi_ref(const BinnedData<Difference>& binned,
   }
   return Rcpp::wrap(phi_ref_r);
 }
+
+double get_maximum_admissible_weight(const Rcpp::NumericVector& w, double percentile) {
+    //get sorted values of weights
+    std::vector<double> sw = Rcpp::as<std::vector<double> >(w);
+    std::sort(sw.begin(),sw.end());
+    //find first nonzero weight
+    unsigned i;
+    for (i=0; i<sw.size(); ++i) if (sw[i]>0) break;
+    //find percentile of positive values
+    i = unsigned(percentile*(sw.size()-1-i)/100.)+i;
+    //return its value
+    return sw[i];
+}

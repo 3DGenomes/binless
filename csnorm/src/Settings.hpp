@@ -35,5 +35,13 @@ template<unsigned kSD, typename GaussianEstimator> struct Settings<ScorePreparat
     static const double get_beta_default() { return -100; }
 };
 
+//settings for Likelihood
+template<typename Calculation> class Likelihood {};
+template<typename Calculation> struct Settings<Likelihood<Calculation> > {
+    //clamp weights above this percentile to their maximum value
+    static const double get_weights_max_percentile() { return 100; }
+};
+
+
 #endif
 
