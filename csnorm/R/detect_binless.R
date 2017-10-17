@@ -36,21 +36,15 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
     return(csig@state$BIC)
   }
   #
-  #dt = foreach (lam=c(1,2,5,10),.combine=rbind) %:%
-  #  foreach (l1min=c(0,0.1,1), .combine=rbind) %dopar% {
-  #    fix.lambda1.at=l1min
-  #    state = csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
-  #    mat=as.data.table(state$mat)
-  #    info=as.data.table(state[c("lambda2","lambda1","eCprime","dof","BIC","BIC.sd","converged")])
-  #    cbind(mat,info)
-  #  }
-  #dt3 = foreach (lam=10^seq(-2,0,length.out=10),.combine=rbind) %dopar% {
+  #dt3 = foreach (lam=10^seq(-1,1,length.out=20),.combine=rbind) %dopar% {
   #  fix.lambda1.at=0
   #  state = csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
   #  mat=as.data.table(state$mat)
   #  info=as.data.table(state[c("lambda2","lambda1","eCprime","dof","BIC","BIC.sd","converged")])
   #  cbind(mat,info)
   #}
+  #ggplot(dt3[,.SD[1],by=lambda2])+geom_line(aes(lambda2,BIC))
+  #ggplot(dcast(dt3,lambda2+bin1+bin2~ori,value.var = "phi"))+geom_raster(aes(bin1,bin2,fill=new))+geom_raster(aes(bin2,bin1,fill=old))+facet_wrap(~lambda2)+coord_fixed()+scale_fill_gradient2()
   #dt.fix = foreach (lam=10^(seq(log10(12.8),log10(13.3),length.out=20)),.combine=rbind) %dopar% {
   #  csig@state <<- csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed)
   #  as.data.table(csig@state[c("lambda2","lambda1","eCprime","dof","BIC","BIC.sd","converged")])
