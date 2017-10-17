@@ -12,11 +12,10 @@ void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::prepare() {
     for (int i=0; i<N_; ++i)
         cvgroup_.push_back( (bin2(i)+bin1(i)) % ngroups ); // 2 cv groups in checkerboard pattern
     //resize beta_cv_
-    const double beta_default = -100.; //all values will be overwritten anyways
-    beta_cv_ = std::vector<double>(N_,beta_default);
+    beta_cv_ = std::vector<double>(N_,beta_default_);
     betas_.reserve(2);
 }
-    
+
 template<unsigned kSD, typename GaussianEstimator>
 void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::compute() {
     //Compute fused lasso solutions on each group and report to beta_cv

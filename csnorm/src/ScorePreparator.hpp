@@ -6,16 +6,20 @@
 
 #include "util.hpp"
 #include "Traits.hpp"
+#include "Settings.hpp"
 
-template<typename Score, typename GaussianEstimator> class ScorePreparator {};
+//already declared in Settings.hpp
+//template<typename Score, typename GaussianEstimator> class ScorePreparator {};
 
 // A class that produces data used for cross-validation of fused lasso regression results
 template<unsigned kSD, typename GaussianEstimator> class ScorePreparator<CVkSD<kSD>, GaussianEstimator> {
     
+    typedef ScorePreparator<CVkSD<kSD>, GaussianEstimator> this_t;
 public:
     
-    ScorePreparator(GaussianEstimator& gauss, const BinnedDataCore& binned, double lambda2, double y_default = -100.)
-     : gauss_(gauss), binned_(binned), y_default_(y_default), lambda2_(lambda2), N_(binned.get_bin1().size()) {
+    ScorePreparator(GaussianEstimator& gauss, const BinnedDataCore& binned, double lambda2)
+     : gauss_(gauss), binned_(binned), y_default_(Settings<this_t>::get_y_default()),
+       beta_default_(Settings<this_t>::get_beta_default()), lambda2_(lambda2), N_(binned.get_bin1().size()) {
         prepare();
         compute();
     }
@@ -37,7 +41,7 @@ private:
     
     GaussianEstimator& gauss_;
     const BinnedDataCore& binned_;
-    const double y_default_, lambda2_;
+    const double y_default_, beta_default_, lambda2_;
     const unsigned N_;
     std::vector<int> cvgroup_;
     std::vector<double> beta_cv_;
