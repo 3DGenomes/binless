@@ -1,7 +1,7 @@
 library(ggplot2)
 library(scales)
 library(data.table)
-library(csnorm)
+library(binless)
 
 
 #Welcome to this quick walk through fast binless normalization!
@@ -62,7 +62,7 @@ load("example/rao_HiCall_IMR90_FOXP1ext_2.3M_csdata.RData")
 csd2=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
 #now we bin the raw data at the base resolution we want, and put it in a data table
-mat=csnorm:::bin_data(cs,resolution=5000)
+mat=binless:::bin_data(cs,resolution=5000)
 #write.table(mat,file = "example/rao_HiCall_FOXP1ext_2.3M_mat_5kb.dat", quote = T, row.names = F)
 
 ### Normalization
@@ -90,7 +90,7 @@ nouter=20
 lam2=5
 tol_val=2e-1
 bg_steps=5
-out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], lam2, nouter, tol_val, bg_steps)
+out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, nouter, tol_val, bg_steps)
 
 
 #Here follow pretty much all the plots you could think of (be sure to check out signal and binless)
@@ -137,7 +137,7 @@ ggplot(out$mat)+geom_raster(aes(bin1,bin2,fill=binless))+geom_raster(aes(bin2,bi
 ref=1
 lam2=10
 tol_val=2e-1
-diff=as.data.table(csnorm:::fast_binless_difference(out, lam2, ref, tol_val))
+diff=as.data.table(binless:::fast_binless_difference(out, lam2, ref, tol_val))
 
 #some plots (check out delta)
 #differences: log(observed)

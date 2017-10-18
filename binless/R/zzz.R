@@ -1,3 +1,3 @@
 .onLoad <- function(libname, pkgname) {
-  loadModule("csnorm_cpp", what = TRUE)
+  loadModule("binless_cpp", what = TRUE)
 }

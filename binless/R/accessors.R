@@ -1,4 +1,4 @@
-#' @include csnorm.R
+#' @include binless.R
 NULL
 
 #' Fetch CSgroup indices from CSnorm object
@@ -117,7 +117,7 @@ get_predicted_subset = function(cs, ncounts=100000) {
   if (length(cs@par)==0) stop("You should first normalize the datasets")
   counts=cs@counts[sample(.N,min(.N,ncounts))]
   setkey(counts,name,id1,id2)
-  mat=csnorm_predict_all(cs, counts, verbose=F)
+  mat=predict_all(cs, counts, verbose=F)
   return(mat)
 }
 
@@ -134,7 +134,7 @@ get_genomic_biases = function(cs, points_per_kb=10) {
   if (length(cs@par)==0) stop("You should first normalize the datasets")
   foreach (gen=cs@design[,unique(genomic)], .combine=rbind) %do% {
     dsets=cs@design[genomic==gen,name]
-    csnorm:::generate_genomic_biases(biases=cs@biases[name%in%dsets], beta_iota=cs@par$beta_iota[gen,],
+    binless:::generate_genomic_biases(biases=cs@biases[name%in%dsets], beta_iota=cs@par$beta_iota[gen,],
                                      beta_rho=cs@par$beta_rho[gen,], bf_per_kb=cs@settings$bf_per_kb,
                                      points_per_kb = points_per_kb)[,.(pos,log_iota,log_rho,genomic=gen)]
   }

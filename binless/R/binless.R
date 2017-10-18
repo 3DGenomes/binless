@@ -1,8 +1,8 @@
-#' csnorm: A package for cut-site normalization
+#' binless: A package for resolution-independent Hi-C normalization
 #'
-#' This package performs cut-site normalization, a negative binomial generalized
+#' This package performs binless normalization, a negative binomial generalized
 #' additive model regression that uses dangling and rejoined ends to normalize
-#' 3C-like data in a resolution-independent way. It also allows for interaction
+#' Hi-C data in a resolution-independent way. It also allows for interaction
 #' or interaction difference detection. See publication TODO.
 #' 
 #' @section Preprocessing:
@@ -27,7 +27,7 @@
 #' \code{\link{generate_genomic_biases}}
 #' \code{\link{plot_binless_matrix}}
 #'
-#' @useDynLib csnorm, .registration = TRUE
+#' @useDynLib binless, .registration = TRUE
 #' @import methods
 #' @import splines
 #' @import data.table
@@ -43,7 +43,7 @@
 #' @importFrom dplyr ntile
 #'
 #' @docType package
-#' @name csnorm
+#' @name binless
 NULL
 
 
