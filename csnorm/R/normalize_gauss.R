@@ -2,11 +2,29 @@
 NULL
 
 #' Compute means for positive and zero counts using previous params
+#' 
+#' @return data.table containing the following columns
+#' - name: name of the dataset
+#' - id1, pos1, bin1: coordinates of the cut site
+#' - bin2, dbin: signal/distance bin in which we looked at the intersections
+#' - dir: fwd (rev) for contacts with downstream (resp upstream) cut-sites
+#' - cat: whether we consider contacts on the left (contact L) or on the right (contact R) of this cut site
+#' - count: the value of the count in this signal/distance/direction/category bin.
+#'  We discard anything below cs@settings$dmin. Note that sum(count) is twice the total number of counts (per dataset).
+#' - lmu.nosig: the log(mean) of the background model (exposure+bias+decay)
+#' - phi: the log(signal)
+#' - mu: the mean, including signal
+#' - weight: how many observations in this signal/distance/direction/category bin have this count.
+#'  Note that sum(weight) is twice the total number of observable counts (per dataset).
+#' - eC, log_decay, log_bias: exposure, log(decay) and log(bias) of this dataset. The bias is either iota or rho depending on cat.
+#' - z: count/mu-1
+#' - var: 1/mu+1/dispersion
+#'   
 #' @keywords internal
 #' 
 csnorm_gauss_common_muhat_mean = function(cs, zeros, sbins) {
   init=cs@par
-  ### positive counts
+  ### positive counts (twice, in both directions)
   #compute means
   cpos=copy(cs@counts)
   bsub=cs@biases[,.(id)]
@@ -41,15 +59,19 @@ csnorm_gauss_common_muhat_mean = function(cs, zeros, sbins) {
                                     count=contact.down,  lmu.nosig=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho2)],
              cpos[contact.up>0,   .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact L", dir="rev",
                                     count=contact.up,    lmu.nosig=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota2)])
-  ### zero counts
-  czero = merge(init$decay[,.(name,dbin,log_decay)], zeros, by=c("name","dbin"))
+  ### zero counts (twice, in both directions)
+  czero = init$decay[zeros,.(name,dbin,bin1,bin2,cat,dir,id1,pos1,weight=nzero,log_decay),on=c("name","dbin")]
+  setkeyv(czero,key(zeros))
   stopifnot(czero[is.na(log_decay),.N]==0)
-  czero = merge(czero[nzero>0],bsub, by.x="id1",by.y="id",all.x=T,all.y=F)
+  setnames(bsub,"id","id1")
+  czero = bsub[czero,on="id1"]
   czero[,log_bias:=ifelse(cat=="contact L", log_iota, log_rho)]
-  czero = merge(cbind(cs@design[,.(name)],eC=init$eC), czero, by="name",all.x=F,all.y=T)
+  czero[,c("log_iota","log_rho"):=NULL]
+  czero = cbind(cs@design[,.(name)],eC=init$eC)[czero,on="name"]
   czero[,lmu.nosig:=eC + log_decay + log_bias] #we don't average over j
-  czero = czero[,.(name,id1,pos1,bin1,bin2,dbin,cat,dir,count=0,lmu.nosig,weight=nzero,log_bias,log_decay,eC)]
+  czero[,count:=0]
   cts=rbind(cpos,czero)
+  setkeyv(cts,key(zeros))
   ### add signal
   signal = csnorm:::get_signal_matrix(cs, resolution = sbins[2]-sbins[1], groups=cs@experiments[,.(name,groupname=name)])
   signal=rbind(signal[,.(name,bin1,bin2,phi)],signal[bin1!=bin2,.(name,bin1=bin2,bin2=bin1,phi)])
@@ -57,6 +79,7 @@ csnorm_gauss_common_muhat_mean = function(cs, zeros, sbins) {
   cts[,mu:=exp(lmu.nosig+phi)]
   ### finalize
   cts[,c("z","var"):=list(count/mu-1,(1/mu+1/init$alpha))]
+  setkey(cts,name,id1,pos1,bin1,bin2,dbin,dir,cat)
   #ggplot(cts[name=="T47D es 60 MboI 1"&cat=="contact R"])+geom_line(aes(dbin,log_decay,colour=count>0,group=count>0))
   return(cts)
 }
@@ -247,7 +270,7 @@ csnorm_gauss_genomic_muhat_mean = function(cs, cts.common) {
   stopifnot(bts[,.N]==3*cs@biases[,.N])
   #counts
   cts.common[,etaij:=eC+log_bias]
-  cts = cts.common[,.(etahat=weighted.mean(z+etaij, weight/var), std=sqrt(2/sum(weight/var))),
+  cts = cts.common[,.(etahat=weighted.mean(z+etaij, weight/var), std=1/sqrt(sum(weight/(2*var)))),
                    keyby=c("id1","name","cat")]
   cts = merge(cs@biases[,.(name,id,pos)],cts,by.x=c("name","id"),by.y=c("name","id1"))
   setkey(cts, id, name, cat)
@@ -609,11 +632,10 @@ csnorm_gauss_signal_muhat_mean = function(cs, cts.common, zeros, sbins) {
   cts = rbind(cts,cts2)[,.(name,bin1,bin2,dbin,count,lmu.nosig,z,mu,var,log_decay,weight=weight/2)] #each count appears twice
   rm(cts2)
   cts = cts[,.(count=weighted.mean(count,weight/var),lmu.nosig=weighted.mean(lmu.nosig,weight/var),
-               z=weighted.mean(z,weight/var),mu=exp(weighted.mean(log(mu),weight/var)),var=1/weighted.mean(1/var,weight),
+               z=weighted.mean(z,weight/var),mu=exp(weighted.mean(lmu.nosig+phi,weight/var)),var=1/weighted.mean(1/var,weight),
                log_decay=weighted.mean(log_decay,weight/var),weight=sum(weight)),
-             by=c("name","bin1","bin2","dbin")]
+             keyby=c("name","bin1","bin2","dbin")]
   stopifnot(cts[,all(bin1<=bin2)])
-  setkey(cts,name,bin1,bin2)
   return(cts)
 }
 
@@ -729,6 +751,22 @@ has_converged = function(cs) {
 }
 
 #' count number of zeros in a given cut site, distance bin and signal bin
+#' 
+#' @return a data table, keyed on name,dbin,id1,pos1,bin1,bin2,dir,cat with the following columns
+#' - name: name of the dataset
+#' - id1, pos1, bin1: coordinates of the cut site
+#' - bin2, dbin: signal/distance bin in which we looked at the intersections
+#' - dir: fwd (rev) for contacts with downstream (resp upstream) cut-sites
+#' - cat: whether we consider contacts on the left (contact L) or on the right (contact R) of this cut site
+#' - ncross: number of cut site intersections (crossings) in this signal/distance/direction/category bin.
+#'  We discard anything below cs@settings$dmin. Note that sum(ncross) is four times the total number of crossings (per dataset).
+#' - nnz: number of non-zero contacts in this signal/distance/direction bin (max 2 per crossing).
+#'  Note that sum(nnz) is twice the number of nonzeros (per dataset)
+#' - nzero: number of zeros in this signal/distance/direction bin. We have nzero = 2*ncross - nnz.
+#'  Note that sum(nzero) is twice the number of zeros (per dataset)
+#'  For speed purposes downstream, we only return the entries where nzero>0, which corresponds to most of the entries anyway.
+#'  We therefore have sum(nnz+nzero) equal to approximately twice the number of detectable counts, e.g. 8x the number of crossings
+#'  
 #' @keywords internal
 #' 
 get_nzeros = function(cs, sbins, ncores=1) {
@@ -776,6 +814,8 @@ get_nzeros = function(cs, sbins, ncores=1) {
   zeros[,nzero:=2*ncross-nnz]
   stopifnot(zeros[is.na(ncross),.N==0])
   stopifnot(zeros[nzero<0,.N==0])
+  zeros=zeros[nzero>0]
+  setkey(zeros,name,dbin,id1,pos1,bin1,bin2,dir,cat)
   return(zeros)
 }
 
