@@ -28,8 +28,6 @@
 #' \code{\link{plot_binless_matrix}}
 #'
 #' @useDynLib csnorm, .registration = TRUE
-#' @import rstan
-#' @import rstantools
 #' @import methods
 #' @import splines
 #' @import data.table
