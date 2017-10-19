@@ -32,7 +32,7 @@ public:
         //cap the weights
         Rcpp::NumericVector wt = binned_.get_weight();
         const double wmax = get_maximum_admissible_weight(wt, Settings<Likelihood<Signal> >::get_weights_max_percentile());
-        Rcpp::Rcout << "maximum admissible weight: " << wmax << "\n";
+        //Rcpp::Rcout << "maximum admissible weight: " << wmax << "\n";
         wt = Rcpp::pmin(wt, wmax);
         
         //compute the score and return
@@ -79,7 +79,7 @@ public:
         Rcpp::NumericVector wt_ref = binned_.get_weight_ref();
         const double wmax_ref = get_maximum_admissible_weight(wt_ref, Settings<Likelihood<Signal> >::get_weights_max_percentile());
         wt_ref = Rcpp::pmin(wt_ref, wmax_ref);
-        Rcpp::Rcout << "maximum admissible weights: " << wmax << " " << wmax_ref << "\n";
+        //Rcpp::Rcout << "maximum admissible weights: " << wmax << " " << wmax_ref << "\n";
         
         const Rcpp::NumericVector chisq = wt * SQUARE(binned_.get_phihat() - (delta + eCprime + phi_ref))
                                         + wt_ref * SQUARE(binned_.get_phihat_ref() - phi_ref);
