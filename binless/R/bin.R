@@ -126,7 +126,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   #predict means, put in triangular form, add biases, and add signal column if absent
   if (verbose==T) cat("   Predict means\n")
   cts.common = binless:::gauss_common_muhat_mean(cs, zeros, sbins)
-  cts = binless:::gauss_signal_muhat_mean(cs, cts.common, zeros, sbins)
+  cts = binless:::gauss_signal_muhat_mean(cs, cts.common)
   eCmat = cs@design[,.(name,eC=cs@par$eC)]
   cts = merge(cts, eCmat, by="name")
   cts[,log_bias:=lmu.nosig-log_decay-eC]

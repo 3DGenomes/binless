@@ -624,12 +624,12 @@ gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-gauss_signal_muhat_mean = function(cs, cts.common, zeros, sbins) {
+gauss_signal_muhat_mean = function(cs, cts.common) {
   cts = cts.common[bin1<=bin2]
   #put in triangular form
   cts2 = cts.common[bin1>bin2]
   setnames(cts2,c("bin1","bin2"),c("bin2","bin1"))
-  cts = rbind(cts,cts2)[,.(name,bin1,bin2,dbin,count,lmu.nosig,z,mu,var,log_decay,weight=weight/2)] #each count appears twice
+  cts = rbind(cts,cts2)[,.(name,bin1,bin2,dbin,count,lmu.nosig,phi,z,mu,var,log_decay,weight=weight/2)] #each count appears twice
   rm(cts2)
   cts = cts[,.(count=weighted.mean(count,weight/var),lmu.nosig=weighted.mean(lmu.nosig,weight/var),
                z=weighted.mean(z,weight/var),mu=exp(weighted.mean(lmu.nosig+phi,weight/var)),var=1/weighted.mean(1/var,weight),
@@ -677,7 +677,7 @@ get_signal_metadata = function(cs, cts, resolution) {
 gauss_signal = function(cs, cts.common, verbose=T, constrained=T, ncores=1, fix.lambda1=F, fix.lambda1.at=NA,
                                fix.lambda2=F, fix.lambda2.at=NA) {
   if (verbose==T) cat(" Signal\n")
-  cts = binless:::gauss_signal_muhat_mean(cs, cts.common, cs@zeros, cs@settings$sbins)
+  cts = binless:::gauss_signal_muhat_mean(cs, cts.common)
   metadata = binless:::get_signal_metadata(cs, cts, cs@settings$base.res)
   #
   if (verbose==T) cat("  predict\n")
