@@ -1,4 +1,4 @@
-#' @include csnorm.R
+#' @include binless.R
 NULL
 
 #' connectivity on a triangle
@@ -45,7 +45,7 @@ build_patch_graph = function(mat, g, tol.value=1e-3) {
 detect_binless_patches = function(mat, settings) {
   if (mat[,uniqueN(name)]>1)
     return(foreach (n=mat[,unique(name)],.combine=rbind) %do%
-             csnorm:::detect_binless_patches(mat[name==n], settings))
+             binless:::detect_binless_patches(mat[name==n], settings))
   #
   #create connectivity graph
   g = compute_2d_connectivity_graph(settings$nbins)

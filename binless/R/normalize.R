@@ -1,4 +1,4 @@
-#' @include csnorm.R
+#' @include binless.R
 NULL
 
 #' Convert a sparse counts data.table to a dense one by adding rows with zero counts
@@ -81,7 +81,7 @@ optimize_stan_model = function(model, data, iter, verbose, init, ...) {
 #' @keywords internal
 #' @export
 #' 
-csnorm_fit_fixed = function(biases, counts, design, dmin, dmax, lambda, bf_per_kb=1, bf_per_decade=20, iter=10000,
+fit_fixed = function(biases, counts, design, dmin, dmax, lambda, bf_per_kb=1, bf_per_decade=20, iter=10000,
                       verbose=T, weight=array(1,dim=design[,.N]), ...) {
   nBiases=design[,uniqueN(genomic)]
   Decays=design[,uniqueN(decay)]
@@ -112,7 +112,7 @@ csnorm_fit_fixed = function(biases, counts, design, dmin, dmax, lambda, bf_per_k
 #' Single-cpu fitting
 #' @keywords internal
 #' 
-csnorm_fit = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_decade=20, iter=10000,
+fit = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_decade=20, iter=10000,
                       verbose=T, init=0, weight=array(1,dim=design[,.N]), ...) {
   Krow=round(biases[,(max(pos)-min(pos))/1000*bf_per_kb])
   Kdiag=round((log10(dmax)-log10(dmin))*bf_per_decade)
@@ -148,7 +148,7 @@ csnorm_fit = function(biases, counts, design, dmin, dmax, bf_per_kb=1, bf_per_de
 #' @export
 #' 
 #' @examples
-csnorm_predict_all = function(cs, counts, verbose=T) {
+predict_all = function(cs, counts, verbose=T) {
   biases=cs@biases
   par=cs@par
   dmin=cs@settings$dmin
@@ -176,14 +176,14 @@ csnorm_predict_all = function(cs, counts, verbose=T) {
 #' @keywords internal
 #' @export
 #'
-csnorm_predict_all_parallel = function(cs, counts, verbose=T, ncores=1) {
+predict_all_parallel = function(cs, counts, verbose=T, ncores=1) {
   nchunks=min(10*ncores,counts[,.N,by=name][,N]) #ensure at least 1 of each per parallel prediction
   counts[,chunk:=.I]
   counts[,chunk:=chunk-min(chunk),by=name]
   counts[,chunk:=as.integer(chunk/((max(chunk)+1)/nchunks)),by=name]
   registerDoParallel(cores = ncores)
   counts = foreach (i=0:(nchunks-1), .combine=rbind) %dopar%
-    csnorm_predict_all(cs,counts[chunk==i],verbose=verbose)
+    predict_all(cs,counts[chunk==i],verbose=verbose)
   stopImplicitCluster()
   counts[,chunk:=NULL]
   counts
@@ -211,7 +211,7 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subs
   dmax=cs@settings$dmax
   #initial guess
   if (length(init)==1) {
-    init.a=system.time(init.output <- capture.output(init.par <- csnorm_fit_fixed(
+    init.a=system.time(init.output <- capture.output(init.par <- fit_fixed(
       counts=cs@counts, biases=cs@biases, design=cs@design, lambda=init[[1]],
       bf_per_kb=bf_per_kb, dmin=dmin, dmax=dmax, bf_per_decade=bf_per_decade,
       verbose=T, iter=iter, init_alpha=init_alpha)))
@@ -232,7 +232,7 @@ run_serial = function(cs, init, bf_per_kb=1, bf_per_decade=20, iter=100000, subs
   #main optimization, subsampled
   counts.sub=cs@counts[sample(.N,round(subsampling.pc/100*.N))]
   setkeyv(counts.sub,key(cs@counts))
-  a=system.time(output <- capture.output(op <- csnorm:::csnorm_fit(
+  a=system.time(output <- capture.output(op <- binless:::fit(
     biases=cs@biases, counts = counts.sub, design=cs@design, dmin=dmin, dmax=dmax,
     bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, iter=iter, verbose = T,
     init=init.op$par, weight=counts.sub[,.N,by=name]$N/cs@counts[,.N,by=name]$N, init_alpha=init_alpha)))
@@ -303,7 +303,7 @@ check_fit = function(cs, genomic.groups=5, decay.groups=5, npoints=10) {
   counts=counts[,.SD[sample(.N,min(.N,npoints))],by=c("name","dbin")]
   setkey(counts, name, id1, id2, pos1, pos2)
   #predict values
-  counts=csnorm_predict_all(cs, counts, verbose=F)
+  counts=predict_all(cs, counts, verbose=F)
   counts=rbind(counts[,.(name,id1,id2,dbin,count=contact.close,mean=exp(log_mean_cclose))],
                counts[,.(name,id1,id2,dbin,count=contact.far,mean=exp(log_mean_cfar))],
                counts[,.(name,id1,id2,dbin,count=contact.up,mean=exp(log_mean_cup))],
@@ -375,7 +375,7 @@ get_exact_logp = function(cs) {
                counts_close=cs@counts[,contact.close], counts_far=cs@counts[,contact.far],
                counts_up=cs@counts[,contact.up], counts_down=cs@counts[,contact.down],
                weight=array(1,dim=cs@design[,.N]))
-  output = capture.output(op <- optimizing(csnorm:::stanmodels$fit, data=data, iter=1, verbose=T,
+  output = capture.output(op <- optimizing(binless:::stanmodels$fit, data=data, iter=1, verbose=T,
                                            init=cs@par, as_vector=F, hessian=F))
   output = output[grepl(pattern="initial.*",output)]
   return(as.numeric(sub("initial log joint probability = ","",output)))

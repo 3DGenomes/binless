@@ -1,4 +1,4 @@
-library(csnorm)
+library(binless)
 library(data.table)
 library(ggplot2)
 library(doParallel)
@@ -79,7 +79,7 @@ if (F) {
   csi@settings$min.l10FC=0.2
   mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
   mat[,value:=phi]
-  mat = csnorm:::detect_binless_patches(mat, csi@settings)
+  mat = binless:::detect_binless_patches(mat, csi@settings)
   mat[,value:=NULL]
   mat[,phi.max:=ifelse(is.maximum==T,NA,phi)]
   ggplot(mat)+geom_raster(aes(begin1,begin2,fill=phi/log(10)))+

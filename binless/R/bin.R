@@ -1,4 +1,4 @@
-#' @include csnorm.R
+#' @include binless.R
 NULL
 
 #' Apply the ICE algorithm to a binned matrix
@@ -57,7 +57,7 @@ iterative_normalization = function(mat, niterations=100, namecol="name", verbose
 #' @export
 #'
 #' @examples
-csnorm_predict_binned_matrices_irls = function(cts, dispersion, ncores=1, niter=100, tol=1e-3, verbose=T) {
+predict_binned_matrices_irls = function(cts, dispersion, ncores=1, niter=100, tol=1e-3, verbose=T) {
   #matrices
   if (verbose==T) cat("   Other matrices\n")
   cts[,c("decay","biases"):=list(exp(log_decay),exp(log_bias))]
@@ -120,13 +120,13 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
     zeros = cs@zeros
   } else {
     sbins = seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
-    zeros = csnorm:::get_nzeros(cs, sbins, ncores=ncores)
+    zeros = binless:::get_nzeros(cs, sbins, ncores=ncores)
   }
   #
   #predict means, put in triangular form, add biases, and add signal column if absent
   if (verbose==T) cat("   Predict means\n")
-  cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, zeros, sbins)
-  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cts.common, zeros, sbins)
+  cts.common = binless:::gauss_common_muhat_mean(cs, zeros, sbins)
+  cts = binless:::gauss_signal_muhat_mean(cs, cts.common, zeros, sbins)
   eCmat = cs@design[,.(name,eC=cs@par$eC)]
   cts = merge(cts, eCmat, by="name")
   cts[,log_bias:=lmu.nosig-log_decay-eC]
@@ -146,7 +146,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   setkeyv(cts,c("name","bin1","bin2"))
   #
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
-  mat = csnorm_predict_binned_matrices_irls(copy(cts), cs@par$alpha, ncores=ncores, niter=niter, tol=tol, verbose=verbose)
+  mat = predict_binned_matrices_irls(copy(cts), cs@par$alpha, ncores=ncores, niter=niter, tol=tol, verbose=verbose)
   setkey(mat,name,bin1,bin2)
   #
   if (verbose==T) cat("*** write begin/end positions\n")

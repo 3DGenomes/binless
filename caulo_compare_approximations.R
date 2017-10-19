@@ -1,6 +1,6 @@
 library(ggplot2)
 library(data.table)
-library(csnorm)
+library(binless)
 library(foreach)
 library(doParallel)
 
@@ -11,7 +11,7 @@ begin=500000
 end=650000
 load("data/caulo_NcoI_all_csdata_with_data.RData")
 data=csd@data[re.closest1>=begin&re.closest1<=end&re.closest2>=begin&re.closest2<=end]
-cs_data = csnorm:::prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
+cs_data = binless:::prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
 csd = new("CSdata", info=csd@info,
           settings=list(circularize=-1,dmin=csd@settings$dmin,dmax=cs_data$biases[,max(pos)-min(pos)]),
           data=data, biases=cs_data$biases, counts=cs_data$counts)

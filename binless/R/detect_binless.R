@@ -1,4 +1,4 @@
-#' @include csnorm.R
+#' @include binless.R
 NULL
 
 #' compute BIC for a given value of lambda2, optimizing lambda1 and eCprime (performance iteration, persistent state)
@@ -17,10 +17,10 @@ gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F, fix.lambda
   if (class(csig)=="CSbdiff") ctsg.ref=csig@cts.ref else ctsg.ref=NULL
   nperf=csig@settings$nperf
   if (is.null(ctsg.ref)) {
-    perf.c = csnorm:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2,
+    perf.c = binless:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2,
                                       tol.val, metadata, state$beta, constrained, fixed, positive, fix.lambda1, fix.lambda1.at)
   } else {
-    perf.c = csnorm:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2,
+    perf.c = binless:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2,
                                       tol.val, metadata, state$phi.ref, state$beta, constrained, fix.lambda1, fix.lambda1.at)
   }
   return(perf.c)
@@ -30,7 +30,7 @@ gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F, fix.lambda
 #' @keywords internal
 optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA, ncores=1) {
   obj = function(x) {
-    csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+    csig@state <<- binless:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
     #cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
     #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
@@ -38,7 +38,7 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
   #
   #dt3 = foreach (lam=10^seq(-1,1,length.out=20),.combine=rbind) %dopar% {
   #  fix.lambda1.at=0
-  #  state = csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+  #  state = binless:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
   #  mat=as.data.table(state$mat)
   #  info=as.data.table(state[c("lambda2","lambda1","eCprime","dof","BIC","BIC.sd","converged")])
   #  cbind(mat,info)
@@ -46,7 +46,7 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
   #ggplot(dt3[,.SD[1],by=lambda2])+geom_line(aes(lambda2,BIC))
   #ggplot(dcast(dt3,lambda2+bin1+bin2~ori,value.var = "phi"))+geom_raster(aes(bin1,bin2,fill=new))+geom_raster(aes(bin2,bin1,fill=old))+facet_wrap(~lambda2)+coord_fixed()+scale_fill_gradient2()
   #dt.fix = foreach (lam=10^(seq(log10(12.8),log10(13.3),length.out=20)),.combine=rbind) %dopar% {
-  #  csig@state <<- csnorm:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed)
+  #  csig@state <<- binless:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed)
   #  as.data.table(csig@state[c("lambda2","lambda1","eCprime","dof","BIC","BIC.sd","converged")])
   #}
   #dt=rbindlist(list(free=dt.free,fix=dt.fix), use=T, idcol="ori")
@@ -105,7 +105,7 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
 #' @keywords internal
 optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA) {
   obj = function(x) {
-    csig@state <<- csnorm:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+    csig@state <<- binless:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
     #cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
     #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
@@ -138,7 +138,7 @@ optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixe
 }
 
 evaluate_at_lambda2 = function(csig, lambda2, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA) {
-  csig@state = csnorm:::gfl_BIC(csig, lambda2=lambda2, constrained=constrained, positive=positive, fixed=fixed,
+  csig@state = binless:::gfl_BIC(csig, lambda2=lambda2, constrained=constrained, positive=positive, fixed=fixed,
                               fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
   retvals = as.list(csig@state)[c("lambda2","lambda1","eCprime","BIC","BIC.sd","dof")]
   if (fixed==T && abs(retvals$eCprime)>csig@settings$tol.val) cat("Warning: fixed = T but eCprime != 0\n") #only when fix.lambda1==F
@@ -159,14 +159,14 @@ evaluate_at_lambda2 = function(csig, lambda2, constrained=T, positive=T, fixed=F
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-csnorm_fused_lasso = function(csig, positive, fixed, constrained, verbose=T, fix.lambda1=F, fix.lambda1.at=0.1, fix.lambda2=F, fix.lambda2.at=NA) {
+fused_lasso = function(csig, positive, fixed, constrained, verbose=T, fix.lambda1=F, fix.lambda1.at=0.1, fix.lambda2=F, fix.lambda2.at=NA) {
   if (fix.lambda2==F) {
     n.SD=ifelse(fixed==T,1,0)
-    csig = csnorm:::optimize_lambda2_smooth(csig, n.SD=n.SD, constrained=constrained, positive=positive, fixed=fixed,
+    csig = binless:::optimize_lambda2_smooth(csig, n.SD=n.SD, constrained=constrained, positive=positive, fixed=fixed,
                                    fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
   } else {
     stopifnot(fix.lambda2.at>0)
-    csig = csnorm:::evaluate_at_lambda2(csig, fix.lambda2.at, constrained=constrained, positive=positive, fixed=fixed,
+    csig = binless:::evaluate_at_lambda2(csig, fix.lambda2.at, constrained=constrained, positive=positive, fixed=fixed,
                                      fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
   }
   csig@par$name=csig@cts[,name[1]]
@@ -221,7 +221,7 @@ get_signal_matrix = function(cs, resolution=cs@settings$base.res, groups=cs@expe
 #' Prepare grouped signal matrix and settings
 #' @keywords internal
 prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
-  mat = csnorm:::get_signal_matrix(cs, resolution, groups=csg@names)
+  mat = binless:::get_signal_matrix(cs, resolution, groups=csg@names)
   #
   #add trail information
   stopifnot(all(mat[,.N,by=name]$N==mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
@@ -242,7 +242,7 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
 #' Build grouped difference matrix using normalization data if available
 #' @keywords internal
 prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val) {
-  csi = csnorm:::prepare_signal_estimation(cs, csg, resolution, tol.val)
+  csi = binless:::prepare_signal_estimation(cs, csg, resolution, tol.val)
   names=csg@names
   mat = foreach(n=names[groupname!=ref,unique(groupname)],.combine=rbind) %do%
     merge(csi@mat[name==n],csi@mat[name==ref,.(bin1,bin2,phi1=phi)],all=T,by=c("bin1","bin2"))
@@ -293,7 +293,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #
   ### prepare signal estimation
   if (verbose==T) cat("  Prepare for signal estimation\n")
-  csi = csnorm:::prepare_signal_estimation(cs, csg, resolution, tol.val)
+  csi = binless:::prepare_signal_estimation(cs, csg, resolution, tol.val)
   #
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
@@ -303,8 +303,8 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
     csig = csi
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
-    csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F)
-    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=T, constrained=F, verbose=verbose,
+    csig@state = binless:::gfl_compute_initial_state(csig, diff=F)
+    binless:::fused_lasso(csig, positive=T, fixed=T, constrained=F, verbose=verbose,
                                 fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                                 fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }
@@ -327,10 +327,10 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #if (verbose==T) cat(" Detect patches\n")
   #csi@mat = foreach(g=groupnames, .combine=rbind) %do% {
   #  matg = mat[name==g]
-  #  #cl = csnorm:::build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
+  #  #cl = binless:::build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
   #  #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
   #  matg[,value:=phi]
-  #  matg = csnorm:::detect_binless_patches(matg, csi@settings)
+  #  matg = binless:::detect_binless_patches(matg, csi@settings)
   #  matg[,value:=NULL]
   #  matg
   #}
@@ -363,7 +363,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     stop("Refusing to overwrite this already detected interaction")
   if (is.character(ref)) ref=csg@names[as.character(groupname)==ref,unique(groupname)]
   if (verbose==T) cat("  Prepare for difference estimation\n")
-  csi = csnorm:::prepare_difference_estimation(cs, csg, resolution, ref, tol.val)
+  csi = binless:::prepare_difference_estimation(cs, csg, resolution, ref, tol.val)
   #
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
@@ -373,8 +373,8 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
     csig = csi
     csig@cts = csi@cts[name==g]
     csig@mat = csi@mat[name==g]
-    csig@state = csnorm:::gfl_compute_initial_state(csig, diff=T)
-    csnorm:::csnorm_fused_lasso(csig, positive=F, fixed=T, constrained=F, verbose=verbose,
+    csig@state = binless:::gfl_compute_initial_state(csig, diff=T)
+    binless:::fused_lasso(csig, positive=F, fixed=T, constrained=F, verbose=verbose,
                                 fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                                 fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }
@@ -397,10 +397,10 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   if (verbose==T) cat(" Detect patches\n")
   csi@mat = foreach(g=groupnames, .combine=rbind) %do% {
     matg = mat[name==g]
-    #cl = csnorm:::build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
+    #cl = binless:::build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
     #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
     matg[,value:=delta]
-    matg = csnorm:::detect_binless_patches(matg, csi@settings)
+    matg = binless:::detect_binless_patches(matg, csi@settings)
     matg[,value:=NULL]
     matg
   }

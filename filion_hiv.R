@@ -1,4 +1,4 @@
-library(csnorm)
+library(binless)
 library(data.table)
 library(ggplot2)
 library(doParallel)
@@ -56,7 +56,7 @@ for (resolution in c(10000)) {
 if (F) {
   load(paste0("data/filion_E11_chr7_1.6M_csnorm_optimized.RData"))
   
-  csnorm:::has_converged(cs)
+  binless:::has_converged(cs)
   cs@diagnostics$params[,sum(runtime)]/3600
   
   plot_diagnostics(cs)$plot

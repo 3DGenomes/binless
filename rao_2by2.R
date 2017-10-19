@@ -1,4 +1,4 @@
-library(csnorm)
+library(binless)
 library(data.table)
 library(ggplot2)
 library(doParallel)
@@ -136,7 +136,7 @@ if (F) {
       csi@settings$min.l10FC=0.2
       mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
       mat[,value:=phi]
-      mat = csnorm:::detect_binless_patches(mat, csi@settings)
+      mat = binless:::detect_binless_patches(mat, csi@settings)
       mat[,value:=NULL]
       mat[,phi.max:=ifelse(is.maximum==T,NA,phi)]
       ggplot(mat)+geom_raster(aes(begin1,begin2,fill=phi))+
@@ -221,7 +221,7 @@ if (F) {
       csi@settings$min.l10FC=0.2
       mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
       mat[,value:=phi]
-      mat = csnorm:::detect_binless_patches(mat, csi@settings)
+      mat = binless:::detect_binless_patches(mat, csi@settings)
       mat[,value:=NULL]
       #number of significant interactions, and percentage
       dt=mat[,.(num=sum(is.maximum)),by=name][
@@ -286,7 +286,7 @@ if (F) {
       csi@settings$min.l10FC=0.2
       mat=get_interactions(cs, type="CSbdiff", resolution=resolution, group="all", ref=cs@experiments[1,name])
       mat[,value:=delta]
-      mat = csnorm:::detect_binless_patches(mat, csi@settings)
+      mat = binless:::detect_binless_patches(mat, csi@settings)
       mat[,value:=NULL]
       mat=mat[name==cs@experiments[2,name]]
       #number of significant interactions
@@ -302,7 +302,7 @@ if (F) {
       csi@settings$min.l10FC=0.2
       mat=get_interactions(cs, type="CSbdiff", resolution=resolution, group="all", ref=cs@experiments[3,name])
       mat[,value:=delta]
-      mat = csnorm:::detect_binless_patches(mat, csi@settings)
+      mat = binless:::detect_binless_patches(mat, csi@settings)
       mat[,value:=NULL]
       mat=mat[name==cs@experiments[4,name]]
       #number of significant interactions

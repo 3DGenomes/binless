@@ -1,6 +1,6 @@
 library(ggplot2)
 library(data.table)
-library(csnorm)
+library(binless)
 library(foreach)
 library(doParallel)
 
@@ -23,7 +23,7 @@ plot_binned(data, resolution=1000, b1=1089000, e1=1092000)
 plot_binned(data, resolution=100, b1=1089000, e1=1092000)
 plot_raw(data, b1=1089000, e1=1094000)
 
-binned = csnorm:::bin_data(csd@data, resolution, b1=csd@biases[,min(pos)], b2=csd@biases[,min(pos)])
+binned = binless:::bin_data(csd@data, resolution, b1=csd@biases[,min(pos)], b2=csd@biases[,min(pos)])
 ggplot(binned[bin1>300&bin2>300])+geom_raster(aes(bin1,bin2, fill=log(N)))#+
   geom_raster(aes(begin2,begin1, fill=log(N)))+
   xlim(binned[,min(begin1)],binned[,max(begin1)])+
@@ -39,7 +39,7 @@ begin=8854480 #100k
 end=8954480
 load("data/ralph_EScell_Rbfox1_3.5M_csdata_with_data.RData")
 data=csd@data[re.closest1>=begin&re.closest1<=end&re.closest2>=begin&re.closest2<=end]
-cs_data = csnorm:::prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
+cs_data = binless:::prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
 csd = new("CSdata", info=csd@info, settings=list(circularize=-1),
           data=data, biases=cs_data$biases, counts=cs_data$counts)
 csd@data=data.table()

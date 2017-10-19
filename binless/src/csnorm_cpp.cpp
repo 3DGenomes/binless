@@ -5,7 +5,7 @@ using namespace Rcpp;
 #include "perf_iteration_diff.hpp"
 #include "fast_binless.hpp"
 
-RCPP_MODULE(csnorm_cpp) {
+RCPP_MODULE(binless_cpp) {
     using namespace Rcpp ;
 
     function("wgfl_signal_BIC", &wgfl_signal_BIC, "documentation for wgfl_signal_BIC ");

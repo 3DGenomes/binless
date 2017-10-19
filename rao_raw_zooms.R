@@ -1,4 +1,4 @@
-library(csnorm)
+library(binless)
 library(data.table)
 library(ggplot2)
 
@@ -49,7 +49,7 @@ load("data/caulo_BglIIr2_all_csdata_with_data.RData")
 begin=500000
 end=1500000
 data=csd@data[re.closest1>=begin&re.closest1<=end&re.closest2>=begin&re.closest2<=end]
-cs_data = csnorm:::prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
+cs_data = binless:::prepare_for_sparse_cs_norm(data, both=F, circularize=-1)
 csd = new("CSdata", info=csd@info, settings=list(circularize=-1),
           data=data, biases=cs_data$biases, counts=cs_data$counts)
 

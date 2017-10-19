@@ -1,6 +1,6 @@
 library(ggplot2)
 library(data.table)
-library(csnorm)
+library(binless)
 library(foreach)
 library(doParallel)
 library(scales)
@@ -53,7 +53,7 @@ load("data/pauli_e22e868a9_chr4_csdata.RData")
 csd2=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
 #now we bin the raw data at the base resolution we want, and put it in a data table
-mat=csnorm:::bin_data(cs,resolution=5000)
+mat=binless:::bin_data(cs,resolution=5000)
 
 #in the fast binless mode, you must ensure no counter diagonal nor row/column is completely zero
 #if there are not too many, you can add 1 to the observed counts
@@ -71,7 +71,7 @@ nouter=20
 lam2=10
 tol_val=1e-1
 bg_steps=5
-out=csnorm:::fast_binless(mat, mat[,nlevels(bin1)], lam2, nouter, tol_val, bg_steps)
+out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, nouter, tol_val, bg_steps)
 
 
 #Here follow pretty much all the plots you could think of (be sure to check out signal and binless)
@@ -118,7 +118,7 @@ ggplot(out$mat)+geom_raster(aes(bin1,bin2,fill=binless))+geom_raster(aes(bin2,bi
 ref=1
 lam2=10
 tol_val=1e-1
-diff=as.data.table(csnorm:::fast_binless_difference(out, lam2, ref, tol_val))
+diff=as.data.table(binless:::fast_binless_difference(out, lam2, ref, tol_val))
 
 #some plots (check out delta)
 #differences: log(observed)
@@ -140,17 +140,17 @@ ggplot(diff)+geom_raster(aes(bin1,bin2,fill=delta))+
 lam2s=10**seq(-1,1.5,length.out=10)
 #lam2s=10**seq(0.9,-0.2,length.out=10)
 #lam2s=c(0,10**seq(0,-10,length.out=11))
-ret=csnorm:::fast_binless_eval_cv(out, lam2s, 0, tol_val)
+ret=binless:::fast_binless_eval_cv(out, lam2s, 0, tol_val)
 names(ret) = as.character(lam2s)
 ret = rbindlist(ret, use.names = T, idcol = "lam2")
 ret[,group:="all"]
 #
-retg1=csnorm:::fast_binless_eval_cv(out, lam2s, 1, tol_val)
+retg1=binless:::fast_binless_eval_cv(out, lam2s, 1, tol_val)
 names(retg1) = as.character(lam2s)
 retg1 = rbindlist(retg1, use.names = T, idcol = "lam2")
 retg1[,group:="g1"]
 #
-retg2=csnorm:::fast_binless_eval_cv(out, lam2s, 2, tol_val)
+retg2=binless:::fast_binless_eval_cv(out, lam2s, 2, tol_val)
 names(retg2) = as.character(lam2s)
 retg2 = rbindlist(retg2, use.names = T, idcol = "lam2")
 retg2[,group:="g2"]

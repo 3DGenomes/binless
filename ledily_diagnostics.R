@@ -1,4 +1,4 @@
-library(csnorm)
+library(binless)
 library(foreach)
 library(doParallel)
 library(ggplot2)
@@ -81,9 +81,9 @@ ggplot(counts[begin2<15100])+geom_raster(aes(begin1,begin2,fill=log(V1)))+facet_
 decays
 
 
-zbias = csnorm:::get_nzeros_per_cutsite(cs, ncores=30)
-csb = csnorm:::csnorm_gauss_genomic_muhat_mean(cs, zbias)
-csb2 = csnorm:::csnorm_gauss_genomic_muhat_mean(cs2, zbias)
+zbias = binless:::get_nzeros_per_cutsite(cs, ncores=30)
+csb = binless:::gauss_genomic_muhat_mean(cs, zbias)
+csb2 = binless:::gauss_genomic_muhat_mean(cs2, zbias)
 csb=rbind(csb$cts[,.(name,id,pos,cat,etahat,std,run="15")],
           csb2$cts[,.(name,id,pos,cat,etahat,std,run="16")])
 setkey(csb,name,run,pos,cat)

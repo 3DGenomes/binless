@@ -1,4 +1,4 @@
-#' @include csnorm.R
+#' @include binless.R
 NULL
 
 #' Read TADBit tsv file and return (paired-end) reads as data.table
@@ -455,7 +455,7 @@ generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1
   #binned=counts[,.(count=sum(contact.far+contact.close+contact.up+contact.down)),by=c("bin1","bin2")]
   #ggplot(binned)+geom_raster(aes(bin1,bin2,fill=log(count)))
   #statistics
-  #csnorm:::dset_statistics(biases,counts)
+  #binless:::dset_statistics(biases,counts)
   counts=counts[contact.close+contact.far+contact.up+contact.down>0]
   #csd object
   dmax=biases[,max(pos)-min(pos)]+0.01

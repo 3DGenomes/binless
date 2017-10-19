@@ -1,4 +1,4 @@
-library(csnorm)
+library(binless)
 library(data.table)
 library(ggplot2)
 library(doParallel)
@@ -54,7 +54,7 @@ if (F) {
   load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_newdisp.RData"))
   load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_newdisp_grpall.RData"))
   load(paste0("data/rao_HiCall_",sub,"_IMR90_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"qmin_",qmin,"_newdisp_grpall_lindecay.RData"))
-  csnorm:::has_converged(cs)
+  binless:::has_converged(cs)
   cs@diagnostics$params[,sum(runtime)/3600]
   ggplot(cs@diagnostics$params[,.(step,leg,runtime)])+geom_line(aes(step,runtime,colour=leg))+scale_y_log10()
   

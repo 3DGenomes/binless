@@ -1,4 +1,4 @@
-library(csnorm)
+library(binless)
 library(data.table)
 library(ggplot2)
 library(doParallel)
@@ -69,7 +69,7 @@ for (resolution in c(10000)) {
 if (F) {
   load("data/ralph_Sox2_csnorm_optimized_base10k.RData")
   
-  csnorm:::has_converged(cs)
+  binless:::has_converged(cs)
   cs@diagnostics$params[,sum(runtime)/3600]
   ggplot(cs@diagnostics$params[,.(step,leg,runtime)])+geom_line(aes(step,runtime,colour=leg))+scale_y_log10()
   

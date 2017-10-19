@@ -1,4 +1,4 @@
-#' @include csnorm.R
+#' @include binless.R
 NULL
 
 #' Compute means for positive and zero counts using previous params
@@ -22,7 +22,7 @@ NULL
 #'   
 #' @keywords internal
 #' 
-csnorm_gauss_common_muhat_mean = function(cs, zeros, sbins) {
+gauss_common_muhat_mean = function(cs, zeros, sbins) {
   init=cs@par
   ### positive counts (twice, in both directions)
   #compute means
@@ -73,7 +73,7 @@ csnorm_gauss_common_muhat_mean = function(cs, zeros, sbins) {
   cts=rbind(cpos,czero)
   setkeyv(cts,key(zeros))
   ### add signal
-  signal = csnorm:::get_signal_matrix(cs, resolution = sbins[2]-sbins[1], groups=cs@experiments[,.(name,groupname=name)])
+  signal = binless:::get_signal_matrix(cs, resolution = sbins[2]-sbins[1], groups=cs@experiments[,.(name,groupname=name)])
   signal=rbind(signal[,.(name,bin1,bin2,phi)],signal[bin1!=bin2,.(name,bin1=bin2,bin2=bin1,phi)])
   cts=signal[cts,,on=c("name","bin1","bin2")]
   cts[,mu:=exp(lmu.nosig+phi)]
@@ -87,7 +87,7 @@ csnorm_gauss_common_muhat_mean = function(cs, zeros, sbins) {
 #' Compute decay etahat and weights using previous mean
 #' @keywords internal
 #' 
-csnorm_gauss_decay_muhat_mean = function(cs, cts.common) {
+gauss_decay_muhat_mean = function(cs, cts.common) {
   cts.common[,kappaij:=eC+log_decay]
   dbins=cs@settings$dbins
   csd = cts.common[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
@@ -99,7 +99,7 @@ csnorm_gauss_decay_muhat_mean = function(cs, cts.common) {
 #' Generate cubic spline
 #' @keywords internal
 #' 
-csnorm_generate_cubic_spline = function(cutsites, Krow, sparse=F) {
+generate_cubic_spline = function(cutsites, Krow, sparse=F) {
   splinedegree=3 #Cubic spline
   dx = 1.01*(max(cutsites)-min(cutsites))/(Krow-splinedegree)
   t = min(cutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
@@ -109,7 +109,7 @@ csnorm_generate_cubic_spline = function(cutsites, Krow, sparse=F) {
 #' Optimize decay parameters
 #' @keywords internal
 #' 
-csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
+gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
                                        verbose=T, max_perf_iteration=1000, convergence_epsilon=1e-9) {
   Totalcbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
   #cbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
@@ -133,7 +133,7 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     }
     SD = cbegin[2]-cbegin[1]
     cutsites = csd[,distance][cbegin[1]:(cbegin[2]-1)]
-    X = csnorm_generate_cubic_spline(log(cutsites), Kdiag, sparse=F)
+    X = generate_cubic_spline(log(cutsites), Kdiag, sparse=F)
     W=csd[,weight][cbegin[1]:(cbegin[2]-1)]
     diags = list(rep(1,Kdiag), rep(-2,Kdiag))
     D = bandSparse(Kdiag-2, Kdiag, k=0:2, diagonals=c(diags, diags[1]))
@@ -148,7 +148,7 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     if (Dsets > 1) {
       for (d in 2:Dsets) {
         ncutsites = csd[,distance][cbegin[(2*d-1)]:(cbegin[2*d]-1)]
-        nBsp = csnorm_generate_cubic_spline(log(ncutsites), Kdiag, sparse=F)
+        nBsp = generate_cubic_spline(log(ncutsites), Kdiag, sparse=F)
         cutsites = c(cutsites,ncutsites)
         X = rbind(X,nBsp)
         SDd = cbegin[2*d]-cbegin[(2*d-1)]
@@ -234,11 +234,11 @@ csnorm_gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-csnorm_gauss_decay = function(cs, cts.common, verbose=T, update.eC=T) {
+gauss_decay = function(cs, cts.common, verbose=T, update.eC=T) {
   if (verbose==T) cat(" Decay\n")
-  csd = csnorm:::csnorm_gauss_decay_muhat_mean(cs, cts.common)
+  csd = binless:::gauss_decay_muhat_mean(cs, cts.common)
   #run optimization
-  op = csnorm:::csnorm_gauss_decay_optimize(csd, cs@design, cs@settings$Kdiag, cs@par$lambda_diag,
+  op = binless:::gauss_decay_optimize(csd, cs@design, cs@settings$Kdiag, cs@par$lambda_diag,
                                             verbose=verbose, max_perf_iteration=cs@settings$iter,
                                             convergence_epsilon = cs@par$tol_decay)
   #restrict tolerance if needed
@@ -253,7 +253,7 @@ csnorm_gauss_decay = function(cs, cts.common, verbose=T, update.eC=T) {
 #' Compute decay etahat and weights using previous mean
 #' @keywords internal
 #' 
-csnorm_gauss_genomic_muhat_mean = function(cs, cts.common) {
+gauss_genomic_muhat_mean = function(cs, cts.common) {
   #biases
   init=cs@par
   bsub=copy(cs@biases)
@@ -277,7 +277,7 @@ csnorm_gauss_genomic_muhat_mean = function(cs, cts.common) {
   return(list(bts=bts,cts=cts))
 }
 
-csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
+gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
                                          original_lambda_iota, original_lambda_rho, verbose=T,
                                          max_perf_iteration=1000, convergence_epsilon=1e-5) {
   XB = as.array(design[,genomic])
@@ -304,7 +304,7 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     }
     SD = bbegin[2]-bbegin[1]
     cutsites = biases[,pos][bbegin[1]:(bbegin[2]-1)]
-    Bsp = csnorm_generate_cubic_spline(cutsites, Krow, sparse=T)
+    Bsp = generate_cubic_spline(cutsites, Krow, sparse=T)
     X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
     if (length(sbins)<=2) {
       centering=Matrix(rep(1,SD),ncol=1)
@@ -340,7 +340,7 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     if (Dsets > 1) {
       for (d in 2:Dsets) {
         ncutsites = biases[,pos][bbegin[(2*d-1)]:(bbegin[2*d]-1)]
-        nBsp  = csnorm_generate_cubic_spline(ncutsites, Krow, sparse=T)
+        nBsp  = generate_cubic_spline(ncutsites, Krow, sparse=T)
         cutsites = c(cutsites,ncutsites)
         nX = rbind(cbind(nBsp/2,nBsp/2),bdiag(nBsp,nBsp),bdiag(nBsp,nBsp))
         SDd = bbegin[2*d]-bbegin[(2*d-1)]
@@ -512,11 +512,11 @@ csnorm_gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-csnorm_gauss_genomic = function(cs, cts.common, verbose=T, update.exposures=T) {
+gauss_genomic = function(cs, cts.common, verbose=T, update.exposures=T) {
   if (verbose==T) cat(" Genomic\n")
-  a = csnorm:::csnorm_gauss_genomic_muhat_mean(cs, cts.common)
+  a = binless:::gauss_genomic_muhat_mean(cs, cts.common)
   #run optimization
-  op = csnorm:::csnorm_gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, cs@settings$sbins,
+  op = binless:::gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, cs@settings$sbins,
                                               cs@par$lambda_iota, cs@par$lambda_rho, verbose=verbose,
                                               max_perf_iteration=cs@settings$iter,
                                               convergence_epsilon=cs@par$tol_genomic)
@@ -535,7 +535,7 @@ csnorm_gauss_genomic = function(cs, cts.common, verbose=T, update.exposures=T) {
 
 #' Compute means for a given counts matrix
 #' @keywords internal
-csnorm_compute_means = function(cs, counts) {
+compute_means = function(cs, counts) {
   #compute background
   init=cs@par
   cpos=copy(counts)
@@ -551,7 +551,7 @@ csnorm_compute_means = function(cs, counts) {
   cpos=merge(cpos,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
   #compute signal
   if (cs@par$signal[,.N]>0 && length(cs@settings$sbins)>2) {
-    signal = csnorm:::get_signal_matrix(cs, resolution = cs@settings$base.res, groups=cs@experiments[,.(name,groupname=name)])
+    signal = binless:::get_signal_matrix(cs, resolution = cs@settings$base.res, groups=cs@experiments[,.(name,groupname=name)])
     signal = rbind(signal[,.(name,bin1,bin2,phi)],signal[bin1!=bin2,.(name,bin1=bin2,bin2=bin1,phi)])
     cpos = signal[cpos,,on=c("name","bin1","bin2")]
   } else {
@@ -573,10 +573,10 @@ csnorm_compute_means = function(cs, counts) {
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
 #' 
-csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T) {
+gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T) {
   if (verbose==T) cat(" Dispersion\n")
   #predict all means and put into table
-  counts = csnorm:::csnorm_compute_means(cs,counts)
+  counts = binless:::compute_means(cs,counts)
   stopifnot(cs@biases[,.N]==length(cs@par$log_iota))
   #
   #fit dispersion and exposures
@@ -602,7 +602,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
   init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],lmu.close]))
   init$alpha=max(0.001,1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu))
   init$mu=NULL
-  out=capture.output(op<-optimize_stan_model(model=csnorm:::stanmodels$gauss_dispersion, tol_param=cs@par$tol_disp,
+  out=capture.output(op<-optimize_stan_model(model=binless:::stanmodels$gauss_dispersion, tol_param=cs@par$tol_disp,
                                              data=data, iter=cs@settings$iter, verbose=verbose, init=init,
                                              init_alpha=1e-9))
   #restrict tolerance if needed
@@ -624,7 +624,7 @@ csnorm_gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], 
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-csnorm_gauss_signal_muhat_mean = function(cs, cts.common, zeros, sbins) {
+gauss_signal_muhat_mean = function(cs, cts.common, zeros, sbins) {
   cts = cts.common[bin1<=bin2]
   #put in triangular form
   cts2 = cts.common[bin1>bin2]
@@ -674,11 +674,11 @@ get_signal_metadata = function(cs, cts, resolution) {
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-csnorm_gauss_signal = function(cs, cts.common, verbose=T, constrained=T, ncores=1, fix.lambda1=F, fix.lambda1.at=NA,
+gauss_signal = function(cs, cts.common, verbose=T, constrained=T, ncores=1, fix.lambda1=F, fix.lambda1.at=NA,
                                fix.lambda2=F, fix.lambda2.at=NA) {
   if (verbose==T) cat(" Signal\n")
-  cts = csnorm:::csnorm_gauss_signal_muhat_mean(cs, cts.common, cs@zeros, cs@settings$sbins)
-  metadata = csnorm:::get_signal_metadata(cs, cts, cs@settings$base.res)
+  cts = binless:::gauss_signal_muhat_mean(cs, cts.common, cs@zeros, cs@settings$sbins)
+  metadata = binless:::get_signal_metadata(cs, cts, cs@settings$base.res)
   #
   if (verbose==T) cat("  predict\n")
   #perform fused lasso on signal
@@ -689,13 +689,13 @@ csnorm_gauss_signal = function(cs, cts.common, verbose=T, constrained=T, ncores=
              settings=list(metadata=metadata,
                            nbins=nbins, dispersion=cs@par$alpha,
                            tol.val=cs@par$tol_signal, nperf=50))
-    csig@state = csnorm:::gfl_compute_initial_state(csig, diff=F)
+    csig@state = binless:::gfl_compute_initial_state(csig, diff=F)
     csig
   }
   registerDoParallel(cores=min(ncores,length(groupnames)))
   params = foreach(csig=csigs, .combine=rbind, .export=c("constrained","verbose","fix.lambda1","fix.lambda1.at",
                                                          "fix.lambda2","fix.lambda2.at")) %dopar% {
-    csnorm:::csnorm_fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose,
+    binless:::fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose,
                                 fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                                 fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }
@@ -935,7 +935,7 @@ save_stripped = function(cs, fname) {
 #' @examples
 load_stripped = function(fname, ncores=1) {
   cs=get(load(fname))
-  cs@zeros = csnorm:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
+  cs@zeros = binless:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
   return(cs)
 }
 
@@ -1008,7 +1008,7 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
     #prepare signal matrix
     if (fit.signal==T) {
       if(verbose==T) cat("Preparing for signal estimation\n")
-      stuff = csnorm:::prepare_first_signal_estimation(cs@biases, cs@experiments[,name], base.res)
+      stuff = binless:::prepare_first_signal_estimation(cs@biases, cs@experiments[,name], base.res)
       cs@par$signal=stuff$signal
       cs@par$phi=stuff$signal[,phi]
       cs@settings$sbins=stuff$sbins
@@ -1021,16 +1021,16 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
     }
     #get number of zeros along cut sites and decay
     if(verbose==T) cat("Counting zeros\n")
-    cs@zeros = csnorm:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
+    cs@zeros = binless:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
     #set initial guess for exposures, decay and biases
     if(verbose==T) cat("Initial guess: residuals\n")
-    cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+    cts.common = binless:::gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
     if(verbose==T) cat("Initial guess: exposures\n")
-    cs = csnorm:::initial_guess_exposures(cs, cts.common)
+    cs = binless:::initial_guess_exposures(cs, cts.common)
     if(verbose==T) cat("Initial guess: decay\n")
-    cs = csnorm:::initial_guess_decay(cs, cts.common)
+    cs = binless:::initial_guess_decay(cs, cts.common)
     if(verbose==T) cat("Initial guess: biases\n")
-    cs = csnorm:::initial_guess_genomic(cs, cts.common)
+    cs = binless:::initial_guess_genomic(cs, cts.common)
     return(cs)
 }
 
@@ -1097,7 +1097,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
   }
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
-  subcounts = csnorm:::subsample_counts(cs, ncounts)
+  subcounts = binless:::subsample_counts(cs, ncounts)
   subcounts.weight = merge(cs@zeros[,.(nc=sum(ncross)/4),by=name],subcounts[,.(ns=.N),keyby=name],by="name")[,.(name,wt=nc/ns)]
   #gibbs sampling
   for (i in (laststep + 1:ngibbs)) {
@@ -1105,33 +1105,33 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     #
     #compute residuals once for this round
     if(verbose==T) cat(" Residuals\n")
-    cts.common = csnorm:::csnorm_gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+    cts.common = binless:::gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
     #
     #fit iota and rho given diagonal decay
-    a=system.time(cs <- csnorm:::csnorm_gauss_genomic(cs, cts.common, update.exposures=update.exposures))
-    cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
+    a=system.time(cs <- binless:::gauss_genomic(cs, cts.common, update.exposures=update.exposures))
+    cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
     if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     #
     #fit diagonal decay given iota and rho
-    a=system.time(cs <- csnorm:::csnorm_gauss_decay(cs, cts.common, update.eC=update.exposures))
-    cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
+    a=system.time(cs <- binless:::gauss_decay(cs, cts.common, update.eC=update.exposures))
+    cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
     if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     #
     #fit dispersion
-    a=system.time(cs <- csnorm:::csnorm_gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight))
-    cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
+    a=system.time(cs <- binless:::gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight))
+    cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
     if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
     #
     if (fit.signal==T && i > cs@settings$bg.steps) {
       #
       #fit signal using sparse fused lasso
       update.exposures=F
-      a=system.time(cs <- csnorm:::csnorm_gauss_signal(cs, cts.common, verbose=verbose, constrained=T, ncores=ncores,
+      a=system.time(cs <- binless:::gauss_signal(cs, cts.common, verbose=verbose, constrained=T, ncores=ncores,
                                                        fix.lambda1=cs@settings$fix.lambda1,
                                                        fix.lambda1.at=cs@settings$fix.lambda1.at,
                                                        fix.lambda2=cs@settings$fix.lambda2,
                                                        fix.lambda2.at=cs@settings$fix.lambda2.at))
-      cs@diagnostics$params = csnorm:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
+      cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
       if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
     }
     #

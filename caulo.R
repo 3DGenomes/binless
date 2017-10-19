@@ -1,6 +1,6 @@
 library(ggplot2)
 library(data.table)
-library(csnorm)
+library(binless)
 library(foreach)
 library(doParallel)
 
@@ -240,7 +240,7 @@ save(cs, file="data/caulo_csnorm_optimized.RData")
 #nu and delta correlation
 nu = foreach (i=fnames,j=dsets,.combine=rbind) %do% {
   load(i)
-  csnorm:::generate_genomic_biases(biases=cs@biases, beta_nu=cs@par$beta_nu, beta_delta=cs@par$beta_delta,
+  binless:::generate_genomic_biases(biases=cs@biases, beta_nu=cs@par$beta_nu, beta_delta=cs@par$beta_delta,
                                    bf_per_kb=cs@settings$bf_per_kb, points_per_kb = 10)[
                                      ,.(pos,log_nu,log_delta,dset=j)]
 }

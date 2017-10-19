@@ -1,6 +1,6 @@
 library(ggplot2)
 library(data.table)
-library(csnorm)
+library(binless)
 library(foreach)
 library(doParallel)
 

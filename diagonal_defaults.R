@@ -1,4 +1,4 @@
-library(csnorm)
+library(binless)
 library(data.table)
 library(ggplot2)
 library(doParallel)
@@ -56,18 +56,18 @@ ggplot(cs@biases[,.(pos,var=pos-shift(pos)==175)])+geom_point(aes(pos,1+var))
 #vary resolutions
 resolution=5000
 #zeros and cts
-zeros = csnorm:::get_nzeros_binning(cs, resolution, ncores = 30)
-cts = csnorm:::csnorm_predict_binned_counts_irls(cs, resolution, zeros)
+zeros = binless:::get_nzeros_binning(cs, resolution, ncores = 30)
+cts = binless:::predict_binned_counts_irls(cs, resolution, zeros)
 setkeyv(cts,c("name","bin1","bin2"))
 #phi and trails
 names=cs@experiments[,unique(name)]
 groups=data.table(name=names,groupname=names)
 setkey(groups,name)
-stuff = csnorm:::prepare_signal_matrix(cs, groups, resolution)
+stuff = binless:::prepare_signal_matrix(cs, groups, resolution)
 mat=stuff$mat
 trails=stuff$trails
 #phihat
-mat = csnorm:::csnorm_compute_raw_signal(cts, cs@par$alpha, mat)
+mat = binless:::compute_raw_signal(cts, cs@par$alpha, mat)
 bin1.begin=mat[,bin1]
 bin2.begin=mat[,bin2]
 levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[][,)]")[[2]]

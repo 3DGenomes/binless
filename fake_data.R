@@ -1,4 +1,4 @@
-library(csnorm)
+library(binless)
 library(data.table)
 library(ggplot2)
 library(doParallel)
@@ -84,7 +84,7 @@ if (F) {
   
   load(paste0("data/fake_",nbg,"bg_",nsig,"sig_",fit.signal,"_csnorm_optimized.RData"))
   
-  csnorm:::has_converged(cs)
+  binless:::has_converged(cs)
   cs@diagnostics$params[,sum(runtime)/3600]
   ggplot(cs@diagnostics$params[,.(step,leg,runtime)])+geom_line(aes(step,runtime,colour=leg))+scale_y_log10()
   

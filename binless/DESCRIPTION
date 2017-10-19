@@ -1,10 +1,10 @@
-Package: csnorm
+Package: binless
 Type: Package
-Title: csnorm: Cut-Site Normalization And Interaction Detection For 3C-like Data
+Title: binless: Resolution-independent Normalization And Interaction Detection For Hi-C Data
 Version: 0.1.0
-Authors@R: person("Yannick", "Spill", email = "yannick.spill@cnag.crg.eu", role = c("aut", "cre"))
-Description: Provides resolution-independent normalization of 3C-like data, and
-    permits interaction detection.
+Authors@R: person("Yannick", "Spill", email = "yannick.spill@crg.eu", role = c("aut", "cre"))
+Description: Provides resolution-independent normalization of Hi-C data, and
+    permits interaction and difference detection.
 License: TODO
 Depends:
     R (>= 3.0.2),
@@ -27,7 +27,7 @@ RoxygenNote: 6.0.1
 NeedsCompilation: yes
 Collate: 
     'CppDocs.R'
-    'csnorm.R'
+    'binless.R'
     'accessors.R'
     'bin.R'
     'detect_binless.R'

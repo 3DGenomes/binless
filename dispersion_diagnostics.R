@@ -1,4 +1,4 @@
-library(csnorm)
+library(binless)
 library(data.table)
 library(ggplot2)
 library(doParallel)
@@ -10,8 +10,8 @@ library(MASS)
 
 if (F) {
   #load a normalized dataset, then do this
-  counts=csnorm:::fill_zeros(cs@counts,cs@biases,dmin=cs@settings$dmin)
-  counts=csnorm:::csnorm_predict_all_parallel(cs,counts,ncores = ncores)
+  counts=binless:::fill_zeros(cs@counts,cs@biases,dmin=cs@settings$dmin)
+  counts=binless:::predict_all_parallel(cs,counts,ncores = ncores)
   setkeyv(counts,key(cs@counts))
   stopifnot(cs@biases[,.N]==length(cs@par$log_iota))
   #add signal contribution if available
