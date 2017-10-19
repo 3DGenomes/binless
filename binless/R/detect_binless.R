@@ -316,16 +316,9 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #compute matrix at new params
   mat = rbindlist(params[,mat])
   mat[,c("value","valuehat"):=list(phi,phihat)]
-  #report parameters
-  csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],name=params[,name])
-  #
-  #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()+facet_wrap(~name)
-  #ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
-  #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))+scale_fill_gradient2()+facet_wrap(~name)
-  #ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
   #
   #if (verbose==T) cat(" Detect patches\n")
-  #csi@mat = foreach(g=groupnames, .combine=rbind) %do% {
+  #mat = foreach(g=groupnames, .combine=rbind) %do% {
   #  matg = mat[name==g]
   #  #cl = binless:::build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
   #  #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
@@ -337,6 +330,8 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #
   ### store interaction
   #store back
+  csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],name=params[,name])
+  csi@mat=mat
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
   return(cs)
@@ -386,25 +381,20 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #compute matrix at new params
   mat = rbindlist(params[,mat])
   mat[,c("value","valuehat"):=list(delta,deltahat)]
-  #report parameters
-  csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],name=params[,name])
   #
-  #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=phi))+scale_fill_gradient2()+facet_wrap(~name)
-  #ggsave(p,filename = paste0("sig_step_",step,"_value.png"), width=10, height=8)
-  #p=ggplot(mat)+geom_raster(aes(bin1,bin2,fill=weight))+scale_fill_gradient2()+facet_wrap(~name)
-  #ggsave(p,filename = paste0("sig_step_",step,"_weight.png"), width=10, height=8)
-  #
-  if (verbose==T) cat(" Detect patches\n")
-  csi@mat = foreach(g=groupnames, .combine=rbind) %do% {
-    matg = mat[name==g]
-    #cl = binless:::build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
-    #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
-    matg[,value:=delta]
-    matg = binless:::detect_binless_patches(matg, csi@settings)
-    matg[,value:=NULL]
-    matg
-  }
+  #if (verbose==T) cat(" Detect patches\n")
+  #mat = foreach(g=groupnames, .combine=rbind) %do% {
+  #  matg = mat[name==g]
+  #  #cl = binless:::build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
+  #  #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
+  #  matg[,value:=delta]
+  #  matg = binless:::detect_binless_patches(matg, csi@settings)
+  #  matg[,value:=NULL]
+  #  matg
+  #}
   #store back
+  csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],name=params[,name])
+  csi@mat=mat
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
   return(cs)
