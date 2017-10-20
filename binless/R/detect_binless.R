@@ -36,14 +36,21 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
     return(csig@state$BIC)
   }
   #
-  #dt3 = foreach (lam=10^seq(-1,1,length.out=20),.combine=rbind) %dopar% {
-  #  fix.lambda1.at=0
+  #dt3 = foreach (lam=10^seq(-1,1,length.out=20),.combine=rbind) %:% foreach(dset=c("GM12878","IMR90"),.combine=rbind) %:%
+  #      foreach (mult=c(1,1.1,1.2,1.5),.combine=rbind) %dopar% {
+  #        dset="GM12878"
+  #  csig = ifelse( (dset=="GM12878"), csig.gm, csig.imr90 )
+  #  csig@cts[,count.ori:=count]
+  #  csig@cts[,count:=count/mult]
   #  state = binless:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
   #  mat=as.data.table(state$mat)
-  #  info=as.data.table(state[c("lambda2","lambda1","eCprime","dof","BIC","BIC.sd","converged")])
+  #  state$dset=dset
+  #  state$mult=mult
+  #  info=as.data.table(state[c("lambda2","lambda1","eCprime","dof","BIC","BIC.sd","converged","dset","mult")])
   #  cbind(mat,info)
   #}
-  #ggplot(dt3[,.SD[1],by=lambda2])+geom_line(aes(lambda2,BIC))
+  #ggplot(dt2[,.SD[1],by=c("lambda2","dset","mult")])+geom_point(aes(lambda2,BIC,colour=converged,group=mult))+facet_grid(mult~dset, scales="free_y")#+scale_y_log10()
+  #ggplot(dt3[,.SD[BIC==min(BIC)],by=c("dset","mult")])+geom_raster(aes(bin1,bin2,fill=pmin(phihat,3)))+geom_raster(aes(bin2,bin1,fill=beta))+facet_grid(mult~dset)+coord_fixed()+scale_fill_gradient2()
   #ggplot(dcast(dt3,lambda2+bin1+bin2~ori,value.var = "phi"))+geom_raster(aes(bin1,bin2,fill=new))+geom_raster(aes(bin2,bin1,fill=old))+facet_wrap(~lambda2)+coord_fixed()+scale_fill_gradient2()
   #dt.fix = foreach (lam=10^(seq(log10(12.8),log10(13.3),length.out=20)),.combine=rbind) %dopar% {
   #  csig@state <<- binless:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed)
@@ -234,7 +241,7 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val) {
                 nperf = 50,
                 min.patchsize = 4,
                 min.l10FC = 0.5)
-  cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight,log_decay)]
   csi=new("CSbsig", mat=mat, cts=cts, settings=settings)
   return(csi)
 }
@@ -248,8 +255,8 @@ prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val) {
     merge(csi@mat[name==n],csi@mat[name==ref,.(bin1,bin2,phi1=phi)],all=T,by=c("bin1","bin2"))
   mat[,c("phi.ref","delta"):=list(phi1,(phi-phi1)/2)]
   mat[,c("phi","phi1"):=NULL]
-  cts=csg@cts[name!=ref,.(name,bin1,bin2,count,lmu.nosig,weight)]
-  cts.ref=csg@cts[name==ref,.(name,bin1,bin2,count,lmu.nosig,weight)]
+  cts=csg@cts[name!=ref,.(name,bin1,bin2,count,lmu.nosig,weight,log_decay)]
+  cts.ref=csg@cts[name==ref,.(name,bin1,bin2,count,lmu.nosig,weight,log_decay)]
   csi=new("CSbdiff", mat=mat, cts=cts, cts.ref=cts.ref,
           ref=as.character(ref), settings=csi@settings)
   return(csi)

@@ -20,6 +20,9 @@ public:
     Rcpp::NumericVector get_weight() const { return weight_; }
     void set_weight(const Rcpp::NumericVector& weight) { weight_ = weight; }
     
+    Rcpp::NumericVector get_weight_nodecay() const { return weight_nodecay_; }
+    void set_weight_nodecay(const Rcpp::NumericVector& weight_nodecay) { weight_nodecay_ = weight_nodecay; }
+    
     Rcpp::NumericVector get_betahat() const { return betahat_; }
     void set_betahat(const Rcpp::NumericVector& betahat) { betahat_ = betahat; }
     
@@ -37,7 +40,7 @@ public:
     
 private:
     Rcpp::IntegerVector bin1_, bin2_;
-    Rcpp::NumericVector beta_, weight_, betahat_, ncounts_;
+    Rcpp::NumericVector beta_, weight_, weight_nodecay_, betahat_, ncounts_;
     Rcpp::IntegerVector patchno_, diag_idx_, diag_grp_;
 };
 
@@ -72,6 +75,9 @@ public:
     Rcpp::NumericVector get_weight_ref() const { return weight_ref_; }
     void set_weight_ref(const Rcpp::NumericVector& weight_ref) { weight_ref_ = weight_ref; }
     
+    Rcpp::NumericVector get_weight_nodecay_ref() const { return weight_nodecay_ref_; }
+    void set_weight_nodecay_ref(const Rcpp::NumericVector& weight_nodecay_ref) { weight_nodecay_ref_ = weight_nodecay_ref; }
+    
     Rcpp::NumericVector get_phihat_var_ref() const { return 1/get_weight_ref(); }
 
     Rcpp::NumericVector get_phihat_ref() const { return phihat_ref_; }
@@ -81,7 +87,7 @@ public:
     void set_phi_ref(const Rcpp::NumericVector& phi_ref) { phi_ref_ = phi_ref; }
     
 private:
-    Rcpp::NumericVector weight_ref_, phihat_ref_, phi_ref_;
+    Rcpp::NumericVector weight_ref_, weight_nodecay_ref_, phihat_ref_, phi_ref_;
 };
 
 

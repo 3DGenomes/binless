@@ -30,10 +30,10 @@ public:
         Rcpp::NumericVector phi = Rcpp::wrap(soft_threshold(beta_phi_r, eCprime, lambda1));
         
         //cap the weights
-        Rcpp::NumericVector wt = binned_.get_weight();
-        const double wmax = get_maximum_admissible_weight(wt, Settings<Likelihood<Signal> >::get_weights_max_percentile());
+        Rcpp::NumericVector wt = binned_.get_weight_nodecay();
+        //const double wmax = get_maximum_admissible_weight(wt, Settings<Likelihood<Signal> >::get_weights_max_percentile());
         //Rcpp::Rcout << "maximum admissible weight: " << wmax << "\n";
-        wt = Rcpp::pmin(wt, wmax);
+        //wt = Rcpp::pmin(wt, wmax);
         
         //compute the score and return
         const Rcpp::NumericVector chisq = wt * SQUARE(binned_.get_phihat() - (phi + eCprime));
@@ -73,12 +73,12 @@ public:
         Rcpp::NumericVector phi_ref = compute_phi_ref(binned_, delta);
         
         //cap the weights
-        Rcpp::NumericVector wt = binned_.get_weight();
-        const double wmax = get_maximum_admissible_weight(wt, Settings<Likelihood<Signal> >::get_weights_max_percentile());
-        wt = Rcpp::pmin(wt, wmax);
-        Rcpp::NumericVector wt_ref = binned_.get_weight_ref();
-        const double wmax_ref = get_maximum_admissible_weight(wt_ref, Settings<Likelihood<Signal> >::get_weights_max_percentile());
-        wt_ref = Rcpp::pmin(wt_ref, wmax_ref);
+        Rcpp::NumericVector wt = binned_.get_weight_nodecay();
+        //const double wmax = get_maximum_admissible_weight(wt, Settings<Likelihood<Signal> >::get_weights_max_percentile());
+        //wt = Rcpp::pmin(wt, wmax);
+        Rcpp::NumericVector wt_ref = binned_.get_weight_nodecay_ref();
+        //const double wmax_ref = get_maximum_admissible_weight(wt_ref, Settings<Likelihood<Signal> >::get_weights_max_percentile());
+        //wt_ref = Rcpp::pmin(wt_ref, wmax_ref);
         //Rcpp::Rcout << "maximum admissible weights: " << wmax << " " << wmax_ref << "\n";
         
         const Rcpp::NumericVector chisq = wt * SQUARE(binned_.get_phihat() - (delta + eCprime + phi_ref))
