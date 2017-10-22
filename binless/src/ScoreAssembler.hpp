@@ -24,11 +24,13 @@ public:
         Rcpp::NumericVector groupwise_CV, groupwise_weights;
         const int ngroups=2;
         for (int i=0; i<ngroups; ++i) {
-            groupwise_CV.push_back(sum(as<NumericVector>(chisq[cv_grp_==i])));
-            groupwise_weights.push_back(sum(cv_grp_==i));
+            double Ni = sum(cv_grp_==i);
+            groupwise_weights.push_back(Ni);
+            groupwise_CV.push_back(sum(as<NumericVector>(chisq[cv_grp_==i]))/Ni);
         }
-        const double CV = sum(groupwise_weights*groupwise_CV)/sum(groupwise_weights);
-        const double CV_sd = std::sqrt(sum(groupwise_weights*SQUARE(groupwise_CV))/sum(groupwise_weights) - SQUARE(CV));
+        const double N = sum(groupwise_weights);
+        const double CV = sum(groupwise_weights*groupwise_CV)/N;
+        const double CV_sd = std::sqrt(sum(groupwise_weights*SQUARE(groupwise_CV-CV))/(N-1));
         return value_t(CV,CV_sd);
     }
     
