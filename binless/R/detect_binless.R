@@ -36,21 +36,33 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
     return(csig@state$BIC)
   }
   #
-  #dt3 = foreach (lam=10^seq(-1,1,length.out=20),.combine=rbind) %:% foreach(dset=c("GM12878","IMR90"),.combine=rbind) %:%
-  #      foreach (mult=c(1,1.1,1.2,1.5),.combine=rbind) %dopar% {
-  #        dset="GM12878"
-  #  csig = ifelse( (dset=="GM12878"), csig.gm, csig.imr90 )
-  #  csig@cts[,count.ori:=count]
-  #  csig@cts[,count:=count/mult]
-  #  state = binless:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
-  #  mat=as.data.table(state$mat)
-  #  state$dset=dset
-  #  state$mult=mult
-  #  info=as.data.table(state[c("lambda2","lambda1","eCprime","dof","BIC","BIC.sd","converged","dset","mult")])
-  #  cbind(mat,info)
-  #}
-  #ggplot(dt2[,.SD[1],by=c("lambda2","dset","mult")])+geom_point(aes(lambda2,BIC,colour=converged,group=mult))+facet_grid(mult~dset, scales="free_y")#+scale_y_log10()
-  #ggplot(dt3[,.SD[BIC==min(BIC)],by=c("dset","mult")])+geom_raster(aes(bin1,bin2,fill=pmin(phihat,3)))+geom_raster(aes(bin2,bin1,fill=beta))+facet_grid(mult~dset)+coord_fixed()+scale_fill_gradient2()
+  # dt3 = foreach (lam=10^seq(-1,1,length.out=20),.combine=rbind) %:% foreach(csig=csigs,.combine=rbind) %dopar% {
+  #   dset = csig@cts[,name[1]]
+  #   state = binless:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+  #   csig@state = state
+  #   mat=as.data.table(state$mat)
+  #   state$dset=dset
+  #   info=as.data.table(state[c("lambda2","lambda1","eCprime","dof","BIC","BIC.sd","converged","dset")])
+  #   cbind(mat,info)
+  # }
+  #ggplot(dt3[,.SD[1],by=c("lambda2","dset")])+geom_point(aes(lambda2,BIC,colour=converged,group=dset))+facet_grid(dset~., scales="free_y")#+scale_y_log10()
+  #ggplot(dt3[,.SD[1],by=c("lambda2","dset")])+geom_line(aes(lambda2,BIC,colour=converged,group=dset))+geom_errorbar(aes(lambda2,ymin=BIC-BIC.sd,ymax=BIC+BIC.sd,colour=converged))+facet_grid(dset~., scales="free_y")#+scale_y_log10()
+  #ggplot(dt3[,.SD[BIC==min(BIC)],by=c("dset")])+geom_raster(aes(bin1,bin2,fill=pmin(phihat,3)))+geom_raster(aes(bin2,bin1,fill=beta))+facet_wrap(~dset)+coord_fixed()+scale_fill_gradient2()
+  #ggplot(dt3[,.SD[abs(lambda2-1)==min(abs(lambda2-1))],by=c("dset")])+geom_raster(aes(bin1,bin2,fill=pmin(phihat,3)))+geom_raster(aes(bin2,bin1,fill=beta))+facet_wrap(~dset)+coord_fixed()+scale_fill_gradient2()
+  # ggplot(dt3[dset==levels(dset)[1]])+geom_raster(aes(bin1,bin2,fill=pmin(phihat,3)))+geom_raster(aes(bin2,bin1,fill=beta))+facet_wrap(~factor(lambda2))+coord_fixed()+scale_fill_gradient2()
+   
+  # scores=rbind(dt3all[resolution=="5k",.SD[1],by=c("lambda2","dset","resolution")],
+  #              dt3.5k.new[,.SD[1],by=c("lambda2","dset","resolution")])
+  # ggplot(scores)+geom_line(aes(lambda2,BIC,colour=correct))+
+  #   geom_hline(aes(yintercept=BIC+BIC.sd),data=scores[,.SD[BIC==min(BIC)],by=c("dset","resolution")])+
+  #   geom_errorbar(aes(lambda2,ymin=BIC-BIC.sd,ymax=BIC+BIC.sd,colour=converged))+facet_wrap(dset~resolution, scales="free_y")#+scale_y_log10()
+   
+  # scores=dt3all[,.SD[1],by=c("lambda2","dset","resolution")]
+  # scores[,upper:=BIC+BIC.sd]
+  # ggplot(scores)+geom_line(aes(lambda2,BIC,colour=correct))+
+  #   geom_hline(aes(yintercept=upper),data=scores[,.SD[BIC==min(BIC)],by=c("dset","resolution")])+
+  #   geom_errorbar(aes(lambda2,ymin=BIC-BIC.sd,ymax=BIC+BIC.sd,colour=converged))+facet_wrap(~resolution+dset, scales="free")#+scale_y_log10()
+  
   #ggplot(dcast(dt3,lambda2+bin1+bin2~ori,value.var = "phi"))+geom_raster(aes(bin1,bin2,fill=new))+geom_raster(aes(bin2,bin1,fill=old))+facet_wrap(~lambda2)+coord_fixed()+scale_fill_gradient2()
   #dt.fix = foreach (lam=10^(seq(log10(12.8),log10(13.3),length.out=20)),.combine=rbind) %dopar% {
   #  csig@state <<- binless:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed)
@@ -305,12 +317,13 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
   groupnames=csi@cts[,unique(name)]
-  registerDoParallel(cores=min(ncores,length(groupnames)))
-  params = foreach(g=groupnames, .combine=rbind) %dopar% {
-    csig = csi
-    csig@cts = csi@cts[name==g]
-    csig@mat = csi@mat[name==g]
+  csigs = foreach(g=groupnames) %do% {
+    csig = new("CSbsig", mat=csi@mat[name==g], cts=csi@cts[name==g], settings=csi@settings)
     csig@state = binless:::gfl_compute_initial_state(csig, diff=F)
+    csig
+  }
+  registerDoParallel(cores=min(ncores,length(groupnames)))
+  params = foreach(csig=csigs, .combine=rbind) %dopar% {
     binless:::fused_lasso(csig, positive=T, fixed=T, constrained=F, verbose=verbose,
                                 fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                                 fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
@@ -370,12 +383,14 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   #perform fused lasso on signal
   if (verbose==T) cat("  Fused lasso\n")
   groupnames=csi@cts[,unique(name)]
-  registerDoParallel(cores=min(ncores,length(groupnames)))
-  params = foreach(g=groupnames, .combine=rbind) %do% {
-    csig = csi
-    csig@cts = csi@cts[name==g]
-    csig@mat = csi@mat[name==g]
+  csigs = foreach (g=groupnames) %do% {
+    csig = new("CSbdiff", mat=csi@mat[name==g], cts=csi@cts[name==g], cts.ref=csi@cts.ref,
+               ref=csi@ref, settings=csi@settings)
     csig@state = binless:::gfl_compute_initial_state(csig, diff=T)
+    csig
+  }
+  registerDoParallel(cores=min(ncores,length(groupnames)))
+  params = foreach(csig=csigs, .combine=rbind) %do% {
     binless:::fused_lasso(csig, positive=F, fixed=T, constrained=F, verbose=verbose,
                                 fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                                 fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
