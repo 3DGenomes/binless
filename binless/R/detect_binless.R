@@ -4,7 +4,7 @@ NULL
 #' compute BIC for a given value of lambda2, optimizing lambda1 and eCprime (performance iteration, persistent state)
 #' @keywords internal
 gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA) {
-  stopifnot(fix.lambda1==F || fix.lambda1.at>=0) #otherwise eCprime cannot be determined
+  stopifnot(fix.lambda1==F || fix.lambda1.at>=0)
   stopifnot(fixed==T || positive==T) #the case positive==F && fixed==F is not implemented
   #
   ctsg=csig@cts
@@ -181,8 +181,12 @@ evaluate_at_lambda2 = function(csig, lambda2, constrained=T, positive=T, fixed=F
 fused_lasso = function(csig, positive, fixed, constrained, verbose=T, fix.lambda1=F, fix.lambda1.at=0.1, fix.lambda2=F, fix.lambda2.at=NA) {
   if (fix.lambda2==F) {
     n.SD=ifelse(fixed==T,1,0)
-    csig = binless:::optimize_lambda2_smooth(csig, n.SD=n.SD, constrained=constrained, positive=positive, fixed=fixed,
-                                   fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+    #first we optimize lambda2 without soft-thresholding (setting eCprime=0)
+    csig = binless:::optimize_lambda2_smooth(csig, n.SD=n.SD, constrained=F, positive=F, fixed=T,
+                                   fix.lambda1=T, fix.lambda1.at=0)
+    #now for that optimum, report the best lambda1 (if optimized) and eCprime
+    csig = binless:::evaluate_at_lambda2(csig, csig@par$lambda2, constrained=constrained, positive=positive, fixed=fixed,
+                                         fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
   } else {
     stopifnot(fix.lambda2.at>0)
     csig = binless:::evaluate_at_lambda2(csig, fix.lambda2.at, constrained=constrained, positive=positive, fixed=fixed,
