@@ -62,7 +62,7 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
   # ggplot(scores)+geom_line(aes(lambda2,BIC,colour=correct))+
   #   geom_hline(aes(yintercept=upper),data=scores[,.SD[BIC==min(BIC)],by=c("dset","resolution")])+
   #   geom_errorbar(aes(lambda2,ymin=BIC-BIC.sd,ymax=BIC+BIC.sd,colour=converged))+facet_wrap(~resolution+dset, scales="free")#+scale_y_log10()
-  
+   
   #ggplot(dcast(dt3,lambda2+bin1+bin2~ori,value.var = "phi"))+geom_raster(aes(bin1,bin2,fill=new))+geom_raster(aes(bin2,bin1,fill=old))+facet_wrap(~lambda2)+coord_fixed()+scale_fill_gradient2()
   #dt.fix = foreach (lam=10^(seq(log10(12.8),log10(13.3),length.out=20)),.combine=rbind) %dopar% {
   #  csig@state <<- binless:::gfl_BIC(csig, lambda2=lam, constrained=constrained, positive=positive, fixed=fixed)
@@ -129,8 +129,8 @@ optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixe
     #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
   }
-  #first, find rough minimum between 1 and 100
-  minlambda=1
+  #first, find rough minimum between 2.5 and 100
+  minlambda=2.5
   maxlambda=100
   op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
   lambda2=10^op$minimum
