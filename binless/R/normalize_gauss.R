@@ -688,7 +688,7 @@ gauss_signal = function(cs, cts.common, verbose=T, constrained=T, ncores=1, fix.
     csig=new("CSbsig", mat=cs@par$signal[name==g], cts=cts[name==g],
              settings=list(metadata=metadata,
                            nbins=nbins, dispersion=cs@par$alpha,
-                           tol.val=cs@par$tol_signal, nperf=50))
+                           tol.val=cs@par$tol_signal, nperf=1)) #only one IRLS iteration
     csig@state = binless:::gfl_compute_initial_state(csig, diff=F)
     csig
   }
