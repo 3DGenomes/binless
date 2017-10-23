@@ -6,25 +6,3 @@
 
 using namespace Rcpp;
 
-
-RcppExport SEXP _rcpp_module_boot_binless_cpp();
-RcppExport SEXP _rcpp_module_boot_stan_fit4fit_mod();
-RcppExport SEXP _rcpp_module_boot_stan_fit4fit_fixed_mod();
-RcppExport SEXP _rcpp_module_boot_stan_fit4gauss_dispersion_mod();
-RcppExport SEXP _rcpp_module_boot_stan_fit4gen_genomic_biases_mod();
-RcppExport SEXP _rcpp_module_boot_stan_fit4predict_all_mod();
-
-static const R_CallMethodDef CallEntries[] = {
-    {"_rcpp_module_boot_binless_cpp", (DL_FUNC) &_rcpp_module_boot_binless_cpp, 0},
-    {"_rcpp_module_boot_stan_fit4fit_mod", (DL_FUNC) &_rcpp_module_boot_stan_fit4fit_mod, 0},
-    {"_rcpp_module_boot_stan_fit4fit_fixed_mod", (DL_FUNC) &_rcpp_module_boot_stan_fit4fit_fixed_mod, 0},
-    {"_rcpp_module_boot_stan_fit4gauss_dispersion_mod", (DL_FUNC) &_rcpp_module_boot_stan_fit4gauss_dispersion_mod, 0},
-    {"_rcpp_module_boot_stan_fit4gen_genomic_biases_mod", (DL_FUNC) &_rcpp_module_boot_stan_fit4gen_genomic_biases_mod, 0},
-    {"_rcpp_module_boot_stan_fit4predict_all_mod", (DL_FUNC) &_rcpp_module_boot_stan_fit4predict_all_mod, 0},
-    {NULL, NULL, 0}
-};
-
-RcppExport void R_init_binless(DllInfo *dll) {
-    R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
-    R_useDynamicSymbols(dll, FALSE);
-}
