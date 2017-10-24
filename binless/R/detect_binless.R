@@ -181,7 +181,7 @@ evaluate_at_lambda2 = function(csig, lambda2, constrained=T, positive=T, fixed=F
 fused_lasso = function(csig, positive, fixed, constrained, verbose=T, fix.lambda1=F, fix.lambda1.at=0.1, fix.lambda2=F, fix.lambda2.at=NA) {
   if (fix.lambda2==F) {
     n.SD=ifelse(fixed==T,1,0)
-    #first we optimize lambda2 without soft-thresholding (setting eCprime=0)
+    #first we optimize lambda2 without constraints nor soft-thresholding (setting eCprime=0)
     csig = binless:::optimize_lambda2_smooth(csig, n.SD=n.SD, constrained=F, positive=F, fixed=T,
                                    fix.lambda1=T, fix.lambda1.at=0)
     #now for that optimum, report the best lambda1 (if optimized) and eCprime
@@ -190,7 +190,21 @@ fused_lasso = function(csig, positive, fixed, constrained, verbose=T, fix.lambda
   } else {
     stopifnot(fix.lambda2.at>0)
     csig = binless:::evaluate_at_lambda2(csig, fix.lambda2.at, constrained=constrained, positive=positive, fixed=fixed,
-                                     fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+                                         fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+  }
+  #in case we model a constraint, report unconstrained solutions as well
+  if (constrained == T) {
+    lambda1.constr = csig@par$lambda1
+    eCprime.constr = csig@par$eCprime
+    BIC.constr = csig@par$BIC
+    BIC.sd.constr = csig@par$BIC.sd
+    mat.constr = csig@state$mat
+    csig = binless:::evaluate_at_lambda2(csig, csig@par$lambda2, constrained=F, positive=positive, fixed=fixed,
+                                         fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+    csig@par[c("lambda1","lambda1.unconstr","eCprime","eCprime.unconstr","BIC","BIC.unconstr","BIC.sd","BIC.sd.unconstr")]=list(
+      lambda1.constr,csig@par$lambda1,eCprime.constr,csig@par$eCprime,BIC.constr,csig@par$BIC,BIC.sd.constr,csig@par$BIC.sd)
+    mat.constr$phi.unconstr = csig@state$mat$phi
+    csig@state$mat = mat.constr
   }
   csig@par$name=csig@cts[,name[1]]
   matg = as.data.table(csig@state$mat)
@@ -339,7 +353,7 @@ detect_binless_interactions = function(cs, resolution, group, ncores=1, tol.val=
       cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],"\n")
   #compute matrix at new params
   mat = rbindlist(params[,mat])
-  mat[,c("value","valuehat"):=list(phi,phihat)]
+  #mat[,c("value","valuehat"):=list(phi,phihat)]
   #
   #if (verbose==T) cat(" Detect patches\n")
   #mat = foreach(g=groupnames, .combine=rbind) %do% {
@@ -406,7 +420,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
       cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],"\n")
   #compute matrix at new params
   mat = rbindlist(params[,mat])
-  mat[,c("value","valuehat"):=list(delta,deltahat)]
+  #mat[,c("value","valuehat"):=list(delta,deltahat)]
   #
   #if (verbose==T) cat(" Detect patches\n")
   #mat = foreach(g=groupnames, .combine=rbind) %do% {

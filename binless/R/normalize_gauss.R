@@ -674,7 +674,7 @@ get_signal_metadata = function(cs, cts, resolution) {
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-gauss_signal = function(cs, cts.common, verbose=T, constrained=T, ncores=1, fix.lambda1=F, fix.lambda1.at=NA,
+gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.lambda1.at=NA,
                                fix.lambda2=F, fix.lambda2.at=NA) {
   if (verbose==T) cat(" Signal\n")
   cts = binless:::gauss_signal_muhat_mean(cs, cts.common)
@@ -693,9 +693,9 @@ gauss_signal = function(cs, cts.common, verbose=T, constrained=T, ncores=1, fix.
     csig
   }
   registerDoParallel(cores=min(ncores,length(groupnames)))
-  params = foreach(csig=csigs, .combine=rbind, .export=c("constrained","verbose","fix.lambda1","fix.lambda1.at",
+  params = foreach(csig=csigs, .combine=rbind, .export=c("verbose","fix.lambda1","fix.lambda1.at",
                                                          "fix.lambda2","fix.lambda2.at")) %dopar% {
-    binless:::fused_lasso(csig, positive=T, fixed=F, constrained=constrained, verbose=verbose,
+    binless:::fused_lasso(csig, positive=T, fixed=F, constrained=T, verbose=verbose,
                                 fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                                 fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }
@@ -711,12 +711,14 @@ gauss_signal = function(cs, cts.common, verbose=T, constrained=T, ncores=1, fix.
   precision = max(abs(mat[,phi]-cs@par$phi))
   cs@par$tol_signal = min(cs@par$tol_signal, max(cs@settings$tol, precision/10))
   #set new parameters
-  cs@par$signal=mat[,.(name,bin1,bin2,phihat,weight,ncounts,phi,beta,diag.grp,diag.idx)]
+  cs@par$signal=mat[,.(name,bin1,bin2,phihat,weight,ncounts,phi,phi.unconstr,beta,diag.grp,diag.idx)]
   cs@par$phi=mat[,phi]
   params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
   cs@par$eC=as.array(params[,eC+eCprime])
   cs@par$eCprime=as.array(params[,eCprime])
   cs@par$lambda1=as.array(params[,lambda1])
+  cs@par$eCprime.unconstr=as.array(params[,eCprime.unconstr])
+  cs@par$lambda1.unconstr=as.array(params[,lambda1.unconstr])
   cs@par$lambda2=as.array(params[,lambda2])
   cs@par$value = params[,sum(BIC)]
   if (verbose==T) cat("  fit: lambda1",cs@par$lambda1[1],"lambda2",cs@par$lambda2[1],"\n")
@@ -1126,7 +1128,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
       #
       #fit signal using sparse fused lasso
       update.exposures=F
-      a=system.time(cs <- binless:::gauss_signal(cs, cts.common, verbose=verbose, constrained=T, ncores=ncores,
+      a=system.time(cs <- binless:::gauss_signal(cs, cts.common, verbose=verbose, ncores=ncores,
                                                        fix.lambda1=cs@settings$fix.lambda1,
                                                        fix.lambda1.at=cs@settings$fix.lambda1.at,
                                                        fix.lambda2=cs@settings$fix.lambda2,
@@ -1140,7 +1142,14 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
       if (fit.signal == T && i <= cs@settings$bg.steps) {
         cs@settings$bg.steps = i #compute signal at next step
       } else {
-        if (verbose==T) cat("Normalization has converged\n")
+        if (verbose==T) {
+          cat("Normalization has converged\n")
+          cat(" setting parameters to their unconstrained values\n")
+        }
+        if (fit.signal==T) {
+          setnames(cs@par$signal,c("phi","phi.unconstr"),c("phi.constr","phi"))
+          cs@par$eC = cs@par$eC - cs@par$eCprime + cs@par$eCprime.unconstr
+        }
         break
       }
     }
