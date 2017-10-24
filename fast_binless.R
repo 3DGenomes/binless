@@ -53,13 +53,13 @@ load("data/pauli_e22e868a9_chr4_csdata.RData")
 csd2=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
 #now we bin the raw data at the base resolution we want, and put it in a data table
-mat=binless:::bin_data(cs,resolution=5000)
+mat=binless:::bin_data(cs,resolution=2500)
 
 #in the fast binless mode, you must ensure no counter diagonal nor row/column is completely zero
 #if there are not too many, you can add 1 to the observed counts
 rbind(mat[,.(bin=bin1,observed)],mat[,.(bin=bin2,observed)])[,.(sum(observed)),by=bin][V1==0]
 mat[,.(d=unclass(bin2)-unclass(bin1),observed)][,sum(observed),by=d][V1==0]
-mat[unclass(bin2)-unclass(bin1)>=555,
+mat[unclass(bin2)-unclass(bin1)>=513,
     observed:=observed+as.integer(c(1,rep(0,length(observed)-1))),
     by=unclass(bin2)-unclass(bin1)]
 
@@ -68,7 +68,7 @@ mat[unclass(bin2)-unclass(bin1)>=555,
 #We do a maximum of nouter steps (or less if the relative precision is lower than tol_val)
 #and hold the fusion penalty fixed at lam2. Play with lam2 to see its effect.
 nouter=20
-lam2=10
+lam2=5
 tol_val=1e-1
 bg_steps=5
 out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, nouter, tol_val, bg_steps)
@@ -137,13 +137,15 @@ ggplot(diff)+geom_raster(aes(bin1,bin2,fill=delta))+
 
 
 #cross-validation diagnostics
-lam2s=10**seq(-1,1.5,length.out=10)
+lam2s=10^seq(-1,1,length.out=20)
 #lam2s=10**seq(0.9,-0.2,length.out=10)
 #lam2s=c(0,10**seq(0,-10,length.out=11))
 ret=binless:::fast_binless_eval_cv(out, lam2s, 0, tol_val)
 names(ret) = as.character(lam2s)
 ret = rbindlist(ret, use.names = T, idcol = "lam2")
 ret[,group:="all"]
+ggplot(ret)+geom_raster(aes(bin1,bin2,fill=pmin(phihat,3)))+geom_raster(aes(bin2,bin1,fill=pmin(signal,3)))+facet_wrap(~factor(lam2))+coord_fixed()+scale_fill_gradient2()
+ggplot(ret)+geom_raster(aes(bin1,bin2,fill=pmin(signal,3)),data=ret.old)+geom_raster(aes(bin2,bin1,fill=pmin(signal,3)))+facet_wrap(~factor(lam2))+coord_fixed()+scale_fill_gradient2()
 #
 retg1=binless:::fast_binless_eval_cv(out, lam2s, 1, tol_val)
 names(retg1) = as.character(lam2s)
@@ -159,9 +161,14 @@ retg=rbind(retg1,retg2)[phihat==-100]
 setkey(retg,lam2,name,bin1,bin2)
 retall=dcast(rbindlist(list(all=ret,cv=retg),use.names = T, idcol = "mode"), lam2+name+bin1+bin2+observed+biases+decay~mode,
              value.var=c("expected","signal","binless","group","phihat","weights"))
-retall[,lam2:=ordered(lam2,lam2s)]
+#retall[,lam2:=ordered(lam2,lam2s)]
+retall[,lam2:=as.numeric(lam2)]
 retall[,sqerr_cv:=(phihat_all-signal_cv)**2]
 retall[,sqerr_all:=(phihat_all-signal_all)**2]
+scores = retall[,.(cv_group=mean(weights_all*sqerr_cv),n_group=.N),by=c("lam2","group_cv")][
+  ,.(cv=sum(n_group*cv_group)/sum(n_group), cv.sd=sum(n_group*cv_group**2)/sum(n_group)),keyby=lam2]
+scores[,cv.sd:=sqrt(cv.sd-cv**2)]
+ggplot(scores)+geom_line(aes(lam2,cv))+geom_errorbar(aes(lam2,ymin=cv-cv.sd,ymax=cv+cv.sd))
 #
 ggplot(retall[,.(CV=sum(weights_all*sqerr_cv),sumsq=sum(weights_all*sqerr_all)),by=lam2])+
   geom_line(aes(lam2,CV,colour="CV",group=1))+geom_line(aes(lam2,sumsq,colour="sumsq",group=1))
