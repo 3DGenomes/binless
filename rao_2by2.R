@@ -12,9 +12,9 @@ bpk=30
 dfuse=5 #as.integer(args[2])
 bpd=10 #as.integer(args[4])
 bpb=10 #as.integer(args[5])
-ncores=5
-qmin=0.01
-base.res=10000
+ncores=4
+qmin=0.05
+base.res=5000
 
 setwd("/home/yannick/simulations/cs_norm")
 
@@ -27,29 +27,29 @@ csd3=csd
 load(paste0("data/rao_HiC055_IMR90_",sub,"_csdata.RData"))
 csd4=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4), different.decays="none", dfuse=dfuse, qmin=qmin)
-cs = run_gauss(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
-               ngibbs = 20, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
-               ncounts = 1000000, ncores=ncores, base.res=base.res, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T)
-save(cs,file=paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k_dfuse",dfuse,"_qmin_",qmin,".RData"))
+cs <- run_gauss(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
+                ngibbs = 15, iter=100000, init.dispersion = 1, tol=1e-1,
+                ncounts = 100000, ncores=ncores, base.res=base.res, fit.signal=T)
+save(cs,file=paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k_dfuse",dfuse,"_qmin_",qmin,"_setunconstr.RData"))
 
 
-foreach (resolution=c(5000,10000,20000),.errorhandling = "pass") %do% {
+foreach (resolution=c(5000,10000),.errorhandling = "pass") %do% {
   cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
   cs=detect_binned_interactions(cs, resolution=resolution, group="all", ncores=ncores)
   cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
   cs=detect_binned_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])
   cs=detect_binless_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])
-  save(cs,file=paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k_dfuse",dfuse,"_qmin_",qmin,".RData"))
+  save(cs,file=paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k_dfuse",dfuse,"_qmin_",qmin,"_setunconstr.RData"))
 }
 
-foreach (resolution=c(5000,10000,20000),.errorhandling = "pass") %do% {
+foreach (resolution=c(5000,10000),.errorhandling = "pass") %do% {
   cs=group_datasets(cs, resolution=resolution, verbose=T, ncores=ncores, group="condition")
   cs=detect_binned_interactions(cs, resolution=resolution, group="condition", ncores=ncores)
   cs=detect_binless_interactions(cs, resolution=resolution, group="condition", ncores=ncores)
   ref=get_matrices(cs,resolution,group="condition")[,name[1]]
   cs=detect_binned_differences(cs, resolution=resolution, group="condition", ncores=ncores, ref=ref)
   cs=detect_binless_differences(cs, resolution=resolution, group="condition", ncores=ncores, ref=ref)
-  save(cs,file=paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k_dfuse",dfuse,"_qmin_",qmin,".RData"))
+  save(cs,file=paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k_dfuse",dfuse,"_qmin_",qmin,"_setunconstr.RData"))
 }
 
 if (F) {
