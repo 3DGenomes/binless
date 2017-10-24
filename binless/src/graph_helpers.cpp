@@ -45,7 +45,7 @@ Graph build_patch_graph(int nbins, double tol_val, const IntegerVector& bin1,
 IntegerVector get_patch_numbers(int nbins, double tol_val, const IntegerVector& bin1,
                                 const IntegerVector& bin2, const NumericVector& value) {
     //build graph with edges only between vertices with equal values
-    Graph fG = build_patch_graph(nbins, tol_val, bin1, bin2, value);
+    Graph fG = build_patch_graph(nbins, tol_val/20., bin1, bin2, value); //use a factor 20 given the factor 20 for the fused lasso computation
     //deduce connected components
     std::vector<int> component(boost::num_vertices(fG));
     int num = boost::connected_components(fG, &component[0]);
@@ -54,6 +54,7 @@ IntegerVector get_patch_numbers(int nbins, double tol_val, const IntegerVector& 
     for (i = 0; i != component.size(); ++i)
       std::cout << "Vertex " << i <<" is in component " << component[i] << std::endl;
     std::cout << std::endl;*/
+    /*for (unsigned i=0; i<component.size(); ++i) Rcpp::Rcout << " i= " << i << " bin1= " << bin1(i) << " bin2= " << bin2(i) << " value= " << value(i) << " patchno= " << component[i] << "\n";*/
     return Rcpp::wrap(component);
 }
 

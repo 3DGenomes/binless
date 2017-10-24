@@ -26,6 +26,7 @@ double get_minimum_UB(const BinnedDataCore& binned) {
     const double minUBo = get_minimum_UB_offset_sign<Offset,Sign>(binned);
     const double minUBd = get_minimum_UB_degen<Degeneracy>(binned, values);
     const double minUB = std::max(minUBd,minUBo);
+    //Rcpp::Rcout << "get_minimum UB: " << minUB << " = max(UBd= " << minUBd << ", UBo= " << minUBo << " )\n";
     return minUB;
 }
 
