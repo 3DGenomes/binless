@@ -512,7 +512,7 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-gauss_genomic = function(cs, cts.common, verbose=T, update.exposures=T) {
+gauss_genomic = function(cs, cts.common, verbose=T, update.eC=T) {
   if (verbose==T) cat(" Genomic\n")
   a = binless:::gauss_genomic_muhat_mean(cs, cts.common)
   #run optimization
@@ -524,11 +524,11 @@ gauss_genomic = function(cs, cts.common, verbose=T, update.exposures=T) {
   precision = max(max(abs(op$log_iota - cs@par$log_iota)), max(abs(op$log_rho - cs@par$log_rho)))
   cs@par$tol_genomic = min(cs@par$tol_genomic, max(cs@settings$tol, precision/10))
   #update par slot
-  if (update.exposures==F) {
+  if (update.eC==F) {
     op$eC=NULL
-    op$eRJ=NULL
-    op$eDE=NULL
   }
+  op$eRJ=NULL
+  op$eDE=NULL
   cs@par=modifyList(cs@par, op)
   return(cs)
 }
@@ -704,7 +704,7 @@ gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.
   mat = rbindlist(params[,mat])
   #store new signal in cs and update eC
   #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+
-  #  scale_fill_gradient2()
+  #  scale_fill_gradient2()+coord_fixed()
   #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
   setkey(mat,name,bin1,bin2)
   #restrict tolerance if needed
@@ -1091,11 +1091,11 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
                      fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
     laststep=0
     #update eC everywhere in the first step
-    update.exposures=T
+    update.eC=T
   } else {
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
-    update.exposures = !(fit.signal==T && laststep > cs@settings$bg.steps)
+    update.eC = !(fit.signal==T && laststep > cs@settings$bg.steps)
   }
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
@@ -1110,12 +1110,12 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     cts.common = binless:::gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
     #
     #fit iota and rho given diagonal decay
-    a=system.time(cs <- binless:::gauss_genomic(cs, cts.common, update.exposures=update.exposures))
+    a=system.time(cs <- binless:::gauss_genomic(cs, cts.common, update.eC=update.eC))
     cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
     if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     #
     #fit diagonal decay given iota and rho
-    a=system.time(cs <- binless:::gauss_decay(cs, cts.common, update.eC=update.exposures))
+    a=system.time(cs <- binless:::gauss_decay(cs, cts.common, update.eC=update.eC))
     cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
     if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     #
@@ -1127,7 +1127,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     if (fit.signal==T && i > cs@settings$bg.steps) {
       #
       #fit signal using sparse fused lasso
-      update.exposures=F
+      update.eC=F
       a=system.time(cs <- binless:::gauss_signal(cs, cts.common, verbose=verbose, ncores=ncores,
                                                        fix.lambda1=cs@settings$fix.lambda1,
                                                        fix.lambda1.at=cs@settings$fix.lambda1.at,
