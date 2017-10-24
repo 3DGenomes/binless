@@ -5,6 +5,7 @@
 binless/src/Modules.cpp
 binless/src/*.o
 binless/src/binless.so
+binless/src/RcppExports.cpp
 binless/src/include/*
 binless/src/gfl/src/*.o
 binless/man/*
