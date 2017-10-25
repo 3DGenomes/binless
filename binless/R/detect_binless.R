@@ -440,38 +440,25 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
   return(cs)
 }
   
-#' make plot of binless matrix, with minima/maxima highlighted
+#' make plot of binless matrix
 #'
 #' @param mat the binless matrix
-#' @param minima whether to display minima or not (say TRUE for difference matrix) 
+#' @param upper,lower the name of the column to plot in upper (resp. lower)
+#'  triangle. Default: phi. Formulae are allowed (ggplot2 aes syntax)
+#' @param facet what to facet on. Default: name
 #'
 #' @return
 #' @export
 #'
 #' @examples
-plot_binless_matrix = function(mat, minima=F, scale=T, value.name="value") {
-  if (length(setdiff(c("begin1","begin2","end1","end2"),names(mat)))>0) {
-    mat[,c("begin1","begin2","end1","end2"):=list(unclass(bin1),unclass(bin2),unclass(bin1)+1,unclass(bin2)+1)]
-  }
-  resolution=mat[bin1==bin1[1]&name==name[1],begin2[2]-begin2[1]]
-  a=mat[is.maximum==T]
-  a=a[,.SD[,.(begin1=c(begin1,begin1,end1,end1)-resolution/2, begin2=c(begin2,end2,begin2,end2)-resolution/2,
-              patchno, get(value.name))][chull(begin1,begin2)], by=c("patchno","name")]
-  if (minima==T) {
-    b=mat[is.minimum==T]
-    b=b[,.SD[,.(begin1=c(begin1,begin1,end1,end1)-resolution/2, begin2=c(begin2,end2,begin2,end2)-resolution/2,
-                patchno, get(value.name))][chull(begin1,begin2)], by=c("patchno","name")]
-    p=ggplot(mat)+geom_raster(aes(begin1,begin2,fill=(get(value.name))))+
-      geom_raster(aes(begin2,begin1,fill=(get(value.name))))+
-      scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value = "white")+facet_wrap(~name)+labs(fill=value.name)+
-      geom_polygon(aes(begin2,begin1,group=patchno),colour="blue",fill=NA,data=b)+
-      geom_polygon(aes(begin2,begin1,group=patchno),colour="red",fill=NA,data=a)
-  } else {
-    p=ggplot(mat)+geom_raster(aes(begin1,begin2,fill=get(value.name)))+
-      geom_raster(aes(begin2,begin1,fill=get(value.name)))+
-      scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value = "white")+facet_wrap(~name)+labs(fill=value.name)+
-      geom_polygon(aes(begin2,begin1,group=patchno),colour="black",fill=NA,data=a)
-  }
-  if (scale!=T) p=p+guides(fill=F)
+plot_binless_matrix = function(mat, upper="phi", lower="phi", facet="name") {
+  bin1 = ifelse("begin1" %in% names(mat), "begin1", "bin1")
+  bin2 = ifelse("begin2" %in% names(mat), "begin2", "bin2")
+  p=ggplot(mat)+geom_raster(aes_string(bin1,bin2,fill=upper))+
+                geom_raster(aes_string(bin2,bin1,fill=lower))+
+      scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value = "white")+
+      coord_fixed()
+  if (facet %in% names(mat)) p = p + facet_wrap(facet)
   print(p)
+  return(p)
 }
