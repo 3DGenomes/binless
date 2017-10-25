@@ -4,7 +4,7 @@
 
 void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
         double* lmu_nosig, double* weight, double* log_decay, int nbins, double dispersion,
-        double* phi, double eCprime, double* phihat, double* phihat_var, double* phihat_var_nodecay,
+        double* phi, double* phihat, double* phihat_var, double* phihat_var_nodecay,
         double* ncounts, int* bin1, int* bin2)
 {
   //walk through cts
@@ -16,8 +16,8 @@ void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
     int b1 = cts_bin1[i];
     int b2 = cts_bin2[i];
     int pos = (b1-1)*(nbins+1) - (b1-1)*b1/2 + b2 - b1;
-    double mu = exp( lmu_nosig[i] + phi[pos] + eCprime);
-    double mu_nodecay = exp( lmu_nosig[i] - log_decay[i] + phi[pos] + eCprime);
+    double mu = exp( lmu_nosig[i] + phi[pos]);
+    double mu_nodecay = exp( lmu_nosig[i] - log_decay[i] + phi[pos]);
     double z = count[i]/mu-1;
     double var = 1/mu + 1/dispersion;
     double var_nodecay = 1/mu_nodecay + 1/dispersion;

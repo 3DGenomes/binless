@@ -28,7 +28,7 @@ public:
     
     void update(const std::vector<double>& beta_phi) {
         set_beta_phi(beta_phi);
-        cts_to_signal_mat(raw_, 0, binned_.get_beta_phi(), binned_); //offset is held at zero since we pass unthresholded beta_phi
+        cts_to_signal_mat(raw_, binned_.get_beta_phi(), binned_); //offset is held at zero since we pass unthresholded beta_phi
     }
 
 private:
