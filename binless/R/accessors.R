@@ -169,7 +169,7 @@ get_all_values = function(cs, param, trans) {
   legs=c("bias","decay","disp","signal")
   if (!(param %in% names(cs@diagnostics$param))) return(data.table())
   values=cs@diagnostics$params[,.(step,leg=ordered(leg,legs),tmp=get(param))][!sapply(tmp,is.null)]
-  values[,step:=step+((unclass(leg)-1)%%5)/5]
+  values[,step:=step+((unclass(leg)-1)%%8)/8]
   #melt it
   melted=as.data.table(values[,melt(tmp)])
   if ("Var1" %in% names(melted)) {

@@ -879,20 +879,23 @@ prepare_first_signal_estimation = function(biases, names, base.res) {
 #' approximation)
 #' 
 #' @param cs a normalized CSnorm object
+#' @param start,end the starting and ending steps on which to plot the info. Default is full range.
 #'   
-#' @return Two plots in a list. The first is for the three log-likelihoods, the
+#' @return Two plots in a list. The first is for the four log-likelihoods, the
 #'   second is for the parameters.
 #' @export
 #' 
 #' @examples
-plot_diagnostics = function(cs, start=1) {
-  plot=ggplot(cs@diagnostics$params[step>=start,.(step,leg,value)])+
-    geom_line(aes(step,value))+geom_point(aes(step,value))+facet_wrap(~leg, scales = "free")+
-    theme(legend.position="bottom")
+plot_diagnostics = function(cs, start=1, end=Inf) {
+  if (is.infinite(end) || cs@diagnostics$params[,max(step)]<end) end = cs@diagnostics$params[,max(step)] 
+  plot=ggplot(cs@diagnostics$params[step>=start&step<end+1,.(step,leg,value)])+
+    geom_line(aes(step,value))+geom_point(aes(step,value))+facet_wrap(~leg, scales = "free_y")+
+    theme(legend.position="bottom")+scale_x_continuous(breaks = seq(start,end,2), minor_breaks = seq(start+1,end,2))
   vars=foreach(var=c("eC","eRJ","eDE","alpha","lambda_iota","lambda_rho","lambda_diag", "lambda1", "lambda2", "eCprime"),
                trans=(c(NA,NA,NA,NA,"log10","log10","log10","log10","log10",NA)),.combine=rbind) %do% get_all_values(cs,var,trans)
-  plot2=ggplot(vars[step>=start])+geom_line(aes(step,value))+
-    geom_point(aes(step,value,colour=leg))+facet_wrap(~variable, scales = "free_y")
+  plot2=ggplot(vars[step>=start&step<end+1])+geom_line(aes(step,value,group=as.integer(step)))+
+    geom_point(aes(step,value,colour=leg))+facet_wrap(~variable, scales = "free_y")+
+    scale_x_continuous(breaks = seq(start,end,2), minor_breaks = seq(start+1,end,2))
   return(list(plot=plot,plot2=plot2))
 }
 
