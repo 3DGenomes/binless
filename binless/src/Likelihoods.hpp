@@ -35,8 +35,11 @@ public:
         //Rcpp::Rcout << "maximum admissible weight: " << wmax << "\n";
         //wt = Rcpp::pmin(wt, wmax);
         
+        //compute -2*log(prior) contribution (standard normal)
+        const double logpri = lambda1*lambda1;
+        
         //compute the score and return
-        const Rcpp::NumericVector chisq = wt * SQUARE(binned_.get_phihat() - (phi + eCprime));
+        const Rcpp::NumericVector chisq = wt * SQUARE(binned_.get_phihat() - (phi + eCprime)) + logpri;
         
         /*Rcpp::Rcout << "UB= " << UB << " LB= " << LB << " eCprime= " << eCprime << " lambda1= " << lambda1
             << " max(beta)= " << (double)(Rcpp::max(beta_phi_))
@@ -81,8 +84,11 @@ public:
         //wt_ref = Rcpp::pmin(wt_ref, wmax_ref);
         //Rcpp::Rcout << "maximum admissible weights: " << wmax << " " << wmax_ref << "\n";
         
+        //compute -2*log(prior) contribution (standard normal)
+        const double logpri = lambda1*lambda1;
+        
         const Rcpp::NumericVector chisq = wt * SQUARE(binned_.get_phihat() - (delta + eCprime + phi_ref))
-                                        + wt_ref * SQUARE(binned_.get_phihat_ref() - phi_ref);
+                                        + wt_ref * SQUARE(binned_.get_phihat_ref() - phi_ref) + logpri;
         return chisq;
     }
     

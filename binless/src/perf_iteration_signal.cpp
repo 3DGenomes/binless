@@ -125,7 +125,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     }
     double lam1 = opt["lambda1"];
     double eCprime = opt["eCprime"];
-    
+     
     //soft-threshold it at the selected parameters
     std::vector<double> beta_r = as<std::vector<double> >(binned.get_beta());
     std::vector<double> phi_r = soft_threshold(beta_r, eCprime, lam1);
@@ -134,6 +134,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     const double BIC = opt["BIC"];
     const double BIC_sd = opt["BIC.sd"];
     const unsigned dof = opt["dof"];
+    //Rcpp::Rcout << "lam1= " << lam1 << " eCprime= " << eCprime << " BIC= " << BIC << "\n";
     
     timer.print_times();
     
