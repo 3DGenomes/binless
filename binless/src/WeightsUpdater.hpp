@@ -28,7 +28,7 @@ public:
     
     void update(const std::vector<double>& beta_phi) {
         set_beta_phi(beta_phi);
-        cts_to_signal_mat(raw_, binned_.get_beta_phi(), binned_); //offset is held at zero since we pass unthresholded beta_phi
+        cts_to_signal_mat(raw_, binned_); //offset is held at zero since we pass unthresholded beta_phi
     }
 
 private:
@@ -52,9 +52,9 @@ public:
     
     void setUp(const std::vector<double>& phi_ref, const std::vector<double>& beta_delta) {
         //store first estimate of phi_ref and compute mat
-        Rcpp::NumericVector phi_ref_r = wrap(phi_ref);
-        Rcpp::NumericVector beta_delta_r = wrap(beta_delta);
-        cts_to_diff_mat(raw_, phi_ref_r, beta_delta_r, binned_);
+        binned_.set_beta_delta(wrap(beta_delta));
+        binned_.set_phi_ref(wrap(phi_ref));
+        cts_to_diff_mat(raw_, binned_);
     }
    
     void set_beta(const std::vector<double>& beta) { set_beta_delta(beta); }
@@ -62,7 +62,7 @@ public:
     void update(const std::vector<double>& beta_delta) {
         set_beta_delta(beta_delta);
         //compute new matrix of weights
-        cts_to_diff_mat(raw_, binned_.get_phi_ref(), binned_.get_beta_delta(), binned_);
+        cts_to_diff_mat(raw_, binned_);
     }
     
 private:

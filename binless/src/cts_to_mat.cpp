@@ -31,12 +31,12 @@ void remove_outliers(const std::vector<int>& bin1, const std::vector<int>& bin2,
   }
 }
 
-void cts_to_signal_mat(const RawData<Signal>& raw, const Rcpp::NumericVector& beta_phi, BinnedData<Signal>& binned) {
+void cts_to_signal_mat(const RawData<Signal>& raw, BinnedData<Signal>& binned) {
     //extract data from holder
     const DataFrame& cts = raw.get_cts();
     int nbins = raw.get_nbins();
     double dispersion = raw.get_dispersion();
-    const std::vector<double> phi = Rcpp::as<std::vector<double> >(beta_phi);
+    const std::vector<double> phi = Rcpp::as<std::vector<double> >(binned.get_beta_phi());
     const List& metadata = raw.get_metadata();
 
     //inputs
@@ -89,7 +89,6 @@ void cts_to_signal_mat(const RawData<Signal>& raw, const Rcpp::NumericVector& be
 
     binned.set_bin1(bin1_i);
     binned.set_bin2(bin2_i);
-    binned.set_beta_phi(beta_phi);  //could be removed, already done in WeightsUpdater
     binned.set_phihat(phihat_i);
     binned.set_weight(weight_i);
     binned.set_weight_nodecay(weight_nodecay_i);
@@ -98,30 +97,29 @@ void cts_to_signal_mat(const RawData<Signal>& raw, const Rcpp::NumericVector& be
     binned.set_diag_grp(dgrp_i);
 }
 
-void cts_to_diff_mat(const RawData<Difference>& raw, const Rcpp::NumericVector& phi_ref, const Rcpp::NumericVector& beta_delta,
-                     BinnedData<Difference>& binned) {
+void cts_to_diff_mat(const RawData<Difference>& raw, BinnedData<Difference>& binned) {
     //compute ref matrix
     RawData<Signal> sraw_ref(raw.get_nbins(), raw.get_dispersion(), raw.get_ref(), raw.get_metadata());
     BinnedData<Signal> sbinned_ref;
-    cts_to_signal_mat(sraw_ref, phi_ref, sbinned_ref);
+    sbinned_ref.set_beta_phi(binned.get_phi_ref());
+    cts_to_signal_mat(sraw_ref, sbinned_ref);
     //compute other matrix
-    Rcpp::NumericVector phi_oth = phi_ref+beta_delta; //unthresholded
+    Rcpp::NumericVector phi_oth = binned.get_phi_ref()+binned.get_beta_delta(); //unthresholded
     RawData<Signal> sraw_oth(raw.get_nbins(), raw.get_dispersion(), raw.get_cts(), raw.get_metadata());
     BinnedData<Signal> sbinned_oth;
-    cts_to_signal_mat(sraw_oth, phi_oth, sbinned_oth);
+    sbinned_oth.set_beta_phi(phi_oth);
+    cts_to_signal_mat(sraw_oth, sbinned_oth);
     //report
     binned.set_bin1(sbinned_ref.get_bin1());
     binned.set_bin2(sbinned_ref.get_bin2());
-    binned.set_beta_delta(beta_delta);  //could be removed, already done in WeightsUpdater
     binned.set_weight(sbinned_oth.get_weight());
     binned.set_weight_nodecay(sbinned_oth.get_weight_nodecay());
-    binned.set_deltahat(sbinned_oth.get_phihat() - phi_ref);
+    binned.set_deltahat(sbinned_oth.get_phihat() - binned.get_phi_ref());
     binned.set_ncounts(sbinned_oth.get_ncounts() + sbinned_ref.get_ncounts());
     binned.set_diag_idx(sbinned_ref.get_diag_idx());
     binned.set_diag_grp(sbinned_ref.get_diag_grp());
     binned.set_weight_ref(sbinned_ref.get_weight());
     binned.set_weight_nodecay_ref(sbinned_ref.get_weight_nodecay());
     binned.set_phihat_ref(sbinned_ref.get_phihat());
-    binned.set_phi_ref(phi_ref); //could be removed, already done in WeightsUpdater
 }
 
