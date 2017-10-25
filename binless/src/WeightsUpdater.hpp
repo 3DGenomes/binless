@@ -24,12 +24,19 @@ public:
     
     void setUp() {}
 
+    void set_beta(const std::vector<double>& beta) { set_beta_phi(beta); }
+    
     void update(const std::vector<double>& beta_phi) {
-        Rcpp::NumericVector beta_phi_r = wrap(beta_phi);
-        cts_to_signal_mat(raw_, 0, beta_phi_r, binned_); //offset is held at zero since we pass unthresholded beta_phi
+        set_beta_phi(beta_phi);
+        cts_to_signal_mat(raw_, 0, binned_.get_beta_phi(), binned_); //offset is held at zero since we pass unthresholded beta_phi
     }
 
 private:
+    
+    void set_beta_phi(const std::vector<double>& beta_phi) {
+        binned_.set_beta_phi(wrap(beta_phi));
+    }
+   
     const RawData<Signal>& raw_;
     BinnedData<Signal>& binned_;
 };
@@ -49,17 +56,24 @@ public:
         Rcpp::NumericVector beta_delta_r = wrap(beta_delta);
         cts_to_diff_mat(raw_, phi_ref_r, beta_delta_r, binned_);
     }
-    
+   
+    void set_beta(const std::vector<double>& beta) { set_beta_delta(beta); }
+        
     void update(const std::vector<double>& beta_delta) {
-        //update phi_ref based on new beta
-        //use beta because we don't threshold
-        Rcpp::NumericVector beta_delta_r = wrap(beta_delta);
-        Rcpp::NumericVector phi_ref_r = compute_phi_ref(binned_, beta_delta_r);
+        set_beta_delta(beta_delta);
         //compute new matrix of weights
-        cts_to_diff_mat(raw_, phi_ref_r, beta_delta_r, binned_);
+        cts_to_diff_mat(raw_, binned_.get_phi_ref(), binned_.get_beta_delta(), binned_);
     }
     
 private:
+    
+    void set_beta_delta(const std::vector<double>& beta_delta) {
+        //update phi_ref based on new beta
+        //use beta because we don't threshold
+        binned_.set_beta_delta(wrap(beta_delta));
+        binned_.set_phi_ref(compute_phi_ref(binned_, binned_.get_beta_delta()));
+    }
+    
     const RawData<Difference>& raw_;
     BinnedData<Difference>& binned_;
 };

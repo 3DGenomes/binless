@@ -89,7 +89,7 @@ void cts_to_signal_mat(const RawData<Signal>& raw, double eCprime, const Rcpp::N
 
     binned.set_bin1(bin1_i);
     binned.set_bin2(bin2_i);
-    binned.set_beta_phi(beta_phi);
+    binned.set_beta_phi(beta_phi);  //could be removed, already done in WeightsUpdater
     binned.set_phihat(phihat_i);
     binned.set_weight(weight_i);
     binned.set_weight_nodecay(weight_nodecay_i);
@@ -114,7 +114,7 @@ void cts_to_diff_mat(const RawData<Difference>& raw, const Rcpp::NumericVector& 
     //report
     binned.set_bin1(sbinned_ref.get_bin1());
     binned.set_bin2(sbinned_ref.get_bin2());
-    binned.set_beta_delta(beta_delta);
+    binned.set_beta_delta(beta_delta);  //could be removed, already done in WeightsUpdater
     binned.set_weight(sbinned_oth.get_weight());
     binned.set_weight_nodecay(sbinned_oth.get_weight_nodecay());
     binned.set_deltahat(sbinned_oth.get_phihat() - phi_ref);
@@ -124,6 +124,6 @@ void cts_to_diff_mat(const RawData<Difference>& raw, const Rcpp::NumericVector& 
     binned.set_weight_ref(sbinned_ref.get_weight());
     binned.set_weight_nodecay_ref(sbinned_ref.get_weight_nodecay());
     binned.set_phihat_ref(sbinned_ref.get_phihat());
-    binned.set_phi_ref(phi_ref);
+    binned.set_phi_ref(phi_ref); //could be removed, already done in WeightsUpdater
 }
 
