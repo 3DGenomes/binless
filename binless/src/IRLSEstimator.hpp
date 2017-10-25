@@ -53,7 +53,7 @@ public:
         /*Rcpp::Rcout << " Perf iteration: end with lam2= " << lambda2 << " alpha= "
         << gauss_.get_alpha() << " phi[0]= " << beta[0] << "\n";*/
         Timer::start_timer("weight");
-        wt_.update(beta); //store last beta and update weights
+        wt_.set_beta(beta); //store last beta without updating weights (but might update phi_ref if applicable)
         Timer::print_times();
     }
     
