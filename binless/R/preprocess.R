@@ -602,6 +602,15 @@ fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
                    contact.far=sum(contact.far),contact.up=sum(contact.down)),
                 keyby=c("id1","id2")]
   counts[,distance:=pos2-pos1]
+  #add a count at the extreme corner if necessary to avoid model degeneracies
+  min_id = biases[,min(id)]
+  max_id = biases[,max(id)]
+  if (counts[id1==min_id&&id2==max_id,.N==0]) {
+    newline=merge(biases[id==min_id,.(name=1,id,pos)],biases[id==max_id,.(name=1,id,pos)],by="name",suffixes=c("1","2"))
+    newline[,c("name","contact.close","contact.down","contact.far","contact.up","distance"):=list(NULL,1,0,0,0,pos2-pos1)]
+    counts=rbind(counts,newline)
+  }
+  #wrap distance if circular
   if (circularize>0) counts[,distance:=pmin(distance,circularize-distance+1)]
   return(list(biases=biases,counts=counts))
 }
