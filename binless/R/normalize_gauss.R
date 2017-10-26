@@ -174,6 +174,7 @@ gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     
     epsilon = Inf
     maxiter = 0
+    betat = array(0,Kdiag+Dsets)
     
     while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
       At = tmp_X_S_m2_X + Kdiag^2*lambda_diag^2*DtD
@@ -181,18 +182,20 @@ gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
       #At.PD = At + salt
       At.PD = nearPD(At)$mat  
       fit = solve.QP(At.PD, tmp_X_S_m2_k, -Ct, meq = Dsets)
-      betat = fit$solution
+      nbetat = fit$solution
+      epsilon = max(abs(betat-nbetat))
+      betat=nbetat
       
       eC=as.array(betat[1:Dsets])
       beta=betat[(Dsets+1):(Kdiag+Dsets)]
       
-      nlambda_diag = (Kdiag - 2)/((Kdiag^2)*crossprod(D%*%beta)+1)
-      nlambda_diag = sqrt(as.numeric(nlambda_diag))
-      epsilon = abs(lambda_diag-nlambda_diag)
-      lambda_diag = nlambda_diag
+      lambda_diag = (Kdiag - 2)/((Kdiag^2)*crossprod(D%*%beta)+1)
+      lambda_diag = sqrt(as.numeric(lambda_diag))
+      
+      #cat("step ",maxiter," epsilon ",epsilon," lambda_diag ", lambda_diag,"\n")
       maxiter = maxiter+1
     }
-    if (verbose==T) cat("   step",maxiter-1,": lambda_diag",nlambda_diag,"\n")
+    if (verbose==T) cat("   step",maxiter-1,": lambda_diag",lambda_diag,"\n")
     
     log_decay = X%*%beta
     log_mean_counts = log_decay
@@ -381,6 +384,7 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     
     epsilon = Inf
     maxiter = 0
+    beta = Matrix(0,2*Krow)
     while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
       D = bdiag(lambda_iota*D1,lambda_rho*D1)
       DtD = crossprod(D)
@@ -411,18 +415,17 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       #    
       e=solve(t(U_e)%*%S_m2%*%(U_e-X%*%beta_U),t(U_e)%*%S_m2%*%(etas-X%*%beta_y))
       
-      beta = beta_y - beta_U%*%e
+      nbeta = beta_y - beta_U%*%e
+      epsilon = max(abs(beta-nbeta))
+      beta = nbeta
       beta_iota = beta[1:Krow]
       beta_rho = beta[(Krow+1):(2*Krow)]
       
-      nlambda_iota = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_iota)+1e10)
-      nlambda_iota = sqrt(as.numeric(nlambda_iota))
-      nlambda_rho = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_rho)+1e10)
-      nlambda_rho = sqrt(as.numeric(nlambda_rho))
+      lambda_iota = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_iota)+1e10)
+      lambda_iota = sqrt(as.numeric(lambda_iota))
+      lambda_rho = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_rho)+1e10)
+      lambda_rho = sqrt(as.numeric(lambda_rho))
       
-      epsilon = max(abs(lambda_iota-nlambda_iota),abs(lambda_rho-nlambda_rho))
-      lambda_iota = nlambda_iota
-      lambda_rho = nlambda_rho
       maxiter = maxiter+1
     }
     if (verbose==T) cat("   step",maxiter-1,"lambda_iota",lambda_iota,"\n")
