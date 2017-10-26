@@ -18,6 +18,7 @@ EstimatedSparsity<Score,Offset,Sign,Degeneracy,Calculation,GaussianEstimator>::o
         bounds_t bounds = BoundsOptimizer<Offset,Sign>::optimize_bounds(c);
         score_t val = ScoreComputer<Calculation,Score,GaussianEstimator>::evaluate(bounds);
         /*Rcpp::Rcout << "EstimatedSparsity: c= " << c << " LB= " << bounds.first <<  " UB= " << bounds.second
+                    << " lambda1= " << (bounds.second-bounds.first)/2. << " eCprime= " << (bounds.second+bounds.first)/2.
                     << " val= " << Rcpp::as<double>(val["BIC"]) << " dof= " << Rcpp::as<unsigned>(val["dof"]) << "\n";*/
         values.push_back(val);
     }
