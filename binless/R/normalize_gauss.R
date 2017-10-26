@@ -679,6 +679,26 @@ get_signal_metadata = function(cs, cts, resolution) {
   return(list(bad.diagonals=bad.diagonals,bad.rows=bad.rows, diag.grp=orth[,rank]))
 }
 
+
+#' remove signal contributions which overlap with decay and bias
+#' @keywords internal
+remove_signal_degeneracy = function(cs, mat) {
+  signal = rbind(mat[,.(name,bin1,bin2,phi)],mat[bin2>bin1,.(name,bin1=bin2,bin2=bin1,phi)])
+  signal = cs@design[signal,,on="name"]
+  setkey(signal,name,bin1,bin2)
+  signal[,diag.grp:=unclass(bin2)-unclass(bin1)]
+  signal[,min_diag:=min(phi),by=c("diag.grp","decay")]
+  signal[,min_bin1:=min(phi),by=c("bin1","genomic")]
+  signal[,min_bin2:=min(phi),by=c("bin2","genomic")]
+  signal[,adjust:=pmax(pmax(min_bin1,min_bin2),min_diag)]
+  signal[,phi.unconstrained:=phi]
+  signal[,phi:=pmax(phi-adjust,0)] #disallow negative signal
+  signal[,c("min_diag","min_bin1","min_bin2"):=NULL]
+  mat[,c("phi","diag.grp"):=NULL]
+  return(signal[mat])
+}
+
+
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
@@ -703,30 +723,25 @@ gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.
   registerDoParallel(cores=min(ncores,length(groupnames)))
   params = foreach(csig=csigs, .combine=rbind, .export=c("verbose","fix.lambda1","fix.lambda1.at",
                                                          "fix.lambda2","fix.lambda2.at")) %dopar% {
-    binless:::fused_lasso(csig, positive=T, fixed=F, constrained=T, verbose=verbose,
+    binless:::fused_lasso(csig, positive=T, fixed=F, constrained=F, verbose=verbose,
                                 fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                                 fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }
   stopImplicitCluster()
-  #compute matrix at new params
+  #compute matrix at new params, and shift in order to avoid degeneracies with the decay and bias
   mat = rbindlist(params[,mat])
-  #store new signal in cs and update eC
-  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+
-  #  scale_fill_gradient2()+coord_fixed()
-  #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
-  setkey(mat,name,bin1,bin2)
+  setkeyv(mat,c("name","bin1","bin2"))
+  #mat = binless:::remove_signal_degeneracy(cs, mat)
   #restrict tolerance if needed
   precision = max(abs(mat[,phi]-cs@par$phi))
   cs@par$tol_signal = min(cs@par$tol_signal, max(cs@settings$tol, precision/10))
   #set new parameters
-  cs@par$signal=mat[,.(name,bin1,bin2,phihat,weight,ncounts,phi,phi.unconstr,beta,diag.grp,diag.idx)]
+  cs@par$signal=mat[,.(name,bin1,bin2,phihat,weight,ncounts,phi,beta,diag.grp,diag.idx)]
   cs@par$phi=mat[,phi]
   params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
   cs@par$eC=as.array(params[,eC+eCprime])
   cs@par$eCprime=as.array(params[,eCprime])
   cs@par$lambda1=as.array(params[,lambda1])
-  cs@par$eCprime.unconstr=as.array(params[,eCprime.unconstr])
-  cs@par$lambda1.unconstr=as.array(params[,lambda1.unconstr])
   cs@par$lambda2=as.array(params[,lambda2])
   cs@par$value = params[,sum(BIC)]
   if (verbose==T) {
@@ -1076,9 +1091,8 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
 #' @param init.dispersion positive numeric. Value of the dispersion to use initially.
 #' @param tol positive numeric (default 1e-2). Convergence tolerance on relative changes in the computed biases.
 #' @param ncores positive integer (default 1). Number of cores to use.
-#' @param fix.lambda1 whether to set lambda1 to a given value, or to estimate it
-#' @param fix.lambda1.at if fix.lambda1==T, the approximate value where it is meant to be fixed. Might move a bit because
-#'   of the positivity and degeneracy constraints.
+#' @param fix.lambda2 whether to set lambda2 to a given value, or to estimate it
+#' @param fix.lambda2.at if fix.lambda2==T, the value where it is meant to be fixed.
 #'   
 #' @return A csnorm object
 #' @export
@@ -1101,8 +1115,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     cs = fresh_start(cs, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, base.res = base.res,
                      bg.steps = bg.steps, iter = iter, fit.signal = fit.signal,
                      verbose = verbose, ncounts = ncounts, init.dispersion = init.dispersion,
-                     tol = tol, ncores = ncores, fix.lambda1 = fix.lambda1, fix.lambda1.at = fix.lambda1.at,
-                     fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
+                     tol = tol, ncores = ncores, fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
     laststep=0
     #update eC everywhere in the first step
     update.eC=T
@@ -1157,11 +1170,6 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
       } else {
         if (verbose==T) {
           cat("Normalization has converged\n")
-          cat(" setting parameters to their unconstrained values\n")
-        }
-        if (fit.signal==T) {
-          setnames(cs@par$signal,c("phi","phi.unconstr"),c("phi.constr","phi"))
-          cs@par$eC = cs@par$eC - cs@par$eCprime + cs@par$eCprime.unconstr
         }
         break
       }
