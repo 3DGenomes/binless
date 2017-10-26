@@ -1114,6 +1114,11 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
     #compute residuals once for this round
     if(verbose==T) cat(" Residuals\n")
     cts.common = binless:::gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
+    cs@diagnostics$residuals = rbind(cs@diagnostics$residuals,
+                                     cts.common[bin1==min(bin1),.(step=i,z=weighted.mean(z,weight/var),phi=weighted.mean(phi,weight/var),
+                                                                  log_decay=weighted.mean(log_decay,weight/var),log_bias=weighted.mean(log_bias,weight/var),
+                                                                  log_mean=weighted.mean(lmu.nosig+phi,weight/var),weight=sum(weight/2),count=sum(weight*count/2)),
+                                                keyby=c("name","bin2")])
     #
     #fit iota and rho given diagonal decay
     a=system.time(cs <- binless:::gauss_genomic(cs, cts.common, update.eC=update.eC))
