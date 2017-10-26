@@ -129,18 +129,9 @@ optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixe
     #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
   }
-  #first, find rough minimum between 2.5 and 100 by gridding
+  #first, find rough minimum between 2.5 and 100
   minlambda=2.5
   maxlambda=100
-  npoints=10
-  lvals=10^seq(log10(minlambda),log10(maxlambda),length.out=npoints)
-  op = foreach (lam=lvals,.combine=rbind) %do% data.table(lambda2=lam,BIC=obj(log10(lam)))
-  setkey(op,BIC)
-  csig@par$op = op
-  #now refine between the three lowest values
-  minlambda=op[1:3,min(lambda2)]
-  maxlambda=op[1:3,max(lambda2)]
-  cat("minlambda ",minlambda," maxlambda ",maxlambda,"\n")
   op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
   lambda2=10^op$minimum
   if (n.SD>0) {
