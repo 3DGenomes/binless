@@ -250,6 +250,7 @@ gauss_decay = function(cs, cts.common, verbose=T, update.eC=T) {
   #update par slot
   if (update.eC==F) op$eC=NULL
   cs@par=modifyList(cs@par, op)
+  if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
   return(cs)
 }
 
@@ -533,6 +534,7 @@ gauss_genomic = function(cs, cts.common, verbose=T, update.eC=T) {
   op$eRJ=NULL
   op$eDE=NULL
   cs@par=modifyList(cs@par, op)
+  if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
   return(cs)
 }
 
@@ -614,13 +616,16 @@ gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose
   #update parameters
   cs@par=modifyList(cs@par, op$par[c("eRJ","eDE","alpha")])
   #cs@par$eC=cs@par$eC+op$par$eC_sup
-  if (verbose==T) cat("  fit: dispersion",cs@par$alpha,"\n")
   #
   #compute log-posterior
   Krow=cs@settings$Krow
   Kdiag=cs@settings$Kdiag
   cs@par$value = op$value + (Krow-2)/2*sum(log(cs@par$lambda_iota/exp(1))+log(cs@par$lambda_rho/exp(1))) +
     (Kdiag-2)/2*sum(log(cs@par$lambda_diag/exp(1)))
+  if (verbose==T) {
+    cat("  fit: dispersion",cs@par$alpha,"\n")
+    cat("  log-likelihood = ",cs@par$value,"\n")
+  }
   return(cs)
 }
 
@@ -724,7 +729,10 @@ gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.
   cs@par$lambda1.unconstr=as.array(params[,lambda1.unconstr])
   cs@par$lambda2=as.array(params[,lambda2])
   cs@par$value = params[,sum(BIC)]
-  if (verbose==T) cat("  fit: lambda1",cs@par$lambda1[1],"lambda2",cs@par$lambda2[1],"\n")
+  if (verbose==T) {
+    cat("  fit: lambda1",cs@par$lambda1[1],"lambda2",cs@par$lambda2[1],"\n")
+    cat("  BIC = ",cs@par$value, "\n")
+  }
   return(cs)
 }
 
@@ -1121,19 +1129,16 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
                                                 keyby=c("name","bin2")])
     #
     #fit iota and rho given diagonal decay
-    a=system.time(cs <- binless:::gauss_genomic(cs, cts.common, update.eC=update.eC))
+    a=system.time(cs <- binless:::gauss_genomic(cs, cts.common, update.eC=update.eC, verbose=verbose))
     cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
-    if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     #
     #fit diagonal decay given iota and rho
-    a=system.time(cs <- binless:::gauss_decay(cs, cts.common, update.eC=update.eC))
+    a=system.time(cs <- binless:::gauss_decay(cs, cts.common, update.eC=update.eC, verbose=verbose))
     cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
-    if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
     #
     #fit dispersion
-    a=system.time(cs <- binless:::gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight))
+    a=system.time(cs <- binless:::gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight, verbose=verbose))
     cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
-    if (verbose==T) cat("  log-likelihood = ",cs@par$value,"\n")
     #
     if (fit.signal==T && i > cs@settings$bg.steps) {
       #
@@ -1145,7 +1150,6 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
                                                        fix.lambda2=cs@settings$fix.lambda2,
                                                        fix.lambda2.at=cs@settings$fix.lambda2.at))
       cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
-      if (verbose==T) cat("  BIC = ",cs@par$value, "\n")
     }
     #
     #check for convergence
