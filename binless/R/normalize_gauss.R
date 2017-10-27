@@ -1141,8 +1141,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=
                                                        fix.lambda2=cs@settings$fix.lambda2,
                                                        fix.lambda2.at=cs@settings$fix.lambda2.at))
       cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
-    }
-    if (fit.signal==F || i <= cs@settings$bg.steps+2) {
+    } else {
       #fit diagonal decay
       a=system.time(cs <- binless:::gauss_decay(cs, cts.common, update.eC=update.eC, verbose=verbose))
       cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
