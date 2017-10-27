@@ -599,7 +599,7 @@ fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
                    dangling.R=sum(dangling.R),rejoined=sum(rejoined)),keyby=id]
   counts=counts[id1!=id2,.(pos1=pos1[1],pos2=pos2[1],
                    contact.close=sum(contact.close),contact.down=sum(contact.down),
-                   contact.far=sum(contact.far),contact.up=sum(contact.down)),
+                   contact.far=sum(contact.far),contact.up=sum(contact.up)),
                 keyby=c("id1","id2")]
   counts[,distance:=pos2-pos1]
   #add a count at the extreme corner if necessary to avoid model degeneracies
