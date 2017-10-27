@@ -175,7 +175,7 @@ gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag, shrink
     
     epsilon = Inf
     maxiter = 0
-    betat = array(0,Kdiag+Dsets)
+    betat = array(1,Kdiag+Dsets)
     
     while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
       At = tmp_X_S_m2_X + Kdiag^2*lambda_diag^2*DtD
@@ -386,7 +386,7 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     
     epsilon = Inf
     maxiter = 0
-    beta = Matrix(0,2*Krow)
+    beta = Matrix(1,2*Krow)
     while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
       D = bdiag(lambda_iota*D1,lambda_rho*D1)
       DtD = crossprod(D)
