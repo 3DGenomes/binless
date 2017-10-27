@@ -637,16 +637,7 @@ gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose
 #' @keywords internal
 #' 
 gauss_signal_muhat_mean = function(cs, cts.common) {
-  cts = cts.common[bin1<=bin2]
-  #put in triangular form
-  cts2 = cts.common[bin1>bin2]
-  setnames(cts2,c("bin1","bin2"),c("bin2","bin1"))
-  cts = rbind(cts,cts2)[,.(name,bin1,bin2,dbin,count,lmu.nosig,phi,z,mu,var,log_decay,weight=weight/2)] #each count appears twice
-  rm(cts2)
-  cts = cts[,.(count=weighted.mean(count,weight/var),lmu.nosig=weighted.mean(lmu.nosig,weight/var),
-               z=weighted.mean(z,weight/var),mu=exp(weighted.mean(lmu.nosig+phi,weight/var)),var=1/weighted.mean(1/var,weight),
-               log_decay=weighted.mean(log_decay,weight/var),weight=sum(weight)),
-             keyby=c("name","bin1","bin2","dbin")]
+  cts = cts.common[,.(name,bin1=pmin(bin1,bin2),bin2=pmax(bin1,bin2),count,z,var,lmu.nosig,log_decay,weight=weight/2)]
   stopifnot(cts[,all(bin1<=bin2)])
   return(cts)
 }
@@ -657,8 +648,10 @@ gauss_signal_muhat_mean = function(cs, cts.common) {
 #' @keywords internal
 #' 
 get_signal_metadata = function(cs, cts, resolution) {
+  cts_compressed = cts[,.(weight=sum(weight), z=weighted.mean(z,weight/var),var=1/weighted.mean(1/var,weight)),
+                       keyby=c("name","bin1","bin2")]
   #biases
-  bad.biases=rbind(cts[,.(bin1,bin2,weight,var,z)],cts[,.(bin1=bin2,bin2=bin1,weight,var,z)])[
+  bad.biases=rbind(cts_compressed[,.(bin1,bin2,weight,var,z)],cts_compressed[,.(bin1=bin2,bin2=bin1,weight,var,z)])[
     ,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=bin1]
   bad.biases[,z:=scale(z)]
   bad.biases[,is.out:=-abs(z)<qnorm(cs@settings$qmin)]
@@ -666,8 +659,8 @@ get_signal_metadata = function(cs, cts, resolution) {
   bad.rows=bad.biases[is.out==T,bin1]
   if (bad.biases[,sum(is.out)/.N>0.1]) cat(" Warning: removing ",bad.biases[,100*sum(is.out)/.N],"% of all rows!\n")
   #decay
-  cts[,diag.idx:=unclass(bin2)-unclass(bin1)]
-  bad.decays=cts[,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=diag.idx]
+  cts_compressed[,diag.idx:=unclass(bin2)-unclass(bin1)]
+  bad.decays=cts_compressed[,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=diag.idx]
   bad.decays[,z:=scale(z)]
   bad.decays[,is.out:=-abs(z)<qnorm(cs@settings$qmin)]
   diag.rm = ceiling(cs@settings$dmin/resolution)
@@ -677,8 +670,8 @@ get_signal_metadata = function(cs, cts, resolution) {
   if (bad.decays[,sum(is.out)/.N>0.1]) cat(" Warning: removing ",bad.decays[,100*sum(is.out)/.N],"% of all counter diagonals!\n")
   #orthogonality
   dx = 1.01*(log10(cs@settings$dmax)-log10(cs@settings$dmin))/(cs@settings$Kdiag-3)
-  orth=data.table(diag.idx=0:cts[,max(diag.idx)],
-                  segment=ceiling((log10(0:cts[,max(diag.idx)]*resolution)-log10(cs@settings$dmin))/(dx/2))) #double constraint
+  orth=data.table(diag.idx=0:cts_compressed[,max(diag.idx)],
+                  segment=ceiling((log10(0:cts_compressed[,max(diag.idx)]*resolution)-log10(cs@settings$dmin))/(dx/2))) #double constraint
   orth[,rank:=frank(segment,ties.method = "dense")-1]
   return(list(bad.diagonals=bad.diagonals,bad.rows=bad.rows, diag.grp=orth[,rank]))
 }
