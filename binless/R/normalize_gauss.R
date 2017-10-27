@@ -109,7 +109,7 @@ generate_cubic_spline = function(cutsites, Krow, sparse=F) {
 #' Optimize decay parameters
 #' @keywords internal
 #' 
-gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag, shrink=0.1,
+gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
                                        verbose=T, max_perf_iteration=1000, convergence_epsilon=1e-9) {
   Totalcbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
   #cbegin=c(1,csd[,.(name,row=.I)][name!=shift(name),row],csd[,.N+1])
@@ -168,7 +168,6 @@ gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag, shrink
     tmp_X_S_m2_X = crossprod(Diagonal(x=1/sdl)%*%Xt)
     tmp_X_S_m2_k = t(Xt)%*%S_m2%*%kappa_hat
     DtD = crossprod(Dt)
-    DtD = DtD + max(abs(diag(DtD)))*shrink*Diagonal(dim(DtD)[1])
     diags = list(rep(1,Kdiag), rep(-2,Kdiag))
     C=-bandSparse(Kdiag, Kdiag-1, k=c(0,-1),diagonals=list(diags[[1]],-diags[[1]]))
     Ct=rbind(matrix(0,nrow=Dsets,ncol=Kdiag), cbind(crossprod(X,W),C))
@@ -242,7 +241,7 @@ gauss_decay = function(cs, cts.common, verbose=T, update.eC=T) {
   if (verbose==T) cat(" Decay\n")
   csd = binless:::gauss_decay_muhat_mean(cs, cts.common)
   #run optimization
-  op = binless:::gauss_decay_optimize(csd, cs@design, cs@settings$Kdiag, cs@par$lambda_diag, shrink=100,
+  op = binless:::gauss_decay_optimize(csd, cs@design, cs@settings$Kdiag, cs@par$lambda_diag,
                                             verbose=verbose, max_perf_iteration=cs@settings$iter,
                                             convergence_epsilon = cs@par$tol_decay)
   #restrict tolerance if needed
