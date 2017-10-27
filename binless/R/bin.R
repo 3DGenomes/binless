@@ -41,6 +41,24 @@ iterative_normalization = function(mat, niterations=100, namecol="name", verbose
   binned
 }
 
+#' bin matrix and compute data
+#' @keywords internal
+#' 
+gauss_binning_muhat_mean = function(cs, cts.common) {
+  cts = cts.common[bin1<=bin2]
+  #put in triangular form
+  cts2 = cts.common[bin1>bin2]
+  setnames(cts2,c("bin1","bin2"),c("bin2","bin1"))
+  cts = rbind(cts,cts2)[,.(name,bin1,bin2,dbin,count,lmu.nosig,phi,z,mu,var,log_decay,weight=weight/2)] #each count appears twice
+  rm(cts2)
+  cts = cts[,.(count=weighted.mean(count,weight/var),lmu.nosig=weighted.mean(lmu.nosig,weight/var),
+               z=weighted.mean(z,weight/var),mu=exp(weighted.mean(lmu.nosig+phi,weight/var)),var=1/weighted.mean(1/var,weight),
+               log_decay=weighted.mean(log_decay,weight/var),weight=sum(weight)),
+            keyby=c("name","bin1","bin2","dbin")]
+  stopifnot(cts[,all(bin1<=bin2)])
+  return(cts)
+}
+
 #' Perform binning of data
 #' 
 #' fast IRLS and zero counts approximation
@@ -126,7 +144,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   #predict means, put in triangular form, add biases, and add signal column if absent
   if (verbose==T) cat("   Predict means\n")
   cts.common = binless:::gauss_common_muhat_mean(cs, zeros, sbins)
-  cts = binless:::gauss_signal_muhat_mean(cs, cts.common)
+  cts = binless:::gauss_binning_muhat_mean(cs, cts.common)
   eCmat = cs@design[,.(name,eC=cs@par$eC)]
   cts = merge(cts, eCmat, by="name")
   cts[,log_bias:=lmu.nosig-log_decay-eC]
