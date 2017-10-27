@@ -284,6 +284,7 @@ gauss_genomic_muhat_mean = function(cs, cts.common) {
 
 gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
                                          original_lambda_iota, original_lambda_rho, verbose=T,
+                                         center_all_bins = T,
                                          max_perf_iteration=1000, convergence_epsilon=1e-5) {
   XB = as.array(design[,genomic])
   
@@ -311,9 +312,11 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     cutsites = biases[,pos][bbegin[1]:(bbegin[2]-1)]
     Bsp = generate_cubic_spline(cutsites, Krow, sparse=T)
     X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
-    if (length(sbins)<=2) {
+    if (length(sbins)<=2 || center_all_bins == F) {
+      cat("   one centering constraint\n")
       centering=Matrix(rep(1,SD),ncol=1)
     } else {
+      cat("   ",length(sbins)-1," centering constraints\n")
       sbinned=biases[bbegin[1]:(bbegin[2]-1), cut(pos, sbins, ordered_result=T,
                                                   right=F, include.lowest=T,dig.lab=12)]
       centering=Matrix(model.matrix(~ 0+sbinned))
@@ -522,7 +525,8 @@ gauss_genomic = function(cs, cts.common, verbose=T, update.eC=T) {
   a = binless:::gauss_genomic_muhat_mean(cs, cts.common)
   #run optimization
   op = binless:::gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, cs@settings$sbins,
-                                              cs@par$lambda_iota, cs@par$lambda_rho, verbose=verbose,
+                                              cs@par$lambda_iota, cs@par$lambda_rho,
+                                              center_all_bins = update.eC, verbose=verbose,
                                               max_perf_iteration=cs@settings$iter,
                                               convergence_epsilon=cs@par$tol_genomic)
   #restrict tolerance if needed
