@@ -166,7 +166,7 @@ update_diagnostics = function(cs, step, leg, runtime) {
 #' @examples
 get_all_values = function(cs, param, trans) {
   #get value in tmp as vector of lists, remove NULL lists
-  legs=c("bias","decay","disp","signal")
+  legs=c("bias","decay","signal","disp")
   if (!(param %in% names(cs@diagnostics$param))) return(data.table())
   values=cs@diagnostics$params[,.(step,leg=ordered(leg,legs),tmp=get(param))][!sapply(tmp,is.null)]
   values[,step:=step+((unclass(leg)-1)%%8)/8]
