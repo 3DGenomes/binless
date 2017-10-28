@@ -47,9 +47,6 @@ iterative_normalization = function(mat, niterations=100, namecol="name", verbose
 #'
 #' @param cts
 #' @param dispersion
-#' @param ncores integer. Number of cores for zero binning
-#' @param niter integer. Maximum number of IRLS iterations
-#' @param tol numeric. Convergence tolerance for IRLS objective
 #' @param verbose boolean.
 #'
 #' @return
@@ -57,7 +54,7 @@ iterative_normalization = function(mat, niterations=100, namecol="name", verbose
 #' @export
 #'
 #' @examples
-predict_binned_matrices_irls = function(cts, dispersion, ncores=1, niter=100, tol=1e-3, verbose=T) {
+predict_binned_matrices_irls = function(cts, dispersion, verbose=T) {
   #matrices
   if (verbose==T) cat("   Other matrices\n")
   cts[,c("decay","biases","mu.nosig"):=list(exp(log_decay),exp(log_bias),exp(lmu.nosig))]
@@ -79,14 +76,14 @@ predict_binned_matrices_irls = function(cts, dispersion, ncores=1, niter=100, to
 #' @param resolution integer. The desired resolution of the matrix.
 #' @param group The type of grouping to be performed. Any combination of the given arguments is possible.
 #' @param verbose
-#' @param ncores integer. The number of cores to parallelize on.
+#' @param ncores integer. The number of cores to parallelize the zeros calculation on.
 #'
 #' @return CSnorm object
 #' @export
 #'
 #' @examples
 group_datasets = function(cs, resolution, group=c("condition","replicate","enzyme","experiment"),
-                          verbose=T, ncores=1, niter=100, tol=cs@settings$tol) {
+                          verbose=T, ncores=1) {
   ### fetch and check inputs
   if (group!="all") group=match.arg(group, several.ok=T)
   if (get_cs_group_idx(cs, resolution=resolution, group=group, raise=F)>0)
@@ -130,7 +127,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   setkeyv(cts,c("name","bin1","bin2"))
   #
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
-  mat = predict_binned_matrices_irls(copy(cts), cs@par$alpha, ncores=ncores, niter=niter, tol=tol, verbose=verbose)
+  mat = predict_binned_matrices_irls(copy(cts), cs@par$alpha, verbose=verbose)
   setkey(mat,name,bin1,bin2)
   #
   if (verbose==T) cat("*** write begin/end positions\n")
@@ -150,8 +147,8 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
 #' @export
 #' 
 #' @examples
-bin_all_datasets = function(cs, resolution=10000, ncores=1, verbose=T, niter=100, tol=cs@settings$tol) {
-  group_datasets(cs, resolution=resolution, group="all", ncores=ncores, verbose=verbose, niter=niter)
+bin_all_datasets = function(cs, resolution=cs@settings$base.res, ncores=1, verbose=T) {
+  group_datasets(cs, resolution=resolution, group="all", ncores=ncores, verbose=verbose)
 }
 
 #' Generate iota and rho genomic biases on evenly spaced points along the genome
