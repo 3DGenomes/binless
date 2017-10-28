@@ -89,18 +89,7 @@ get_interactions = function(cs, type, resolution, group, threshold=-1, ref=NULL)
   csg=cs@groups[[idx1]]
   idx2=get_cs_interaction_idx(csg, type, threshold, ref)
   mat=csg@interactions[[idx2]]@mat
-  bin1.begin=mat[,bin1]
-  bin1.end=mat[,bin1]
-  bin2.begin=mat[,bin2]
-  bin2.end=mat[,bin2]
-  levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[][,)]")[[2]]
-  levels(bin1.end) <- tstrsplit(as.character(levels(bin1.end)), "[][,)]")[[3]]
-  levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[][,)]")[[2]]
-  levels(bin2.end) <- tstrsplit(as.character(levels(bin2.end)), "[][,)]")[[3]]
-  mat[,begin1:=as.integer(as.character(bin1.begin))]
-  mat[,end1:=as.integer(as.character(bin1.end))]
-  mat[,begin2:=as.integer(as.character(bin2.begin))]
-  mat[,end2:=as.integer(as.character(bin2.end))]
+  mat = add_bin_begin_and_end(mat)
   return(mat)
 }
 
@@ -200,3 +189,26 @@ get_all_values = function(cs, param, trans) {
   setkey(melted,variable,step,leg)
   melted
 }
+
+#' Add begin and end for a binned matrix
+#'
+#' @keywords internal
+#' @export
+#'
+#' @examples
+add_bin_begin_and_end = function(mat) {
+  bin1.begin=mat[,bin1]
+  bin1.end=mat[,bin1]
+  bin2.begin=mat[,bin2]
+  bin2.end=mat[,bin2]
+  levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[][,)]")[[2]]
+  levels(bin1.end) <- tstrsplit(as.character(levels(bin1.end)), "[][,)]")[[3]]
+  levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[][,)]")[[2]]
+  levels(bin2.end) <- tstrsplit(as.character(levels(bin2.end)), "[][,)]")[[3]]
+  mat[,begin1:=as.integer(as.character(bin1.begin))]
+  mat[,end1:=as.integer(as.character(bin1.end))]
+  mat[,begin2:=as.integer(as.character(bin2.begin))]
+  mat[,end2:=as.integer(as.character(bin2.end))]
+  return(mat)
+}
+

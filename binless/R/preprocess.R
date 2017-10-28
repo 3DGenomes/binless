@@ -122,10 +122,7 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
     counts[bin1==min(bin1)&bin2==max(bin2),observed:=observed+as.integer(1)] #otherwise fitted decay can be degenerate
   }
   #
-  counts[,begin1:=do.call(as.integer, tstrsplit(as.character(bin1), "[[,]")[2])]
-  counts[,end1:=do.call(as.integer, tstrsplit(as.character(bin1), "[],)]")[2])]
-  counts[,begin2:=do.call(as.integer, tstrsplit(as.character(bin2), "[[,]")[2])]
-  counts[,end2:=do.call(as.integer, tstrsplit(as.character(bin2), "[],)]")[2])]
+  counts = add_bin_begin_and_end(counts)
   return(counts)
 }
 

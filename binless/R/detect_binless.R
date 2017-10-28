@@ -454,12 +454,7 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
 plot_binless_matrix = function(mat, upper="phi", lower="phi", facet="name") {
   if (!("begin1" %in% names(mat) && "begin2" %in% names(mat))) {
     if (mat[,is.factor(bin1)] && mat[,is.factor(bin2)]) {
-      bin1.begin=mat[,bin1]
-      bin2.begin=mat[,bin2]
-      levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[][,)]")[[2]]
-      levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[][,)]")[[2]]
-      mat[,begin1:=as.integer(as.character(bin1.begin))]
-      mat[,begin2:=as.integer(as.character(bin2.begin))]
+      mat = add_bin_begin_and_end(mat)
       bin1="begin1"
       bin2="begin2"
     } else {

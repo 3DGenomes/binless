@@ -23,7 +23,6 @@ detect_binned_interactions = function(cs, resolution, group, threshold=0.95, nco
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
-  #check if interaction wasn't calculated already
   if (get_cs_interaction_idx(csg, type="CSsig", threshold=threshold, raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
   cts = copy(csg@cts)
@@ -92,7 +91,7 @@ detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95,
   #replicate reference counts for each case
   cts[,c("mu.nosig"):=list(exp(lmu.nosig))]
   ctsref = foreach(n=cts[name!=ref,unique(name)],.combine=rbind) %do%
-    cts[name==ref,.(name=n,bin1,bin2,count,mu,weight,mu.nosig)]
+    cts[name==ref,.(name=n,bin1,bin2,count,weight,mu.nosig)]
   cts=cts[name!=ref]
   #IRLS iteration
   mat=cts[,.(phi.ref=0,delta=0,diffsig=1),by=c("name","bin1","bin2")]
