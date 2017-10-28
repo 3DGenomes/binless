@@ -452,13 +452,30 @@ detect_binless_differences = function(cs, resolution, group, ref, ncores=1, tol.
 #'
 #' @examples
 plot_binless_matrix = function(mat, upper="phi", lower="phi", facet="name") {
-  bin1 = ifelse("begin1" %in% names(mat), "begin1", "bin1")
-  bin2 = ifelse("begin2" %in% names(mat), "begin2", "bin2")
+  if (!("begin1" %in% names(mat) && "begin2" %in% names(mat))) {
+    if (mat[,is.factor(bin1)] && mat[,is.factor(bin2)]) {
+      bin1.begin=mat[,bin1]
+      bin2.begin=mat[,bin2]
+      levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[][,)]")[[2]]
+      levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[][,)]")[[2]]
+      mat[,begin1:=as.integer(as.character(bin1.begin))]
+      mat[,begin2:=as.integer(as.character(bin2.begin))]
+      bin1="begin1"
+      bin2="begin2"
+    } else {
+      bin1="bin1"
+      bin2="bin2"
+    }
+  } else {
+    bin1="begin1"
+    bin2="begin2"
+  }
   p=ggplot(mat)+geom_raster(aes_string(bin1,bin2,fill=upper))+
                 geom_raster(aes_string(bin2,bin1,fill=lower))+
       scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value = "white")+
-      coord_fixed()
+      coord_fixed()+theme(panel.background=element_blank(), axis.text.x = element_text(angle = 90, hjust = 1))+
+      scale_x_continuous(expand=c(0,0)) + scale_y_continuous(expand=c(0,0))
   if (facet %in% names(mat)) p = p + facet_wrap(facet)
   print(p)
-  return(p)
+  invisible(p)
 }
