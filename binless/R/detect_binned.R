@@ -19,7 +19,7 @@ NULL
 #' 
 #' @examples
 detect_binned_interactions = function(cs, resolution, group, threshold=0.95, ncores=1,
-                                      niter=100, tol=1e-3, verbose=T){
+                                      niter=100, tol=cs@settings$tol, verbose=T){
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
@@ -37,7 +37,7 @@ detect_binned_interactions = function(cs, resolution, group, threshold=0.95, nco
     cts[,phihat:=weighted.mean(z+log(signal), weight/var),by=c("name","bin1","bin2")]
     cts[,sigmasq:=1/sum(weight/var),by=c("name","bin1","bin2")]
     cts[,signal:=exp(phihat/(1+sigmasq/prior.sd^2))]
-    if(cts[,all(abs(signal-signal.old)<tol)]) break
+    if(cts[, max(abs(signal-signal.old))/(max(signal)-min(signal)) < tol ]) break
   }
   if (i==niter) cat("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
   #
@@ -72,7 +72,7 @@ detect_binned_interactions = function(cs, resolution, group, threshold=0.95, nco
 #' 
 #' @examples
 detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95, ncores=1,
-                                     niter=100, tol=1e-3, verbose=T){
+                                     niter=100, tol=cs@settings$tol, verbose=T){
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
@@ -117,7 +117,7 @@ detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95,
     mat[,delta:=deltahat/(1+(sigmasq.ref+sigmasq)/prior.sd^2)]
     mat[,diffsig.old:=diffsig]
     mat[,diffsig:=exp(delta)]
-    if(mat[,all(abs(diffsig-diffsig.old)<tol)]) break
+    if(mat[, max(abs(diffsig-diffsig.old))/(max(diffsig)-min(diffsig.old)) < tol]) break
   }
   if (i==niter) message("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
   #
