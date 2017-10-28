@@ -989,9 +989,9 @@ initial_guess_decay = function(cs, cts.common, pseudocount=1e-2) {
 #' Cleanup a CSnorm object, store settings and populate it with initial guesses of all required parameters
 #' @keywords internal
 #' 
-fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
-                       bg.steps=5, iter=100, fit.signal=T, verbose=T, ncounts=100000, init.dispersion=10,
-                       tol=1e-2, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
+fresh_start = function(cs, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, base.res=5000,
+                       bg.steps=5, iter=100, fit.signal=T, verbose=T, ncounts=100000, init.dispersion=1,
+                       tol=1e-1, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
     #fresh start
     cs@par=list() #in case we have a weird object
     cs@groups=list()
@@ -1078,10 +1078,10 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.
 #' 
 #' @examples
 #' 
-run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=20, bins_per_bf=10, base.res=10000,
-                     ngibbs = 20, bg.steps=5, iter=100, fit.signal=T,
-                     verbose=T, ncounts=100000, init.dispersion=10,
-                     tol=1e-2, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
+run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, base.res=5000,
+                     ngibbs = 15, bg.steps=5, iter=100, fit.signal=T,
+                     verbose=T, ncounts=100000, init.dispersion=1,
+                     tol=1e-1, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
