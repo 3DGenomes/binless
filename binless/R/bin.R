@@ -41,24 +41,6 @@ iterative_normalization = function(mat, niterations=100, namecol="name", verbose
   binned
 }
 
-#' bin matrix and compute data
-#' @keywords internal
-#' 
-gauss_binning_muhat_mean = function(cs, cts.common) {
-  cts = cts.common[bin1<=bin2]
-  #put in triangular form
-  cts2 = cts.common[bin1>bin2]
-  setnames(cts2,c("bin1","bin2"),c("bin2","bin1"))
-  cts = rbind(cts,cts2)[,.(name,bin1,bin2,dbin,count,lmu.nosig,phi,z,mu,var,log_decay,weight=weight/2)] #each count appears twice
-  rm(cts2)
-  cts = cts[,.(count=weighted.mean(count,weight/var),lmu.nosig=weighted.mean(lmu.nosig,weight/var),
-               z=weighted.mean(z,weight/var),mu=exp(weighted.mean(lmu.nosig+phi,weight/var)),var=1/weighted.mean(1/var,weight),
-               log_decay=weighted.mean(log_decay,weight/var),weight=sum(weight)),
-            keyby=c("name","bin1","bin2","dbin")]
-  stopifnot(cts[,all(bin1<=bin2)])
-  return(cts)
-}
-
 #' Perform binning of data
 #' 
 #' fast IRLS and zero counts approximation
@@ -78,32 +60,16 @@ gauss_binning_muhat_mean = function(cs, cts.common) {
 predict_binned_matrices_irls = function(cts, dispersion, ncores=1, niter=100, tol=1e-3, verbose=T) {
   #matrices
   if (verbose==T) cat("   Other matrices\n")
-  cts[,c("decay","biases"):=list(exp(log_decay),exp(log_bias))]
+  cts[,c("decay","biases","mu.nosig"):=list(exp(log_decay),exp(log_bias),exp(lmu.nosig))]
   mat=cts[,.(ncounts=sum(weight),
              observed=sum(count*weight),
-             biasmat=sum(biases*weight)/sum(weight),
-             decaymat=sum(decay*weight)/sum(weight),
-             expected=sum(mu*weight),
-             expected.sd=sqrt(sum((mu+mu^2/dispersion)*weight)),
-             residual=sum(count*weight)/sum(mu*weight))
+             biasmat=weighted.mean(biases,weight),
+             decaymat=weighted.mean(decay,weight),
+             background=sum(mu.nosig*weight),
+             background.sd=sqrt(sum((mu.nosig+mu.nosig^2/dispersion)*weight)),
+             residual=sum(count*weight)/sum(mu*weight),
+             normalized=sum(count*weight)/sum(exp(lmu.nosig-log_decay)*weight))
           ,keyby=c("name","bin1","bin2")]
-  #signal matrix
-  if (verbose==T) cat("   Signal matrix\n")
-  cts[,c("signal","mu.nosig"):=list(1,exp(lmu.nosig))]
-  for (i in 1:niter) {
-    cts[,c("z","var","signal.old"):=list(count/(signal*mu.nosig)-1,(1/(signal*mu.nosig)+1/dispersion),signal)]
-    cts[,signal:=exp(weighted.mean(z+log(signal), weight/var)),by=c("name","bin1","bin2")]
-    cts[,signal.sd:=signal[1]*sqrt(1/sum(weight/var)),by=c("name","bin1","bin2")]
-    if(cts[,all(abs(signal-signal.old)<tol)]) break
-  }
-  if (i==niter) cat("Warning: Maximum number of IRLS iterations reached for signal estimation!\n")
-  mats = cts[,.(signal=signal[1],signal.sd=signal.sd[1]),keyby=c("name","bin1","bin2")]
-  #normalized matrix
-  if (verbose==T) cat("   'Normalized' matrix\n")
-  mat=mat[mats]
-  mat[,normalized:=signal*decaymat]
-  mat[,normalized.sd:=signal.sd*decaymat]
-  mat[observed==0,c("signal","normalized","signal.sd","normalized.sd"):=list(0,0,NA,NA)]
   return(mat)
 }
 
@@ -144,7 +110,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   #predict means, put in triangular form, add biases, and add signal column if absent
   if (verbose==T) cat("   Predict means\n")
   cts.common = binless:::gauss_common_muhat_mean(cs, zeros, sbins)
-  cts = binless:::gauss_binning_muhat_mean(cs, cts.common)
+  cts = binless:::gauss_signal_muhat_mean(cs, cts.common)
   eCmat = cs@design[,.(name,eC=cs@par$eC)]
   cts = merge(cts, eCmat, by="name")
   cts[,log_bias:=lmu.nosig-log_decay-eC]
@@ -168,18 +134,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   setkey(mat,name,bin1,bin2)
   #
   if (verbose==T) cat("*** write begin/end positions\n")
-  bin1.begin=mat[,bin1]
-  bin1.end=mat[,bin1]
-  bin2.begin=mat[,bin2]
-  bin2.end=mat[,bin2]
-  levels(bin1.begin) <- tstrsplit(as.character(levels(bin1.begin)), "[][,)]")[[2]]
-  levels(bin1.end) <- tstrsplit(as.character(levels(bin1.end)), "[][,)]")[[3]]
-  levels(bin2.begin) <- tstrsplit(as.character(levels(bin2.begin)), "[][,)]")[[2]]
-  levels(bin2.end) <- tstrsplit(as.character(levels(bin2.end)), "[][,)]")[[3]]
-  mat[,begin1:=as.integer(as.character(bin1.begin))]
-  mat[,end1:=as.integer(as.character(bin1.end))]
-  mat[,begin2:=as.integer(as.character(bin2.begin))]
-  mat[,end2:=as.integer(as.character(bin2.end))]
+  mat = add_bin_begin_and_end(mat)
   ### store matrices
   csg=new("CSgroup", mat=mat, interactions=list(), resolution=resolution, group=group,
           cts=cts, par=list(alpha=cs@par$alpha, dmin=cs@settings$dmin, nbins=length(sbins)-1, sbins=sbins),

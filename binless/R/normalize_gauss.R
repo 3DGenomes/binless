@@ -633,7 +633,8 @@ gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose
 #' @keywords internal
 #' 
 gauss_signal_muhat_mean = function(cs, cts.common) {
-  cts = cts.common[,.(name,bin1=pmin(bin1,bin2),bin2=pmax(bin1,bin2),count,z,var,lmu.nosig,log_decay,weight=weight/2)]
+  cts = cts.common[,.(name,bin1=pmin(bin1,bin2),bin2=pmax(bin1,bin2),count,z,var,mu,lmu.nosig,
+                      log_decay,log_bias,weight=weight/2)]
   stopifnot(cts[,all(bin1<=bin2)])
   return(cts)
 }
