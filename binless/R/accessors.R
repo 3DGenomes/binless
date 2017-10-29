@@ -67,21 +67,15 @@ get_cs_interaction_idx = function(csg, type, threshold=-1, ref=NULL, raise=T) {
 #' @export
 #' 
 #' @examples
-get_matrices = function(cs, resolution, group) {
+get_binned_matrices = function(cs, resolution, group) {
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csb=cs@groups[[idx1]]
   return(csb@mat)
 }
 
-
 #' Fetch detected interactions from CSnorm object
 #' 
-#' @param type character. Either "interactions" or "differences"
-#' @inheritParams get_matrices
-#' @param ref character. The 
-#' @param threshold 
-#' @return a data.table containing the interactions
-#' @export
+#' @keywords internal
 #' 
 #' @examples
 get_interactions = function(cs, type, resolution, group, threshold=-1, ref=NULL) {
@@ -89,7 +83,69 @@ get_interactions = function(cs, type, resolution, group, threshold=-1, ref=NULL)
   csg=cs@groups[[idx1]]
   idx2=get_cs_interaction_idx(csg, type, threshold, ref)
   mat=copy(csg@interactions[[idx2]]@mat)
-  mat = merge(csg@mat,mat,by=c("name","bin1","bin2","ncounts"))
+  mat = merge(csg@mat,mat,by=c("name","bin1","bin2"))
+  return(mat)
+}
+
+#' Fetch binned interactions from CSnorm object
+#' 
+#' @inheritParams get_binned_matrices
+#' 
+#' @return a data.table containing the interactions
+#' @export
+#' 
+#' @examples
+get_binned_interactions = function(cs, resolution, group, threshold=0.95) {
+  type="CSsig"
+  ref=NULL
+  mat=get_interactions(cs, type, resolution, group, threshold, ref)
+  return(mat)
+}
+
+#' Fetch binless interactions from CSnorm object
+#' 
+#' @inheritParams get_binned_matrices
+#' 
+#' @return a data.table containing the interactions
+#' @export
+#' 
+#' @examples
+get_binless_interactions = function(cs, resolution, group) {
+  type="CSbsig"
+  ref=NULL
+  threshold=-1
+  mat=get_interactions(cs, type, resolution, group, threshold, ref)
+  mat[,c("signal","binless"):=list(exp(phi),exp(phi)*decaymat)]
+  return(mat)
+}
+
+#' Fetch binned differences from CSnorm object
+#' 
+#' @inheritParams get_binned_matrices
+#' 
+#' @return a data.table containing the differences
+#' @export
+#' 
+#' @examples
+get_binned_differences = function(cs, resolution, group, ref, threshold=0.95) {
+  type="CSdiff"
+  mat=get_interactions(cs, type, resolution, group, threshold, ref)
+  return(mat)
+}
+
+#' Fetch binless differences from CSnorm object
+#' 
+#' @inheritParams get_binned_matrices
+#' 
+#' @return a data.table containing the differences
+#' @export
+#' 
+#' @examples
+get_binless_differences = function(cs, resolution, group, ref) {
+  type="CSbdiff"
+  threshold=-1
+  mat=get_interactions(cs, type, resolution, group, threshold, ref)
+  mat[,difference:=exp(delta)]
   return(mat)
 }
 
