@@ -88,8 +88,8 @@ get_interactions = function(cs, type, resolution, group, threshold=-1, ref=NULL)
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
   idx2=get_cs_interaction_idx(csg, type, threshold, ref)
-  mat=csg@interactions[[idx2]]@mat
-  mat = add_bin_begin_and_end(mat)
+  mat=copy(csg@interactions[[idx2]]@mat)
+  mat = merge(csg@mat,mat,by=c("name","bin1","bin2","ncounts"))
   return(mat)
 }
 
