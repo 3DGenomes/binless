@@ -244,8 +244,8 @@ fused_lasso = function(csig, positive, fixed, constrained, verbose=T, fix.lambda
 #' @keywords internal
 get_signal_matrix = function(cs, resolution=cs@settings$base.res, groups=cs@experiments[,.(name,groupname=name)]) {
   #build signal matrix
-  if (cs@par$signal[,.N]==0) {
-    sbins=seq(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1+resolution],resolution)
+  if (resolution >= cs@biases[,max(pos)-min(pos)]) {
+    sbins=c(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1])
     signal.bins=unique(cut(c(sbins,head(sbins,n=-1)+resolution/2), sbins,
                            ordered_result=T, right=F, include.lowest=T,dig.lab=12))
     mat=CJ(name=groups[,groupname],bin1=signal.bins,bin2=signal.bins,sorted=F,unique=F)[bin2>=bin1]
