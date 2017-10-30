@@ -37,6 +37,7 @@
 #' @import foreach
 #' @import matrixStats
 #' @import ggplot2
+#' @import scales
 #' @import MASS
 #' @import Matrix
 #' @import quadprog
