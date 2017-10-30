@@ -45,10 +45,10 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
   #   info=as.data.table(state[c("lambda2","lambda1","eCprime","dof","BIC","BIC.sd","converged","dset")])
   #   cbind(mat,info)
   # }
-  #ggplot(dt3[,.SD[1],by=c("lambda2","dset")])+geom_point(aes(lambda2,BIC,colour=converged,group=dset))+facet_grid(dset~., scales="free_y")#+scale_y_log10()
-  #ggplot(dt3[,.SD[1],by=c("lambda2","dset")])+geom_line(aes(lambda2,BIC,colour=converged,group=dset))+geom_errorbar(aes(lambda2,ymin=BIC-BIC.sd,ymax=BIC+BIC.sd,colour=converged))+facet_grid(dset~., scales="free_y")#+scale_y_log10()
-  #ggplot(dt3[,.SD[BIC==min(BIC)],by=c("dset")])+geom_raster(aes(bin1,bin2,fill=pmin(phihat,3)))+geom_raster(aes(bin2,bin1,fill=beta))+facet_wrap(~dset)+coord_fixed()+scale_fill_gradient2()
-  #ggplot(dt3[,.SD[abs(lambda2-1)==min(abs(lambda2-1))],by=c("dset")])+geom_raster(aes(bin1,bin2,fill=pmin(phihat,3)))+geom_raster(aes(bin2,bin1,fill=beta))+facet_wrap(~dset)+coord_fixed()+scale_fill_gradient2()
+  # ggplot(dt3[,.SD[1],by=c("lambda2","dset")])+geom_point(aes(lambda2,BIC,colour=converged,group=dset))+facet_grid(dset~., scales="free_y")#+scale_y_log10()
+  # ggplot(dt3[,.SD[1],by=c("lambda2","dset")])+geom_line(aes(lambda2,BIC,colour=converged,group=dset))+geom_errorbar(aes(lambda2,ymin=BIC-BIC.sd,ymax=BIC+BIC.sd,colour=converged))+facet_grid(dset~., scales="free_y")#+scale_y_log10()
+  # ggplot(dt3[,.SD[BIC==min(BIC)],by=c("dset")])+geom_raster(aes(bin1,bin2,fill=pmin(phihat,3)))+geom_raster(aes(bin2,bin1,fill=beta))+facet_wrap(~dset)+coord_fixed()+scale_fill_gradient2()
+  # ggplot(dt3[,.SD[abs(lambda2-1)==min(abs(lambda2-1))],by=c("dset")])+geom_raster(aes(bin1,bin2,fill=pmin(phihat,3)))+geom_raster(aes(bin2,bin1,fill=beta))+facet_wrap(~dset)+coord_fixed()+scale_fill_gradient2()
   # ggplot(dt3[dset==levels(dset)[1]])+geom_raster(aes(bin1,bin2,fill=pmin(phihat,3)))+geom_raster(aes(bin2,bin1,fill=beta))+facet_wrap(~factor(lambda2))+coord_fixed()+scale_fill_gradient2()
    
   # scores=rbind(dt3all[resolution=="5k",.SD[1],by=c("lambda2","dset","resolution")],
@@ -125,12 +125,12 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
 optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA) {
   obj = function(x) {
     csig@state <<- binless:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
-    #cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
-    #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
+    cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
+        " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
   }
   #first, find rough minimum between 2.5 and 100
-  minlambda=2.5
+  minlambda=0.1
   maxlambda=100
   op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
   lambda2=10^op$minimum
