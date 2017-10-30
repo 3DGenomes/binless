@@ -156,8 +156,9 @@ optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixe
     #finally, find minimum + SD
     optBIC=csig@state$BIC+n.SD*csig@state$BIC.sd
     minlambda=lambda2
-    maxlambda=csig@state$l2vals[lambda2>minlambda&BIC>optBIC,min(lambda2)]
-    if (is.infinite(maxlambda)) maxlambda=100
+    setkey(csig@state$l2vals,lambda2)
+    maxlambda=csig@state$l2vals[lambda2>minlambda&BIC>optBIC,lambda2[1]]
+    if (length(maxlambda)==0 || is.na(maxlambda)) maxlambda=100
     obj2 = function(x) {
       a=obj(x)
       return(a+2*abs(optBIC-a))
