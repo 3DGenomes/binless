@@ -47,12 +47,22 @@ foreach (resolution=c(5000,10000),.errorhandling = "pass") %do% {
 }
 
 if (F) {
-  subs=c("SELP_150k","Peak1_450k","ADAMTS2_450k","PARM1_600k","Tbx19_700k","SEMA3C_1M", "FOXP1_1.3M",
-         "TBX3_1.5M","Comparison_1.7M")
+  subs=c("SELP_150k","Peak1_450k","ADAMTS2_450k","PARM1_600k","Tbx19_700k","SEMA3C_1M", "Fig1C_1M","FOXP1_1.3M","TBX3_1.5M",
+         "Comparison_1.7M","22qter_1.7M", "Talk_2M", "ADAMTS1_2.3M")
+  
+  #check convergence
+  info = foreach(sub=subs,.combine=rbind,.errorhandling="remove") %dopar% {
+    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
+    data.table(ori=sub,has.converged=binless:::has_converged(cs),#run=run,
+               runtime=cs@diagnostics$params[,sum(runtime)],nsteps=cs@diagnostics$params[,max(step)],
+               name=cs@experiments[,name],
+               lambda1=cs@par$lambda1,lambda2=cs@par$lambda2,eCprime=cs@par$eCprime,lambda_diag=cs@par$lambda_diag)#,
+  }
+  info
   
   #plot last signal
   info = foreach(sub=subs, .combine=rbind, .errorhandling="remove") %dopar% {
-    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base10k_dfuse",5,"_qmin_",0.01,"_stripped.RData"))
+    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
     ggplot(cs@par$signal)+geom_raster(aes(bin1,bin2,fill=phi))+
       geom_raster(aes(bin2,bin1,fill=pmin(phihat,3)))+facet_wrap(~name)+
       scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white")+

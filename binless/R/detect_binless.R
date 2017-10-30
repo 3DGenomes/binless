@@ -124,27 +124,50 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
 #' @keywords internal
 optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA) {
   obj = function(x) {
-    csig@state <<- binless:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
-    cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
-        " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " dof= ",csig@state$dof,"\n")
+    l2vals = csig@state$l2vals
+    ret = binless:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+    ret$l2vals = rbind(csig@state$l2vals,data.table(lambda2=10^(x),BIC=ret$BIC,BIC.sd=ret$BIC.sd))
+    csig@state <<- ret
+    #cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
+    #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " BIC.sd= ", csig@state$BIC.sd, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
   }
-  #first, find rough minimum between 2.5 and 100
-  minlambda=0.1
+  #first, find rough minimum between 2.5 and 100 by gridding
+  minlambda=2.5
   maxlambda=100
+  npoints=10
+  lvals=10^seq(log10(minlambda),log10(maxlambda),length.out=npoints)
+  op = foreach (lam=lvals,.combine=rbind) %do% obj(log10(lam))
+  op = copy(csig@state$l2vals)
+  setkey(op,lambda2)
+  #ggplot(op)+geom_point(aes(lambda2,BIC))+geom_errorbar(aes(lambda2,ymin=BIC-BIC.sd,ymax=BIC+BIC.sd))+scale_x_log10()+scale_y_log10()
+  #now find the lowest minimum and extract flanking values
+  l2min=op[BIC==min(BIC),min(lambda2)]
+  minlambda=op[lambda2<=l2min][.N-1,lambda2]
+  if (length(minlambda)==0 || is.na(minlambda)) minlambda=l2min
+  maxlambda=op[lambda2>=l2min][2,lambda2]
+  if (length(maxlambda)==0 || is.na(maxlambda)) maxlambda=l2min
+  #cat("minlambda ",minlambda," maxlambda ",maxlambda,"\n")
+  stopifnot(maxlambda>minlambda)
+  #optimize there
   op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
   lambda2=10^op$minimum
   if (n.SD>0) {
     #finally, find minimum + SD
-    minlambda=lambda2
-    maxlambda=100
     optBIC=csig@state$BIC+n.SD*csig@state$BIC.sd
+    minlambda=lambda2
+    maxlambda=csig@state$l2vals[lambda2>minlambda&BIC>optBIC,min(lambda2)]
+    if (is.infinite(maxlambda)) maxlambda=100
     obj2 = function(x) {
       a=obj(x)
       return(a+2*abs(optBIC-a))
     }
-    op<-optimize(obj2, c(log10(minlambda),log10(maxlambda)), tol=0.1)
-    lambda2=10^op$minimum
+    if (minlambda==maxlambda) {
+      lambda2=minlambda
+    } else {
+      op<-optimize(obj2, c(log10(minlambda),log10(maxlambda)), tol=0.1)
+      lambda2=10^op$minimum
+    }
   }
   #finish
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
@@ -153,6 +176,7 @@ optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixe
   retvals = as.list(csig@state)[c("lambda2","lambda1","eCprime","BIC","BIC.sd","dof")]
   if (fixed==T && abs(retvals$eCprime)>csig@settings$tol.val) cat("Warning: fixed = T but eCprime != 0\n") #only when fix.lambda1==F
   csig@par=modifyList(csig@par,retvals)
+  csig@state$l2vals=NULL
   return(csig)
 }
 

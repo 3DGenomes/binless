@@ -679,6 +679,7 @@ get_signal_metadata = function(cs, cts, resolution) {
 gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.lambda1.at=NA,
                                fix.lambda2=F, fix.lambda2.at=NA) {
   if (verbose==T) cat(" Signal\n")
+  #cts.common = binless:::gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   cts = binless:::gauss_signal_muhat_mean(cs, cts.common)
   metadata = binless:::get_signal_metadata(cs, cts, cs@settings$base.res)
   #
