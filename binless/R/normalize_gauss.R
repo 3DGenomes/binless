@@ -1015,7 +1015,7 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, base.
     decay[,c("dist","log_decay"):=list(NULL,0)]
     cs@par=list(eC=array(0,cs@experiments[,.N]), eRJ=array(0,cs@experiments[,.N]), eDE=array(0,cs@experiments[,.N]), alpha=init.dispersion,
                 log_iota=array(0,cs@biases[,.N]), log_rho=array(0,cs@biases[,.N]),
-                decay=decay, log_decay=decay[,log_decay], tol_genomic=.1, tol_decay=.1, tol_disp=.1, tol_signal=1)
+                decay=decay, log_decay=0, tol_genomic=.1, tol_decay=.1, tol_disp=.1, tol_signal=1)
     #prepare signal matrix
     if (fit.signal==T) {
       if(verbose==T) cat("Preparing for signal estimation\n")
