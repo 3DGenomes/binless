@@ -1111,6 +1111,7 @@ run_gauss = function(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=
   subcounts = binless:::subsample_counts(cs, ncounts)
   subcounts.weight = merge(cs@zeros[,.(nc=sum(ncross)/4),by=name],subcounts[,.(ns=.N),keyby=name],by="name")[,.(name,wt=nc/ns)]
   #gibbs sampling
+  if (ngibbs==0) return(cs)
   for (i in (laststep + 1:ngibbs)) {
     if (verbose==T) cat("\n### Iteration",i,"\n")
     #
