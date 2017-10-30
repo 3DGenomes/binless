@@ -999,6 +999,7 @@ fresh_start = function(cs, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10, base.
     cs@groups=list()
     cs@diagnostics=list()
     #add settings
+    if (fit.signal==F) base.res = cs@biases[,max(pos)-min(pos)]+2
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
                          bg.steps=bg.steps, iter=iter, init.dispersion=init.dispersion, tol=tol,
