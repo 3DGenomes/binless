@@ -18,7 +18,7 @@ NULL
 #' @export
 #' 
 #' @examples
-detect_binned_interactions = function(cs, resolution, group, threshold=0.95, ncores=1,
+detect_binned_interactions = function(cs, resolution=cs@settings$base.res, group="all", threshold=0.95, ncores=1,
                                       niter=100, tol=cs@settings$tol, verbose=T){
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
@@ -71,7 +71,7 @@ detect_binned_interactions = function(cs, resolution, group, threshold=0.95, nco
 #' @export
 #' 
 #' @examples
-detect_binned_differences = function(cs, resolution, group, ref, threshold=0.95, ncores=1,
+detect_binned_differences = function(cs, ref, resolution=cs@settings$base.res, group="all", threshold=0.95, ncores=1,
                                      niter=100, tol=cs@settings$tol, verbose=T){
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
