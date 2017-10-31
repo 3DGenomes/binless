@@ -1,4 +1,5 @@
 # binless
+
 ## Resolution-independent normalization of Hi-C data
 
 ### Installation
@@ -16,9 +17,8 @@ future.
 
 In the `example/` folder, we provide files to play with, taken from publicly
 available data (Rao *et al.*, 2014). Alternatively you can use your own data.
-Start with something not too large, for example 10Mb. If you want to try it out
-right away, skip to the *Fast binless* section. Otherwise, read on.
-
+Start with something not too large, for example 10Mb. If you want a quick and
+dirty overview, skip to the *Fast binless* section. Otherwise, read on.
 
 ### Preprocessing
 
@@ -36,7 +36,7 @@ point, you will also be able to visualize your data using our **base-resolution
 See `optimized_binless.R`. The resolution-independent normalization is performed
 on the `CSnorm` object you built at the previous step. Once normalized, datasets
 can be combined, and signal and difference detection can be performed.  **This
-is the full-blown version of the algorithm, so you will get statistically
+is the full-blown version of the algorithm, with statistically
 significant output**. Note that this is a beta version, so check for updates
 frequently.
 
@@ -52,7 +52,8 @@ full-blown algorithm. But you can try out a whole chromosome ;)
 ### Questions? Problems?
 
 Please use the GitHub issues tracker to report anything, rather than
-sending me an e-mail.
+sending an e-mail. You can use it to report bugs, ask questions or suggest new
+features. We are looking forward to your feedback!
 
 ### Citation
 
@@ -67,28 +68,27 @@ resolution", *to be submitted*
 [TADbit](https://3dgenomes.github.io/TADbit/index.html) `.tsv`: tab-separated
 text file containing paired-end mapped reads for a single experiment. All lines
 starting with # will be discarded. It has the following columns
-    . `id`: ID of the mapped pair (alphanumeric without spaces)
-    . `chr1`: chromosome of read 1 (alphanumeric without spaces)
-    . `pos1`: position of the 5' end of read 1 (integer)
-    . `strand1`: whether the read maps on the forward (1) or reverse (0)
-    direction
-    . `length1`: how many bases were mapped (integer)
-    . `re.up1`: upstream restriction site closest to pos1 (integer <= pos1)
-    . `re.dn1`: downstream restriction site closest to pos1 (integer > pos1)
-    . `chr2`
-    . `pos2`
-    . `strand2`
-    . `length2`
-    . `re.up2`
-    . `re.dn2`
-
+1. `id`: ID of the mapped pair (alphanumeric without spaces)
+1. `chr1`: chromosome of read 1 (alphanumeric without spaces)
+1. `pos1`: position of the 5' end of read 1 (integer)
+1. `strand1`: whether the read maps on the forward (1) or reverse (0)
+     direction
+1. `length1`: how many bases were mapped (integer)
+1. `re.up1`: upstream restriction site closest to pos1 (integer <= pos1)
+1. `re.dn1`: downstream restriction site closest to pos1 (integer > pos1)
+1. `chr2`
+1. `pos2`
+1. `strand2`
+1. `length2`
+1. `re.up2`
+1. `re.dn2`
 
 Binned raw matrix (used for fast binless): tab or space-separated text file
 containing multiple datasets. The first line is a header that must start with
-`"name" "bin1" "bin2" "observed"`. Optionally, more columns can be added.
-    . `name`: The name of the dataset. Put in "" if you use spaces
-    . `bin1`: the label for the bin on the x axis. Put in "" if you use spaces,
-    for example "[begin1,end1)"
-    . `bin2`: The label for the bin on the y axis
-    .`observed`: How many paired-end reads were mapped within (bin1,bin2)
+`"name" "bin1" "bin2" "observed"`. Optionally, more columns can be added but
+make sure their column names are different.
+1. `name`: The name of the dataset. Put in "" if you use spaces
+1. `bin1`: the label for the bin on the x axis. For example `"[begin1,end1)"`
+1. `bin2`: The label for the bin on the y axis
+1. `observed`: How many paired-end reads were mapped within (bin1,bin2)
 
