@@ -371,7 +371,7 @@ Rcpp::DataFrame fast_binless_difference(const List obs, double lam2, unsigned re
   const unsigned nbins = obs["nbins"];
   const Rcpp::DataFrame mat = Rcpp::as<Rcpp::DataFrame>(obs["mat"]);
   FastDifferenceData out(mat, nbins, ref);
-  auto signal = Rcpp::as<std::vector<double> >(mat["signal"]);
+  auto signal = Rcpp::as<std::vector<double> >(mat["log_signal"]);
   out.set_log_signal(signal); //fills-in phi_ref and delta
   auto log_decay = Rcpp::as<std::vector<double> >(obs["log_decay"]);
   out.set_log_decay(log_decay);

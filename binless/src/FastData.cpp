@@ -2,8 +2,8 @@
 
 
 Rcpp::DataFrame FastData<Signal>::get_as_dataframe() const {
-    //bias, decay, signal with decay and exposures, and expected matrix (w/ offset)
-    std::vector<double> biasmat,decaymat,binless,expected;
+    //bias, decay, signal with decay and exposures, and log_background matrix (w/ offset)
+    std::vector<double> biasmat,decaymat,binless,log_background;
     biasmat.reserve(get_N());
     decaymat.reserve(get_N());
     binless.reserve(get_N());
@@ -21,18 +21,18 @@ Rcpp::DataFrame FastData<Signal>::get_as_dataframe() const {
         double signal = log_signal[i];
         unsigned name = dname[i]-1;
         double exposure = exposures[name];
-        binless.push_back(decay + signal);
-        expected.push_back(std::exp(bi + bj + decay + signal + exposure));
+        binless.push_back(decay + signal + exposure);
+        log_background.push_back(bi + bj + decay + exposure);
     }
     return Rcpp::DataFrame::create(_["name"]=dname,
                                    _["bin1"]=dbin1,
                                    _["bin2"]=dbin2,
                                    _["observed"]=get_observed(),
-                                   _["expected"]=expected,
-                                   _["biases"]=biasmat,
-                                   _["decay"]=decaymat,
-                                   _["signal"]=log_signal,
-                                   _["binless"]=binless,
+                                   _["log_background"]=log_background,
+                                   _["log_biases"]=biasmat,
+                                   _["log_decay"]=decaymat,
+                                   _["log_signal"]=log_signal,
+                                   _["log_binless"]=binless,
                                    _["phihat"]=get_signal_phihat(),
                                    _["weights"]=get_signal_weights() );
 }
@@ -69,7 +69,7 @@ Rcpp::DataFrame FastData<Difference>::get_as_dataframe() const {
                                    _["bin1"]=get_bin1(),
                                    _["bin2"]=get_bin2(),
                                    _["observed"]=get_observed(),
-                                   _["delta"]=get_log_difference(),
+                                   _["log_difference"]=get_log_difference(),
                                    _["deltahat"]=get_deltahat(),
                                    _["weights"]=get_difference_weights(),
                                    _["phi_ref"]=phi_ref_);
