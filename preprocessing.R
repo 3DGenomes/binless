@@ -60,9 +60,7 @@ csd1=csd
 load("example/rao_HiCall_IMR90_FOXP1ext_2.3M_csdata.RData")
 csd2=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
-
-#that class can be stored and reused later on
-save(cs,file="example/rao_HiCall_FOXP1ext_csnorm.RData")
+#save(cs,file="example/rao_HiCall_FOXP1ext_csnorm.RData")
 
 
 
