@@ -48,7 +48,7 @@ mat[is.na(direction)]
 #compare difference detection
 mat.ori = binless:::detect_binned(cs, resolution, "all", ref="GM MboI 1", threshold=0.95, prior.sd=5, ncores=ncores)
 mat.ori[,ori:="old"]
-mat.new = binless:::detect_binned_differences_irls(cs, resolution, "all", ref="GM MboI 1", threshold=0.95, prior.sd=5, ncores=ncores)
+mat.new = binless:::detect_binned_differences_irls(cs, "GM MboI 1", resolution, "all", threshold=0.95, prior.sd=5, ncores=ncores)
 mat.new[,ori:="new"]
 mat=rbind(mat.new,mat.ori)
 ggplot(dcast(mat[,.(name,bin1,bin2,ori,difference)],name+bin1+bin2~ori))+stat_function(fun=identity)+

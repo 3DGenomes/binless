@@ -32,8 +32,9 @@ for (resolution in c(5000,20000,50000)) {
   cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
   cs=detect_binned_interactions(cs, resolution=resolution, group="all", ncores=ncores)
   #cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
-  cs=detect_binned_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])
-  #cs=detect_binless_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])
+  ref=cs@experiments[1,name]
+  cs=detect_binned_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
+  #cs=detect_binless_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
   #save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"_cv_cvsd_outlier_rmdiag.RData"))
 }
 

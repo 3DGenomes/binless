@@ -31,8 +31,9 @@ foreach (resolution=c(5000,10000),.errorhandling = "pass") %do% {
   cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
   cs=detect_binned_interactions(cs, resolution=resolution, group="all", ncores=ncores)
   cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
-  cs=detect_binned_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])
-  cs=detect_binless_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])
+  ref=cs@experiments[1,name]
+  cs=detect_binned_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
+  cs=detect_binless_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
   save(cs,file=paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
 }
 
@@ -41,8 +42,8 @@ foreach (resolution=c(5000,10000),.errorhandling = "pass") %do% {
   cs=detect_binned_interactions(cs, resolution=resolution, group="condition", ncores=ncores)
   cs=detect_binless_interactions(cs, resolution=resolution, group="condition", ncores=ncores)
   ref=get_binned_matrices(cs,resolution,group="condition")[,name[1]]
-  cs=detect_binned_differences(cs, resolution=resolution, group="condition", ncores=ncores, ref=ref)
-  cs=detect_binless_differences(cs, resolution=resolution, group="condition", ncores=ncores, ref=ref)
+  cs=detect_binned_differences(cs, ref, resolution=resolution, group="condition", ncores=ncores)
+  cs=detect_binless_differences(cs, ref, resolution=resolution, group="condition", ncores=ncores)
   save(cs,file=paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
 }
 

@@ -73,8 +73,9 @@ for (resolution in c(base.res,5000,20000)) {
   cs=detect_binned_interactions(cs, resolution=resolution, group="all", ncores=ncores)
   cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
   if (nbg+nsig>1) {
-    cs=detect_binned_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])
-    cs=detect_binless_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])
+    ref=cs@experiments[1,name]
+    cs=detect_binned_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
+    cs=detect_binless_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
   }
   save(cs,file=paste0("data/fake_",nbg,"bg_",nsig,"sig_",fit.signal,"_csnorm_optimized.RData"))
 }
