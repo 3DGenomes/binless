@@ -35,6 +35,7 @@ Collate:
     'legacy_graph.R'
     'normalize.R'
     'normalize_gauss.R'
+    'onAttach.R'
     'preprocess.R'
     'stanmodels.R'
     'zzz.R'
