@@ -67,7 +67,7 @@ get_cs_interaction_idx = function(csg, type, threshold=-1, ref=NULL, raise=T) {
 #' @export
 #' 
 #' @examples
-get_binned_matrices = function(cs, resolution, group) {
+get_binned_matrices = function(cs, resolution=cs@settings$base.res, group="all") {
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csb=cs@groups[[idx1]]
   return(csb@mat)
@@ -95,7 +95,7 @@ get_interactions = function(cs, type, resolution, group, threshold=-1, ref=NULL)
 #' @export
 #' 
 #' @examples
-get_binned_interactions = function(cs, resolution, group, threshold=0.95) {
+get_binned_interactions = function(cs, resolution=cs@settings$base.res, group="all", threshold=0.95) {
   type="CSsig"
   ref=NULL
   mat=get_interactions(cs, type, resolution, group, threshold, ref)
@@ -110,7 +110,7 @@ get_binned_interactions = function(cs, resolution, group, threshold=0.95) {
 #' @export
 #' 
 #' @examples
-get_binless_interactions = function(cs, resolution, group) {
+get_binless_interactions = function(cs, resolution=cs@settings$base.res, group="all") {
   type="CSbsig"
   ref=NULL
   threshold=-1
@@ -127,7 +127,7 @@ get_binless_interactions = function(cs, resolution, group) {
 #' @export
 #' 
 #' @examples
-get_binned_differences = function(cs, resolution, group, ref, threshold=0.95) {
+get_binned_differences = function(cs, ref, resolution=cs@settings$base.res, group="all", threshold=0.95) {
   type="CSdiff"
   mat=get_interactions(cs, type, resolution, group, threshold, ref)
   return(mat)
@@ -141,7 +141,7 @@ get_binned_differences = function(cs, resolution, group, ref, threshold=0.95) {
 #' @export
 #' 
 #' @examples
-get_binless_differences = function(cs, resolution, group, ref) {
+get_binless_differences = function(cs, ref, resolution=cs@settings$base.res, group="all") {
   type="CSbdiff"
   threshold=-1
   mat=get_interactions(cs, type, resolution, group, threshold, ref)
