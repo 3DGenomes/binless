@@ -77,7 +77,7 @@ plot_raw(data2[rbegin2<min(rbegin1)+10000])
 #prefix: if you set this, individual optimizations will be stored using that prefix. Can be useful for recovery of a failed normalization.
 load("data/rao_HiCall_chrX_450k_csdata.RData")
 cs=merge_cs_norm_datasets(list(csd), different.decays = "none")
-cs = run_gauss(cs, bf_per_kb=5, bf_per_decade=10, bins_per_bf=10, lambdas=10**seq(from=-2,to=2,length.out=10),
+cs = normalize_binless(cs, bf_per_kb=5, bf_per_decade=10, bins_per_bf=10, lambdas=10**seq(from=-2,to=2,length.out=10),
                ngibbs = 20, iter=10000, verbose=T,
                prefix="tmp/rao_HiCall_chrX_450k", ncores=10)
 save(cs, file="data/rao_HiCall_chrX_450k_csnorm_optimized.RData")

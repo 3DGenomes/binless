@@ -19,7 +19,7 @@ load(paste0("data/rao_HiCall_GM12878_SELP_150k_csdata.RData"))
 #csd@settings$qmin=0
 #csd@settings$qmax=1
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-cs = run_gauss(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=10000, init_alpha=1e-7,
+cs = normalize_binless(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 10, iter=10000, init_alpha=1e-7,
                ncounts = 1000000, type="perf", fit_model="exact")
 save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_stan.RData"))
 #save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_csnorm_optimized_gauss_nofill.RData"))

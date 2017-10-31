@@ -23,7 +23,7 @@ csd3=csd
 load(paste0("data/rao_HiC055_IMR90_",sub,"_csdata.RData"))
 csd4=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4), different.decays="none")
-cs <- run_gauss(cs, restart=F, ncores=ncores, base.res=base.res)
+cs <- normalize_binless(cs, restart=F, ncores=ncores, base.res=base.res)
 save(cs,file=paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
 
 

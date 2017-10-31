@@ -48,13 +48,13 @@ cell="ES"
 load(paste0("data/ralph_",locus,"_",cell,"_rep1_csdata.RData"))
 csd2=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none", dfuse=dfuse)
-cs = run_gauss(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
+cs = normalize_binless(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
                ngibbs = 5, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
                ncounts = 1000000, ncores=ncores, base.res=10000, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T,
                signif.threshold=T)
 save(cs,file=paste0("data/ralph_Sox2_B1_ES1_csnorm_optimized_base10k_cv.RData"))
 
-cs = run_gauss(cs, restart=T, ngibbs = 15, ncores=ncores)
+cs = normalize_binless(cs, restart=T, ngibbs = 15, ncores=ncores)
 save(cs,file=paste0("data/ralph_Sox2_B1_ES1_csnorm_optimized_base10k_cv.RData"))
 
 #load(paste0("data/ralph_Sox2_B1_ES1_csnorm_optimized_base10k_cv.RData"))

@@ -23,7 +23,7 @@ csd1=csd
 load(paste0("data/rao_HiCall_IMR90_",sub,"_csdata.RData"))
 csd2=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none", dfuse=dfuse, qmin=qmin)
-cs = run_gauss(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
+cs = normalize_binless(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
                ngibbs = 25, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
                ncounts = 1000000, ncores=ncores, base.res=base.res, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T)
 save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k_bpk",bpk,"_dfuse",dfuse,"_cv_cvsd_outlier_rmdiag.RData"))

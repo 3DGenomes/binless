@@ -29,7 +29,7 @@ if (F) {
 
 load(paste0("data/rao_HiC003_GM12878_hg19_Fig1C_1M_csdata.RData"))
 cs=merge_cs_norm_datasets(list(csd), different.decays="none", dfuse=dfuse, qmin=qmin)
-cs = run_gauss(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
+cs = normalize_binless(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
                ngibbs = 25, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
                ncounts = 1000000, ncores=ncores, base.res=base.res, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T)
 save(cs,file=paste0("data/rao_HiC003_GM12878_hg19_Fig1C_1M_csnorm_optimized_base",base.res/1000,"k_qmin",qmin,".RData"))

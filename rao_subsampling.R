@@ -21,7 +21,7 @@ foreach (sub=c(1,10,20,30,40,50,60,70,80,90,100)) %do% {
 foreach (sub=c(1,10,20,30,40,50,60,70,80,90,100)) %dopar% {
   load(paste0("data/rao_HiCall_GM12878_SELP_150k_",sub,"pc_csdata.RData"))
   cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-  cs = run_gauss(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 40, iter=100000, init_alpha=1e-7, ncounts = 1000000)
+  cs = normalize_binless(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 40, iter=100000, init_alpha=1e-7, ncounts = 1000000)
   save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_",sub,"pc_csnorm_optimized.RData"))
 }
 

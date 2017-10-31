@@ -13,7 +13,7 @@ sub="SEMA3C_1M"
 #normalize
 load(paste0("data/rao_HiCall_",sub,"_csdata.RData"))
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-cs = run_gauss(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 20, iter=100000, init_alpha=1e-7, ncounts = 1000000)
+cs = normalize_binless(cs, bf_per_kb=3, bf_per_decade=10, bins_per_bf=10, ngibbs = 20, iter=100000, init_alpha=1e-7, ncounts = 1000000)
 save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_gauss.RData"))
 
 #bin

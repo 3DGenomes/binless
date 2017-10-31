@@ -62,7 +62,7 @@ cs=merge_cs_norm_datasets(datasets, different.decays="none", dfuse=5,qmin=0.)
 
 base.res=10000
 
-cs = run_gauss(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10,
+cs = normalize_binless(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10,
                ngibbs = 25, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
                ncounts = 1000000, ncores=5, base.res=base.res, fit.signal=fit.signal, fit.disp=T, fit.decay=T, fit.genomic=T)
 

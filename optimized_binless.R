@@ -17,7 +17,7 @@ ngibbs=15 #maximum number of iterations
 base.res=5000 #base resolution for the fused lasso signal detection
 bg.steps=5 #maximum number of steps where only the background model is fitted
 tol=1e-1 #relative tolerance on computed quantities upon convergence
-cs <- run_gauss(cs, ngibbs = ngibbs, ncores = ncores, base.res = base.res, bg.steps = bg.steps, tol = tol)
+cs <- normalize_binless(cs, ngibbs = ngibbs, ncores = ncores, base.res = base.res, bg.steps = bg.steps, tol = tol)
 
 # If you get the message "Normalization has converged", congratulations! You can save the normalization like so
 #save(cs,file="example/rao_HiCall_FOXP1ext_csnorm_optimized.RData")
@@ -33,7 +33,7 @@ plot_diagnostics(cs)$plot
 plot_diagnostics(cs)$plot2
 
 #If you see damped oscillations, most likely you only need to extend the normalization by a couple of steps, say 10
-cs <- run_gauss(cs, restart=T, ngibbs = 10, ncores = ncores)
+cs <- normalize_binless(cs, restart=T, ngibbs = 10, ncores = ncores)
 
 #Otherwise, try the following
 # - change the base resolution. Watch out: the algorithm CPU and memory usage scale quadratically with the base resolution

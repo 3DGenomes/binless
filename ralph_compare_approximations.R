@@ -65,9 +65,9 @@ save(cs, file="data/ralph_EScell_Rbfox1_20k_csnorm_optimized_gibbs_simplified_in
 #normalize with gauss sampler
 load("data/ralph_EScell_Rbfox1_60k_csdata.RData")
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
-cs = run_gauss(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=100, lambdas=10**seq(from=-2,to=2,length.out=10),
+cs = normalize_binless(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=100, lambdas=10**seq(from=-2,to=2,length.out=10),
                ngibbs = 20, iter=10000, ncores=30)
-cs = run_gauss_gibbs(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=100, init=cs@par, fit.disp=T,
+cs = normalize_binless_gibbs(cs, bf_per_kb=5, bf_per_decade=5, bins_per_bf=100, init=cs@par, fit.disp=T,
                      ngibbs = 5, iter=10000)
 save(cs, file="data/ralph_EScell_Rbfox1_60k_csnorm_optimized_gibbs_gauss_redo.RData")
 
