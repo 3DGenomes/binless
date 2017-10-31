@@ -5,7 +5,7 @@ Version: 0.1.0
 Authors@R: person("Yannick", "Spill", email = "yannick.spill@crg.eu", role = c("aut", "cre"))
 Description: Provides resolution-independent normalization of Hi-C data, and
     permits interaction and difference detection.
-License: TODO
+License: LGPLv3
 Depends:
     R (>= 3.0.2),
     Rcpp (>= 0.11.0)
