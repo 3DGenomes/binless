@@ -67,7 +67,8 @@ resolution", *to be submitted*
 
 [TADbit](https://3dgenomes.github.io/TADbit/index.html) `.tsv`: tab-separated
 text file containing paired-end mapped reads for a single experiment. All lines
-starting with # will be discarded. It has the following columns
+starting with # will be discarded. The order of the reads is unimportant. It has
+the following columns
 1. `id`: ID of the mapped pair (alphanumeric without spaces)
 1. `chr1`: chromosome of read 1 (alphanumeric without spaces)
 1. `pos1`: position of the 5' end of read 1 (integer)
@@ -89,6 +90,14 @@ containing multiple datasets. The first line is a header that must start with
 make sure their column names are different.
 1. `name`: The name of the dataset. Put in "" if you use spaces
 1. `bin1`: the label for the bin on the x axis. For example `"[begin1,end1)"`
-1. `bin2`: The label for the bin on the y axis
+1. `bin2`: The label for the bin on the y axis.
 1. `observed`: How many paired-end reads were mapped within (bin1,bin2)
+
+Note that `name`, `bin1` and `bin2` will be converted to R factors, so you an also
+provide them as integers starting at 1 (i.e. use 1 for the first dataset, 2 for the second etc.).
+Also, **you must have bin2 >= bin1, and the data must be sorted by name, bin1 and bin2, in that order**.
+
+
+
+
 
