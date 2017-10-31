@@ -473,15 +473,17 @@ detect_binless_differences = function(cs, ref, resolution=cs@settings$base.res, 
 #' @param upper,lower the name of the column to plot in upper (resp. lower)
 #'  triangle. Default: phi. Formulae are allowed (ggplot2 aes syntax)
 #' @param facet what to facet on. Default: name
+#' @param limits set to a pair of values to enforce plot and colour scale to be within these values
 #'
 #' @return
 #' @export
 #'
 #' @examples
-plot_binless_matrix = function(mat, upper="phi", lower="phi", facet="name") {
-  if (!("begin1" %in% names(mat) && "begin2" %in% names(mat))) {
-    if (mat[,is.factor(bin1)] && mat[,is.factor(bin2)]) {
-      mat = add_bin_begin_and_end(mat)
+plot_binless_matrix = function(mat, upper="phi", lower="phi", facet="name", limits=NULL) {
+  data=copy(mat)
+  if (!("begin1" %in% names(data) && "begin2" %in% names(data))) {
+    if (data[,is.factor(bin1)] && data[,is.factor(bin2)]) {
+      data = add_bin_begin_and_end(data)
       bin1="begin1"
       bin2="begin2"
     } else {
@@ -492,12 +494,45 @@ plot_binless_matrix = function(mat, upper="phi", lower="phi", facet="name") {
     bin1="begin1"
     bin2="begin2"
   }
-  p=ggplot(mat)+geom_raster(aes_string(bin1,bin2,fill=upper))+
+  p=ggplot(data)+geom_raster(aes_string(bin1,bin2,fill=upper))+
                 geom_raster(aes_string(bin2,bin1,fill=lower))+
-      scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value = "white")+
-      coord_fixed()+theme(panel.background=element_blank(), axis.text.x = element_text(angle = 90, hjust = 1))+
+      scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value = "white", limits=limits, oob=squish)+
+      coord_fixed()+theme(panel.background=element_blank(), axis.text.x = element_text(angle = 90, hjust = 1),
+                          axis.title.x=element_blank(), axis.title.y=element_blank())+
       scale_x_continuous(expand=c(0,0)) + scale_y_continuous(expand=c(0,0))
-  if (facet %in% names(mat)) p = p + facet_wrap(facet)
+  if (facet %in% names(data)) p = p + facet_wrap(facet)
   print(p)
   invisible(p)
 }
+
+#' Plot a binless signal matrix
+#' 
+#' This function is to ensure a consistent representation of signal matrices
+#' Plots the signal in log2 scale (unit is log2 fold change) and caps the maximum
+#' signal to log2FC = 3.
+#'
+#' @param mat the binless matrix data.table
+#'
+#' @return
+#' @export
+#'
+#' @examples
+plot_binless_signal_matrix = function(mat) {
+  plot_binless_matrix(mat,upper="log2(signal)", lower="log2(signal)", limits=c(-3,3))
+}
+
+#' Plot a binless difference matrix
+#' 
+#' Plots the difference in log2 scale (unit is log2 fold change) and caps the maximum
+#' difference (in absolute value) to log2FC = 3.
+#'
+#' @param mat the binless matrix data.table
+#'
+#' @return
+#' @export
+#'
+#' @examples
+plot_binless_difference_matrix = function(mat) {
+  plot_binless_matrix(mat,upper="log2(difference)", lower="log2(difference)", limits=c(-3,3))
+}
+

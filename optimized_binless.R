@@ -77,8 +77,9 @@ cs=detect_binless_interactions(cs, ncores=ncores)
 #For commodity, binned matrices are reported as well
 mat=get_binless_interactions(cs)
 #We plot the fused lasso signal that is estimated to be significantly different from the background model
-#"signal" is a fold change
-plot_binless_matrix(mat, upper="log2(signal)", lower="log2(signal)")
+#"signal" is a fold change. Notice the different function call, which ensures the colour scale ranges from -3 to 3.
+#Any signal that has a log2 fold change larger than 3 will be capped at that maximum, for visualization.
+plot_binless_signal_matrix(mat)
 #The binless matrix corresponds to the signal matrix plus the estimated decay
 plot_binless_matrix(mat, upper="log(binless)", lower="log(binless)")
 #Binless matrices can be visually compared to the raw data to validate the normalization
@@ -100,10 +101,11 @@ cs=detect_binless_differences(cs, ref = ref, ncores=ncores)
 mat=get_binless_differences(cs, ref = ref)
 #We plot the difference that is estimated to be significant between each dataset and the reference
 #log difference of all datasets wrt ref
-#"difference" is a fold change
-plot_binless_matrix(mat[name!=ref], upper="log2(difference)", lower="log2(difference)")
+#"difference" is a fold change. Notice the different function call, which ensures the colour scale ranges from -3 to 3.
+#Any difference that has a log2 fold change larger than 3 (in absolute value) will be capped at that value, for visualization.
+plot_binless_difference_matrix(mat[name!=ref])
 
 ### This concludes the quick tour on binless normalization!
 ### We hope you will enjoy the software and please do not hesitate to report
-### any feature, bug or question to our GitHub issue tracker
+### any question, bug or feature request to our GitHub issue tracker
 
