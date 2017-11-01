@@ -17,7 +17,7 @@ future.
 
 In the `example/` folder, we provide files to play with, taken from publicly
 available data (Rao *et al.*, 2014). Alternatively you can use your own data.
-Start with something not too large, for example 10Mb. If you want a quick and
+Start with something not too large, for example 2Mb. If you want a quick and
 dirty overview, skip to the *Fast binless* section. Otherwise, read on.
 
 ### Preprocessing
@@ -59,7 +59,7 @@ features. We are looking forward to your feedback!
 
 If you use this software, please acknowledge the following paper
 
-Spill YG, Castillo D, Marti-Renom MA, "Binless normalization of Hi-C data
+Spill YG, Castillo D, Marti-Renom MA, "Bin-less normalization of Hi-C data
 provides significant interaction and difference detection independently of
 resolution", *to be submitted*
 
