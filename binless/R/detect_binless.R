@@ -132,8 +132,8 @@ optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixe
     #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " BIC.sd= ", csig@state$BIC.sd, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
   }
-  #first, find rough minimum between 1 and 100 by gridding
-  minlambda=1
+  #first, find rough minimum between 2.5 and 100 by gridding
+  minlambda=2.5
   maxlambda=100
   npoints=10
   lvals=10^seq(log10(minlambda),log10(maxlambda),length.out=npoints)
