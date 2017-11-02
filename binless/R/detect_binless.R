@@ -479,7 +479,7 @@ detect_binless_differences = function(cs, ref, resolution=cs@settings$base.res, 
 #' @export
 #'
 #' @examples
-plot_binless_matrix = function(mat, upper="phi", lower="phi", facet="name", limits=NULL) {
+plot_binless_matrix = function(mat, upper="binless", lower="observed", trans="log10", facet="name", limits=NULL, label=NA) {
   data=copy(mat)
   if (!("begin1" %in% names(data) && "begin2" %in% names(data))) {
     if (data[,is.factor(bin1)] && data[,is.factor(bin2)]) {
@@ -494,13 +494,19 @@ plot_binless_matrix = function(mat, upper="phi", lower="phi", facet="name", limi
     bin1="begin1"
     bin2="begin2"
   }
+  #plot data
   p=ggplot(data)+geom_raster(aes_string(bin1,bin2,fill=upper))+
-                geom_raster(aes_string(bin2,bin1,fill=lower))+
-      scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value = "white", limits=limits, oob=squish)+
-      coord_fixed()+theme(panel.background=element_blank(), axis.text.x = element_text(angle = 90, hjust = 1),
-                          axis.title.x=element_blank(), axis.title.y=element_blank())+
-      scale_x_continuous(expand=c(0,0)) + scale_y_continuous(expand=c(0,0))
+                geom_raster(aes_string(bin2,bin1,fill=lower))
   if (facet %in% names(data)) p = p + facet_wrap(facet)
+  #set colour scale
+  p=p+scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value = "white", limits=limits, oob=squish, trans=trans)
+  #set visual appearance
+  p=p+coord_fixed()+theme_minimal()+
+     theme(panel.background = element_rect(fill = "white", colour = "black"),
+                          axis.text.x = element_text(angle = 90, hjust = 1),
+                          panel.spacing=unit(0,"cm"), axis.title=element_blank())+
+      scale_x_continuous(expand=c(0,0)) + scale_y_continuous(expand=c(0,0))
+  if (!is.na(label)) p = p + labs(fill=label)
   print(p)
   invisible(p)
 }
@@ -518,7 +524,7 @@ plot_binless_matrix = function(mat, upper="phi", lower="phi", facet="name", limi
 #'
 #' @examples
 plot_binless_signal_matrix = function(mat) {
-  plot_binless_matrix(mat,upper="log2(signal)", lower="log2(signal)", limits=c(-3,3))
+  plot_binless_matrix(mat,upper="log2(signal)", lower="log2(signal)", trans="identity", limits=c(-3,3), label="log2 FC")
 }
 
 #' Plot a binless difference matrix
@@ -533,6 +539,6 @@ plot_binless_signal_matrix = function(mat) {
 #'
 #' @examples
 plot_binless_difference_matrix = function(mat) {
-  plot_binless_matrix(mat,upper="log2(difference)", lower="log2(difference)", limits=c(-3,3))
+  plot_binless_matrix(mat,upper="log2(difference)", lower="log2(difference)", trans="identity", limits=c(-3,3), label="log2 FC")
 }
 
