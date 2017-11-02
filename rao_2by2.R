@@ -81,206 +81,130 @@ if (plot==T) {
 }
 
 if (F) {
-  subs=c("SELP_150k","Peak1_450k","ADAMTS2_450k","PARM1_600k","Tbx19_700k","SEMA3C_1M", "Fig1C_1M","FOXP1_1.3M","TBX3_1.5M",
-         "Comparison_1.7M","22qter_1.7M", "Talk_2M", "ADAMTS1_2.3M")
-  
-  #check convergence
-  info = foreach(sub=subs,.combine=rbind,.errorhandling="remove") %dopar% {
-    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k_minlambda25.RData"))
-    data.table(ori=sub,has.converged=binless:::has_converged(cs),#run=run,
-               runtime=cs@diagnostics$params[,sum(runtime)],nsteps=cs@diagnostics$params[,max(step)],
-               name=cs@experiments[,name],
-               lambda1=cs@par$lambda1,lambda2=cs@par$lambda2,eCprime=cs@par$eCprime,lambda_diag=cs@par$lambda_diag)#,
-  }
-  info
-  
-  #plot last signal
-  info = foreach(sub=subs, .combine=rbind, .errorhandling="remove") %dopar% {
-    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
-    ggplot(cs@par$signal)+geom_raster(aes(bin1,bin2,fill=phi))+
-      geom_raster(aes(bin2,bin1,fill=pmin(phihat,3)))+facet_wrap(~name)+
-      scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white")+
-      theme_void()+ theme(axis.title=element_blank(),
-                          panel.background = element_rect(fill = "white", colour = "black"),
-                          panel.spacing=unit(0,"cm"))+
-      coord_fixed()+labs(fill="log10 FC")
-    ggsave(filename=paste0("images/rao_2by2_",sub,"_base10_iterated_signal.png"),width=10,height=10)
-  }
-  
-  #get binless parameters
-  info = foreach(sub=subs, .combine=rbind) %dopar% {
-    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base10k_dfuse",5,"_qmin_",0.01,"_stripped.RData"))
-    foreach (resolution=c(5000,10000), .combine=rbind, .errorhandling = "remove") %do% {
-      #side-by-side at 5k: observed
-      idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
-      csg=cs@groups[[idx1]]
-      idx2=get_cs_interaction_idx(csg, type="CSbsig", raise=T)
-      csi=csg@interactions[[idx2]]
-      ret=as.data.table(csi@par)
-      ret[,c("run","resolution"):=list(sub,resolution)]
-      ret
-    }
-  }
-  
-  
+  #load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
   #generate plots
-  mat = foreach(sub=subs, .combine=rbind, .errorhandling="remove") %dopar% {
-    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base10k_dfuse",5,"_qmin_",0.01,"_stripped.RData"))
-    foreach (resolution=c(5000,10000), .errorhandling="remove") %do% {
-      #side-by-side at 5k: observed
-      mat=get_matrices(cs, resolution=resolution, group="all")
-      ggplot(mat)+
-        geom_raster(aes(begin1,begin2,fill=observed))+
-        geom_raster(aes(begin2,begin1,fill=observed))+coord_fixed()+facet_wrap(~name)+
-        scale_fill_gradient(low="white",high="black",na.value="white",trans="log")+
-        scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
-        theme_void()+ theme(axis.title=element_blank(),
-                            panel.background = element_rect(fill = "white", colour = "black"),
-                            panel.spacing=unit(0,"cm"))
-      ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_observed.png"),width=10,height=10)
-      
-      #side-by-side at 5k: signal
-      mat=get_interactions(cs, resolution=resolution, group="all", type="CSsig")
-      mat[,is.significant:=prob.gt.expected>1-1e-10]
-      ggplot(mat)+
-        geom_raster(aes(begin1,begin2,fill=log10(signal)))+
-        geom_raster(aes(begin2,begin1,fill=log10(signal)))+coord_fixed()+facet_wrap(~name)+
-        geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])+
-        scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white")+
-        scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
-        theme_void()+ theme(axis.title=element_blank(),
-                            panel.background = element_rect(fill = "white", colour = "black"),
-                            panel.spacing=unit(0,"cm")) + labs(fill="log10 FC")
-      ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binned_signal.png"),width=10,height=10)
-      
-      #side-by-side at 5k: differences
-      mat=get_interactions(cs, resolution=resolution, group="all", type="CSdiff", ref=cs@experiments[1,name])
-      ggplot(mat)+
-        geom_raster(aes(begin1,begin2,fill=log10(difference)))+
-        geom_raster(aes(begin2,begin1,fill=log10(difference)))+coord_fixed()+facet_wrap(~name)+
-        geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])+
-        scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white")+
-        scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
-        theme_void()+ theme(axis.title=element_blank(),
-                            panel.background = element_rect(fill = "white", colour = "black"),
-                            panel.spacing=unit(0,"cm")) + labs(fill="log10 FC")
-      ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binned_differences.png"),width=15,height=5)
-      
-      #side-by-side at 5k: binless signal
-      idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
-      csg=cs@groups[[idx1]]
-      idx2=get_cs_interaction_idx(csg, type="CSbsig", raise=T)
-      csi=csg@interactions[[idx2]]
-      csi@settings$min.l10FC=0.2
-      mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
-      mat[,value:=phi]
-      mat = binless:::detect_binless_patches(mat, csi@settings)
-      mat[,value:=NULL]
-      mat[,phi.max:=ifelse(is.maximum==T,NA,phi)]
-      ggplot(mat)+geom_raster(aes(begin1,begin2,fill=phi))+
-        geom_raster(aes(begin2,begin1,fill=phi.max))+facet_wrap(~name)+
-        scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="black")+
-        scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
-        theme_void()+ theme(axis.title=element_blank(),
-                            panel.background = element_rect(fill = "white", colour = "black"),
-                            panel.spacing=unit(0,"cm"))+
-        coord_fixed()+labs(fill="log10 FC")
-      ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binless_signal.png"),width=10,height=10)
-      
-      
-      #side-by-side at 5k: binless signal without threshold
-      mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
-      ggplot(mat)+geom_raster(aes(begin1,begin2,fill=beta))+
-        geom_raster(aes(begin2,begin1,fill=beta_cv))+facet_wrap(~name)+
-        scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white")+
-        scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
-        theme_void()+ theme(axis.title=element_blank(),
-                            panel.background = element_rect(fill = "white", colour = "black"),
-                            panel.spacing=unit(0,"cm"))+
-        coord_fixed()+labs(fill="log10 FC")
-      ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binless_signal_nothresh.png"),width=10,height=10)
-      
-      #side-by-side at 5k: binless difference without threshold
-      mat=get_interactions(cs, type="CSbdiff", resolution=resolution, group="all", ref=cs@experiments[1,name])
-      ggplot(mat)+geom_raster(aes(begin1,begin2,fill=beta))+
-        geom_raster(aes(begin2,begin1,fill=beta_cv))+facet_wrap(~name)+
-        scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white") +
-        scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
-        theme_void()+ theme(axis.title=element_blank(),
-                            panel.background = element_rect(fill = "white", colour = "black"),
-                            panel.spacing=unit(0,"cm"))+
-        coord_fixed()+labs(fill="log10 FC")
-      ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binless_differences_nothresh.png"),width=15,height=5)
-      
-      #side-by-side at 5k: binless difference
-      mat=get_interactions(cs, type="CSbdiff", resolution=resolution, group="all", ref=cs@experiments[1,name])
-      ggplot(mat)+geom_raster(aes(begin1,begin2,fill=delta))+
-        geom_raster(aes(begin2,begin1,fill=delta))+facet_wrap(~name)+
-        scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value="white") +
-        scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
-        theme_void()+ theme(axis.title=element_blank(),
-                            panel.background = element_rect(fill = "white", colour = "black"),
-                            panel.spacing=unit(0,"cm"))+
-        coord_fixed()+labs(fill="log10 FC")
-      ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binless_differences.png"),width=15,height=5)
-    }
-  }
+  resolution=5000
+  
+  #side-by-side at 5k: observed
+  mat=get_binned_matrices(cs, resolution=resolution, group="all")
+  plot_binless_matrix(mat,upper="observed",lower="observed")
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_observed.png"),width=10,height=10)
+  
+  #side-by-side at 5k: signal
+  mat=get_binned_interactions(cs, resolution=resolution, group="all")
+  mat[,is.significant:=prob.gt.expected>1-1e-12]
+  plot_binless_signal_matrix(mat) + geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_signal.png"),width=10,height=10)
+  
+  #side-by-side at 5k: normalized
+  mat=get_binned_interactions(cs, resolution=resolution, group="all")
+  mat[,is.significant:=prob.gt.expected>1-1e-12]
+  plot_binless_matrix(mat, upper="normalized", lower="normalized") + geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_normalized.png"),width=10,height=10)
+  
+  #side-by-side at 5k: differences
+  mat=get_binned_differences(cs, resolution=resolution, group="all", ref=cs@experiments[1,name])
+  mat[,is.significant:=pmax(`prob.gt.TBX3 GM12878 odd`,1-`prob.gt.TBX3 GM12878 odd`)>1-1e-12]
+  mat[,direction:=ordered(direction,c("enriched","depleted"))]
+  plot_binless_difference_matrix(mat) + geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_differences.png"),width=15,height=5)
+  
+  #side-by-side at 5k: binless signal
+  mat=get_binless_interactions(cs)
+  plot_binless_signal_matrix(mat)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless_signal.png"),width=10,height=10)
+  
+  #side-by-side at 5k: binless matrix
+  mat=get_binless_interactions(cs)
+  plot_binless_matrix(mat, upper="binless", lower="binless")
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless.png"),width=10,height=10)
+  
+  #side-by-side at 5k: binless difference
+  mat=get_binless_differences(cs,ref=cs@experiments[1,name])
+  plot_binless_difference_matrix(mat)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binless_differences.png"),width=15,height=5)
+
+  
+  resolution=10000
+  
+  #side-by-side at 10k: observed
+  mat=get_binned_matrices(cs, resolution=resolution, group="all")
+  plot_binless_matrix(mat,upper="observed",lower="observed")
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_observed.png"),width=10,height=10)
+  
+  #side-by-side at 10k: signal
+  mat=get_binned_interactions(cs, resolution=resolution, group="all")
+  mat[,is.significant:=prob.gt.expected>1-1e-12]
+  plot_binless_signal_matrix(mat) + geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_signal.png"),width=10,height=10)
+  
+  #side-by-side at 10k: normalized
+  mat=get_binned_interactions(cs, resolution=resolution, group="all")
+  mat[,is.significant:=prob.gt.expected>1-1e-12]
+  plot_binless_matrix(mat, upper="normalized", lower="normalized") + geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_normalized.png"),width=10,height=10)
+  
+  #side-by-side at 10k: differences
+  mat=get_binned_differences(cs, resolution=resolution, group="all", ref=cs@experiments[1,name])
+  mat[,is.significant:=pmax(`prob.gt.TBX3 GM12878 odd`,1-`prob.gt.TBX3 GM12878 odd`)>1-1e-12]
+  mat[,direction:=ordered(direction,c("enriched","depleted"))]
+  plot_binless_difference_matrix(mat) + geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_differences.png"),width=15,height=5)
+  
   
   #get statistics on signal matrices
-  info = foreach(sub=subs, .combine=rbind, .errorhandling="remove") %dopar% {
-    locus=strsplit(sub,"_")[[1]][1]
-    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base10k_dfuse",5,"_qmin_",0.01,"_stripped.RData"))
-    foreach (resolution=c(5000,10000),.combine=rbind , .errorhandling="remove") %do% {
-      data=data.table()
-      
-      #jacard for binned interactions
-      mat=get_interactions(cs, resolution=resolution, group="all", type="CSsig")[!is.na(is.significant)]
-      #number of significant interactions
-      dt=mat[,.(num=sum(is.significant)),by=name][
-        ,.(name=locus,type="binned",resolution=resolution,variable=c("GM1","GM2","IMR1","IMR2"),value=num)]
-      data=rbind(data,dt)
-      #number of significant interactions
-      compnames=data.table(t(matrix(cs@experiments[,name][c(c(1,2),c(1,3),c(2,4),c(3,4))],nrow=2)))
-      dt = foreach (nref=compnames[,V1],n=compnames[,V2],.combine=rbind) %do% {
-        refmat=mat[name==nref,.(bin1,bin2,ref.is=is.significant)]
-        merge(mat[name==n,.(name,bin1,bin2,is=is.significant)],refmat,by=c("bin1","bin2"))[
-          ,.(ref=nref,N=sum(is),refN=sum(ref.is),inter=sum(is==T&ref.is==T),union=sum(is==T|ref.is==T),
-             jacard=sum(is==T&ref.is==T)/sum(is==T|ref.is==T)),by=name]
-      }
-      data=rbind(data,
-                 dt[,.(name=locus,type="binned",resolution=resolution,variable=c("NGM","N1","N2","NIMR"),value=inter)],
-                 dt[,.(name=locus,type="binned",resolution=resolution,variable=c("JGM","J1","J2","JIMR"),value=jacard)])
-      
-      #jacard for binless interactions
-      idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
-      csg=cs@groups[[idx1]]
-      idx2=get_cs_interaction_idx(csg, type="CSbsig", raise=T)
-      csi=csg@interactions[[idx2]]
-      csi@settings$min.l10FC=0.2
-      mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
-      mat[,value:=phi]
-      mat = binless:::detect_binless_patches(mat, csi@settings)
-      mat[,value:=NULL]
-      #number of significant interactions, and percentage
-      dt=mat[,.(num=sum(is.maximum)),by=name][
-        ,.(name=locus,type="binless",resolution=resolution,variable=c("GM1","GM2","IMR1","IMR2"),value=num)]
-      data=rbind(data,dt)
-      #number of significant interactions
-      compnames=data.table(t(matrix(cs@experiments[,name][c(c(1,2),c(1,3),c(2,4),c(3,4))],nrow=2)))
-      dt = foreach (nref=compnames[,V1],n=compnames[,V2],.combine=rbind) %do% {
-        refmat=mat[name==nref,.(bin1,bin2,ref.is=is.maximum)]
-        merge(mat[name==n,.(name,bin1,bin2,is=is.maximum)],refmat,by=c("bin1","bin2"))[
-          ,.(ref=nref,N=sum(is),refN=sum(ref.is),inter=sum(is==T&ref.is==T),union=sum(is==T|ref.is==T),
-             jacard=sum(is==T&ref.is==T)/sum(is==T|ref.is==T)),by=name]
-      }
-      data=rbind(data,
-                 dt[,.(name=locus,type="binless",resolution=resolution,variable=c("NGM","N1","N2","NIMR"),value=inter)],
-                 dt[,.(name=locus,type="binless",resolution=resolution,variable=c("JGM","J1","J2","JIMR"),value=jacard)])
-      dcast(data,name+type+resolution~variable,value.var = "value")
+  resolution=5000
+  data=data.table()
+    
+    #jacard for binned interactions
+    mat=get_binned_interactions(cs, resolution=resolution, group="all")[!is.na(is.significant)]
+    #number of significant interactions
+    dt=mat[,.(num=sum(is.significant)),by=name][
+      ,.(name=sub,type="binned",resolution=resolution,variable=c("GM1","GM2","IMR1","IMR2"),value=num)]
+    data=rbind(data,dt)
+    #number of significant interactions
+    compnames=data.table(t(matrix(cs@experiments[,name][c(c(1,2),c(1,3),c(2,4),c(3,4))],nrow=2)))
+    dt = foreach (nref=compnames[,V1],n=compnames[,V2],.combine=rbind) %do% {
+      refmat=mat[name==nref,.(bin1,bin2,ref.is=is.significant)]
+      merge(mat[name==n,.(name,bin1,bin2,is=is.significant)],refmat,by=c("bin1","bin2"))[
+        ,.(ref=nref,N=sum(is),refN=sum(ref.is),inter=sum(is==T&ref.is==T),union=sum(is==T|ref.is==T),
+           jacard=sum(is==T&ref.is==T)/sum(is==T|ref.is==T)),by=name]
     }
-  }
+    data=rbind(data,
+               dt[,.(name=sub,type="binned",resolution=resolution,variable=c("NGM","N1","N2","NIMR"),value=inter)],
+               dt[,.(name=sub,type="binned",resolution=resolution,variable=c("JGM","J1","J2","JIMR"),value=jacard)])
+    
+    #jacard for binless interactions
+    idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
+    csg=cs@groups[[idx1]]
+    idx2=get_cs_interaction_idx(csg, type="CSbsig", raise=T)
+    csi=csg@interactions[[idx2]]
+    csi@settings$min.l10FC=0.2
+    mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
+    mat[,value:=phi]
+    mat = binless:::detect_binless_patches(mat, csi@settings)
+    mat[,value:=NULL]
+    #number of significant interactions, and percentage
+    dt=mat[,.(num=sum(is.maximum)),by=name][
+      ,.(name=locus,type="binless",resolution=resolution,variable=c("GM1","GM2","IMR1","IMR2"),value=num)]
+    data=rbind(data,dt)
+    #number of significant interactions
+    compnames=data.table(t(matrix(cs@experiments[,name][c(c(1,2),c(1,3),c(2,4),c(3,4))],nrow=2)))
+    dt = foreach (nref=compnames[,V1],n=compnames[,V2],.combine=rbind) %do% {
+      refmat=mat[name==nref,.(bin1,bin2,ref.is=is.maximum)]
+      merge(mat[name==n,.(name,bin1,bin2,is=is.maximum)],refmat,by=c("bin1","bin2"))[
+        ,.(ref=nref,N=sum(is),refN=sum(ref.is),inter=sum(is==T&ref.is==T),union=sum(is==T|ref.is==T),
+           jacard=sum(is==T&ref.is==T)/sum(is==T|ref.is==T)),by=name]
+    }
+    data=rbind(data,
+               dt[,.(name=locus,type="binless",resolution=resolution,variable=c("NGM","N1","N2","NIMR"),value=inter)],
+               dt[,.(name=locus,type="binless",resolution=resolution,variable=c("JGM","J1","J2","JIMR"),value=jacard)])
+    dcast(data,name+type+resolution~variable,value.var = "value")
 
-  dcast(melt(info[type=="binned"],id.vars = c("name","type","resolution"))[
+
+    
+    
+      dcast(melt(info[type=="binned"],id.vars = c("name","type","resolution"))[
     ,mean(value,na.rm=T),by=c("type","resolution","variable")],type+resolution~variable,value.var="V1")
   #enrichment vs detection type
   enrich=info[,.(name,resolution,type,Jdset=c(JGM,JIMR),Jrep=c(J1,J2))][(Jdset+Jrep)>0]
