@@ -122,7 +122,7 @@ if (F) {
   #side-by-side at 5k: binless difference
   mat=get_binless_differences(cs,ref=cs@experiments[1,name])
   plot_binless_difference_matrix(mat)
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base10at",resolution/1000,"_binless_differences.pdf"),width=15,height=5)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless_differences.pdf"),width=15,height=5)
 
   
   resolution=10000
