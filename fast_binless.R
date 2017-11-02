@@ -38,8 +38,6 @@ nouter=25
 lam2=5
 tol_val=2e-1
 bg_steps=5
-setwd("..")
-mat=fread("gzcat ../binless/example/rao_HiCall_FOXP1ext_2.3M_mat_5kb.dat.gz",stringsAsFactors = T)
 out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, nouter, tol_val, bg_steps)
 
 
@@ -47,26 +45,27 @@ out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, nouter, tol_val, bg_s
 #all data
 a=as.data.table(out$mat)
 #observed matrix (input data)
-plot_binless_matrix(a, upper="log(observed)", lower="log(observed)")
+plot_binless_matrix(a, upper="observed", lower="observed")
+#ggsave(filename="example/rao_HiCall_FOXP1ext_2.3M_fast_binless_observed.pdf", width=18,height=8)
 #fitted background
-plot_binless_matrix(a, upper="log_background", lower="log_background")
+plot_binless_matrix(a, upper="log_background", lower="log_background", trans="identity")
 #fitted biases
-ggplot(data.table(bin=1:nlevels(mat[,bin1]),log_biases=out$log_biases))+geom_point(aes(bin,log_biases,colour="cpp"))#+
+ggplot(data.table(bin=1:nlevels(mat[,bin1]),log_biases=out$log_biases))+geom_point(aes(bin,log_biases,colour="cpp"))
 #biases matrix
-plot_binless_matrix(a, upper="log_biases", lower="log_biases")
+plot_binless_matrix(a, upper="log_biases", lower="log_biases", trans="identity")
 #fitted decay
-ggplot(data.table(distance=1:nlevels(mat[,bin1]),log_decay=out$log_decay))+geom_point(aes(distance,log_decay,colour="cpp"))#+
+ggplot(data.table(distance=1:nlevels(mat[,bin1]),log_decay=out$log_decay))+geom_point(aes(distance,log_decay,colour="cpp"))
 #decay matrix
-plot_binless_matrix(a, upper="log_decay", lower="log_decay")
+plot_binless_matrix(a, upper="log_decay", lower="log_decay", trans="identity")
 #signal matrix ( = what is different from the background)
-plot_binless_matrix(a, upper="log_signal", lower="log_signal")
+plot_binless_matrix(a, upper="log_signal", lower="log_signal", trans="identity")
 #weights ( = 1/variance )
-plot_binless_matrix(a, upper="log(weights)", lower="log(weights)")
+plot_binless_matrix(a, upper="weights", lower="weights")
 #binless matrix ( = signal + decay)
-plot_binless_matrix(a, upper="log_binless", lower="log_binless")
+plot_binless_matrix(a, upper="log_binless", lower="log_binless", trans="identity")
 #binless and observed
-plot_binless_matrix(a, upper="log_binless", lower="log(observed)")
-#ggsave(filename="example/rao_HiCall_FOXP1ext_2.3M_binless_signal.pdf", width=18,height=8)
+plot_binless_matrix(a, upper="log_binless", lower="log(observed)", trans="identity")
+#ggsave(filename="example/rao_HiCall_FOXP1ext_2.3M_fast_binless.pdf", width=18,height=8)
 
 
 ### Difference detection
@@ -78,8 +77,8 @@ tol_val=2e-1
 diff=as.data.table(binless:::fast_binless_difference(out, lam2, ref, tol_val))
 
 #log(observed)
-plot_binless_matrix(diff, upper="log(observed)", lower="log(observed)")
+plot_binless_matrix(diff, upper="observed", lower="observed")
 #log difference of all datasets wrt ref
-plot_binless_matrix(diff[name!=ref], upper="log_difference", lower="log_difference")
-#ggsave(filename="example/rao_HiCall_FOXP1ext_2.3M_binless_difference.pdf", width=10,height=8)
+plot_binless_matrix(diff[name!=ref], upper="log_difference/log(2)", lower="log_difference/log(2)", trans="identity", label="log2 FC", limits = c(-3,3))
+#ggsave(filename="example/rao_HiCall_FOXP1ext_2.3M_fast_binless_difference.pdf", width=10,height=8)
 

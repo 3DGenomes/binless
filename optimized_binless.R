@@ -55,11 +55,11 @@ cs=bin_all_datasets(cs, ncores=ncores)
 #You can get the generated matrices (as data.table objects) with the call
 mat=get_binned_matrices(cs)
 #Here we plot the observed counts
-plot_binless_matrix(mat, upper="log(observed)", lower="log(observed)")
+plot_binless_matrix(mat, upper="observed", lower="observed")
 #The optimized background (upper panel), and its estimated standard deviation 
-plot_binless_matrix(mat, upper="log(background)", lower="log(background.sd)")
+plot_binless_matrix(mat, upper="background", lower="background.sd")
 #The "normalized" (ICE-like) matrix, where we simply subtract the estimated biases from the raw data 
-plot_binless_matrix(mat, upper="log(normalized)", lower="log(normalized)")
+plot_binless_matrix(mat, upper="normalized", lower="normalized")
 
 #If you have more than one dataset, you can group data, by providing the appropriate grouping
 #Imagine you have two replicates and two conditions, you could group the data using group="condition"
@@ -81,9 +81,10 @@ mat=get_binless_interactions(cs)
 #Any signal that has a log2 fold change larger than 3 will be capped at that maximum, for visualization.
 plot_binless_signal_matrix(mat)
 #The binless matrix corresponds to the signal matrix plus the estimated decay
-plot_binless_matrix(mat, upper="log(binless)", lower="log(binless)")
+plot_binless_matrix(mat, upper="binless", lower="binless")
+#ggsave(filename="example/rao_HiCall_FOXP1ext_2.3M_optimized_binless.pdf", width=18,height=8)
 #Binless matrices can be visually compared to the raw data to validate the normalization
-plot_binless_matrix(mat, upper="log(binless)", lower="log(observed)")
+plot_binless_matrix(mat, upper="binless", lower="observed")
 
 
 ### Obtaining binless difference matrices
@@ -104,6 +105,7 @@ mat=get_binless_differences(cs, ref = ref)
 #"difference" is a fold change. Notice the different function call, which ensures the colour scale ranges from -3 to 3.
 #Any difference that has a log2 fold change larger than 3 (in absolute value) will be capped at that value, for visualization.
 plot_binless_difference_matrix(mat[name!=ref])
+#ggsave(filename="example/rao_HiCall_FOXP1ext_2.3M_optimized_binless_difference.pdf", width=10,height=8)
 
 ### This concludes the quick tour on binless normalization!
 ### We hope you will enjoy the software and please do not hesitate to report
