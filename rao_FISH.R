@@ -1,4 +1,4 @@
-library(csnorm)
+library(binless)
 library(data.table)
 library(ggplot2)
 library(doParallel)
@@ -37,7 +37,7 @@ if (FALSE) {
 #load(paste0("data/rao_HiCall_GM12878_",sub,"_csdata.RData"))
 #csd1=csd
 #cs=merge_cs_norm_datasets(list(csd1), different.decays="none", dfuse=dfuse, qmin=qmin)
-#cs = run_gauss(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
+#cs = normalize_binless(cs, restart=F, bf_per_kb=bpk, bf_per_decade=bpd, bins_per_bf=bpb,
 #               ngibbs = 25, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
 #               ncounts = 1000000, ncores=ncores, base.res=10000, fit.signal=T, fit.disp=T, fit.decay=T, fit.genomic=T)
 #save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base10k_bpk",bpk,"_dfuse",dfuse,"_cv_cvsd_outlier_rmdiag.RData"))
@@ -78,7 +78,7 @@ if(F) {
                   csi@settings$min.l10FC=0.2
                   mat=get_interactions(cs, type="CSbsig", resolution=resolution, group="all")
                   mat[,value:=phi]
-                  mat = csnorm:::detect_binless_patches(mat, csi@settings)
+                  mat = binless:::detect_binless_patches(mat, csi@settings)
                   mat[,value:=NULL]
                   mat[,phi.max:=ifelse(is.maximum==T,NA,phi)]
                   mat=merge(mat,get_matrices(cs, resolution=resolution, group="all")[,.(name,bin1,bin2,decaymat)],by=c("name","bin1","bin2"))

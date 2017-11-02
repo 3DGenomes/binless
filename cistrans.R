@@ -1,4 +1,4 @@
-library(csnorm)
+library(binless)
 library(data.table)
 library(ggplot2)
 library(doParallel)
@@ -35,6 +35,6 @@ ggplot(melt(cistrans,id.vars=c("run")))+geom_point(aes(run,value,colour=variable
 
 ggplot(cistrans,aes(100-dangling.pc,cis.pc))+geom_point()+theme_minimal()+stat_smooth(method="lm")+
   labs(x="ligation ratio (%)", y="cis interactions (%)")
-ggsave(filename="images/cistrans_vs_dangling.png",width=6,height=5)
+ggsave(filename="images/cistrans_vs_dangling.pdf",width=6,height=5)
 cistrans[,summary(lm(cis.pc~I(100-dangling.pc)))]
 cistrans[,cor.test(dangling.pc,cis.pc)]

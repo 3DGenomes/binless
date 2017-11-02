@@ -1,6 +1,6 @@
 library(ggplot2)
 library(data.table)
-library(csnorm)
+library(binless)
 library(foreach)
 library(doParallel)
 library(scales)
@@ -27,40 +27,55 @@ a=examine_dataset("/scratch/rao/mapped/IMR90_MboI_in_situ/IMR90_MboI_HICall_Peak
 #they contain the respective CSdata objects
 
 registerDoParallel(cores=10)
-foreach (chr=c("chrX","chr1","chr1","chr7","chr3","chr4","chr21","chr21","chr5","chr12","chr21","chr22","chr1"),
-         name=c("Peak1","SELP","Talk","SEMA3C","FOXP1","PARM1","Comparison","ADAMTS1","ADAMTS2","TBX3","Fig1C","22qter","Tbx19"),
-         size=c("450k","150k","2M","1M","1.3M","600k","1.7M","2.3M","450k","1.5M","1M","1.7M")) %do% {
-           cat(chr,name,size,"\n")
-           csd=read_and_prepare(paste0("/scratch/rao/mapped/GM12878_MboI_in_situ/GM12878_MboI_HICall_",name,".tsv"),
-                                paste0("data/rao_HiCall_GM12878_",name,"_",size), "GM", "1",
-                                enzyme="MboI", name=paste(name,"GM12878 all"), circularize=-1, dangling.L=c(0),
-                                dangling.R=c(3), maxlen=900, read.len=101, dmin=1000, save.data=T)
-           for (run in c("03","06")) {
-             csd=read_and_prepare(paste0("/scratch/rao/mapped/GM12878_MboI_in_situ/GM12878_MboI_HIC0",run,"_",name,".tsv"),
-                                  paste0("data/rao_HiC0",run,"_GM12878_",name,"_",size), "GM", run,
-                                  enzyme="MboI", name=paste(name,"GM12878",run), circularize=-1, dangling.L=c(0),
-                                  dangling.R=c(3), maxlen=900, read.len=101, dmin=1000, save.data=T)
-           }
-           csd=read_and_prepare(paste0("/scratch/rao/mapped/IMR90_MboI_in_situ/IMR90_MboI_HICall_",name,".tsv"),
-                                paste0("data/rao_HiCall_IMR90_",name,"_",size), "IMR90", "1",
-                                enzyme="MboI", name=paste(name,"IMR90 all"), circularize=-1, dangling.L=c(0),
-                                dangling.R=c(3), maxlen=600, read.len=101, dmin=1000, save.data=T)
-           for (run in c("53","55")) {
-             csd=read_and_prepare(paste0("/scratch/rao/mapped/IMR90_MboI_in_situ/IMR90_MboI_HIC0",run,"_",name,".tsv"),
-                                  paste0("data/rao_HiC0",run,"_IMR90_",name,"_",size), "IMR90", run,
-                                  enzyme="MboI", name=paste(name,"IMR90",run), circularize=-1, dangling.L=c(0),
-                                  dangling.R=c(3), maxlen=600, read.len=101, dmin=1000, save.data=T)
-           }
+chrs=c("chrX",  "chr1", "chr1", "chr7",   "chr3",  "chr4",  "chr21",      "chr21",   "chr5",    "chr12", "chr21", "chr22",  "chr1",  "chr3",     "chr3")
+names=c("Peak1","SELP", "Talk", "SEMA3C", "FOXP1", "PARM1", "Comparison", "ADAMTS1", "ADAMTS2", "TBX3",  "Fig1C", "22qter", "Tbx19", "FOXP1ext", "FOXP1big")
+sizes=c("450k", "150k", "2M",   "1M",     "1.3M",  "600k",  "1.7M",       "2.3M",    "450k",    "1.5M",  "1M",    "1.7M",   "700k",  "2.3M",     "5M")
+foreach (chr=chrs, name=names, size=sizes, .errorhandling="remove") %dopar% {
+  cat(chr,name,size,"\n")
+  if (F) {
+    csd=read_and_prepare(paste0("zcat /scratch/rao/mapped/GM12878_MboI_in_situ/GM12878_MboI_HICall_",name,".tsv.gz"),
+                         paste0("data/rao_HiCall_GM12878_",name,"_",size), "GM", "1",
+                         enzyme="MboI", name=paste(name,"GM12878 all"), circularize=-1, dangling.L=c(0),
+                         dangling.R=c(3), maxlen=900, read.len=101, dmin=1000, save.data=T)
+    for (run in c("03","06")) {
+      csd=read_and_prepare(paste0("zcat /scratch/rao/mapped/GM12878_MboI_in_situ/GM12878_MboI_HIC0",run,"_",name,".tsv.gz"),
+                           paste0("data/rao_HiC0",run,"_GM12878_",name,"_",size), "GM", run,
+                           enzyme="MboI", name=paste(name,"GM12878",run), circularize=-1, dangling.L=c(0),
+                           dangling.R=c(3), maxlen=900, read.len=101, dmin=1000, save.data=T)
+    }
+    csd=read_and_prepare(paste0("zcat /scratch/rao/mapped/IMR90_MboI_in_situ/IMR90_MboI_HICall_",name,".tsv.gz"),
+                         paste0("data/rao_HiCall_IMR90_",name,"_",size), "IMR90", "1",
+                         enzyme="MboI", name=paste(name,"IMR90 all"), circularize=-1, dangling.L=c(0),
+                         dangling.R=c(3), maxlen=600, read.len=101, dmin=1000, save.data=T)
+    for (run in c("53","55")) {
+      csd=read_and_prepare(paste0("zcat /scratch/rao/mapped/IMR90_MboI_in_situ/IMR90_MboI_HIC0",run,"_",name,".tsv.gz"),
+                           paste0("data/rao_HiC0",run,"_IMR90_",name,"_",size), "IMR90", run,
+                           enzyme="MboI", name=paste(name,"IMR90",run), circularize=-1, dangling.L=c(0),
+                           dangling.R=c(3), maxlen=600, read.len=101, dmin=1000, save.data=T)
+    }
+  }
+  for (run in c("odd","even")) {
+    csd=read_and_prepare(paste0("zcat /scratch/rao/mapped/GM12878_MboI_in_situ/GM12878_MboI_HIC",run,"_",name,".tsv.gz"),
+                         paste0("data/rao_HiC",run,"_GM12878_",name,"_",size), "GM", run,
+                         enzyme="MboI", name=paste(name,"GM12878",run), circularize=-1, dangling.L=c(0),
+                         dangling.R=c(3), maxlen=900, read.len=101, dmin=1000, save.data=T)
+  }
+  for (run in c("odd","even")) {
+    csd=read_and_prepare(paste0("zcat /scratch/rao/mapped/IMR90_MboI_in_situ/IMR90_MboI_HIC",run,"_",name,".tsv.gz"),
+                         paste0("data/rao_HiC",run,"_IMR90_",name,"_",size), "IMR90", run,
+                         enzyme="MboI", name=paste(name,"IMR90",run), circularize=-1, dangling.L=c(0),
+                         dangling.R=c(3), maxlen=600, read.len=101, dmin=1000, save.data=T)
+  }
 }
 
 
 #here we plot the raw reads. We need to load the full csdata object, as only the one without the raw reads is returned.
-load("data/rao_HiCall_GM12878_Tbx19_700k_csdata_with_data.RData")
+load("data/rao_HiCall_GM12878_FOXP1big_5M_csdata_with_data.RData")
 data=get_raw_reads(csd@data, csd@biases[,min(pos)], csd@biases[,max(pos)])
 plot_binned(data, resolution=10000, b1=csd@biases[,min(pos)], e1=csd@biases[,max(pos)])
 plot_raw(data[rbegin2<min(rbegin1)+10000])
 
-load("data/rao_HiCall_IMR90_Tbx19_700k_csdata_with_data.RData")
+load("data/rao_HiCall_IMR90_FOXP1big_5M_csdata_with_data.RData")
 data2=get_raw_reads(csd@data, csd@biases[,min(pos)], csd@biases[,max(pos)])
 plot_binned(data2, resolution=10000, b1=csd@biases[,min(pos)], e1=csd@biases[,max(pos)])
 plot_raw(data2[rbegin2<min(rbegin1)+10000])
@@ -76,7 +91,7 @@ plot_raw(data2[rbegin2<min(rbegin1)+10000])
 #prefix: if you set this, individual optimizations will be stored using that prefix. Can be useful for recovery of a failed normalization.
 load("data/rao_HiCall_chrX_450k_csdata.RData")
 cs=merge_cs_norm_datasets(list(csd), different.decays = "none")
-cs = run_gauss(cs, bf_per_kb=5, bf_per_decade=10, bins_per_bf=10, lambdas=10**seq(from=-2,to=2,length.out=10),
+cs = normalize_binless(cs, bf_per_kb=5, bf_per_decade=10, bins_per_bf=10, lambdas=10**seq(from=-2,to=2,length.out=10),
                ngibbs = 20, iter=10000, verbose=T,
                prefix="tmp/rao_HiCall_chrX_450k", ncores=10)
 save(cs, file="data/rao_HiCall_chrX_450k_csnorm_optimized.RData")
