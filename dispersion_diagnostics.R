@@ -30,7 +30,7 @@ if (F) {
   biases[,log_mean_RJ:=cs@par$eRJ[1]+(log_rho+log_iota)/2.]
 }
 
-load("tmp/dispersion_diag.RData")
+#load("tmp/dispersion_diag.RData")
 
 counts=rbind(counts[,.(name,bin1,bin2,phi,id1,id2,pos1,pos2,distance,log_decay,count=contact.close,log_mean=log_mean_cclose,type="contact",subtype="close")],
              counts[,.(name,bin1,bin2,phi,id1,id2,pos1,pos2,distance,log_decay,count=contact.down,log_mean=log_mean_cdown,type="contact",subtype="down")],

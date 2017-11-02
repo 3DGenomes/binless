@@ -60,31 +60,35 @@ if (nsig>=1) {
 
 cs=merge_cs_norm_datasets(datasets, different.decays="none", dfuse=5,qmin=0.)
 
-base.res=10000
+base.res=5000
 
-cs = normalize_binless(cs, restart=F, bf_per_kb=30, bf_per_decade=10, bins_per_bf=10,
-               ngibbs = 25, iter=100000, init_alpha=1e-7, init.dispersion = 1, tol.obj=1e-2, tol.leg=1e-4,
-               ncounts = 1000000, ncores=5, base.res=base.res, fit.signal=fit.signal, fit.disp=T, fit.decay=T, fit.genomic=T)
+cs <- normalize_binless(cs, restart=F, ncores=ncores, base.res=base.res, fit.signal = fit.signal, tol=1e-4)
 
 save(cs,file=paste0("data/fake_",nbg,"bg_",nsig,"sig_",fit.signal,"_csnorm_optimized.RData"))
 
-for (resolution in c(base.res,5000,20000)) {
+for (resolution in c(5000)) {
   cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
   cs=detect_binned_interactions(cs, resolution=resolution, group="all", ncores=ncores)
   cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
   if (nbg+nsig>1) {
-    ref=cs@experiments[1,name]
-    cs=detect_binned_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
-    cs=detect_binless_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
+    cs=detect_binned_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])
+    cs=detect_binless_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])
   }
   save(cs,file=paste0("data/fake_",nbg,"bg_",nsig,"sig_",fit.signal,"_csnorm_optimized.RData"))
 }
 
-
 if (F) {
-  
   load(paste0("data/fake_",nbg,"bg_",nsig,"sig_",fit.signal,"_csnorm_optimized.RData"))
   
+  mat=get_binned_matrices(cs,5000,"all")
+  plot_binless_matrix(mat,upper="log(normalized)",lower="log(normalized)")
+  
+  biases=merge(rbindlist(lapply(cs@diagnostics$params[leg=="bias",log_iota],function(x){cs@biases[,.(name,pos,log_iota=x)]}),use=T,id="step"),
+               rbindlist(lapply(cs@diagnostics$params[leg=="bias",log_rho],function(x){cs@biases[,.(name,pos,log_rho=x)]}),use=T,id="step"))[name==name[1]]
+  biases=melt(biases,id=c("step","name","pos"))
+  ggplot(biases)+geom_line(aes(pos,value,colour=variable))+facet_grid(step~variable)
+  
+
   binless:::has_converged(cs)
   cs@diagnostics$params[,sum(runtime)/3600]
   ggplot(cs@diagnostics$params[,.(step,leg,runtime)])+geom_line(aes(step,runtime,colour=leg))+scale_y_log10()
