@@ -15,10 +15,11 @@ future.
 
 ### How does it work?
 
-In the `example/` folder, we provide files to play with, taken from publicly
-available data (Rao *et al.*, 2014). Alternatively you can use your own data.
-Start with something not too large, for example 2Mb. If you want a quick and
-dirty overview, skip to the *Fast binless* section. Otherwise, read on.
+In the `example/` folder, we provide plots and files to perform a normalization,
+taken from publicly available data (Rao *et al.*, 2014). Alternatively you can
+use your own data.  Start with something not too large, for example 2Mb. If you
+want a quick and dirty overview, skip to the *Fast binless* section. Otherwise,
+read on.
 
 ### Preprocessing
 
