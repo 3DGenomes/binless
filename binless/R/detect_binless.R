@@ -421,6 +421,7 @@ detect_binless_differences = function(cs, ref, resolution=cs@settings$base.res, 
   if (get_cs_interaction_idx(csg, type="CSbdiff", ref=ref, raise=F)>0)
     stop("Refusing to overwrite this already detected interaction")
   if (is.character(ref)) ref=csg@names[as.character(groupname)==ref,unique(groupname)]
+  if (length(ref) == 0) stop(paste0("Invalid ref! For group by ",group,", acceptable refs are: ",paste(levels(ref),collapse=" / ")))
   if (verbose==T) cat("  Prepare for difference estimation\n")
   csi = binless:::prepare_difference_estimation(cs, csg, resolution, ref, tol.val)
   #
