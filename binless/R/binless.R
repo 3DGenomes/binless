@@ -170,7 +170,7 @@ setMethod("show",signature="CSgroup",definition=function(object) {
   } else {
     cat("   *** Group [", object@group,"] at", object@resolution/1000, "kb resolution")
   }
-  cat( " : ", object@names[,do.call(paste,c(as.list(groupname), sep=" / "))], "\n")
+  cat( " : ", paste0(object@names[,levels(groupname)], collapse=" / "), "\n")
   if (length(object@interactions)==0) {
     cat("        No interactions computed\n")
   } else {
