@@ -2,6 +2,8 @@
 
 ## Resolution-independent normalization of Hi-C data
 
+Refer to the [CHANGELOG](CHANGELOG.md) for the latest changes
+
 ### Installation
 
 * Download this repository to a fresh folder on your computer
