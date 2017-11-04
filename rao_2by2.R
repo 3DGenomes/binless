@@ -56,15 +56,15 @@ if (plot==T) {
   #load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k_minlambda25.RData"))
   resolution=5000
   mat=get_binless_interactions(cs, resolution)
-  plot_binless_matrix(mat,upper="log(observed)",lower="log(observed)")
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_observed.pdf"),width=15,height=15)
-  plot_binless_matrix(mat,upper="log(binless)",lower="log(binless)")
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless.pdf"),width=15,height=15)
-  plot_binless_signal_matrix(mat)
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_signal.pdf"),width=15,height=15)
+  plot_binless_matrix(mat,upper="observed",lower="observed")+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_observed.pdf"),width=20,height=8)
+  plot_binless_matrix(mat,upper="binless",lower="binless")+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless.pdf"),width=20,height=8)
+  plot_binless_signal_matrix(mat)+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_signal.pdf"),width=20,height=8)
   mat=get_binless_differences(cs, cs@experiments[1,name],resolution)
-  plot_binless_difference_matrix(mat)
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_difference.pdf"),width=15,height=8)
+  plot_binless_difference_matrix(mat)+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_difference.pdf"),width=16,height=8)
   #
   #mat=get_binless_interactions(cs, resolution, group="condition")
   #plot_binless_matrix(mat,upper="log(observed)",lower="log(observed)")
@@ -87,69 +87,69 @@ if (F) {
   
   #side-by-side at 5k: observed
   mat=get_binned_matrices(cs, resolution=resolution, group="all")
-  plot_binless_matrix(mat,upper="observed",lower="observed")
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_observed.pdf"),width=10,height=10)
+  plot_binless_matrix(mat,upper="observed",lower="observed")+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_observed.pdf"),width=20,height=8)
   
   #side-by-side at 5k: signal
   mat=get_binned_interactions(cs, resolution=resolution, group="all")
   mat[,is.significant:=prob.gt.expected>1-1e-12]
-  plot_binless_signal_matrix(mat) + geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_signal.pdf"),width=10,height=10)
+  plot_binless_signal_matrix(mat) + geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_signal.pdf"),width=20,height=8)
   
   #side-by-side at 5k: normalized
   mat=get_binned_interactions(cs, resolution=resolution, group="all")
   mat[,is.significant:=prob.gt.expected>1-1e-12]
-  plot_binless_matrix(mat, upper="normalized", lower="normalized") + geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_normalized.pdf"),width=10,height=10)
+  plot_binless_matrix(mat, upper="normalized", lower="normalized") + geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_normalized.pdf"),width=20,height=8)
   
   #side-by-side at 5k: differences
   mat=get_binned_differences(cs, resolution=resolution, group="all", ref=cs@experiments[1,name])
   mat[,is.significant:=pmax(`prob.gt.TBX3 GM12878 odd`,1-`prob.gt.TBX3 GM12878 odd`)>1-1e-12]
   mat[,direction:=ordered(direction,c("enriched","depleted"))]
-  plot_binless_difference_matrix(mat) + geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_differences.pdf"),width=15,height=5)
+  plot_binless_difference_matrix(mat) + geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_differences.pdf"),width=16,height=8)
   
   #side-by-side at 5k: binless signal
   mat=get_binless_interactions(cs)
-  plot_binless_signal_matrix(mat)
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless_signal.pdf"),width=10,height=10)
+  plot_binless_signal_matrix(mat)+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless_signal.pdf"),width=20,height=8)
   
   #side-by-side at 5k: binless matrix
   mat=get_binless_interactions(cs)
-  plot_binless_matrix(mat, upper="binless", lower="binless")
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless.pdf"),width=10,height=10)
+  plot_binless_matrix(mat, upper="binless", lower="binless")+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless.pdf"),width=20,height=8)
   
   #side-by-side at 5k: binless difference
   mat=get_binless_differences(cs,ref=cs@experiments[1,name])
-  plot_binless_difference_matrix(mat)
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless_differences.pdf"),width=15,height=5)
+  plot_binless_difference_matrix(mat)+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless_differences.pdf"),width=16,height=8)
 
   
   resolution=10000
   
   #side-by-side at 10k: observed
   mat=get_binned_matrices(cs, resolution=resolution, group="all")
-  plot_binless_matrix(mat,upper="observed",lower="observed")
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_observed.pdf"),width=10,height=10)
+  plot_binless_matrix(mat,upper="observed",lower="observed")+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_observed.pdf"),width=20,height=8)
   
   #side-by-side at 10k: signal
   mat=get_binned_interactions(cs, resolution=resolution, group="all")
   mat[,is.significant:=prob.gt.expected>1-1e-12]
-  plot_binless_signal_matrix(mat) + geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_signal.pdf"),width=10,height=10)
+  plot_binless_signal_matrix(mat) + geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_signal.pdf"),width=20,height=8)
   
   #side-by-side at 10k: normalized
   mat=get_binned_interactions(cs, resolution=resolution, group="all")
   mat[,is.significant:=prob.gt.expected>1-1e-12]
-  plot_binless_matrix(mat, upper="normalized", lower="normalized") + geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_normalized.pdf"),width=10,height=10)
+  plot_binless_matrix(mat, upper="normalized", lower="normalized") + geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_normalized.pdf"),width=20,height=8)
   
   #side-by-side at 10k: differences
   mat=get_binned_differences(cs, resolution=resolution, group="all", ref=cs@experiments[1,name])
   mat[,is.significant:=pmax(`prob.gt.TBX3 GM12878 odd`,1-`prob.gt.TBX3 GM12878 odd`)>1-1e-12]
   mat[,direction:=ordered(direction,c("enriched","depleted"))]
-  plot_binless_difference_matrix(mat) + geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_differences.pdf"),width=15,height=5)
+  plot_binless_difference_matrix(mat) + geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_differences.pdf"),width=16,height=8)
   
   
   #get statistics on signal matrices
