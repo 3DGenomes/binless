@@ -14,9 +14,9 @@ base.res=5000
 
 setwd("/home/yannick/simulations/cs_norm")
 
-fit=T
+fit=F
 bin=T
-plot=T
+plot=F
 
 if (fit==T) {
   load(paste0("data/rao_HiCodd_GM12878_",sub,"_csdata.RData"))
@@ -33,6 +33,7 @@ if (fit==T) {
 }
 
 if (bin==T) {
+  load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
   foreach (resolution=c(5000,10000),.errorhandling = "pass") %do% {
     cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
     cs=detect_binned_interactions(cs, resolution=resolution, group="all", ncores=ncores)
@@ -153,27 +154,28 @@ if (F) {
   
   
   #get statistics on signal matrices
-  resolution=5000
+  resolution=10000
   data=data.table()
     
-    #jacard for binned interactions
-    mat=get_binned_interactions(cs, resolution=resolution, group="all")[!is.na(is.significant)]
-    #number of significant interactions
-    dt=mat[,.(num=sum(is.significant)),by=name][
-      ,.(name=sub,type="binned",resolution=resolution,variable=c("GM1","GM2","IMR1","IMR2"),value=num)]
-    data=rbind(data,dt)
-    #number of significant interactions
-    compnames=data.table(t(matrix(cs@experiments[,name][c(c(1,2),c(1,3),c(2,4),c(3,4))],nrow=2)))
-    dt = foreach (nref=compnames[,V1],n=compnames[,V2],.combine=rbind) %do% {
-      refmat=mat[name==nref,.(bin1,bin2,ref.is=is.significant)]
-      merge(mat[name==n,.(name,bin1,bin2,is=is.significant)],refmat,by=c("bin1","bin2"))[
-        ,.(ref=nref,N=sum(is),refN=sum(ref.is),inter=sum(is==T&ref.is==T),union=sum(is==T|ref.is==T),
-           jacard=sum(is==T&ref.is==T)/sum(is==T|ref.is==T)),by=name]
-    }
-    data=rbind(data,
-               dt[,.(name=sub,type="binned",resolution=resolution,variable=c("NGM","N1","N2","NIMR"),value=inter)],
-               dt[,.(name=sub,type="binned",resolution=resolution,variable=c("JGM","J1","J2","JIMR"),value=jacard)])
-    
+  #jacard for binned interactions
+  mat=get_binned_interactions(cs, resolution=resolution, group="all")[!is.na(is.significant)]
+  #number of significant interactions
+  dt=mat[,.(num=sum(is.significant)),by=name][
+    ,.(name=sub,type="binned",resolution=resolution,variable=c("GM1","GM2","IMR1","IMR2"),value=num)]
+  data=rbind(data,dt)
+  #number of significant interactions
+  compnames=data.table(t(matrix(cs@experiments[,name][c(c(1,2),c(1,3),c(2,4),c(3,4))],nrow=2)))
+  dt = foreach (nref=compnames[,V1],n=compnames[,V2],.combine=rbind) %do% {
+    refmat=mat[name==nref,.(bin1,bin2,ref.is=is.significant)]
+    merge(mat[name==n,.(name,bin1,bin2,is=is.significant)],refmat,by=c("bin1","bin2"))[
+      ,.(ref=nref,N=sum(is),refN=sum(ref.is),inter=sum(is==T&ref.is==T),union=sum(is==T|ref.is==T),
+         jacard=sum(is==T&ref.is==T)/sum(is==T|ref.is==T)),by=name]
+  }
+  
+  data
+  dt[,.(name=sub,type="binned",resolution=resolution,variable=c("NGM","N1","N2","NIMR"),value=inter)]
+  dt[,.(name=sub,type="binned",resolution=resolution,variable=c("JGM","J1","J2","JIMR"),value=jacard)]
+  
     #jacard for binless interactions
     idx1=get_cs_group_idx(cs, resolution, "all", raise=T)
     csg=cs@groups[[idx1]]
