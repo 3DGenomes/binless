@@ -18,10 +18,12 @@ gfl_BIC = function(csig, lambda2, constrained=T, positive=T, fixed=F, fix.lambda
   nperf=csig@settings$nperf
   if (is.null(ctsg.ref)) {
     perf.c = binless:::wgfl_signal_BIC(ctsg, dispersion, nperf, nbins, state$GFLState, lambda2,
-                                      tol.val, metadata, state$beta, constrained, fixed, positive, fix.lambda1, fix.lambda1.at)
+                                      tol.val, metadata, csig@settings$last.beta,
+                                      constrained, fixed, positive, fix.lambda1, fix.lambda1.at)
   } else {
     perf.c = binless:::wgfl_diff_BIC(ctsg, ctsg.ref, dispersion, nperf, nbins, state$GFLState, lambda2,
-                                      tol.val, metadata, state$phi.ref, state$beta, constrained, fix.lambda1, fix.lambda1.at)
+                                     tol.val, metadata, csig@settings$last.phi.ref, csig@settings$last.beta,
+                                     constrained, fix.lambda1, fix.lambda1.at)
   }
   return(perf.c)
 }
@@ -362,6 +364,7 @@ detect_binless_interactions = function(cs, resolution=cs@settings$base.res, grou
   groupnames=csi@cts[,unique(name)]
   csigs = foreach(g=groupnames) %do% {
     csig = new("CSbsig", mat=csi@mat[name==g], cts=csi@cts[name==g], settings=csi@settings)
+    csig@settings$last.beta=csi@mat[name==g,phi]
     csig@state = binless:::gfl_compute_initial_state(csig, diff=F)
     csig
   }
@@ -431,6 +434,8 @@ detect_binless_differences = function(cs, ref, resolution=cs@settings$base.res, 
   csigs = foreach (g=groupnames) %do% {
     csig = new("CSbdiff", mat=csi@mat[name==g], cts=csi@cts[name==g], cts.ref=csi@cts.ref,
                ref=csi@ref, settings=csi@settings)
+    csig@settings$last.beta=csi@mat[name==g,delta]
+    csig@settings$last.phi.ref=csi@mat[name==g,phi.ref]
     csig@state = binless:::gfl_compute_initial_state(csig, diff=T)
     csig
   }

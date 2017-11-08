@@ -691,6 +691,7 @@ gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.
     csig=new("CSbsig", mat=cs@par$signal[name==g], cts=cts[name==g],
              settings=list(metadata=metadata,
                            nbins=nbins, dispersion=cs@par$alpha,
+                           last.beta=cs@par$signal[name==g,beta],
                            tol.val=cs@par$tol_signal, nperf=1)) #only one IRLS iteration
     csig@state = binless:::gfl_compute_initial_state(csig, diff=F)
     csig
@@ -875,7 +876,7 @@ prepare_first_signal_estimation = function(biases, names, base.res) {
   signal.bins=unique(cut(c(sbins,head(sbins,n=-1)+base.res/2), sbins,
                          ordered_result=T, right=F, include.lowest=T,dig.lab=12))
   signal.mat=CJ(name=names,bin1=signal.bins,bin2=signal.bins,sorted=F,unique=F)[bin2>=bin1]
-  signal.mat[,phi:=0]
+  signal.mat[,c("phi","beta"):=list(0,0)]
   setkey(signal.mat,name,bin1,bin2)
   stopifnot(all(signal.mat[,.N,by=name]$N==signal.mat[,nlevels(bin1)*(nlevels(bin1)+1)/2]))
   return(list(signal=signal.mat,sbins=sbins))
