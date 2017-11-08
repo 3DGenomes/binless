@@ -673,6 +673,18 @@ get_signal_metadata = function(cs, cts, resolution) {
   return(list(bad.diagonals=bad.diagonals,bad.rows=bad.rows, diag.grp=orth[,rank]))
 }
 
+
+#' make a summarized cts matrix used for one IRLS iteration
+#' @keywords internal
+#' 
+compress_cts = function(cs, cts) {
+  cts.new = cts[,.(phihat=weighted.mean(count/mu-1,weight/(2*var)), weight=sum(weight/(2*var)),
+                   log_decay=weighted.mean(log_decay,weight)), keyby=c("name","bin1","bin2")]
+  cts.new[,count:=phihat+2] #or any strictly positive number (but beware of exp(lmu.nosig) )
+  cts.new = cs@par$signal[,.(name,bin1,bin2,phi)][cts.new]
+  cts.new[,.(name,bin1,bin2,count,lmu.nosig=log(count/(phihat+1))-phi, log_decay, weight=2*weight*(1/cs@par$alpha + (1+phihat)/count))]
+}
+
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
@@ -682,6 +694,7 @@ gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.
   #cts.common = binless:::gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   cts = binless:::gauss_signal_muhat_mean(cs, cts.common)
   metadata = binless:::get_signal_metadata(cs, cts, cs@settings$base.res)
+  cts = binless:::compress_cts(cs, cts)
   #
   if (verbose==T) cat("  predict\n")
   #perform fused lasso on signal
