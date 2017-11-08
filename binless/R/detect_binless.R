@@ -120,9 +120,51 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
   return(csig)
 }
 
+#' cross-validate lambda2 assuming positive=T fixed=F constrained=T n.SD=0 fix.lambda1=T fix.lambda1.at=0
+#' @keywords internal
+optimize_lambda2_normalization = function(csig) {
+  obj = function(x) {
+    l2vals = csig@state$l2vals
+    ret = binless:::gfl_BIC(csig, lambda2=10^(x), constrained=T, positive=T, fixed=F, fix.lambda1=T, fix.lambda1.at=0)
+    ret$l2vals = rbind(csig@state$l2vals,data.table(lambda2=10^(x),BIC=ret$BIC,BIC.sd=ret$BIC.sd))
+    csig@state <<- ret
+    #cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
+    #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " BIC.sd= ", csig@state$BIC.sd, " dof= ",csig@state$dof,"\n")
+    return(csig@state$BIC)
+  }
+  #first, find rough minimum between 2.5 and 100 by gridding
+  minlambda=2.5
+  maxlambda=100
+  npoints=10
+  lvals=10^seq(log10(minlambda),log10(maxlambda),length.out=npoints)
+  op = foreach (lam=lvals,.combine=rbind) %do% obj(log10(lam))
+  op = copy(csig@state$l2vals)
+  setkey(op,lambda2)
+  #ggplot(op)+geom_point(aes(lambda2,BIC))+geom_errorbar(aes(lambda2,ymin=BIC-BIC.sd,ymax=BIC+BIC.sd))+scale_x_log10()+scale_y_log10()
+  #now find the lowest minimum and extract flanking values
+  l2min=op[BIC==min(BIC),min(lambda2)]
+  minlambda=op[lambda2<=l2min][.N-1,lambda2]
+  if (length(minlambda)==0 || is.na(minlambda)) minlambda=l2min
+  maxlambda=op[lambda2>=l2min][2,lambda2]
+  if (length(maxlambda)==0 || is.na(maxlambda)) maxlambda=l2min
+  #cat("minlambda ",minlambda," maxlambda ",maxlambda,"\n")
+  stopifnot(maxlambda>minlambda)
+  #optimize there
+  op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
+  lambda2=10^op$minimum
+  #finish
+  if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
+  if (lambda2==minlambda) cat("   Warning: lambda2 hit lower boundary.\n")
+  obj(log10(lambda2))
+  retvals = as.list(csig@state)[c("lambda2","lambda1","eCprime","BIC","BIC.sd","dof")]
+  csig@par=modifyList(csig@par,retvals)
+  csig@state$l2vals=NULL
+  return(csig)
+}
+
 #' cross-validate lambda2 assuming it is smooth
 #' @keywords internal
-optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA) {
+optimize_lambda2_binning = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA) {
   obj = function(x) {
     l2vals = csig@state$l2vals
     ret = binless:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
@@ -190,6 +232,51 @@ evaluate_at_lambda2 = function(csig, lambda2, constrained=T, positive=T, fixed=F
   return(csig)
 }
 
+
+#' run fused lasso on one dataset contained in csig, assuming positive=T, fixed=F, constrained=T
+#' 
+#' @keywords internal
+fused_lasso_normalization = function(csig, verbose=T, fix.lambda1=F, fix.lambda1.at=0.1, fix.lambda2=F, fix.lambda2.at=NA) {
+  positive=T
+  fixed=F
+  constrained=T
+  n.SD=0
+  if (fix.lambda2==F) {
+    #first we optimize lambda2 without constraints nor soft-thresholding (setting eCprime=0)
+    cat("opt smooth\n")
+    csig = binless:::optimize_lambda2_normalization(csig, n.SD=n.SD, constrained=F, positive=F, fixed=T)
+    #now for that optimum, report the best lambda1 (if optimized) and eCprime
+    cat("eval\n")
+    csig = binless:::evaluate_at_lambda2(csig, csig@par$lambda2, constrained=constrained, positive=positive, fixed=fixed,
+                                         fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+  } else {
+    stopifnot(fix.lambda2.at>0)
+    csig = binless:::evaluate_at_lambda2(csig, fix.lambda2.at, constrained=constrained, positive=positive, fixed=fixed,
+                                         fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+  }
+  #in case we model a constraint, report unconstrained solutions as well
+  lambda1.constr = csig@par$lambda1
+  eCprime.constr = csig@par$eCprime
+  BIC.constr = csig@par$BIC
+  BIC.sd.constr = csig@par$BIC.sd
+  mat.constr = csig@state$mat
+  cat("eval unconstr\n")
+  csig = binless:::evaluate_at_lambda2(csig, csig@par$lambda2, constrained=F, positive=positive, fixed=fixed,
+                                       fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
+  csig@par[c("lambda1","lambda1.unconstr","eCprime","eCprime.unconstr","BIC","BIC.unconstr","BIC.sd","BIC.sd.unconstr")]=list(
+    lambda1.constr,csig@par$lambda1,eCprime.constr,csig@par$eCprime,BIC.constr,csig@par$BIC,BIC.sd.constr,csig@par$BIC.sd)
+  mat.constr$phi.unconstr = csig@state$mat$phi
+  csig@state$mat = mat.constr
+  
+  csig@par$name=csig@cts[,name[1]]
+  matg = as.data.table(csig@state$mat)
+  setkey(matg,bin1,bin2)
+  matg[,name:=csig@par$name]
+  params = as.data.table(csig@par)
+  params[,c("state","mat"):=list(list(csig@state),list(matg))]
+  return(params)
+}
+
 #' run fused lasso on one dataset contained in matg, fusing 'valuehat' into
 #' 'value'
 #' 
@@ -203,13 +290,15 @@ evaluate_at_lambda2 = function(csig, lambda2, constrained=T, positive=T, fixed=F
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-fused_lasso = function(csig, positive, fixed, constrained, verbose=T, fix.lambda1=F, fix.lambda1.at=0.1, fix.lambda2=F, fix.lambda2.at=NA) {
+fused_lasso_binning = function(csig, positive, fixed, constrained, verbose=T, fix.lambda1=F, fix.lambda1.at=0.1, fix.lambda2=F, fix.lambda2.at=NA) {
   if (fix.lambda2==F) {
     n.SD=ifelse(fixed==T,1,0)
     #first we optimize lambda2 without constraints nor soft-thresholding (setting eCprime=0)
-    csig = binless:::optimize_lambda2_smooth(csig, n.SD=n.SD, constrained=F, positive=F, fixed=T,
+    cat("opt smooth\n")
+    csig = binless:::optimize_lambda2_binning(csig, n.SD=n.SD, constrained=F, positive=F, fixed=T,
                                    fix.lambda1=T, fix.lambda1.at=0)
     #now for that optimum, report the best lambda1 (if optimized) and eCprime
+    cat("eval\n")
     csig = binless:::evaluate_at_lambda2(csig, csig@par$lambda2, constrained=constrained, positive=positive, fixed=fixed,
                                          fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
   } else {
@@ -224,6 +313,7 @@ fused_lasso = function(csig, positive, fixed, constrained, verbose=T, fix.lambda
     BIC.constr = csig@par$BIC
     BIC.sd.constr = csig@par$BIC.sd
     mat.constr = csig@state$mat
+    cat("eval unconstr\n")
     csig = binless:::evaluate_at_lambda2(csig, csig@par$lambda2, constrained=F, positive=positive, fixed=fixed,
                                          fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
     csig@par[c("lambda1","lambda1.unconstr","eCprime","eCprime.unconstr","BIC","BIC.unconstr","BIC.sd","BIC.sd.unconstr")]=list(
@@ -367,7 +457,7 @@ detect_binless_interactions = function(cs, resolution=cs@settings$base.res, grou
   }
   registerDoParallel(cores=min(ncores,length(groupnames)))
   params = foreach(csig=csigs, .combine=rbind) %dopar% {
-    binless:::fused_lasso(csig, positive=T, fixed=T, constrained=F, verbose=verbose,
+    binless:::fused_lasso_binning(csig, positive=T, fixed=T, constrained=F, verbose=verbose,
                                 fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                                 fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }
@@ -436,7 +526,7 @@ detect_binless_differences = function(cs, ref, resolution=cs@settings$base.res, 
   }
   registerDoParallel(cores=min(ncores,length(groupnames)))
   params = foreach(csig=csigs, .combine=rbind) %do% {
-    binless:::fused_lasso(csig, positive=F, fixed=T, constrained=F, verbose=verbose,
+    binless:::fused_lasso_binning(csig, positive=F, fixed=T, constrained=F, verbose=verbose,
                                 fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                                 fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }

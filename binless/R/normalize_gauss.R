@@ -698,9 +698,9 @@ gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.
   registerDoParallel(cores=min(ncores,length(groupnames)))
   params = foreach(csig=csigs, .combine=rbind, .export=c("verbose","fix.lambda1","fix.lambda1.at",
                                                          "fix.lambda2","fix.lambda2.at")) %dopar% {
-    binless:::fused_lasso(csig, positive=T, fixed=F, constrained=T, verbose=verbose,
-                                fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
-                                fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
+    binless:::fused_lasso_normalization(csig, positive=T, fixed=F, constrained=T, verbose=verbose,
+                                        fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
+                                        fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }
   stopImplicitCluster()
   #compute matrix at new params
