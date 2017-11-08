@@ -49,7 +49,7 @@ public:
           /*Rcpp::Rcout << " Iteration " << counter_ << " / " << nouter << " with lam2= " << lambda2 << " alpha= "
             << gauss_.get_alpha() << " reached maxval= " << precision
             << " after " << gauss_.get_ninner() << " steps " << " phi[0]= " << beta[0] << "\n";*/
-        } while (counter_ <= nouter && precision > converge_ );
+        } while (counter_ < nouter && precision > converge_ );
         /*Rcpp::Rcout << " Perf iteration: end with lam2= " << lambda2 << " alpha= "
         << gauss_.get_alpha() << " phi[0]= " << beta[0] << "\n";*/
         Timer::start_timer("weight");
