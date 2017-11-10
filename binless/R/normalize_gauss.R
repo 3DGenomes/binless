@@ -506,7 +506,7 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
   bout=rbind(bout,cout)
   setkey(bout, id, name, cat)
   genomic_out$biases=bout
-  genomic_out[c("beta_iota_diff","beta_rho_diff","beta_iota","beta_rho","log_mean_RJ",
+  genomic_out[c("beta_iota_diff","beta_rho_diff","log_mean_RJ",
                 "log_mean_DL","log_mean_DR","log_mean_cleft","log_mean_cright")]=NULL
   return(genomic_out)
 }
@@ -536,6 +536,28 @@ gauss_genomic = function(cs, cts.common, verbose=T, update.eC=T) {
   cs@par=modifyList(cs@par, op)
   if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
   return(cs)
+}
+
+#' Generate iota and rho genomic biases on evenly spaced points along the genome
+#'
+#' @param cs normalized CSnorm object
+#' @param points_per_kb number of evaluation points per kb
+#'
+#' @return
+#' @keywords internal
+#' @export
+#'
+#' @examples
+generate_genomic_biases = function(cs, points_per_kb=10) {
+  cutsites = cs@biases[, seq(min(pos), max(pos), by = 1000/points_per_kb)]
+  Krow = cs@settings$Krow
+  Bsp = binless:::generate_cubic_spline(cutsites, Krow, sparse=T)
+  Dsets = cs@experiments[,.N]
+  X = bdiag(lapply(1:Dsets,function(x){Bsp}))
+  stopifnot(ncol(X) == length(cs@par$beta_iota), ncol(X) == length(cs@par$beta_rho))
+  dt = data.table(name=rep(cs@experiments[,name],each=length(cutsites)), pos=rep(cutsites,Dsets),
+                  log_iota = (X %*% cs@par$beta_iota)[,1], log_rho = (X %*% cs@par$beta_rho)[,1])
+  return(dt)
 }
 
 #' Compute means for a given counts matrix
