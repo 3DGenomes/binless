@@ -39,7 +39,7 @@ iota = foreach(sub=subs,cs=runs,.combine=rbind) %dopar% {
   ret
 }
 
-ggplot()+facet_grid(method~.)+scale_y_log10(limits=c(0.1,10))+
+ggplot()+facet_grid(method~.)+scale_y_log10()+coord_cartesian(ylim=c(0.1,10))+
   geom_line(aes(position,iota),data=iota[type=="fun"])+#xlim(1000000,1100000)+
   geom_vline(aes(xintercept=position),data=iota[type=="pts"],alpha=0.1)
 ggsave(filename = "images/rao_HiCall_SELP_150k_subs_iota_bias.pdf", width=10, height=7)

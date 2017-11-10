@@ -422,9 +422,9 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       beta_iota = beta[1:Krow]
       beta_rho = beta[(Krow+1):(2*Krow)]
       
-      lambda_iota = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_iota)+1e6)
+      lambda_iota = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_iota)+1e8)
       lambda_iota = sqrt(as.numeric(lambda_iota))
-      lambda_rho = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_rho)+1e6)
+      lambda_rho = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_rho)+1e8)
       lambda_rho = sqrt(as.numeric(lambda_rho))
       
       maxiter = maxiter+1
