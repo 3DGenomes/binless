@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 - Better display and error messages for groupings
 - Compress cts matrix during normalization for lower memory footprint
-- Improved convergence: default bf_per_kb = 100 (avoids some oscillations)
+- Improved convergence: default bf_per_kb = 50 (avoids some oscillations)
 
 ## [0.9.0] - 2017-11-02
 ### Added
