@@ -84,6 +84,19 @@ if (plot==T) {
 }
 
 if (F) {
+  
+  subs=c("SELP_150k","Peak1_450k","ADAMTS2_450k","PARM1_600k","Tbx19_700k","SEMA3C_1M", "Fig1C_1M","FOXP1_1.3M","TBX3_1.5M",
+         "Comparison_1.7M","22qter_1.7M", "Talk_2M", "ADAMTS1_2.3M")
+  info = foreach(sub=subs,.combine=rbind,.errorhandling="remove") %dopar% {
+    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
+    data.table(ori=sub,has.converged=binless:::has_converged(cs),#run=run,
+               runtime=cs@diagnostics$params[,sum(runtime)],nsteps=cs@diagnostics$params[,max(step)],
+               name=cs@experiments[,name],
+               lambda1=cs@par$lambda1,lambda2=cs@par$lambda2,eCprime=cs@par$eCprime,lambda_diag=cs@par$lambda_diag)#,
+  }
+  info
+  
+  
   #load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
   #generate plots
   resolution=5000
