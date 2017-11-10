@@ -720,6 +720,7 @@ subsample_csnorm = function(cs, subsampling.pc=100) {
   new("CSnorm", experiments=cs@experiments,
       design=cs@design,
       settings=cs@settings,
+      zeros=cs@zeros,
       biases=biases, counts=counts)
 }
 
