@@ -4,7 +4,7 @@
 \alias{fresh_start}
 \title{Cleanup a CSnorm object, store settings and populate it with initial guesses of all required parameters}
 \usage{
-fresh_start(cs, bf_per_kb = 30, bf_per_decade = 10, bins_per_bf = 10,
+fresh_start(cs, bf_per_kb = 100, bf_per_decade = 10, bins_per_bf = 10,
   base.res = 5000, bg.steps = 5, iter = 100, fit.signal = T,
   verbose = T, ncounts = 1e+05, init.dispersion = 1, tol = 0.1,
   ncores = 1, fix.lambda1 = F, fix.lambda1.at = NA, fix.lambda2 = F,
