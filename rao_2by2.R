@@ -14,8 +14,8 @@ base.res=5000
 
 setwd("/home/yannick/simulations/cs_norm")
 
-fit=F
-bin=T
+fit=T
+bin=F
 plot=F
 
 if (fit==T) {
@@ -54,11 +54,13 @@ if (bin==T) {
 }
 
 if (plot==T) {
-  #load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k_minlambda25.RData"))
+  load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
   resolution=5000
   mat=get_binless_interactions(cs, resolution)
   plot_binless_matrix(mat,upper="observed",lower="observed")+facet_wrap(~name,nrow = 1)
   ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_observed.pdf"),width=20,height=8)
+  plot_binless_matrix(mat,upper="binless",lower="observed")+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless_observed.pdf"),width=20,height=8)
   plot_binless_matrix(mat,upper="binless",lower="binless")+facet_wrap(~name,nrow = 1)
   ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless.pdf"),width=20,height=8)
   plot_binless_signal_matrix(mat)+facet_wrap(~name,nrow = 1)
