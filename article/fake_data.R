@@ -30,6 +30,7 @@ if (F) {
   csd=generate_fake_dataset(signal=T,biases.ref=biases.ref,eC=-5.2,replicate="5",condition="KO")
   save(csd,file="data/fake_signal_replicate5_csdata.RData")
 
+  #bin raw data
   counts=csd@counts
   counts[,bin1:=round(pos1/10000)]
   counts[,bin2:=round(pos2/10000)]
@@ -69,7 +70,7 @@ save(cs,file=paste0("data/fake_",nbg,"bg_",nsig,"sig_",fit.signal,"_csnorm_optim
 for (resolution in c(5000)) {
   cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
   cs=detect_binned_interactions(cs, resolution=resolution, group="all", ncores=ncores)
-  cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
+  #cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
   if (nbg+nsig>1) {
     cs=detect_binned_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])
     cs=detect_binless_differences(cs, resolution=resolution, group="all", ncores=ncores, ref=cs@experiments[1,name])
@@ -80,68 +81,23 @@ for (resolution in c(5000)) {
 if (F) {
   load(paste0("data/fake_",nbg,"bg_",nsig,"sig_",fit.signal,"_csnorm_optimized.RData"))
   
-  mat=get_binned_matrices(cs,5000,"all")
-  plot_binless_matrix(mat,upper="log(normalized)",lower="log(normalized)")
-  
-  biases=merge(rbindlist(lapply(cs@diagnostics$params[leg=="bias",log_iota],function(x){cs@biases[,.(name,pos,log_iota=x)]}),use=T,id="step"),
-               rbindlist(lapply(cs@diagnostics$params[leg=="bias",log_rho],function(x){cs@biases[,.(name,pos,log_rho=x)]}),use=T,id="step"))[name==name[1]]
-  biases=melt(biases,id=c("step","name","pos"))
-  ggplot(biases)+geom_line(aes(pos,value,colour=variable))+facet_grid(step~variable)
-  
-
-  binless:::has_converged(cs)
-  cs@diagnostics$params[,sum(runtime)/3600]
-  ggplot(cs@diagnostics$params[,.(step,leg,runtime)])+geom_line(aes(step,runtime,colour=leg))+scale_y_log10()
-  
-  plot_diagnostics(cs)$plot
-  plot_diagnostics(cs)$plot2
-  
-  signals=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
-    if ("signal" %in% cs@diagnostics$params[step==i,leg]) {
-      sig=copy(cs@diagnostics$params[step==i&leg=="signal",signal][[1]])
-      sig[,step:=i]
-      sig
-    }
-  }
-  
-  ggplot(signals[name==name[1]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_wrap(~ step)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
-  ggplot(signals[name==name[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_wrap(~ step)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
-  ggplot(signals[step>=step[.N]-1])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_grid(step~ name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
-  ggplot(signals[step>=step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_wrap(~name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
-  ggplot(signals[step>=step[.N]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phihat))+facet_wrap(~name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
-  
-  
   #observed
   resolution=10000
-  mat=get_matrices(cs, resolution=resolution, group="all")
-  ggplot(mat)+
-    geom_raster(aes(begin1,begin2,fill=observed))+
-    geom_raster(aes(begin2,begin1,fill=observed))+coord_fixed()+
-    scale_fill_gradient(low="white",high="black",na.value="white",trans="log")+
-    scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + #guides(colour=F) +
-    theme_minimal()+ theme(axis.title=element_blank(), axis.text.x = element_text(angle = 90, hjust = 1),
-                        panel.background = element_rect(fill = "white", colour = "black"),
-                        panel.spacing=unit(0,"cm"))
+  mat=get_binned_matrices(cs, resolution=resolution, group="all")
+  plot_binless_matrix(mat,upper="observed",lower="observed")
   ggsave(filename=paste0("images/fake_",nbg,"bg_",nsig,"sig_observed.png"),width=7,height=5)
   
   #normalized
-  mat=get_matrices(cs, resolution=resolution, group="all")
-  ggplot(mat)+
-    geom_raster(aes(begin1,begin2,fill=normalized))+
-    geom_raster(aes(begin2,begin1,fill=normalized))+coord_fixed()+facet_wrap(~name)+
-    scale_fill_gradient(low="white",high="black",na.value="white",trans="log")+
-    scale_x_continuous(expand=c(0, 0)) + scale_y_continuous(expand=c(0, 0)) + guides(colour=F) +
-    theme_void()+ theme(axis.title=element_blank(),
-                        panel.background = element_rect(fill = "white", colour = "black"),
-                        panel.spacing=unit(0,"cm"))
+  mat=get_binned_matrices(cs, resolution=resolution, group="all")
+  plot_binless_matrix(mat,upper="normalized",lower="normalized")
   ggsave(filename=paste0("images/fake_",nbg,"bg_",nsig,"sig_",fit.signal,"_binned_normalized.png"),width=7,height=5)
   
   load("data/fake_0bg_1sig_TRUE_csnorm_optimized.RData")
   csT=cs
   load("data/fake_0bg_1sig_FALSE_csnorm_optimized.RData")
   csF=cs
-  matF=get_matrices(csF, resolution=resolution, group="all")
-  matT=get_matrices(csT, resolution=resolution, group="all")
+  matF=get_binned_matrices(csF, resolution=resolution, group="all")
+  matT=get_binned_matrices(csT, resolution=resolution, group="all")
   ice=merge(matF[,.(name,begin1,begin2,observed)],iterative_normalization(matF,niterations = 10),by=c("name","begin1","begin2"))
   ice[,ice.10:=ice.10/70.5]
   mat=rbind(matF[,.(model="no signal",begin1,begin2,observed,normalized)],
