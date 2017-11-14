@@ -698,6 +698,38 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
       biases=biases, counts=counts)
 }
 
+#' Restrict a CSnorm object to a given genomic portion.
+#' 
+#' Will remove any pre-existing normalization parameters
+#' 
+#' @param begin,end Start and end positions, refer to cs@biases[,pos]
+#'   
+#' @return The csnorm object with updated biases and counts slots
+#' @export
+#' 
+#' @examples
+zoom_csnorm = function(cs, begin, end) {
+  stopifnot(begin<end)
+  if (begin<cs@biases[,min(pos)]) cat("Warning: begin < cs@biases[,min(pos)]\n")
+  if (end>cs@biases[,max(pos)]) cat("Warning: end > cs@biases[,max(pos)]\n")
+  biases=copy(cs@biases[pos>=begin&pos<=end])
+  biases[,new.id:=.I]
+  counts=copy(cs@counts[pos1>=begin&pos1<=end&pos2>=begin&pos2<=end])
+  counts=biases[,.(id1=id,new.id1=new.id)][counts,,on="id1"]
+  counts=biases[,.(id2=id,new.id2=new.id)][counts,,on="id2"]
+  counts=counts[,.(name,id1=new.id1,id2=new.id2,pos1,pos2,contact.close,contact.down,contact.far,contact.up,distance)]
+  setkeyv(counts,key(cs@counts))
+  biases=biases[,.(name,id=new.id,pos,dangling.L,dangling.R,rejoined)]
+  setkeyv(biases,key(cs@biases))
+  settings=cs@settings
+  settings$dmax=biases[,max(pos)-min(pos)]+0.01
+  new("CSnorm", experiments=cs@experiments,
+      design=cs@design,
+      settings=settings,
+      zeros=cs@zeros,
+      biases=biases, counts=counts)
+}
+
 #' Take a random subset of the reads of a given csnorm object
 #' 
 #' @param csnorm a csnorm object
