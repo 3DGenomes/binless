@@ -1188,6 +1188,7 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     #check for convergence
     if (has_converged(cs)) {
       if (fit.signal == T && i <= cs@settings$bg.steps) {
+        cat("Background has converged, fitting signal\n")
         cs@settings$bg.steps = i #compute signal at next step
       } else {
         if (verbose==T) {
