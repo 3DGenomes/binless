@@ -747,11 +747,11 @@ gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.
   #ggplot(mat)+facet_wrap(~name)+geom_raster(aes(bin1,bin2,fill=phi==0))
   setkey(mat,name,bin1,bin2)
   #restrict tolerance if needed
-  precision = max(abs(mat[,phi]-cs@par$phi))
+  precision = max(abs(mat[,beta]-cs@par$beta.phi))
   cs@par$tol_signal = min(cs@par$tol_signal, max(cs@settings$tol, precision/10))
   #set new parameters
   cs@par$signal=mat[,.(name,bin1,bin2,phihat,weight,ncounts,phi,phi.unconstr,beta,diag.grp,diag.idx)]
-  cs@par$phi=mat[,phi]
+  cs@par$beta.phi=mat[,beta]
   params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
   cs@par$eC=as.array(params[,eC+eCprime])
   cs@par$eCprime=as.array(params[,eCprime])
@@ -784,13 +784,13 @@ has_converged = function(cs) {
   conv.log_iota = rel.precision("log_iota")
   conv.log_rho = rel.precision("log_rho")
   conv.log_decay = rel.precision("log_decay")
-  conv.phi = rel.precision("phi")
+  conv.signal = max(rel.precision("beta.phi"),rel.precision("lambda1"))
   #cat(" conv.log_iota ", conv.log_iota,
   #    " conv.log_rho ", conv.log_rho, " conv.log_decay ", conv.log_decay, " conv.phi ", conv.phi, "\n")
   cat(" relative precision for this iteration: iota ", conv.log_iota,
-      " rho ", conv.log_rho, " decay ", conv.log_decay, " signal ", conv.phi, "\n")
+      " rho ", conv.log_rho, " decay ", conv.log_decay, " signal ", conv.signal, "\n")
   conv.param = all(c(conv.log_iota,conv.log_rho,
-                     conv.log_decay,conv.phi)<cs@settings$tol, na.rm=T)
+                     conv.log_decay,conv.signal)<cs@settings$tol, na.rm=T)
   return(conv.param)
 }
 
@@ -1058,13 +1058,15 @@ fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.
       if(verbose==T) cat("Preparing for signal estimation\n")
       stuff = binless:::prepare_first_signal_estimation(cs@biases, cs@experiments[,name], base.res)
       cs@par$signal=stuff$signal
-      cs@par$phi=stuff$signal[,phi]
+      cs@par$beta.phi=stuff$signal[,beta]
+      cs@par$lambda1=array(dim=cs@experiments[,.N])
       cs@settings$sbins=stuff$sbins
     } else {
       cs@settings$sbins=cs@biases[,c(min(pos)-1,max(pos)+1)]
-      cs@par$signal=cs@biases[,.(phi=0,bin1=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+      cs@par$signal=cs@biases[,.(phi=0,beta=0,bin1=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                                  bin2=cut(pos[1], cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)),by=name]
-      cs@par$phi=cs@par$signal[,phi]
+      cs@par$beta.phi=cs@par$signal[,beta]
+      cs@par$lambda1=NA
       setkey(cs@par$signal,name,bin1,bin2)
     }
     #get number of zeros along cut sites and decay
