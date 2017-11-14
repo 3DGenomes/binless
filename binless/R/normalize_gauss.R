@@ -283,7 +283,7 @@ gauss_genomic_muhat_mean = function(cs, cts.common) {
 
 gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
                                          original_lambda_iota, original_lambda_rho, verbose=T,
-                                         max_perf_iteration=1000, convergence_epsilon=1e-5) {
+                                         max_perf_iteration=1000, convergence_epsilon=1e-5, constrain=F) {
   XB = as.array(design[,genomic])
   
   #run optimization
@@ -310,13 +310,13 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     cutsites = biases[,pos][bbegin[1]:(bbegin[2]-1)]
     Bsp = generate_cubic_spline(cutsites, Krow, sparse=T)
     X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
-    if (length(sbins)<=2) {
-      centering=Matrix(rep(1,SD),ncol=1)
-    } else {
+    if (constrain == T) {
       sbinned=biases[bbegin[1]:(bbegin[2]-1), cut(pos, sbins, ordered_result=T,
                                                   right=F, include.lowest=T,dig.lab=12)]
       centering=Matrix(model.matrix(~ 0+sbinned))
       stopifnot(dim(centering)==c(SD,length(sbins)-1))
+    } else {
+      centering=Matrix(rep(1,SD),ncol=1)
     }
     W=cbind(rbind(Matrix(0,nrow=3*SD,ncol=ncol(centering)),centering,Matrix(0,nrow=SD,ncol=ncol(centering))),
             rbind(Matrix(0,nrow=4*SD,ncol=ncol(centering)),centering))
@@ -390,7 +390,7 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       D = bdiag(lambda_iota*D1,lambda_rho*D1)
       DtD = crossprod(D)
       if (maxiter==0) {
-        cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD, LDL=F, super=NA,Imult=1e-20) 
+        cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD + Diagonal(dim(DtD)[1])/(2*1**2), LDL=F, super=NA,Imult=1e-20) 
         stopifnot(!isLDL(cholA)) #do LLt cholesky so we can use crossprod for Gamma_v
       } else {
         cholA = update(cholA,tmp_X_S_m2_X + Krow^2*DtD)
@@ -516,14 +516,15 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-gauss_genomic = function(cs, cts.common, verbose=T, update.eC=T) {
+gauss_genomic = function(cs, cts.common, verbose=T, update.eC=T, constrain=F) {
   if (verbose==T) cat(" Genomic\n")
   a = binless:::gauss_genomic_muhat_mean(cs, cts.common)
   #run optimization
   op = binless:::gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, cs@settings$sbins,
                                               cs@par$lambda_iota, cs@par$lambda_rho, verbose=verbose,
                                               max_perf_iteration=cs@settings$iter,
-                                              convergence_epsilon=cs@par$tol_genomic)
+                                              convergence_epsilon=cs@par$tol_genomic,
+                                              constrain=constrain)
   #restrict tolerance if needed
   precision = max(max(abs(op$log_iota - cs@par$log_iota)), max(abs(op$log_rho - cs@par$log_rho)))
   cs@par$tol_genomic = min(cs@par$tol_genomic, max(cs@settings$tol, precision/10))
@@ -1163,10 +1164,13 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
                                                                   log_mean=weighted.mean(lmu.nosig+phi,weight/var),weight=sum(weight/2),count=sum(weight*count/2)),
                                                 keyby=c("name","bin2")])
     #fit iota and rho
-    a=system.time(cs <- binless:::gauss_genomic(cs, cts.common, update.eC=update.eC, verbose=verbose))
+    constrain.bias = fit.signal==T && i <= cs@settings$bg.steps+1
+    a=system.time(cs <- binless:::gauss_genomic(cs, cts.common, update.eC=update.eC, verbose=verbose, constrain=constrain.bias))
     cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
     #
     if (fit.signal==T && i > cs@settings$bg.steps) {
+      if(verbose==T) cat(" Residuals\n")
+      cts.common = binless:::gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
       #fit signal using sparse fused lasso
       update.eC=F
       a=system.time(cs <- binless:::gauss_signal(cs, cts.common, verbose=verbose, ncores=ncores,

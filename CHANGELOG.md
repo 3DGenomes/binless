@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - New function `zoom_csnorm` to take parts of a CSnorm object
 - Remove large count outliers (possible PCR duplicates)
+### Changed
+- Biases are not constrained while doing normalization
 ### Fixed
 - Better display and error messages for groupings
 - Compress cts matrix during normalization for lower memory footprint

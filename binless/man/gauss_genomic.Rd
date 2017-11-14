@@ -4,7 +4,7 @@
 \alias{gauss_genomic}
 \title{Single-cpu simplified fitting for iota and rho}
 \usage{
-gauss_genomic(cs, cts.common, verbose = T, update.eC = T)
+gauss_genomic(cs, cts.common, verbose = T, update.eC = T, constrain = F)
 }
 \arguments{
 \item{if}{a single value, use data for estimate of mu and that value as a
