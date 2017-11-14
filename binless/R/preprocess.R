@@ -571,9 +571,8 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "H
 
 #' Fuse cut sites that are very close to each other
 #'
-#' @param csd CSData object
-#' @keywords internal
 #' @return a list with filtered biases and counts
+#' @keywords internal
 #'
 fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
   #group cut sites
@@ -606,6 +605,16 @@ fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
     newline=merge(biases[id==min_id,.(name=1,id,pos)],biases[id==max_id,.(name=1,id,pos)],by="name",suffixes=c("1","2"))
     newline[,c("name","contact.close","contact.down","contact.far","contact.up","distance"):=list(NULL,1,0,0,0,pos2-pos1)]
     counts=rbind(counts,newline)
+  }
+  #remove probable PCR artifacts: count > 10, highest 3 by count/log(distance)
+  art=melt(counts,id.vars=c("id1","id2","pos1","pos2","distance"),variable.factor = F)[value>10]
+  if (art[,.N]>0) {
+    art=art[order(-value/log(distance))][1:min(3,.N)]
+    cat("Removing possible PCR artifacts in ",name,"\n")
+    for (i in 1:art[,.N]) {
+      cat("   pos1 =",art[i,pos1]," pos2 =",art[i,pos2], " ",art[i,variable],"=",art[i,value],"\n")
+      counts[id1==art[i,id1]&id2==art[i,id2],(art[i,variable]):=1]
+    }
   }
   #wrap distance if circular
   if (circularize>0) counts[,distance:=pmin(distance,circularize-distance+1)]
@@ -645,7 +654,7 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
   settings$dfuse=dfuse
   settings$qmin=qmin
   #
-  filtered = lapply(datasets, function(csd){fuse_close_cut_sites(csd@biases, csd@counts, dfuse,
+  filtered = lapply(datasets, function(csd){binless:::fuse_close_cut_sites(csd@biases, csd@counts, dfuse,
                                                                  csd@info$name, csd@settings$circularize)})
   biases = lapply(filtered, function(x) x$biases)
   counts = lapply(filtered, function(x) x$counts)

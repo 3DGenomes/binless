@@ -6,9 +6,6 @@
 \usage{
 fuse_close_cut_sites(biases, counts, dfuse, name, circularize)
 }
-\arguments{
-\item{csd}{CSData object}
-}
 \value{
 a list with filtered biases and counts
 }
