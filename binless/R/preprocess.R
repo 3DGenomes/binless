@@ -606,11 +606,20 @@ fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
     newline[,c("name","contact.close","contact.down","contact.far","contact.up","distance"):=list(NULL,1,0,0,0,pos2-pos1)]
     counts=rbind(counts,newline)
   }
-  #remove probable PCR artifacts: count > 10, highest 3 by count/log(distance)
-  art=melt(counts,id.vars=c("id1","id2","pos1","pos2","distance"),variable.factor = F)[value>10]
+  #remove probable PCR artifacts: fit count*log(distance) histogram (except last 10%), remove righttmost points
+  art=melt(counts,id.vars=c("id1","id2","pos1","pos2","distance"),variable.factor = F)
+  art[,vld:=value*log(distance)]
+  setkey(art,vld)
+  art[,bin:=cut(vld,20,right = F, ordered_result = T, dig.lab = 12)]
+  hart=art[,.(count=.N,vld=mean(vld)),keyby=bin]
+  fit=lm(log(count)~vld,data=hart[1:round(0.9*.N)])
+  hart[,curve:=exp(fit$coefficients[["(Intercept)"]]+fit$coefficients[["vld"]]*vld)]
+  ggplot()+geom_histogram(aes(vld),data=art,bins=20)+scale_y_log10()+geom_point(aes(vld,count,colour=curve>count),data=hart)+
+    geom_line(aes(vld,curve),data=hart)
+  vldmin=hart[curve>count][.N,vld]
+  art=art[vld>vldmin]
   if (art[,.N]>0) {
-    art=art[order(-value/log(distance))][1:min(3,.N)]
-    cat("Removing possible PCR artifacts in ",name,"\n")
+    cat(name, ": Removing possible PCR artifacts\n")
     for (i in 1:art[,.N]) {
       cat("   pos1 =",art[i,pos1]," pos2 =",art[i,pos2], " ",art[i,variable],"=",art[i,value],"\n")
       counts[id1==art[i,id1]&id2==art[i,id2],(art[i,variable]):=1]
