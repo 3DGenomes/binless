@@ -20,6 +20,9 @@ ggplot(cs@diagnostics$params[,.(step,leg,runtime)])+geom_line(aes(step,runtime,c
 plot_diagnostics(cs)$plot
 plot_diagnostics(cs)$plot2
 
+#signal
+plot_binless_matrix(cs@par$signal,upper="phi",lower="beta",trans="identity")
+
 #signal vs step
 signals=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
   if ("signal" %in% cs@diagnostics$params[step==i,leg]) {
