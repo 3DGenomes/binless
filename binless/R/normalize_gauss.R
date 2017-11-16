@@ -786,7 +786,7 @@ has_converged = function(cs) {
   conv.log_iota = rel.precision("log_iota")
   conv.log_rho = rel.precision("log_rho")
   conv.log_decay = rel.precision("log_decay")
-  conv.signal = max(rel.precision("beta.phi"),rel.precision("lambda1"))
+  conv.signal = max(rel.precision("beta.phi"))
   #cat(" conv.log_iota ", conv.log_iota,
   #    " conv.log_rho ", conv.log_rho, " conv.log_decay ", conv.log_decay, " conv.phi ", conv.phi, "\n")
   cat(" relative precision for this iteration: iota ", conv.log_iota,
