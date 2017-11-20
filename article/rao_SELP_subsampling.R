@@ -4,10 +4,6 @@ library(binless)
 library(foreach)
 library(doParallel)
 
-setwd("/home/yannick/simulations/cs_norm")
-
-
-
 ### take less reads
 subs = round(100/(2**(0:7)), digits = 2)
 foreach (sub=subs) %do% {
