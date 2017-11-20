@@ -5,11 +5,9 @@ library(doParallel)
 library(foreach)
 library(scales)
 
-setwd("/home/yannick/simulations/cs_norm")
-
 cistrans = foreach (cell=rep(c("GM12878"),18), run=sapply(1:18,function(x){sprintf("%02d",x)}), .combine=rbind) %do% {
   #read file
-  data=read_tsv(paste0("/scratch/rao/mapped/",cell,"_MboI_in_situ/",cell,"_MboI_HIC0",run,"_Talk.tsv")) 
+  data=read_tsv(paste0("zcat /scratch/rao/mapped/",cell,"_MboI_in_situ/",cell,"_MboI_HIC0",run,"_Talk.tsv.gz")) 
   #classify reads
   maxlen=900
   read.len=101
