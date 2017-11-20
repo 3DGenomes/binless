@@ -59,6 +59,14 @@ ggplot(decays[,.(distance,log_decay=kappa-mean(kappa),std,khat=kappahat-mean(kap
   geom_line(aes(distance,log_decay,colour=name))+geom_point(aes(distance,khat,colour=name),alpha=0.1)+
   geom_errorbar(aes(distance,ymin=khat-std,ymax=khat+std,colour=name))+facet_wrap(~step)
 
+#fit last decay to polymer model
+decay=cs@par$decay[name==name[1],.(ldist=log(distance),ldec=log_decay,distance,decay=exp(log_decay))]
+fit=lm(ldec~ldist,data=decay[distance>1e4&distance<5e5])
+summary(fit)
+decay[,model:=exp(fit$coefficients[["(Intercept)"]]+fit$coefficients[["ldist"]]*ldist)]
+ggplot(decay)+geom_line(aes(distance,decay,colour="decay"))+
+  scale_x_log10()+scale_y_log10()+geom_line(aes(distance,model,colour="model"))
+
 #residuals
 i=6
 a=cs@diagnostics$residuals[step==i]
