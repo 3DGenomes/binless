@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Improved convergence: default bf_per_kb = 50 (avoids some oscillations)
 - enlarge decay bins at border to avoid NAs
 - pixels in plots are properly aligned with bin borders
+- report missing data in binned matrices (fixes empty lines in binless matrices)
 
 ## [0.9.0] - 2017-11-02
 ### Added

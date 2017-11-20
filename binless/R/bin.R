@@ -54,9 +54,8 @@ iterative_normalization = function(mat, niterations=100, namecol="name", verbose
 #' @export
 #'
 #' @examples
-predict_binned_matrices_irls = function(cts, dispersion, verbose=T) {
-  #matrices
-  if (verbose==T) cat("   Other matrices\n")
+predict_binned_matrices_irls = function(cts, dispersion) {
+  #predict means
   cts[,c("decay","biases","mu.nosig"):=list(exp(log_decay),exp(log_bias),exp(lmu.nosig))]
   mat=cts[,.(ncounts=sum(weight),
              observed=sum(count*weight),
@@ -67,6 +66,16 @@ predict_binned_matrices_irls = function(cts, dispersion, verbose=T) {
              residual=sum(count*weight)/sum(mu*weight),
              normalized=sum(count*weight)/sum(exp(lmu.nosig-log_decay)*weight))
           ,keyby=c("name","bin1","bin2")]
+  #fill missing data
+  bl1=cts[,levels(bin1)]
+  bins=ordered(1:length(bl1))
+  levels(bins) <- bl1
+  fullmat=CJ(name=cts[,unique(name)],bin1=bins,bin2=bins,sorted=T)[bin2>=bin1]
+  mat=mat[fullmat]
+  mat[is.na(observed),c("ncounts","observed","normalized"):=list(0,0,0)]
+  mat[,diag.idx:=unclass(bin2)-unclass(bin1)]
+  mat[,decaymat:=mean(decaymat,na.rm = T),by=c("name","diag.idx")]
+  mat[,diag.idx:=NULL]
   return(mat)
 }
 
@@ -127,7 +136,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   setkeyv(cts,c("name","bin1","bin2"))
   #
   if (verbose==T) cat("*** build binned matrices for each experiment\n")
-  mat = predict_binned_matrices_irls(copy(cts), cs@par$alpha, verbose=verbose)
+  mat = predict_binned_matrices_irls(copy(cts), cs@par$alpha)
   setkey(mat,name,bin1,bin2)
   #
   if (verbose==T) cat("*** write begin/end positions\n")
