@@ -4,7 +4,7 @@
 \alias{predict_binned_matrices_irls}
 \title{Perform binning of data}
 \usage{
-predict_binned_matrices_irls(cts, dispersion, verbose = T)
+predict_binned_matrices_irls(cts, dispersion)
 }
 \arguments{
 \item{verbose}{boolean.}

@@ -5,7 +5,7 @@
 \title{Merge one or more CSdata objects into a CSnorm object and set experimental design}
 \usage{
 merge_cs_norm_datasets(datasets, different.decays = c("none", "all", "enzyme",
-  "condition"), dfuse = 5, qmin = 0.05)
+  "condition"), dfuse = 5, qmin = 0.005)
 }
 \arguments{
 \item{datasets}{list of CSdata objects}
