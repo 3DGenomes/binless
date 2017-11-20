@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Remove large count outliers (possible PCR duplicates)
 ### Changed
 - Biases are not constrained while doing normalization
+- Do not remove bad counter diagonals except very close to main diagonal
+  (smoothing is good enough)
 ### Fixed
 - Better display and error messages for groupings
 - Compress cts matrix during normalization for lower memory footprint

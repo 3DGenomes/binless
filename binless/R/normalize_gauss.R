@@ -671,14 +671,14 @@ get_signal_metadata = function(cs, cts, resolution) {
   cts_compressed = cts[,.(weight=sum(weight), z=weighted.mean(z,weight/var),var=1/weighted.mean(1/var,weight)),
                        keyby=c("name","bin1","bin2")]
   #biases
-  # bad.biases=rbind(cts_compressed[,.(bin1,bin2,weight,var,z)],cts_compressed[,.(bin1=bin2,bin2=bin1,weight,var,z)])[
-  #   ,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=bin1]
-  # bad.biases[,z:=scale(z)]
-  # bad.biases[,is.out:=-abs(z)<qnorm(cs@settings$qmin)]
-  # #ggplot(bad.biases)+geom_point(aes(bin1,z,colour=is.out))
-  # bad.rows=bad.biases[is.out==T,bin1]
-  # if (bad.biases[,sum(is.out)/.N>0.1]) cat(" Warning: removing ",bad.biases[,100*sum(is.out)/.N],"% of all rows!\n")
-  # #decay
+  bad.biases=rbind(cts_compressed[,.(bin1,bin2,weight,var,z)],cts_compressed[,.(bin1=bin2,bin2=bin1,weight,var,z)])[
+    ,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=bin1]
+  bad.biases[,z:=scale(z)]
+  bad.biases[,is.out:=-abs(z)<qnorm(cs@settings$qmin)]
+  #ggplot(bad.biases)+geom_point(aes(bin1,z,colour=is.out))
+  bad.rows=bad.biases[is.out==T,bin1]
+  if (bad.biases[,sum(is.out)/.N>0.1]) cat(" Warning: removing ",bad.biases[,100*sum(is.out)/.N],"% of all rows!\n")
+  #decay
   cts_compressed[,diag.idx:=unclass(bin2)-unclass(bin1)]
   # bad.decays=cts_compressed[,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=diag.idx]
   # bad.decays[,z:=scale(z)]
@@ -693,7 +693,7 @@ get_signal_metadata = function(cs, cts, resolution) {
   orth=data.table(diag.idx=0:cts_compressed[,max(diag.idx)],
                   segment=ceiling((log10(0:cts_compressed[,max(diag.idx)]*resolution)-log10(cs@settings$dmin))/(dx/2))) #double constraint
   orth[,rank:=frank(segment,ties.method = "dense")-1]
-  return(list(bad.diagonals=0:diag.rm, bad.rows=as.integer(), diag.grp=orth[,rank]))
+  return(list(bad.diagonals=0:diag.rm, bad.rows=bad.rows, diag.grp=orth[,rank]))
   #return(list(bad.diagonals=bad.diagonals,bad.rows=bad.rows, diag.grp=orth[,rank]))
 }
 
