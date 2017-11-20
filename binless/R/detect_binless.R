@@ -492,17 +492,20 @@ plot_binless_matrix = function(mat, upper="binless", lower="observed", trans="lo
       data = add_bin_begin_and_end(data)
       bin1="begin1"
       bin2="begin2"
+      just=1
     } else {
       bin1="bin1"
       bin2="bin2"
+      just=0.5
     }
   } else {
     bin1="begin1"
     bin2="begin2"
+    just=1
   }
   #plot data
-  p=ggplot(data)+geom_raster(aes_string(bin1,bin2,fill=upper))+
-                geom_raster(aes_string(bin2,bin1,fill=lower))
+  p=ggplot(data)+geom_raster(aes_string(bin1,bin2,fill=upper),hjust=just,vjust=just)+
+                geom_raster(aes_string(bin2,bin1,fill=lower),hjust=just,vjust=just)
   if (facet %in% names(data)) p = p + facet_wrap(facet)
   #set colour scale
   p=p+scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value = "white", limits=limits, oob=squish, trans=trans)
