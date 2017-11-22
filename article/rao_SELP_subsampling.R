@@ -18,7 +18,7 @@ foreach (sub=subs) %do% {
 registerDoParallel(cores=8)
 runs = foreach (sub=subs) %dopar% {
   load(paste0("data/rao_HiCall_GM12878_SELP_150k_",sub,"pc_csnorm.RData"))
-  cs = normalize_binless(cs,fit.signal=F, tol=1e-2)
+  cs = normalize_binless(cs)
   save(cs,file=paste0("data/rao_HiCall_GM12878_SELP_150k_",sub,"pc_csnorm_optimized.RData"))
   cs
 }
