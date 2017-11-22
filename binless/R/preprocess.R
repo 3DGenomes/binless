@@ -606,7 +606,9 @@ fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
     newline[,c("name","contact.close","contact.down","contact.far","contact.up","distance"):=list(NULL,1,0,0,0,pos2-pos1)]
     counts=rbind(counts,newline)
   }
-  #remove probable PCR artifacts: fit count*log(distance) histogram, remove righttmost points
+  #wrap distance if circular
+  if (circularize>0) counts[,distance:=pmin(distance,circularize-distance+1)]
+  #remove probable PCR artifacts: fit count*log(distance) histogram, remove rightmost points
   art=melt(counts,id.vars=c("id1","id2","pos1","pos2","distance"),variable.factor = F)
   art[,vld:=value*log(distance)]
   setkey(art,vld)
@@ -624,8 +626,6 @@ fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
       counts[id1==art[i,id1]&id2==art[i,id2],(art[i,variable]):=1]
     }
   }
-  #wrap distance if circular
-  if (circularize>0) counts[,distance:=pmin(distance,circularize-distance+1)]
   return(list(biases=biases,counts=counts))
 }
 
