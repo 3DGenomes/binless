@@ -393,7 +393,7 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
         cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD + Diagonal(dim(DtD)[1])/(2*1**2), LDL=F, super=NA,Imult=1e-20) 
         stopifnot(!isLDL(cholA)) #do LLt cholesky so we can use crossprod for Gamma_v
       } else {
-        cholA = update(cholA,tmp_X_S_m2_X + Krow^2*DtD)
+        cholA = update(cholA,tmp_X_S_m2_X + Krow^2*DtD + Diagonal(dim(DtD)[1])/(2*1**2))
       }
       tmp_Lm1XtW = solve(cholA,solve(cholA,tmp_Xt_W,system="P"),system="L") 
       if (maxiter==0) {
