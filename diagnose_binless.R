@@ -36,6 +36,9 @@ ggplot(signals[name==unique(name)[2]])+geom_raster(aes(bin1,bin2,fill=phi))+geom
 ggplot(signals[step>=step[.N]-1])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_grid(step~ name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
 ggplot(signals[step>=step[.N]])+geom_raster(aes(bin1,bin2,fill=beta))+geom_raster(aes(bin2,bin1,fill=pmin(phihat,max(beta))))+facet_wrap(~name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
 
+#signal differential
+ggplot(signals[name==unique(name)[1],.(step,value=beta-shift(beta)),by=c("name","bin1","bin2")])+geom_raster(aes(bin1,bin2,fill=value))+facet_wrap(~step)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
+
 #plot last signal row (virtual 4C)
 ggplot(signals[bin1==min(bin1)])+geom_line(aes(bin2,phi,group=name))+geom_point(aes(bin2,phihat),alpha=0.1)+facet_grid(step~name)+ylim(-2.5,10)
 
