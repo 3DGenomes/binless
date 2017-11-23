@@ -736,7 +736,7 @@ gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.
   registerDoParallel(cores=min(ncores,length(groupnames)))
   params = foreach(csig=csigs, .combine=rbind, .export=c("verbose","fix.lambda1","fix.lambda1.at",
                                                          "fix.lambda2","fix.lambda2.at")) %dopar% {
-    binless:::fused_lasso(csig, positive=T, fixed=F, constrained=T, verbose=verbose,
+    binless:::fused_lasso(csig, positive=T, fixed=F, constrained=F, verbose=verbose,
                                 fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                                 fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }
@@ -752,14 +752,12 @@ gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.
   precision = max(abs(mat[,beta]-cs@par$beta.phi))
   cs@par$tol_signal = min(cs@par$tol_signal, max(cs@settings$tol, precision/10))
   #set new parameters
-  cs@par$signal=mat[,.(name,bin1,bin2,phihat,weight,ncounts,phi,phi.unconstr,beta,diag.grp,diag.idx)]
+  cs@par$signal=mat[,.(name,bin1,bin2,phihat,weight,ncounts,phi,beta,diag.grp,diag.idx)]
   cs@par$beta.phi=mat[,beta]
   params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
   cs@par$eC=as.array(params[,eC+eCprime])
   cs@par$eCprime=as.array(params[,eCprime])
   cs@par$lambda1=as.array(params[,lambda1])
-  cs@par$eCprime.unconstr=as.array(params[,eCprime.unconstr])
-  cs@par$lambda1.unconstr=as.array(params[,lambda1.unconstr])
   cs@par$lambda2=as.array(params[,lambda2])
   cs@par$value = params[,sum(BIC)]
   if (verbose==T) {
@@ -1198,11 +1196,6 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
       } else {
         if (verbose==T) {
           cat("Normalization has converged\n")
-          cat(" setting parameters to their unconstrained values\n")
-        }
-        if (fit.signal==T) {
-          setnames(cs@par$signal,c("phi","phi.unconstr"),c("phi.constr","phi"))
-          cs@par$eC = cs@par$eC - cs@par$eCprime + cs@par$eCprime.unconstr
         }
         break
       }
