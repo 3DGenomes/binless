@@ -129,8 +129,8 @@ detect_binned_differences = function(cs, ref, resolution=cs@settings$base.res, g
   mat[,difference.sd:=delta.sd*difference]
   mat[,delta.sd:=NULL]
   # treat limiting cases
-  mat=cts[,.(is.zero=sum(count)==0),by=c("name","bin1","bin2")][mat]
-  mat=ctsref[,.(is.zero.ref=sum(count)==0),by=c("name","bin1","bin2")][mat]
+  mat=cts[,.(is.zero=sum(count)==0),keyby=c("name","bin1","bin2")][mat]
+  mat=ctsref[,.(is.zero.ref=sum(count)==0),keyby=c("name","bin1","bin2")][mat]
   mat[is.zero==T,c("difference","difference.sd","K"):=list(0,NA,0)]
   mat[is.zero.ref==T,c("difference","difference.sd","K"):=list(Inf,NA,Inf)]
   mat[is.zero.ref==T&is.zero==T,c("difference","difference.sd","K"):=list(NA,NA,NA)]
