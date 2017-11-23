@@ -207,7 +207,7 @@ evaluate_at_lambda2 = function(csig, lambda2, constrained=T, positive=T, fixed=F
 #' @keywords internal
 fused_lasso = function(csig, positive, fixed, constrained, verbose=T, fix.lambda1=F, fix.lambda1.at=0.1, fix.lambda2=F, fix.lambda2.at=NA) {
   if (fix.lambda2==F) {
-    n.SD=0 #ifelse(fixed==T,1,0)
+    n.SD=ifelse(fixed==T,1,0)
     #first we optimize lambda2 without constraints nor soft-thresholding (setting eCprime=0)
     csig = binless:::optimize_lambda2_smooth(csig, n.SD=n.SD, constrained=F, positive=F, fixed=T,
                                    fix.lambda1=T, fix.lambda1.at=0)
