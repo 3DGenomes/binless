@@ -9,32 +9,39 @@ library(igraph)
 
 args=commandArgs(trailingOnly=TRUE)
 sub=args[1]
-ncores=4
+ncores=1
 base.res=5000
 
 setwd("/home/yannick/simulations/cs_norm")
 
-fit=T
+fit=F
+restart=F
 bin=F
-plot=F
+plot=T
 
 if (fit==T) {
-  load(paste0("data/rao_HiCodd_GM12878_",sub,"_csdata.RData"))
-  csd1=csd
-  load(paste0("data/rao_HiCeven_GM12878_",sub,"_csdata.RData"))
-  csd2=csd
-  load(paste0("data/rao_HiCodd_IMR90_",sub,"_csdata.RData"))
-  csd3=csd
-  load(paste0("data/rao_HiCeven_IMR90_",sub,"_csdata.RData"))
-  csd4=csd
-  cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4), different.decays="none")
-  cs <- normalize_binless(cs, restart=F, ncores=ncores, base.res=base.res)
+  if (restart==F) {
+    load(paste0("data/rao_HiCodd_GM12878_",sub,"_csdata.RData"))
+    csd1=csd
+    load(paste0("data/rao_HiCeven_GM12878_",sub,"_csdata.RData"))
+    csd2=csd
+    load(paste0("data/rao_HiCodd_IMR90_",sub,"_csdata.RData"))
+    csd3=csd
+    load(paste0("data/rao_HiCeven_IMR90_",sub,"_csdata.RData"))
+    csd4=csd
+    cs=merge_cs_norm_datasets(list(csd1,csd2,csd3,csd4), different.decays="none")
+    cs <- normalize_binless(cs, restart=F, ncores=ncores, base.res=base.res)
+  } else {
+    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
+    cs <- normalize_binless(cs, restart=T, ngibbs = 10, ncores=ncores)
+  }
   save(cs,file=paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
 }
 
 if (bin==T) {
   load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
-  foreach (resolution=c(5000,10000),.errorhandling = "pass") %do% {
+  #foreach (resolution=c(5000,10000),.errorhandling = "pass") %do% {
+  foreach (resolution=c(5000),.errorhandling = "pass") %do% {
     cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
     cs=detect_binned_interactions(cs, resolution=resolution, group="all", ncores=ncores)
     cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
@@ -57,17 +64,32 @@ if (plot==T) {
   load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
   resolution=5000
   mat=get_binless_interactions(cs, resolution)
+  #observed
   plot_binless_matrix(mat,upper="observed",lower="observed")+facet_wrap(~name,nrow = 1)
   ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_observed.pdf"),width=20,height=8)
+  #binless and observed
   plot_binless_matrix(mat,upper="binless",lower="observed")+facet_wrap(~name,nrow = 1)
   ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless_observed.pdf"),width=20,height=8)
+  #binless
   plot_binless_matrix(mat,upper="binless",lower="binless")+facet_wrap(~name,nrow = 1)
   ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless.pdf"),width=20,height=8)
+  #binless signal
   plot_binless_signal_matrix(mat)+facet_wrap(~name,nrow = 1)
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_signal.pdf"),width=20,height=8)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless_signal.pdf"),width=20,height=8)
+  #binless differences
   mat=get_binless_differences(cs, cs@experiments[1,name],resolution)
   plot_binless_difference_matrix(mat)+facet_wrap(~name,nrow = 1)
-  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_difference.pdf"),width=16,height=8)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binless_differences.pdf"),width=16,height=8)
+  #binned normalized
+  mat=get_binned_interactions(cs, resolution=resolution, group="all")
+  mat[,is.significant:=prob.gt.expected>=1-1e-12]
+  plot_binless_matrix(mat, upper="normalized", lower="normalized") + geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_normalized.pdf"),width=16,height=8)
+  #binned differences
+  mat=get_binned_differences(cs, resolution=resolution, group="all", ref=cs@experiments[1,name])
+  mat[,direction:=ordered(direction,c("enriched","depleted"))]
+  plot_binless_difference_matrix(mat) + geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])+facet_wrap(~name,nrow = 1)
+  ggsave(filename=paste0("images/rao_2by2_",sub,"_base5at",resolution/1000,"_binned_differences.pdf"),width=16,height=8)
   #
   #mat=get_binless_interactions(cs, resolution, group="condition")
   #plot_binless_matrix(mat,upper="log(observed)",lower="log(observed)")
@@ -85,14 +107,16 @@ if (plot==T) {
 
 if (F) {
   
-  subs=c("SELP_150k","Peak1_450k","ADAMTS2_450k","PARM1_600k","Tbx19_700k","SEMA3C_1M", "Fig1C_1M","FOXP1_1.3M","TBX3_1.5M",
-         "Comparison_1.7M","22qter_1.7M", "Talk_2M", "ADAMTS1_2.3M")
+  subs=c("SELP_150k","Peak1_450k","ADAMTS2_450k","PARM1_600k","Tbx19_700k","SEMA3C_1M", "SEMA3Cext_1.5M", "FOXP1_1.3M", "FOXP1ext_2.3M",
+         "TBX3_1.5M", "TBX3ext_2M", "Comparison_1.7M", "Talk_2M", "ADAMTS1_2.3M", "ADAMTS1ext_2.8M")
   info = foreach(sub=subs,.combine=rbind,.errorhandling="remove") %dopar% {
-    load(paste0("data/rao_HiC_2by2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
+    load(paste0("data/rao_HiC_2b
+                y2_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
     data.table(ori=sub,has.converged=binless:::has_converged(cs),#run=run,
                runtime=cs@diagnostics$params[,sum(runtime)],nsteps=cs@diagnostics$params[,max(step)],
                name=cs@experiments[,name],
-               lambda1=cs@par$lambda1,lambda2=cs@par$lambda2,eCprime=cs@par$eCprime,lambda_diag=cs@par$lambda_diag)#,
+               lambda1=cs@par$lambda1,lambda2=cs@par$lambda2,eCprime=cs@par$eCprime,lambda_diag=cs@par$lambda_diag,
+               binned=length(cs@groups)>0)#,
   }
   info
   
