@@ -1144,6 +1144,7 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
     update.eC = !(fit.signal==T && laststep > cs@settings$bg.steps)
+    cs@groups=list()
   }
   #
   if(verbose==T) cat("Subsampling counts for dispersion\n")
