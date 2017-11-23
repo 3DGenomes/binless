@@ -9,15 +9,15 @@ library(igraph)
 
 args=commandArgs(trailingOnly=TRUE)
 sub=args[1]
-ncores=4
+ncores=1
 base.res=5000
 
 setwd("/home/yannick/simulations/cs_norm")
 
-fit=T
+fit=F
 restart=F
 bin=F
-plot=F
+plot=T
 
 if (fit == T) {
   if (restart == F) {
@@ -29,7 +29,7 @@ if (fit == T) {
     cs <- normalize_binless(cs, restart=F, ncores=ncores, base.res=base.res)
   } else {
     load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
-    cs <- normalize_binless(cs, restart=T, ngibbs = 1, ncores=ncores)
+    cs <- normalize_binless(cs, restart=T, ngibbs = 10, ncores=ncores)
   }
   save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
 }
@@ -41,6 +41,7 @@ if (bin == T) {
     cs=detect_binned_interactions(cs, resolution=resolution, group="all", ncores=ncores)
     cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
     ref=cs@experiments[1,name]
+    cs=detect_binned_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
     cs=detect_binless_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
     save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
   }
@@ -54,7 +55,19 @@ if (plot == T) {
     plot_binless_matrix(mat, upper="observed", lower="observed")
     ggsave(filename=paste0("images/rao_",sub,"_GMvsIMR90_base5at5_observed.pdf"),width=10,height=5)
     
-    #side-by-side at 5k: signal
+    #side-by-side at 5k: normalized
+    mat=get_binned_interactions(cs, resolution=resolution, group="all")
+    mat[,is.significant:=prob.gt.expected>=1-1e-12]
+    plot_binless_matrix(mat, upper="normalized", lower="normalized") + geom_point(aes(begin2,begin1),colour=muted("yellow"),data=mat[is.significant==T])
+    ggsave(filename=paste0("images/rao_",sub,"_GMvsIMR90_base5at5_binned_normalized.pdf"),width=10,height=5)
+    
+    #side-by-side at 5k: binned differences
+    mat=get_binned_differences(cs, resolution=resolution, group="all", ref=cs@experiments[1,name])
+    mat[,direction:=ordered(direction,c("enriched","depleted"))]
+    plot_binless_difference_matrix(mat) + geom_point(aes(begin2,begin1,colour=direction),data=mat[is.significant==T])+facet_wrap(~name,nrow = 1)
+    ggsave(filename=paste0("images/rao_",sub,"_GMvsIMR90_base5at5_binned_difference.pdf"),width=10,height=5)
+    
+    #side-by-side at 5k: binless signal
     mat=get_binless_interactions(cs)
     plot_binless_signal_matrix(mat)
     ggsave(filename=paste0("images/rao_",sub,"_GMvsIMR90_base5at5_binless_signal.pdf"),width=10,height=5)
@@ -78,14 +91,15 @@ if (plot == T) {
 
 if (F) {
   
-  subs=c("SELP_150k","Peak1_450k","ADAMTS2_450k","PARM1_600k","Tbx19_700k","SEMA3C_1M", "Fig1C_1M","FOXP1_1.3M","TBX3_1.5M",
-         "Comparison_1.7M","22qter_1.7M", "Talk_2M", "ADAMTS1_2.3M")
+  subs=c("SELP_150k","Peak1_450k","ADAMTS2_450k","PARM1_600k","Tbx19_700k","SEMA3C_1M", "SEMA3Cext_1.5M", "FOXP1_1.3M", "FOXP1ext_2.3M",
+         "TBX3_1.5M", "TBX3ext_2M", "Comparison_1.7M", "Talk_2M", "ADAMTS1_2.3M", "ADAMTS1ext_2.8M")
   info = foreach(sub=subs,.combine=rbind,.errorhandling="remove") %dopar% {
     load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
     data.table(ori=sub,has.converged=binless:::has_converged(cs),#run=run,
                runtime=cs@diagnostics$params[,sum(runtime)],nsteps=cs@diagnostics$params[,max(step)],
                name=cs@experiments[,name],
-               lambda1=cs@par$lambda1,lambda2=cs@par$lambda2,eCprime=cs@par$eCprime,lambda_diag=cs@par$lambda_diag)#,
+               lambda1=cs@par$lambda1,lambda2=cs@par$lambda2,eCprime=cs@par$eCprime,lambda_diag=cs@par$lambda_diag,
+               binned=length(cs@groups)>0)#,
   }
   info
   
