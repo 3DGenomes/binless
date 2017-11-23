@@ -5,7 +5,7 @@ library(foreach)
 library(doParallel)
 
 ### take less reads
-subs = round(100/(2**(0:7)), digits = 2)
+subs = round(100/(2**(0:6)), digits = 2)
 foreach (sub=subs) %do% {
   load("data/rao_HiCall_GM12878_SELP_150k_csdata_with_data.RData")
   cs=merge_cs_norm_datasets(list(csd), different.decays="none")
