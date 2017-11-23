@@ -73,10 +73,10 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
         if (constrained) {
             if (fixed) { // is eCprime fixed to 0?
                 if (positive) {
-                    auto est = make_FixedSparsity<CVkSD<1>, ZeroOffset, PositiveSign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
+                    auto est = make_FixedSparsity<CV, ZeroOffset, PositiveSign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
                     opt = est.optimize();
                 } else {
-                    auto est = make_FixedSparsity<CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
+                    auto est = make_FixedSparsity<CV, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
                     opt = est.optimize();
                 }
             } else {
@@ -86,10 +86,10 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
         } else {
             if (fixed) { // is eCprime fixed to 0?
                 if (positive) {
-                    auto est = make_FixedSparsity<CVkSD<1>, ZeroOffset, PositiveSign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
+                    auto est = make_FixedSparsity<CV, ZeroOffset, PositiveSign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
                     opt = est.optimize();
                 } else {
-                    auto est = make_FixedSparsity<CVkSD<1>, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
+                    auto est = make_FixedSparsity<CV, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
                     opt = est.optimize();
                 }
             } else {
@@ -101,10 +101,10 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
         if (constrained) {
             if (fixed) { // is eCprime fixed to 0?
                 if (positive) {
-                    auto est = make_EstimatedSparsity<CVkSD<1>, ZeroOffset, PositiveSign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
+                    auto est = make_EstimatedSparsity<CV, ZeroOffset, PositiveSign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
                     opt = est.optimize();
                 } else {
-                    auto est = make_EstimatedSparsity<CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
+                    auto est = make_EstimatedSparsity<CV, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
                     opt = est.optimize();
                 }
             } else {
@@ -114,10 +114,10 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
         } else {
             if (fixed) { // is eCprime fixed to 0?
                 if (positive) {
-                    auto est = make_EstimatedSparsity<CVkSD<1>, ZeroOffset, PositiveSign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
+                    auto est = make_EstimatedSparsity<CV, ZeroOffset, PositiveSign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
                     opt = est.optimize();
                 } else {
-                    auto est = make_EstimatedSparsity<CVkSD<1>, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
+                    auto est = make_EstimatedSparsity<CV, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
                     opt = est.optimize();
                 }
             } else {
