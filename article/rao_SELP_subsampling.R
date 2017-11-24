@@ -15,7 +15,7 @@ foreach (sub=subs) %do% {
 
 
 #run normalizations
-registerDoParallel(cores=8)
+registerDoParallel(cores=7)
 runs = foreach (sub=subs) %dopar% {
   load(paste0("data/rao_HiCall_GM12878_SELP_150k_",sub,"pc_csnorm.RData"))
   cs = normalize_binless(cs)
@@ -49,7 +49,8 @@ decay = foreach(j=subs,cs=runs,.combine=rbind) %dopar% {
     cs@par$decay[,.(subsampling=j,distance,decay=exp(kappa-cs@par$eC))]
   }
 }
-ggplot(decay[,.SD[sample(.N,min(.N,100000))],by=subsampling])+scale_colour_gradient(trans="log10")+
+decay[,subsampling:=ordered(subsampling)]
+ggplot(decay[,.SD[sample(.N,min(.N,100000))],by=subsampling])+scale_colour_grey()+
   geom_line(aes(distance,decay,colour=subsampling,group=subsampling))+scale_x_log10()+scale_y_log10()
 ggsave(filename="images/rao_HiCall_SELP_150k_subs_diagonal_decay.pdf", width=10, height=7)
 
