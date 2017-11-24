@@ -14,9 +14,9 @@ base.res=5000
 
 setwd("/home/yannick/simulations/cs_norm")
 
-fit=F
+fit=T
 restart=F
-bin=F
+bin=T
 plot=T
 
 if (fit == T) {
@@ -29,26 +29,31 @@ if (fit == T) {
     cs <- normalize_binless(cs, restart=F, ncores=ncores, base.res=base.res)
   } else {
     load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
-    cs <- normalize_binless(cs, restart=T, ngibbs = 10, ncores=ncores)
+    if (!has_converged(cs)) cs <- normalize_binless(cs, restart=T, ngibbs = 10, ncores=ncores)
   }
   save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
 }
 
 if (bin == T) {
   load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
-  for (resolution in c(base.res)) {
+  # for (resolution in c(base.res)) {
+  #   cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
+  #   cs=detect_binned_interactions(cs, resolution=resolution, group="all", ncores=ncores)
+  #   cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
+  #   ref=cs@experiments[1,name]
+  #   cs=detect_binned_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
+  #   cs=detect_binless_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
+  #   save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
+  # }
+  for (resolution in c(10000,20000,50000)) {
     cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
     cs=detect_binned_interactions(cs, resolution=resolution, group="all", ncores=ncores)
-    cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
-    ref=cs@experiments[1,name]
-    cs=detect_binned_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
-    cs=detect_binless_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
-    save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
   }
+  save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
 }
 
 if (plot == T) {
-  load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
+  #load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
   for (resolution in c(base.res)) {
     #side-by-side at 5k: observed
     mat=get_binless_interactions(cs)
@@ -93,6 +98,7 @@ if (F) {
   
   subs=c("SELP_150k","Peak1_450k","ADAMTS2_450k","PARM1_600k","Tbx19_700k","SEMA3C_1M", "SEMA3Cext_1.5M", "FOXP1_1.3M", "FOXP1ext_2.3M",
          "TBX3_1.5M", "TBX3ext_2M", "Comparison_1.7M", "Talk_2M", "ADAMTS1_2.3M", "ADAMTS1ext_2.8M")
+  registerDoParallel(cores=10)
   info = foreach(sub=subs,.combine=rbind,.errorhandling="remove") %dopar% {
     load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
     data.table(ori=sub,has.converged=binless:::has_converged(cs),#run=run,
@@ -113,10 +119,9 @@ if (F) {
   melted.mat=melt(mat[,.(resolution,name,begin1,begin2,observed,decay=decaymat,genomic=biasmat,
                          normalized,normalized.sd=background.sd, signal,signal.sd)],
                   id.vars=c("name","begin1","begin2","resolution"))
-  #melted.mat[,value:=value/.SD[begin1==begin2,max(value)],by=c("variable","name")]
-  melted.mat[,value:=pmin(value,quantile(value,0.99,na.rm=T)),by=c("variable","name","resolution")]
+  melted.mat[,value:=pmin(value,quantile(value,0.98,na.rm=T)),by=c("variable","name","resolution")]
   melted.mat[,value:=(value-min(value,na.rm=T))/(max(value,na.rm=T)-min(value,na.rm=T)),by=c("variable","name","resolution")]
-  #one dataset, all bw matrices
+  #
   ggplot(melted.mat)+geom_raster(aes(begin1,begin2,fill=value))+theme_minimal()+
     geom_raster(aes(begin2,begin1,fill=value))+facet_grid(resolution~variable)+scale_fill_gradient(low="white",high="black",na.value="white")+
     coord_fixed()+theme(panel.background=element_blank(), axis.text.x = element_text(angle = 90, hjust = 1))+
