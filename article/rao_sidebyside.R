@@ -36,15 +36,15 @@ if (fit == T) {
 
 if (bin == T) {
   load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
-  # for (resolution in c(base.res)) {
-  #   cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
-  #   cs=detect_binned_interactions(cs, resolution=resolution, group="all", ncores=ncores)
-  #   cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
-  #   ref=cs@experiments[1,name]
-  #   cs=detect_binned_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
-  #   cs=detect_binless_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
-  #   save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
-  # }
+  for (resolution in c(base.res)) {
+    cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
+    cs=detect_binned_interactions(cs, resolution=resolution, group="all", ncores=ncores)
+    cs=detect_binless_interactions(cs, resolution=resolution, group="all", ncores=ncores)
+    ref=cs@experiments[1,name]
+    cs=detect_binned_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
+    cs=detect_binless_differences(cs, ref, resolution=resolution, group="all", ncores=ncores)
+    save(cs,file=paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
+  }
   for (resolution in c(10000,20000,50000)) {
     cs=bin_all_datasets(cs, resolution=resolution, verbose=T, ncores=ncores)
     cs=detect_binned_interactions(cs, resolution=resolution, group="all", ncores=ncores)
@@ -53,7 +53,7 @@ if (bin == T) {
 }
 
 if (plot == T) {
-  #load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
+  load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
   for (resolution in c(base.res)) {
     #side-by-side at 5k: observed
     mat=get_binless_interactions(cs)
@@ -111,7 +111,7 @@ if (F) {
   
   
   #generate bw plots
-  #load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
+  load(paste0("data/rao_HiCall_",sub,"_csnorm_optimized_base",base.res/1000,"k.RData"))
   mat = foreach(resolution=c(5000,10000,20000,50000), .combine=rbind, .errorhandling="remove") %do% {
     mat=get_binned_interactions(cs, resolution=resolution, group="all")[name==name[1]]
     mat[,resolution:=resolution]
