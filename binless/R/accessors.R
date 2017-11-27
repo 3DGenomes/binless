@@ -149,23 +149,6 @@ get_binless_differences = function(cs, ref, resolution=cs@settings$base.res, gro
   return(mat)
 }
 
-#' Predict model parameters on a subset of the input data
-#'
-#' @param cs 
-#' @param ncounts 
-#'
-#' @return
-#' @export
-#'
-#' @examples
-get_predicted_subset = function(cs, ncounts=100000) {
-  if (length(cs@par)==0) stop("You should first normalize the datasets")
-  counts=cs@counts[sample(.N,min(.N,ncounts))]
-  setkey(counts,name,id1,id2)
-  mat=predict_all(cs, counts, verbose=F)
-  return(mat)
-}
-
 #' update diagnostics data table or create it if not existing
 #'
 #' @return

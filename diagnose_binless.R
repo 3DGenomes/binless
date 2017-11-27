@@ -71,8 +71,8 @@ ggplot(decay)+geom_line(aes(distance,decay,colour="decay"))+
   scale_x_log10()+scale_y_log10()+geom_line(aes(distance,model,colour="model"))
 
 #residuals
-i=6
-a=cs@diagnostics$residuals[step==i]
+i=14
+a=cs.small@diagnostics$residuals[step==i]
 ggplot()+geom_point(aes(unclass(bin2),pmin(z,10)),alpha=0.5,data=a)+facet_wrap(~name)+ylim(-8,8)+
   geom_line(aes(unclass(bin2),value,colour=variable),data=melt(a[,.(name,bin2,phi,log_decay,log_bias,log_mean)],id=c("name","bin2")))
 ggplot(a)+geom_line(aes(unclass(bin2),weight,colour=name))
