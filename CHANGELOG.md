@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Biases are not constrained while doing normalization
 - Do not remove bad counter diagonals except very close to main diagonal
   (smoothing is good enough)
+- Reorganize source code
 ### Fixed
 - Better display and error messages for groupings
 - Compress cts matrix during normalization for lower memory footprint
