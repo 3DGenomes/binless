@@ -9,6 +9,7 @@ binless/src/RcppExports.cpp
 binless/src/include/*
 binless/src/gfl/src/*.o
 binless/.R*
+binless/binless.Rproj
 .*.sw*
 *_cmdline.R
 run*.R
