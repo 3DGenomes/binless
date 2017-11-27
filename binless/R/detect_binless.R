@@ -381,19 +381,6 @@ detect_binless_interactions = function(cs, resolution=cs@settings$base.res, grou
       cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],"\n")
   #compute matrix at new params
   mat = rbindlist(params[,mat])
-  #mat[,c("value","valuehat"):=list(phi,phihat)]
-  #
-  #if (verbose==T) cat(" Detect patches\n")
-  #mat = foreach(g=groupnames, .combine=rbind) %do% {
-  #  matg = mat[name==g]
-  #  #cl = binless:::build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
-  #  #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
-  #  matg[,value:=phi]
-  #  matg = binless:::detect_binless_patches(matg, csi@settings)
-  #  matg[,value:=NULL]
-  #  matg
-  #}
-  #
   ### store interaction
   #store back
   csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],eCprime=params[,eCprime],name=params[,name])
@@ -452,18 +439,6 @@ detect_binless_differences = function(cs, ref, resolution=cs@settings$base.res, 
       cat("  ",params[i,name]," : lambda1=",params[i,lambda1]," lambda2=",params[i,lambda2],"\n")
   #compute matrix at new params
   mat = rbindlist(params[,mat])
-  #mat[,c("value","valuehat"):=list(delta,deltahat)]
-  #
-  #if (verbose==T) cat(" Detect patches\n")
-  #mat = foreach(g=groupnames, .combine=rbind) %do% {
-  #  matg = mat[name==g]
-  #  #cl = binless:::build_patch_graph_components(csi@settings$nbins, matg, csi@settings$tol.val)
-  #  #matg[,c("patchno","value"):=list(factor(cl$membership),NULL)]
-  #  matg[,value:=delta]
-  #  matg = binless:::detect_binless_patches(matg, csi@settings)
-  #  matg[,value:=NULL]
-  #  matg
-  #}
   #store back
   csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],eCprime=params[,eCprime],name=params[,name])
   mat[,ncounts:=NULL]

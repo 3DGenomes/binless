@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - pixels in plots are properly aligned with bin borders
 - report missing data in binned matrices (fixes empty lines in binless matrices)
 ### Removed
-- Deprecated code (exact model and stan spline helper functions)
+- Deprecated code (exact model, stan spline helper functions and R graph calls)
 
 ## [0.9.0] - 2017-11-02
 ### Added

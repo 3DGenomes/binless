@@ -41,7 +41,6 @@
 #' @import MASS
 #' @import Matrix
 #' @import quadprog
-#' @import igraph
 #' @importFrom Hmisc cut2
 #' @importFrom dplyr ntile
 #'
