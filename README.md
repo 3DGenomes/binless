@@ -2,8 +2,6 @@
 
 ## Resolution-independent normalization of Hi-C data
 
-Refer to the [CHANGELOG](CHANGELOG.md) for the latest changes
-
 ### Installation
 
 * Download this repository to a fresh folder on your computer
@@ -62,9 +60,9 @@ features. We are looking forward to your feedback!
 
 If you use this software, please acknowledge the following paper
 
-Spill YG, Castillo D, Marti-Renom MA, "Binless normalization of Hi-C data
+Spill YG, Castillo D, Marti-Renom MA, "Bin-less normalization of Hi-C data
 provides significant interaction and difference detection independently of
-resolution", bioRxiv 214403; [doi:10.1101/214403](https://doi.org/10.1101/214403) 
+resolution", *to be submitted*
 
 ### File format description
 
