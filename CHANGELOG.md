@@ -4,7 +4,7 @@ All notable changes to *binless* will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.10.0] - 2017-11-28
 ### Added
 - New function `zoom_csnorm` to take parts of a CSnorm object
 - Remove large count outliers (possible PCR duplicates)
@@ -38,6 +38,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Initial commit
 
 
-[Unreleased]: ../../compare/v0.9.0...HEAD
+[0.10.0]: ../../compare/v0.9.0...v0.10.0
 [0.9.0]: ../../compare/v0.2.0...v0.9.0
 
