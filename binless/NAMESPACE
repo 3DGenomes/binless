@@ -3,6 +3,7 @@
 export(add_bin_begin_and_end)
 export(bin_all_datasets)
 export(bin_data)
+export(categorize_by_new_type)
 export(detect_binless_differences)
 export(detect_binless_interactions)
 export(detect_binned_differences)

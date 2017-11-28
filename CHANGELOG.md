@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - New function `zoom_csnorm` to take parts of a CSnorm object
 - Remove large count outliers (possible PCR duplicates)
+- Tutorial on arrow plots
 ### Changed
 - Biases are not constrained while doing normalization
 - Do not remove bad counter diagonals except very close to main diagonal

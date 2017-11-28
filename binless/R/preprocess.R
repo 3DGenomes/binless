@@ -138,7 +138,7 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
 #' @param read.len integer vector. The length of a full read, used for dangling ends (temporary)
 #'   
 #' @return The same data.table, with an additional "category" column
-#' @keywords internal
+#' @export
 #' 
 #' @examples
 categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0), dangling.R = c(3), read.len=40) {
