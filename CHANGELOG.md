@@ -38,6 +38,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Initial commit
 
 
-[Unreleased]: https://github.com/3DGenomes/csnorm/compare/v0.9.0...HEAD
-[0.9.0]: https://github.com/3DGenomes/csnorm/compare/v0.2.0...v0.9.0
+[Unreleased]: ../../compare/v0.9.0...HEAD
+[0.9.0]: ../../compare/v0.2.0...v0.9.0
 
