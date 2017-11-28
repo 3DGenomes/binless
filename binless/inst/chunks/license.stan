@@ -1,4 +1,3 @@
 /* 
-    TODO
-    LICENSE IS GPLv3
+    LICENSE IS LGPLv3
 */

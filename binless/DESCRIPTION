@@ -1,7 +1,7 @@
 Package: binless
 Type: Package
 Title: binless: Resolution-independent Normalization And Interaction Detection For Hi-C Data
-Version: 0.9.0
+Version: 0.10.0
 Authors@R: person("Yannick", "Spill", email = "yannick.spill@crg.eu", role = c("aut", "cre"))
 Description: Provides resolution-independent normalization of Hi-C data, and
     permits interaction and difference detection.
@@ -29,12 +29,19 @@ Collate:
     'CppDocs.R'
     'binless.R'
     'accessors.R'
-    'bin.R'
+    'classes.R'
+    'common.R'
+    'detect.R'
     'detect_binless.R'
     'detect_binned.R'
-    'legacy_graph.R'
+    'fused_lasso.R'
+    'ice.R'
+    'io.R'
     'normalize.R'
-    'normalize_gauss.R'
+    'normalize_decay.R'
+    'normalize_dispersion.R'
+    'normalize_genomic.R'
+    'normalize_signal.R'
     'onAttach.R'
     'preprocess.R'
     'stanmodels.R'

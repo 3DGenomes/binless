@@ -17,9 +17,15 @@ library(binless)
 #fread warning can be ignored
 #be sure to set the proper read length
 #with this Rao dataset, we can start with dangling.L=0 dangling.R=3 maxlen=900 read.len=101 and dmin=1000
+#if you use a Mac, use gzcat instead of zcat, or provide the path to an uncompressed file
+#refer to README.md for a description of the tsv file format
 a=examine_dataset("zcat example/GM12878_MboI_HICall_FOXP1ext.tsv.gz",
                   skip=0L,nrows=1000000, skip.fbm=T, read.len=101)
-
+a$data #the data that was read. Here you can make sure you provided the correct read.len
+a$pdangling #select begin of dangling ends. With DpnII, one can expect 0 for dangling.L and 3 for dangling.R
+a$pdiag #the distribution of sonication fragments. In this experiment, reads are mostly smaller than maxlen=900
+a$pclose #You should see an elbow at short distance, which should not be included. If not, try increasing nrows.
+         #Set dmin after it, e.g. dmin=1000. Do not set dmin<maxlen.
 
 #Create the CSdata objects that contain each dataset, using the just-determined parameters
 #Fast binless does not support circular genomes, so leave circularize=-1
@@ -61,6 +67,5 @@ load("example/rao_HiCall_IMR90_FOXP1ext_2.3M_csdata.RData")
 csd2=csd
 cs=merge_cs_norm_datasets(list(csd1,csd2), different.decays="none")
 #save(cs,file="example/rao_HiCall_FOXP1ext_csnorm.RData")
-
 
 

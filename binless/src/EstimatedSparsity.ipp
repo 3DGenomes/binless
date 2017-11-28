@@ -16,6 +16,8 @@ EstimatedSparsity<Score,Offset,Sign,Degeneracy,Calculation,GaussianEstimator>::o
     for (double c : UBcandidates_) {
         //optimize bounds
         bounds_t bounds = BoundsOptimizer<Offset,Sign>::optimize_bounds(c);
+        double lambda1 = (bounds.second-bounds.first)/2.;
+        if (lambda1 < lambda1_min_ && c < UBcandidates_(UBcandidates_.size()-1)-1e-12) continue; //skip candidate except if it's the last one
         score_t val = ScoreComputer<Calculation,Score,GaussianEstimator>::evaluate(bounds);
         /*Rcpp::Rcout << "EstimatedSparsity: c= " << c << " LB= " << bounds.first <<  " UB= " << bounds.second
                     << " lambda1= " << (bounds.second-bounds.first)/2. << " eCprime= " << (bounds.second+bounds.first)/2.

@@ -2,10 +2,12 @@
 
 ## Resolution-independent normalization of Hi-C data
 
+Refer to the [CHANGELOG](CHANGELOG.md) for the latest changes
+
 ### Installation
 
-* Download this repository to a fresh folder on your computer
-* Go to that folder on your machine, and hit `R CMD INSTALL --preclean binless`
+* Download the latest release [here](../../releases/latest)
+* Unpack it in a clean folder on your machine, and hit `R CMD INSTALL --preclean binless`
   in a shell.
 * If it complains that some packages are not installed, you must install them in
   R using `install.packages`
@@ -50,6 +52,12 @@ produced at the preprocessing stage, or directly provide the binned raw matrix.
 get statistically significant output**, and it might not look as *smooth* as the
 full-blown algorithm. But you can try out a whole chromosome ;)
 
+### Base-resolution (arrow) plots
+
+If you just want to see how your data looks like with the arrow plots and are
+not interested in binless normalization, check out the short tutorial
+`arrow_plot.R`.
+
 ### Questions? Problems?
 
 Please use the GitHub issues tracker to report anything, rather than
@@ -60,9 +68,9 @@ features. We are looking forward to your feedback!
 
 If you use this software, please acknowledge the following paper
 
-Spill YG, Castillo D, Marti-Renom MA, "Bin-less normalization of Hi-C data
+Spill YG, Castillo D, Marti-Renom MA, "Binless normalization of Hi-C data
 provides significant interaction and difference detection independently of
-resolution", *to be submitted*
+resolution", bioRxiv 214403; [doi:10.1101/214403](https://doi.org/10.1101/214403) 
 
 ### File format description
 

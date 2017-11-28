@@ -20,6 +20,9 @@ ggplot(cs@diagnostics$params[,.(step,leg,runtime)])+geom_line(aes(step,runtime,c
 plot_diagnostics(cs)$plot
 plot_diagnostics(cs)$plot2
 
+#signal
+plot_binless_matrix(cs@par$signal,upper="phi",lower="beta",trans="identity")
+
 #signal vs step
 signals=foreach(i=1:cs@diagnostics$params[,max(step)],.combine=rbind) %do% {
   if ("signal" %in% cs@diagnostics$params[step==i,leg]) {
@@ -32,6 +35,9 @@ ggplot(signals[name==unique(name)[1]])+geom_raster(aes(bin1,bin2,fill=phi))+geom
 ggplot(signals[name==unique(name)[2]])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=beta))+facet_wrap(~ step)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
 ggplot(signals[step>=step[.N]-1])+geom_raster(aes(bin1,bin2,fill=phi))+geom_raster(aes(bin2,bin1,fill=phi))+facet_grid(step~ name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
 ggplot(signals[step>=step[.N]])+geom_raster(aes(bin1,bin2,fill=beta))+geom_raster(aes(bin2,bin1,fill=pmin(phihat,max(beta))))+facet_wrap(~name)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
+
+#signal differential
+ggplot(signals[name==unique(name)[1],.(step,value=beta-shift(beta)),by=c("name","bin1","bin2")])+geom_raster(aes(bin1,bin2,fill=value))+facet_wrap(~step)+scale_fill_gradient2(high=muted("red"), low=muted("blue"), na.value = "white")+coord_fixed()
 
 #plot last signal row (virtual 4C)
 ggplot(signals[bin1==min(bin1)])+geom_line(aes(bin2,phi,group=name))+geom_point(aes(bin2,phihat),alpha=0.1)+facet_grid(step~name)+ylim(-2.5,10)
@@ -56,9 +62,17 @@ ggplot(decays[,.(distance,log_decay=kappa-mean(kappa),std,khat=kappahat-mean(kap
   geom_line(aes(distance,log_decay,colour=name))+geom_point(aes(distance,khat,colour=name),alpha=0.1)+
   geom_errorbar(aes(distance,ymin=khat-std,ymax=khat+std,colour=name))+facet_wrap(~step)
 
+#fit last decay to polymer model
+decay=cs@par$decay[name==name[1],.(ldist=log(distance),ldec=log_decay,distance,decay=exp(log_decay))]
+fit=lm(ldec~ldist,data=decay[distance>1e4&distance<5e5])
+summary(fit)
+decay[,model:=exp(fit$coefficients[["(Intercept)"]]+fit$coefficients[["ldist"]]*ldist)]
+ggplot(decay)+geom_line(aes(distance,decay,colour="decay"))+
+  scale_x_log10()+scale_y_log10()+geom_line(aes(distance,model,colour="model"))
+
 #residuals
-i=6
-a=cs@diagnostics$residuals[step==i]
+i=14
+a=cs.small@diagnostics$residuals[step==i]
 ggplot()+geom_point(aes(unclass(bin2),pmin(z,10)),alpha=0.5,data=a)+facet_wrap(~name)+ylim(-8,8)+
   geom_line(aes(unclass(bin2),value,colour=variable),data=melt(a[,.(name,bin2,phi,log_decay,log_bias,log_mean)],id=c("name","bin2")))
 ggplot(a)+geom_line(aes(unclass(bin2),weight,colour=name))

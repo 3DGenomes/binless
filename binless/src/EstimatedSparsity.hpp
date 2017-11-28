@@ -40,13 +40,13 @@ public:
      ScoreComputer<Calculation,Score,GaussianEstimator>(tol_val, binned, gauss, lambda2),
      ScoreOptimizer<Score>(),
      UBcandidates_(get_UB_candidates<Offset,Sign,Degeneracy>(nbins, tol_val, binned)),
-     lambda2_(lambda2) {}
+     lambda2_(lambda2), lambda1_min_(tol_val) {}
     
      score_t optimize() const;
     
 private:
     const Rcpp::NumericVector UBcandidates_;
-    const double lambda2_;
+    const double lambda2_, lambda1_min_;
 };
 
 //named constructor

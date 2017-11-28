@@ -126,105 +126,6 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
   return(counts)
 }
 
-#' Plot reads in binned form at a given resolution
-#'
-#' @param dt a reads data.table containing the parsed tsv reads
-#' @param resolution the requested resolution, in base pairs
-#' @param b1,e1 the begin and end of the range requested 
-#' @param b2,e2 optional, if you want an outer-diagonal section 
-#' @param diagonal logical, default FALSE. Should the diagonal be indicated? 
-#' @param rsites logical, default FALSE. Should restriction sites be indicated?
-#'
-#' @return
-#' @export
-#'
-#' @examples
-plot_binned = function(dt, resolution, b1, e1, b2=NULL, e2=NULL, diagonal=F, rsites=F) {
-  if (is.null(b2)) b2=b1
-  if (is.null(e2)) e2=e1
-  binned = bin_data(dt, resolution, b1=b1, b2=b2)
-  #
-  p=ggplot(binned, aes(begin1,begin2, fill=log(observed)))+geom_raster()+
-    coord_cartesian(xlim=c(b1,e1),ylim=c(b2,e2))+
-    scale_fill_gradient(low="white", high="black")
-  if (diagonal) p = p+stat_function(fun=function(x){x})
-  if (rsites) {
-    rsites1=dt[,unique(c(re.up1,re.dn2))]
-    rsites1=rsites1[rsites1>=b1&rsites1<=e1]
-    rsites2=dt[,unique(c(re.up2,re.dn2))]
-    rsites2=rsites2[rsites2>=b1&rsites2<=e1]
-    p = p + geom_vline(xintercept=rsites1) + geom_hline(yintercept=rsites2)
-  }
-  print(p)
-}
-
-#' Plot raw reads
-#'
-#' @inheritParams plot_binned
-#'
-#' @return
-#' @export
-#'
-#' @examples
-plot_raw = function(dt, b1=NULL, e1=NULL, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
-  if (is.null(b1)) b1 = dt[,min(rbegin1)]
-  if (is.null(e1)) e1 = dt[,max(rend2)]
-  faceted = (!is.null(b2)) & (!is.null(e2)) & b2>=e1 & diagonal==T #show 3 viewpoints simultaneously
-  if (length(faceted)!=1) faceted=F #happens if b2 is NULL
-  #get subset of data, add facet info
-  if (faceted==F) {
-    sub = get_raw_reads(dt, b1, e1, b2, e2)
-    if (is.null(b2)) b2=b1
-    if (is.null(e2)) e2=e1
-    p=ggplot(sub[,.SD[sample(.N,min(.N,100000))],,by=c("strand1","strand2")])
-    if (diagonal==T) p = p+stat_function(fun=function(x){x})
-    if (rsites==T) {
-      #rsite positions
-      rsites.all=sub[,unique(c(re.up1,re.up2,re.dn1,re.dn2))]
-      rsites1=rsites.all[rsites.all>=b1&rsites.all<=e1]
-      p = p + geom_vline(xintercept=rsites1, colour="grey")
-      rsites2=rsites.all[rsites.all>=b2&rsites.all<=e2]
-      p = p + geom_hline(yintercept=rsites2, colour="grey")
-    }
-    #plot
-    p=p+geom_segment(aes(x=rbegin1, y=rbegin2, xend=rend1, yend=rend2, colour=category),
-                     arrow=arrow(type="closed", length=unit(0.005,"npc")))
-    p=p+xlim(b1,e1)+ylim(b2,e2)
-  } else {
-    sub1 = get_raw_reads(dt, b1, e1)
-    sub1[,c("xfac","yfac"):=list(1,0)]
-    sub2 = get_raw_reads(dt, b2, e2)
-    sub2[,c("xfac","yfac"):=list(0,1)]
-    sub3 = get_raw_reads(dt, b1, e1, b2, e2)
-    sub3[,c("xfac","yfac"):=list(0,0)]
-    sub=rbind(sub1,sub2,sub3)
-    #diagonal
-    diag.data = data.table(x=c(b1,b2), y=c(b1,b2), xend=c(e1,e2), yend=c(e1,e2), xfac=c(1,0), yfac=c(0,1))
-    p=ggplot(sub[,.SD[sample(.N,min(.N,100000))],,by=c("strand1","strand2")])
-    p = p+geom_segment(aes(x=x, y=y, xend=xend, yend=yend), data=diag.data)
-    #rsites
-    if (rsites==T) {
-      rsites.all=sub[,unique(c(re.up1,re.up2,re.dn1,re.dn2))]
-      rsites1=rsites.all[rsites.all>=b1&rsites.all<=e1]
-      rsites2=rsites.all[rsites.all>=b2&rsites.all<=e2]
-      rsite.data.x = data.table(z=c(rsites1,rsites1,rsites2),
-                                xfac=c(rep(c(1,0),each=length(rsites1)), rep(0,length(rsites2))),
-                                yfac=c(rep(0,length(rsites1)*2), rep(1,length(rsites2))))
-      rsite.data.y = data.table(z=c(rsites2,rsites2,rsites1),
-                                yfac=c(rep(c(1,0),each=length(rsites2)), rep(0,length(rsites1))),
-                                xfac=c(rep(0,length(rsites2)*2), rep(1,length(rsites1))))
-      p = p + geom_vline(aes(xintercept=z), rsite.data.x, colour="grey") + geom_hline(aes(yintercept=z), rsite.data.y, colour="grey")
-    }
-    #plot
-    p=p+geom_segment(aes(x=rbegin1, y=rbegin2, xend=rend1, yend=rend2, colour=category),
-                     arrow=arrow(type="closed", length=unit(0.005,"npc")))
-    p=p+facet_grid(xfac~yfac, scales = "free", space="free") + theme(axis.text.x = element_text(angle = 90, hjust = 1))
-  }
-  p = p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank())
-  print(p)
-}
-
-
 #' Add category label to reads
 #' 
 #' Performs classification according to cut-site normalization scheme
@@ -237,7 +138,7 @@ plot_raw = function(dt, b1=NULL, e1=NULL, b2=NULL, e2=NULL, diagonal=T, rsites=T
 #' @param read.len integer vector. The length of a full read, used for dangling ends (temporary)
 #'   
 #' @return The same data.table, with an additional "category" column
-#' @keywords internal
+#' @export
 #' 
 #' @examples
 categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0), dangling.R = c(3), read.len=40) {
@@ -402,9 +303,11 @@ generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1
     genome_size=biases[,max(pos)+1]
   }
   #build biases
-  biases[,true_log_iota:=scale(rnorm(.N,sd=0.5), center=T, scale=F)]
+  biases[,true_log_iota:=scale(rnorm(.N,sd=0.2), center=T, scale=F)]
+  biases[,true_log_iota:=true_log_iota+0.5*shift(true_log_iota,fill=0)+0.2*shift(true_log_iota,n=2,fill=0)]
   #ggplot(biases,aes(pos,true_log_iota))+geom_point()+geom_line()
-  biases[,true_log_rho:=scale(rnorm(.N,sd=0.5), center=T, scale=F)]
+  biases[,true_log_rho:=scale(rnorm(.N,sd=0.2), center=T, scale=F)]
+  biases[,true_log_rho:=true_log_rho+0.5*shift(true_log_rho,fill=0)+0.2*shift(true_log_iota,n=2,fill=0)]
   #ggplot(biases,aes(pos,true_log_rho))+geom_point()+geom_line()
   biases[,true_log_mean_RJ:=eRJ+(true_log_iota+true_log_rho)/2]
   biases[,true_log_mean_DL:=eDE+true_log_iota]
@@ -571,9 +474,8 @@ read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "H
 
 #' Fuse cut sites that are very close to each other
 #'
-#' @param csd CSData object
-#' @keywords internal
 #' @return a list with filtered biases and counts
+#' @keywords internal
 #'
 fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
   #group cut sites
@@ -609,6 +511,24 @@ fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
   }
   #wrap distance if circular
   if (circularize>0) counts[,distance:=pmin(distance,circularize-distance+1)]
+  #remove probable PCR artifacts: fit count*log(distance) histogram, remove rightmost points
+  art=melt(counts,id.vars=c("id1","id2","pos1","pos2","distance"),variable.factor = F)
+  art[,vld:=value*log(distance)]
+  setkey(art,vld)
+  art[,bin:=cut(vld,20,right = F, ordered_result = T, dig.lab = 12)]
+  hart=art[,.(count=.N,vld=mean(vld)),keyby=bin]
+  fit=lm(log(count)~vld,data=hart)
+  hart[,curve:=exp(fit$coefficients[["(Intercept)"]]+fit$coefficients[["vld"]]*vld)]
+  #ggplot()+geom_histogram(aes(vld),data=art,bins=20)+scale_y_log10()+geom_point(aes(vld,count,colour=curve>count),data=hart)+geom_line(aes(vld,curve),data=hart)
+  vldmin=hart[curve>count][.N,vld]
+  art=art[vld>vldmin]
+  if (art[,.N]>0) {
+    cat(name, ": Removing possible PCR artifacts\n")
+    for (i in 1:art[,.N]) {
+      cat("   pos1 =",art[i,pos1]," pos2 =",art[i,pos2], " distance =", art[i,distance], " ",art[i,variable],"=",art[i,value],"\n")
+      counts[id1==art[i,id1]&id2==art[i,id2],(art[i,variable]):=1]
+    }
+  }
   return(list(biases=biases,counts=counts))
 }
 
@@ -632,7 +552,7 @@ fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
 #' @export
 #'
 #' @examples
-merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enzyme","condition"), dfuse=5, qmin=0.05) {
+merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enzyme","condition"), dfuse=5, qmin=0.01) {
   cat("compile table of experiments, sorted by id\n")
   experiments = rbindlist(lapply(datasets, function(x) x@info))
   experiments[,name:=ordered(name, levels=name)]
@@ -645,7 +565,7 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
   settings$dfuse=dfuse
   settings$qmin=qmin
   #
-  filtered = lapply(datasets, function(csd){fuse_close_cut_sites(csd@biases, csd@counts, dfuse,
+  filtered = lapply(datasets, function(csd){binless:::fuse_close_cut_sites(csd@biases, csd@counts, dfuse,
                                                                  csd@info$name, csd@settings$circularize)})
   biases = lapply(filtered, function(x) x$biases)
   counts = lapply(filtered, function(x) x$counts)
@@ -698,6 +618,38 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
       biases=biases, counts=counts)
 }
 
+#' Restrict a CSnorm object to a given genomic portion.
+#' 
+#' Will remove any pre-existing normalization parameters
+#' 
+#' @param begin,end Start and end positions, refer to cs@biases[,pos]
+#'   
+#' @return The csnorm object with updated biases and counts slots
+#' @export
+#' 
+#' @examples
+zoom_csnorm = function(cs, begin, end) {
+  stopifnot(begin<end)
+  if (begin<cs@biases[,min(pos)]) cat("Warning: begin < cs@biases[,min(pos)]\n")
+  if (end>cs@biases[,max(pos)]) cat("Warning: end > cs@biases[,max(pos)]\n")
+  biases=copy(cs@biases[pos>=begin&pos<=end])
+  biases[,new.id:=.I]
+  counts=copy(cs@counts[pos1>=begin&pos1<=end&pos2>=begin&pos2<=end])
+  counts=biases[,.(id1=id,new.id1=new.id)][counts,,on="id1"]
+  counts=biases[,.(id2=id,new.id2=new.id)][counts,,on="id2"]
+  counts=counts[,.(name,id1=new.id1,id2=new.id2,pos1,pos2,contact.close,contact.down,contact.far,contact.up,distance)]
+  setkeyv(counts,key(cs@counts))
+  biases=biases[,.(name,id=new.id,pos,dangling.L,dangling.R,rejoined)]
+  setkeyv(biases,key(cs@biases))
+  settings=cs@settings
+  settings$dmax=biases[,max(pos)-min(pos)]+0.01
+  new("CSnorm", experiments=cs@experiments,
+      design=cs@design,
+      settings=settings,
+      zeros=cs@zeros,
+      biases=biases, counts=counts)
+}
+
 #' Take a random subset of the reads of a given csnorm object
 #' 
 #' @param csnorm a csnorm object
@@ -720,6 +672,7 @@ subsample_csnorm = function(cs, subsampling.pc=100) {
   new("CSnorm", experiments=cs@experiments,
       design=cs@design,
       settings=cs@settings,
+      zeros=cs@zeros,
       biases=biases, counts=counts)
 }
 
