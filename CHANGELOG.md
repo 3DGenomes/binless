@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Optimized binless
 - Tutorials
 
-## 0.2.0 - 2017-10-19
+## [0.2.0] - 2017-10-19
 ### Changed
 - Propose only a fast and approximate binless implementation
 
@@ -45,4 +45,5 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 [0.10.1]: ../../compare/v0.10.0...v0.10.1
 [0.10.0]: ../../compare/v0.9.0...v0.10.0
 [0.9.0]: ../../compare/v0.2.0...v0.9.0
+[0.2.0]: ../../compare/v0.1.0...v0.2.0
 
