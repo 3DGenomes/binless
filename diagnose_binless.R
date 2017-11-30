@@ -70,13 +70,11 @@ decay[,model:=exp(fit$coefficients[["(Intercept)"]]+fit$coefficients[["ldist"]]*
 ggplot(decay)+geom_line(aes(distance,decay,colour="decay"))+
   scale_x_log10()+scale_y_log10()+geom_line(aes(distance,model,colour="model"))
 
-#residuals
-i=14
-a=cs.small@diagnostics$residuals[step==i]
-ggplot()+geom_point(aes(unclass(bin2),pmin(z,10)),alpha=0.5,data=a)+facet_wrap(~name)+ylim(-8,8)+
-  geom_line(aes(unclass(bin2),value,colour=variable),data=melt(a[,.(name,bin2,phi,log_decay,log_bias,log_mean)],id=c("name","bin2")))
-ggplot(a)+geom_line(aes(unclass(bin2),weight,colour=name))
-ggplot(a)+geom_line(aes(unclass(bin2),count,colour=name))
+#residuals at last step (along first row of the matrix)
+a=cs@diagnostics$residuals[step==max(step)]
+ggplot()+geom_point(aes(unclass(bin),count/ncounts),alpha=0.5,data=a)+facet_wrap(~name)+scale_y_log10()+
+  geom_line(aes(unclass(bin),value/ncounts,colour=variable),
+            data=melt(a[,.(name,bin,signal,decay,bias,mean,ncounts)],id=c("name","bin","ncounts")))
 
 
 

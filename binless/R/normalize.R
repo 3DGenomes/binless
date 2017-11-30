@@ -230,6 +230,22 @@ has_converged = function(cs) {
   return(conv.param)
 }
 
+#' Check whether a normalization has converged
+#'
+#' @keywords internal
+#' 
+get_residuals = function(cts.common, viewpoint) {
+  a=cts.common[bin1==viewpoint,.(signal=sum(exp(phi)*weight),
+                               decay=sum(exp(log_decay)*weight),
+                               bias=sum(exp(log_bias)*weight),
+                               mean=sum(exp(lmu.nosig+phi)*weight),
+                               ncounts=sum(weight),
+                               count=sum(count*weight)),
+             keyby=c("name","bin2")]
+  setnames(a,"bin2","bin")
+  a[bin==viewpoint,c("signal","decay","bias","mean","ncounts","count"):=list(signal/2,decay/2,bias/2,mean/2,ncounts/2,count/2)]
+  return(a)
+}
 
 #' Binless normalization
 #' 
@@ -302,11 +318,9 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     #compute residuals once for this round
     if(verbose==T) cat(" Residuals\n")
     cts.common = binless:::gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
-    cs@diagnostics$residuals = rbind(cs@diagnostics$residuals,
-                                     cts.common[bin1==min(bin1),.(step=i,z=weighted.mean(z,weight/var),phi=weighted.mean(phi,weight/var),
-                                                                  log_decay=weighted.mean(log_decay,weight/var),log_bias=weighted.mean(log_bias,weight/var),
-                                                                  log_mean=weighted.mean(lmu.nosig+phi,weight/var),weight=sum(weight/2),count=sum(weight*count/2)),
-                                                keyby=c("name","bin2")])
+    residuals = get_residuals(cts.common, viewpoint = cts.common[,min(bin1)])
+    residuals[,step:=i]
+    cs@diagnostics$residuals = rbind(cs@diagnostics$residuals, residuals)
     #fit iota and rho
     constrain.bias = fit.signal==T && i <= cs@settings$bg.steps+1
     a=system.time(cs <- binless:::gauss_genomic(cs, cts.common, update.eC=update.eC, verbose=verbose, constrain=constrain.bias))
