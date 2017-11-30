@@ -29,7 +29,6 @@
 #'
 #' @useDynLib binless, .registration = TRUE
 #' @import rstan
-#' @import rstantools
 #' @import methods
 #' @import splines
 #' @import data.table
@@ -37,12 +36,13 @@
 #' @import foreach
 #' @import matrixStats
 #' @import ggplot2
-#' @import scales
 #' @import MASS
 #' @import Matrix
 #' @import quadprog
+#' @importFrom scales muted
 #' @importFrom Hmisc cut2
 #' @importFrom dplyr ntile
+#' @importFrom utils packageVersion
 #'
 #' @docType package
 #' @name binless

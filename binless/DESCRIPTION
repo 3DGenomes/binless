@@ -5,7 +5,7 @@ Version: 0.10.1
 Authors@R: person("Yannick", "Spill", email = "yannick.spill@crg.eu", role = c("aut", "cre"))
 Description: Provides resolution-independent normalization of Hi-C data, and
     permits interaction and difference detection.
-License: LGPLv3
+License: LGPL-3
 Depends:
     R (>= 3.0.2),
     Rcpp (>= 0.11.0)
@@ -20,7 +20,9 @@ Imports:
     ggplot2,
     dplyr,
     Matrix,
-    quadprog
+    quadprog,
+    scales,
+    utils
 LinkingTo: StanHeaders (>= 2.11.0), rstan (>= 2.11.1), BH (>= 1.60.0), Rcpp (>=
     0.12.0), RcppEigen
 RoxygenNote: 6.0.1
