@@ -4,7 +4,7 @@
 \alias{prepare_difference_estimation}
 \title{Build grouped difference matrix using normalization data if available}
 \usage{
-prepare_difference_estimation(cs, csg, resolution, ref, tol.val)
+prepare_difference_estimation(cs, csg, resolution, ref, tol.val, nperf)
 }
 \description{
 Build grouped difference matrix using normalization data if available

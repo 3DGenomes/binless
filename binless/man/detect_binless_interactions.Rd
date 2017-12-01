@@ -7,7 +7,7 @@
 detect_binless_interactions(cs, resolution = cs@settings$base.res,
   group = "all", ncores = 1, tol.val = cs@settings$tol, verbose = T,
   fix.lambda1 = F, fix.lambda1.at = NA, fix.lambda2 = F,
-  fix.lambda2.at = NA)
+  fix.lambda2.at = NA, nperf = 50)
 }
 \arguments{
 \item{cs}{}

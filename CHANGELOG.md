@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 - better storage and reporting of residuals
 - correctly report when fused lasso does not converge
+- provide means to increase nperf during binning
 
 ## [0.10.1] - 2017-11-29
 ### Fixed
