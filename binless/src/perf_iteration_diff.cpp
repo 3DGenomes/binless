@@ -42,17 +42,16 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     //first, warm start
     auto irls = make_IRLSEstimator(converge, flo, wt);
     irls.optimize(nouter, beta, lam2);
-    unsigned step = irls.get_nouter();
+    converged = irls.has_converged();
     //cold start if failed
-    if (step>nouter) {
+    if (!converged) {
         std::fill(beta.begin(), beta.end(), 0);
         flo.reset();
         irls.optimize(nouter, beta, lam2);
-        step = irls.get_nouter();
-        if (step>nouter) {
-            //Rcout << " warning: cold start did not converge" <<std::endl;
-            converged = false;
-        }
+        converged = irls.has_converged();
+        /*if (!converged) {
+            Rcout << " warning: cold start did not converge" <<std::endl;
+        }*/
     }
     
     //store GFL state for next round
