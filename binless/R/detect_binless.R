@@ -38,12 +38,15 @@ prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val, nper
 
 #' Perform binless interaction detection using fused lasso
 #'
-#' @param cs 
-#' @param ref 
-#' @param resolution 
-#' @param group 
-#' @param ncores 
-#' @param niter number of IRLS iterations, and BIC iterations within
+#' @param cs a normalized CSnorm object
+#' @param resolution The base resolution (default: the one used during normalization)
+#' @param group Default "all", but also various groupings, see \code{\link{group_datasets}}
+#' @param ncores How many cores to parallelize on (default: the one used during normalization)
+#' @param verbose Whether to be verbose (default) or not
+#' @param tol.val Tolerance on computed quantities
+#' @param fix.lambda1,fix.lambda1.at,fix.lambda2,fix.lambda2.at Default FALSE. if TRUE, sets lambda1
+#'  (resp. lambda2) to the provided value instead of optimizing it
+#' @param nperf number of IRLS iterations (default 50)
 #'   
 #' @return 
 #' @export
@@ -99,6 +102,7 @@ detect_binless_interactions = function(cs, resolution=cs@settings$base.res, grou
 #' Binless detection of significant differences with a reference
 #' 
 #' @inheritParams detect_binless_interactions
+#' @param ref The reference to compute the difference on, as obtained from cs@experiments
 #'   
 #' @return the binned matrix with additional information relating to these
 #'   significant interactions

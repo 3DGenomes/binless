@@ -10,15 +10,33 @@ detect_binless_differences(cs, ref, resolution = cs@settings$base.res,
   fix.lambda2.at = NA, nperf = 50)
 }
 \arguments{
-\item{cs}{}
+\item{cs}{a normalized CSnorm object}
 
-\item{ref}{}
+\item{ref}{The reference to compute the difference on, as obtained from cs@experiments}
 
-\item{resolution}{}
+\item{resolution}{The base resolution (default: the one used during normalization)}
 
-\item{group}{}
+\item{group}{Default "all", but also various groupings, see \code{\link{group_datasets}}}
 
-\item{ncores}{}
+\item{ncores}{How many cores to parallelize on (default: the one used during normalization)}
+
+\item{tol.val}{Tolerance on computed quantities}
+
+\item{verbose}{Whether to be verbose (default) or not}
+
+\item{fix.lambda1}{Default FALSE. if TRUE, sets lambda1
+(resp. lambda2) to the provided value instead of optimizing it}
+
+\item{fix.lambda1.at}{Default FALSE. if TRUE, sets lambda1
+(resp. lambda2) to the provided value instead of optimizing it}
+
+\item{fix.lambda2}{Default FALSE. if TRUE, sets lambda1
+(resp. lambda2) to the provided value instead of optimizing it}
+
+\item{fix.lambda2.at}{Default FALSE. if TRUE, sets lambda1
+(resp. lambda2) to the provided value instead of optimizing it}
+
+\item{nperf}{number of IRLS iterations (default 50)}
 }
 \value{
 the binned matrix with additional information relating to these
