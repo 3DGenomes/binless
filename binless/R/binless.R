@@ -30,7 +30,6 @@
 #' @useDynLib binless, .registration = TRUE
 #' @import rstan
 #' @import methods
-#' @import splines
 #' @import data.table
 #' @import doParallel
 #' @import foreach
