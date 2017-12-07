@@ -8,6 +8,9 @@ using namespace Rcpp;
 #include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
 
+namespace binless {
+namespace fast {
+
 struct ResidualsPair { std::vector<double> residuals,weights; };
 struct PrecisionPair { double abs,rel; };
 struct SignalTriplet { std::vector<double> phihat, weights, beta; };
@@ -18,28 +21,31 @@ ResidualsPair get_normal_residuals(const FastData& data);
 template<typename FastData>
 ResidualsPair get_poisson_residuals(const FastData& data);
 
-std::vector<double> fast_compute_poisson_lsq_exposures(const FastSignalData& data);
-std::vector<double> fast_step_exposures(const FastSignalData& data);
-std::vector<double> fast_compute_poisson_lsq_log_biases(const FastSignalData& data);
-std::vector<double> fast_step_log_biases(const FastSignalData& data);
-std::vector<double> fast_compute_poisson_lsq_log_decay(const FastSignalData& data);
-std::vector<double> fast_step_log_decay(const FastSignalData& data);
+std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data);
+std::vector<double> step_exposures(const FastSignalData& data);
+std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data);
+std::vector<double> step_log_biases(const FastSignalData& data);
+std::vector<double> compute_poisson_lsq_log_decay(const FastSignalData& data);
+std::vector<double> step_log_decay(const FastSignalData& data);
 template<typename Lasso>
-SignalTriplet fast_step_signal(const FastSignalData& data, std::vector<Lasso>& flo, double lam2, unsigned group=0);
+SignalTriplet step_signal(const FastSignalData& data, std::vector<Lasso>& flo, double lam2, unsigned group=0);
 template<typename Lasso>
-DifferenceQuadruplet fast_step_difference(const FastDifferenceData& data, std::vector<Lasso>& flos, double lam2, unsigned ref);
+DifferenceQuadruplet step_difference(const FastDifferenceData& data, std::vector<Lasso>& flos, double lam2, unsigned ref);
 
-PrecisionPair fast_precision(const std::vector<double>& weights, const std::vector<double>& weights_old);
-std::vector<double> fast_remove_signal_degeneracy(const FastSignalData& data);
-std::vector<double> fast_shift_signal(const FastSignalData& data);
+PrecisionPair get_precision(const std::vector<double>& weights, const std::vector<double>& weights_old);
+std::vector<double> remove_signal_degeneracy(const FastSignalData& data);
+std::vector<double> shift_signal(const FastSignalData& data);
 
-Rcpp::List fast_binless(const DataFrame obs, unsigned nbins, double lam2, unsigned nouter=20, double tol_val=1e-1, unsigned bg_steps=5);
+Rcpp::List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned nouter=20, double tol_val=1e-1, unsigned bg_steps=5);
 
-Rcpp::List fast_binless_eval_cv(const List obs, const NumericVector lam2, unsigned group=0, double tol_val=1e-1);
+Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned group=0, double tol_val=1e-1);
 
-Rcpp::DataFrame fast_binless_difference(const List obs, double lam2, unsigned ref, double tol_val=1e-1);
+Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, double tol_val=1e-1);
 
 #include "fast_binless.ipp"
+
+}
+}
 
 #endif
 

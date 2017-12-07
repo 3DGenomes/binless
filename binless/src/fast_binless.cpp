@@ -8,9 +8,11 @@ using namespace Rcpp;
 #include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
 
+namespace binless {
+namespace fast {
 
 //here, exposures are log ( sum_i observed / sum_i expected ) with i summed over datasets
-std::vector<double> fast_compute_poisson_lsq_exposures(const FastSignalData& data) {
+std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data) {
   //get observed and expected
   std::vector<double> sum_obs(data.get_ndatasets(),0);
   std::vector<double> sum_exp(data.get_ndatasets(),0);
@@ -33,7 +35,7 @@ std::vector<double> fast_compute_poisson_lsq_exposures(const FastSignalData& dat
 }
 
 //one IRLS iteration for exposures, with a poisson model
-std::vector<double> fast_step_exposures(const FastSignalData& data) {
+std::vector<double> step_exposures(const FastSignalData& data) {
   //get residuals
   ResidualsPair z = get_poisson_residuals(data);
   //average by name
@@ -54,7 +56,7 @@ std::vector<double> fast_step_exposures(const FastSignalData& data) {
 }
 
 //here, biases are log ( sum_i observed / sum_i expected ) with i summed over rows/columns
-std::vector<double> fast_compute_poisson_lsq_log_biases(const FastSignalData& data) {
+std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data) {
   //get observed and expected data
   std::vector<double> sum_obs(data.get_nbins(),0);
   std::vector<double> sum_exp(data.get_nbins(),0);
@@ -89,7 +91,7 @@ std::vector<double> fast_compute_poisson_lsq_log_biases(const FastSignalData& da
 }
 
 //one IRLS iteration for log biases, with a poisson model
-std::vector<double> fast_step_log_biases(const FastSignalData& data) {
+std::vector<double> step_log_biases(const FastSignalData& data) {
   //get residuals
   ResidualsPair z = get_poisson_residuals(data);
   //sum them along the rows/columns
@@ -129,7 +131,7 @@ std::vector<double> fast_step_log_biases(const FastSignalData& data) {
 
 
 //here, log decay is log ( sum_i observed / sum_i expected ) with i summed over counter diagonals
-std::vector<double> fast_compute_poisson_lsq_log_decay(const FastSignalData& data) {
+std::vector<double> compute_poisson_lsq_log_decay(const FastSignalData& data) {
   //get observed and expected data
   std::vector<double> sum_obs(data.get_nbins(),0);
   std::vector<double> sum_exp(data.get_nbins(),0);
@@ -163,7 +165,7 @@ std::vector<double> fast_compute_poisson_lsq_log_decay(const FastSignalData& dat
 }
 
 //one IRLS iteration for log decay, with a poisson model
-std::vector<double> fast_step_log_decay(const FastSignalData& data) {
+std::vector<double> step_log_decay(const FastSignalData& data) {
   //get residuals
   ResidualsPair z = get_poisson_residuals(data);
   //sum them along the diagonals
@@ -199,7 +201,7 @@ std::vector<double> fast_step_log_decay(const FastSignalData& data) {
   return log_decay;
 }
 
-PrecisionPair fast_precision(const std::vector<double>& weights, const std::vector<double>& weights_old) {
+PrecisionPair get_precision(const std::vector<double>& weights, const std::vector<double>& weights_old) {
   double delta = std::abs(weights[0]-weights_old[0]);
   double maxval = weights[0];
   double minval = weights[0];
@@ -212,7 +214,7 @@ PrecisionPair fast_precision(const std::vector<double>& weights, const std::vect
   return PrecisionPair{delta,delta/(maxval-minval)};
 }
 
-std::vector<double> fast_remove_signal_degeneracy(const FastSignalData& data) {
+std::vector<double> remove_signal_degeneracy(const FastSignalData& data) {
   auto dbin1 = data.get_bin1();
   auto dbin2 = data.get_bin2();
   auto dname = data.get_name();
@@ -244,7 +246,7 @@ std::vector<double> fast_remove_signal_degeneracy(const FastSignalData& data) {
   return log_signal;
 }
 
-std::vector<double> fast_shift_signal(const FastSignalData& data) {
+std::vector<double> shift_signal(const FastSignalData& data) {
   auto dname = data.get_name();
   std::vector<double> log_signal = data.get_log_signal();
   double max_signal = *std::max_element(log_signal.begin(),log_signal.end());
@@ -262,13 +264,13 @@ std::vector<double> fast_shift_signal(const FastSignalData& data) {
   return log_signal;
 }
 
-List fast_binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, double tol_val, unsigned bg_steps) {
+List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, double tol_val, unsigned bg_steps) {
   //initialize return values, exposures and fused lasso optimizer
   Rcpp::Rcout << "init\n";
   FastSignalData out(obs, nbins);
-  out.set_exposures(fast_compute_poisson_lsq_exposures(out));
-  out.set_log_decay(fast_compute_poisson_lsq_log_decay(out));
-  out.set_log_biases(fast_compute_poisson_lsq_log_biases(out));
+  out.set_exposures(compute_poisson_lsq_exposures(out));
+  out.set_log_decay(compute_poisson_lsq_log_decay(out));
+  out.set_log_biases(compute_poisson_lsq_log_biases(out));
   double current_tol_val = 1.;
   std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
                                                              FusedLassoGaussianEstimator<GFLLibrary>(nbins, current_tol_val/20.));
@@ -278,24 +280,24 @@ List fast_binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngi
     Rcpp::Rcout << "step " << step;
     std::vector<double> expected,old_expected;
     //compute biases
-    auto biases = fast_step_log_biases(out);
+    auto biases = step_log_biases(out);
     out.set_log_biases(biases);
     //compute decay
-    auto decay = fast_step_log_decay(out);
+    auto decay = step_log_decay(out);
     if (step <= bg_steps) old_expected = out.get_log_expected();
     out.set_log_decay(decay);
     if (step <= bg_steps) expected = out.get_log_expected();
     //compute signal
     if (step > bg_steps) {
       old_expected = out.get_log_expected();
-      auto signal = fast_step_signal(out, flos, lam2);
+      auto signal = step_signal(out, flos, lam2);
       out.set_log_signal(signal.beta);
       out.set_signal_phihat(signal.phihat);
       out.set_signal_weights(signal.weights);
       expected = out.get_log_expected();
     }
     //compute precision and convergence
-    auto precision = fast_precision(expected,old_expected);
+    auto precision = get_precision(expected,old_expected);
     Rcpp::Rcout << " : reached precision abs = " << precision.abs << " rel = " << precision.rel << "\n";
       bool converged = precision.rel <= tol_val && current_tol_val <= tol_val*1.01;
       if (converged && step <= bg_steps) {
@@ -307,14 +309,14 @@ List fast_binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngi
       for (unsigned i=0; i<out.get_ndatasets(); ++i) flos[i].set_tol(current_tol_val/20);
       //shift signal
       if (converged || step == ngibbs) {
-        auto adjust = fast_shift_signal(out);
+        auto adjust = shift_signal(out);
         out.set_log_signal(adjust);
       } else {
-        auto adjust = fast_remove_signal_degeneracy(out);
+        auto adjust = remove_signal_degeneracy(out);
         out.set_log_signal(adjust);
       }
       //compute exposures
-      auto exposures = fast_step_exposures(out);
+      auto exposures = step_exposures(out);
       out.set_exposures(exposures);
       //diagnostics.push_back(out.get_as_dataframe());
       if (converged) {
@@ -330,7 +332,7 @@ List fast_binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngi
                             _["nbins"]=nbins);
 }
 
-Rcpp::List fast_binless_eval_cv(const List obs, const NumericVector lam2, unsigned group, double tol_val) {
+Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned group, double tol_val) {
   //read normalization data
   Rcpp::Rcout << "init\n";
   const unsigned nbins = obs["nbins"];
@@ -354,7 +356,7 @@ Rcpp::List fast_binless_eval_cv(const List obs, const NumericVector lam2, unsign
     Rcpp::checkUserInterrupt();
     Rcpp::Rcout << "lambda2= " << lam2[i] << "\n";
     out.set_log_signal(signal_ori); //fills-in phi_ref and delta
-    auto signal = fast_step_signal(out, flos, lam2[i], group);
+    auto signal = step_signal(out, flos, lam2[i], group);
     out.set_log_signal(signal.beta);
     out.set_signal_phihat(signal.phihat);
     out.set_signal_weights(signal.weights);
@@ -365,7 +367,7 @@ Rcpp::List fast_binless_eval_cv(const List obs, const NumericVector lam2, unsign
   return Rcpp::wrap(diagnostics);
 }
 
-Rcpp::DataFrame fast_binless_difference(const List obs, double lam2, unsigned ref, double tol_val) {
+Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, double tol_val) {
   //read normalization data
   Rcpp::Rcout << "init\n";
   const unsigned nbins = obs["nbins"];
@@ -384,7 +386,7 @@ Rcpp::DataFrame fast_binless_difference(const List obs, double lam2, unsigned re
                                                              FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge));
   //compute differences
   Rcpp::Rcout << "compute\n";
-  auto diff = fast_step_difference(out, flos, lam2, ref);
+  auto diff = step_difference(out, flos, lam2, ref);
   out.set_log_difference(diff.delta);
   out.set_deltahat(diff.deltahat);
   out.set_difference_weights(diff.weights);
@@ -394,3 +396,5 @@ Rcpp::DataFrame fast_binless_difference(const List obs, double lam2, unsigned re
   return out.get_as_dataframe();
 }
 
+}
+}

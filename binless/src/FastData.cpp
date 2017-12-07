@@ -1,5 +1,7 @@
 #include "FastData.hpp"
 
+namespace binless {
+namespace fast {
 
 Rcpp::DataFrame FastData<Signal>::get_as_dataframe() const {
     //bias, decay, signal with decay and exposures, and log_background matrix (w/ offset)
@@ -73,5 +75,8 @@ Rcpp::DataFrame FastData<Difference>::get_as_dataframe() const {
                                    _["deltahat"]=get_deltahat(),
                                    _["weights"]=get_difference_weights(),
                                    _["phi_ref"]=phi_ref_);
+}
+
+}
 }
 

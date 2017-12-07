@@ -7,6 +7,9 @@ using namespace Rcpp;
 
 #include "Traits.hpp"
 
+namespace binless {
+namespace fast {
+
 template<typename Derived>
 class FastDataCore {
 public:
@@ -101,6 +104,9 @@ private:
 };
 
 #include "FastData.ipp"
+
+}
+}
 
 #endif
 
