@@ -54,8 +54,8 @@ ggplot(biases[,.(step,value=value-shift(value)),by=c("name","pos","variable")])+
 #decay vs step (x log scale)
 decays=rbindlist(cs@diagnostics$params[leg=="decay",decay],idcol = "step", use=T)
 ggplot(decays[,.(distance,log_decay=kappa-mean(kappa),std,khat=kappahat-mean(kappa)),by=c("name","step")])+
-  geom_line(aes(distance,log_decay,colour=name))+geom_point(aes(distance,khat,colour=name),alpha=0.1)+
-  geom_errorbar(aes(distance,ymin=khat-std,ymax=khat+std,colour=name))+facet_wrap(~step)+scale_x_log10()
+  geom_line(aes(distance,log_decay))+geom_point(aes(distance,khat,colour=name),alpha=0.1)+
+  geom_errorbar(aes(distance,ymin=khat-std,ymax=khat+std,colour=name),alpha=0.1)+facet_wrap(~step)+scale_x_log10()
 
 #decay vs step (x linear scale)
 ggplot(decays[,.(distance,log_decay=kappa-mean(kappa),std,khat=kappahat-mean(kappa)),by=c("name","step")])+
@@ -70,13 +70,11 @@ decay[,model:=exp(fit$coefficients[["(Intercept)"]]+fit$coefficients[["ldist"]]*
 ggplot(decay)+geom_line(aes(distance,decay,colour="decay"))+
   scale_x_log10()+scale_y_log10()+geom_line(aes(distance,model,colour="model"))
 
-#residuals
-i=14
-a=cs.small@diagnostics$residuals[step==i]
-ggplot()+geom_point(aes(unclass(bin2),pmin(z,10)),alpha=0.5,data=a)+facet_wrap(~name)+ylim(-8,8)+
-  geom_line(aes(unclass(bin2),value,colour=variable),data=melt(a[,.(name,bin2,phi,log_decay,log_bias,log_mean)],id=c("name","bin2")))
-ggplot(a)+geom_line(aes(unclass(bin2),weight,colour=name))
-ggplot(a)+geom_line(aes(unclass(bin2),count,colour=name))
+#residuals at last step (along first row of the matrix)
+a=cs@diagnostics$residuals[step==max(step)]
+ggplot()+geom_point(aes(unclass(bin),count/ncounts),alpha=0.5,data=a)+facet_wrap(~name)+scale_y_log10()+
+  geom_line(aes(unclass(bin),value/ncounts,colour=variable),
+            data=melt(a[,.(name,bin,signal,decay,bias,mean,ncounts)],id=c("name","bin","ncounts")))
 
 
 

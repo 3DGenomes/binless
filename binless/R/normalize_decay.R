@@ -101,7 +101,7 @@ gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
       #salt=Kdiag^2*lambda_diag^2*0.1*bdiag(Diagonal(Dsets)*0,Diagonal(Kdiag))
       #At.PD = At + salt
       At.PD = nearPD(At)$mat  
-      fit = solve.QP(At.PD, tmp_X_S_m2_k, -Ct, meq = Dsets)
+      fit = solve.QP(At.PD, tmp_X_S_m2_k, -Ct, meq = 1)
       nbetat = fit$solution
       epsilon = max(abs(betat-nbetat))
       betat=nbetat
