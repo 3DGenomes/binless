@@ -8,7 +8,8 @@ Description: Provides resolution-independent normalization of Hi-C data, and
 License: LGPL-3
 Depends:
     R (>= 3.0.2),
-    Rcpp (>= 0.11.0)
+    Rcpp (>= 0.11.0),
+    RcppEigen
 Imports:
     data.table (>= 1.9.6),
     rstan (>= 2.11.1),
