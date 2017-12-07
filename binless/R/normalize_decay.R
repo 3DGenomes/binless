@@ -53,7 +53,7 @@ gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     }
     SD = cbegin[2]-cbegin[1]
     cutsites = csd[,distance][cbegin[1]:(cbegin[2]-1)]
-    X = generate_cubic_spline(log(cutsites), Kdiag, sparse=F)
+    X = as.matrix(generate_spline_base(log(cutsites), Kdiag))
     W=csd[,weight][cbegin[1]:(cbegin[2]-1)]
     diags = list(rep(1,Kdiag), rep(-2,Kdiag))
     D = bandSparse(Kdiag-2, Kdiag, k=0:2, diagonals=c(diags, diags[1]))
@@ -68,7 +68,7 @@ gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     if (Dsets > 1) {
       for (d in 2:Dsets) {
         ncutsites = csd[,distance][cbegin[(2*d-1)]:(cbegin[2*d]-1)]
-        nBsp = generate_cubic_spline(log(ncutsites), Kdiag, sparse=F)
+        nBsp = as.matrix(generate_spline_base(log(ncutsites), Kdiag))
         cutsites = c(cutsites,ncutsites)
         X = rbind(X,nBsp)
         SDd = cbegin[2*d]-cbegin[(2*d-1)]

@@ -84,16 +84,6 @@ gauss_common_muhat_mean = function(cs, zeros, sbins) {
   return(cts)
 }
 
-#' Generate cubic spline
-#' @keywords internal
-#' 
-generate_cubic_spline = function(cutsites, Krow, sparse=F) {
-  splinedegree=3 #Cubic spline
-  dx = 1.01*(max(cutsites)-min(cutsites))/(Krow-splinedegree)
-  t = min(cutsites) - dx*0.01 + dx * seq(-splinedegree,Krow-splinedegree+3)
-  return(splineDesign(cutsites, knots = t, ord = splinedegree + 1, outer.ok = F, sparse=sparse))
-}
-
 #' Add begin and end for a binned matrix
 #'
 #' @keywords internal
