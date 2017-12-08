@@ -19,6 +19,7 @@ struct DecaySummary { std::vector<double> distance, kappahat, weight; };
 struct DecayFit {
   std::vector<double> log_decay;
   DecaySummary dec;
+  double lambda_diag;
 };
 
 template<typename FastData>

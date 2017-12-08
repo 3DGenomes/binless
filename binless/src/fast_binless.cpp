@@ -208,7 +208,7 @@ DecayFit pointwise_log_decay_fit(const DecaySummary& dec) {
   for (unsigned i=0; i<N; ++i) {
     log_decay[i] -= avg;
   }
-  return DecayFit{log_decay,dec};
+  return DecayFit{log_decay,dec,-1};
 }
 
 //one IRLS iteration for log decay, with a poisson model
