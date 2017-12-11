@@ -3,10 +3,13 @@ using namespace Rcpp;
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <Eigen/Dense>
+#include <Eigen/Sparse>
 
 #include "fast_binless.hpp"
 #include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
+#include "spline.hpp"
 
 namespace binless {
 namespace fast {
@@ -211,12 +214,47 @@ DecayFit pointwise_log_decay_fit(const DecaySummary& dec) {
   return DecayFit{log_decay,dec,-1};
 }
 
+DecayFit spline_log_decay_fit(const DecaySummary& dec, double tol_val, unsigned Kdiag, unsigned max_iter) {
+  //X: build spline base on log distance
+  const Eigen::VectorXd log_distance = Eigen::ArrayXd(dec.distance.data()).log().matrix();
+  const auto X = generate_spline_base(log_distance, Kdiag);
+  //D: build difference matrix
+  const auto D = difference_matrix(Kdiag);
+  auto D = Eigen::MatrixXd::Identity(Kdiag-2,Kdiag);
+  D.diagonal<1>().setConstant(-2);
+  D.diagonal<2>().setConstant(1);
+  //C: build constraint matrix to forbid increase past first diagonal
+  auto C = -Eigen::MatrixXd::Identity(Kdiag,Kdiag-1);
+  C.diagonal<-1>()setConstant(1);
+  //iteratively fit decay and estimate lambda
+  unsigned iter=0;
+  bool has_converged=false;
+  Eigen::VectorXd beta = Eigen::VectorXd::Constant(Kdiag,1);
+  do {
+    Eigen::VectorXd beta_new = constrained_QP(X,)
+  } while ( iter < max_iter && (!has_converged) );
+  //compute weighted mean
+  double avg=0;
+  double wsum=0;
+  for (unsigned i=0; i<N; ++i) {
+    avg += log_decay[i]*dec.weight[i];
+    wsum += dec.weight[i];
+  }
+  avg = avg / wsum;
+  //subtract average and return
+  for (unsigned i=0; i<N; ++i) {
+    log_decay[i] -= avg;
+  }
+  return DecayFit{log_decay,dec,-1};
+}
+
 //one IRLS iteration for log decay, with a poisson model
-std::vector<double> step_log_decay(const FastSignalData& data) {
+std::vector<double> step_log_decay(const FastSignalData& data, double tol_val) {
   //compute summary statistics for decay
   DecaySummary dec = get_decay_summary(data);
   //infer new decay from summaries
-  DecayFit fit = pointwise_log_decay_fit(dec);
+  //DecayFit fit = pointwise_log_decay_fit(dec);
+  DecayFit fit = spline_log_decay_fit(dec, tol_val);
   /*Rcpp::Rcout << "distance log_decay kappahat weight\n";
   for (unsigned i=0; i<fit.log_decay.size(); ++i)
     Rcpp::Rcout << fit.dec.distance[i] << " " << fit.log_decay[i] << " "
@@ -306,7 +344,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
     auto biases = step_log_biases(out);
     out.set_log_biases(biases);
     //compute decay
-    auto decay = step_log_decay(out);
+    auto decay = step_log_decay(out, tol_val);
     if (step <= bg_steps) old_expected = out.get_log_expected();
     out.set_log_decay(decay);
     if (step <= bg_steps) expected = out.get_log_expected();
