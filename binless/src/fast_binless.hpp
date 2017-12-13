@@ -15,6 +15,12 @@ struct ResidualsPair { std::vector<double> residuals,weights; };
 struct PrecisionPair { double abs,rel; };
 struct SignalTriplet { std::vector<double> phihat, weights, beta; };
 struct DifferenceQuadruplet { std::vector<double> deltahat,weights,delta,phi_ref; };
+struct DecaySummary { std::vector<double> distance, kappahat, weight; };
+struct DecayFit {
+  std::vector<double> log_decay;
+  DecaySummary dec;
+  double lambda_diag;
+};
 
 template<typename FastData>
 ResidualsPair get_normal_residuals(const FastData& data);
@@ -26,6 +32,8 @@ std::vector<double> step_exposures(const FastSignalData& data);
 std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data);
 std::vector<double> step_log_biases(const FastSignalData& data);
 std::vector<double> compute_poisson_lsq_log_decay(const FastSignalData& data);
+DecaySummary get_decay_summary(const FastSignalData& data);
+DecayFit pointwise_log_decay_fit(const DecaySummary& dec);
 std::vector<double> step_log_decay(const FastSignalData& data);
 template<typename Lasso>
 SignalTriplet step_signal(const FastSignalData& data, std::vector<Lasso>& flo, double lam2, unsigned group=0);

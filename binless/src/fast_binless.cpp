@@ -164,41 +164,64 @@ std::vector<double> compute_poisson_lsq_log_decay(const FastSignalData& data) {
   return log_decay;
 }
 
-//one IRLS iteration for log decay, with a poisson model
-std::vector<double> step_log_decay(const FastSignalData& data) {
+DecaySummary get_decay_summary(const FastSignalData& data) {
   //get residuals
   ResidualsPair z = get_poisson_residuals(data);
   //sum them along the diagonals
   auto dbin1 = data.get_bin1();
   auto dbin2 = data.get_bin2();
-  std::vector<double> log_decay(data.get_nbins(),0);
-  std::vector<double> weightsums(data.get_nbins(),0);
+  std::vector<double> kappahat(data.get_nbins(),0);
+  std::vector<double> weight(data.get_nbins(),0);
   for (unsigned i=0; i<data.get_N(); ++i) {
     unsigned bin1 = dbin1[i]-1; //offset by 1 for vector indexing
     unsigned bin2 = dbin2[i]-1;
-    log_decay[bin2-bin1] += z.residuals[i]*z.weights[i];
-    weightsums[bin2-bin1] += z.weights[i];
+    kappahat[bin2-bin1] += z.residuals[i]*z.weights[i];
+    weight[bin2-bin1] += z.weights[i];
   }
-  //add current bias and forbid increase past first diagonal
-  auto dlog_decay = data.get_log_decay();
+  //add current bias and normalize
+  auto log_decay = data.get_log_decay();
+  std::vector<double> distance;
   for (unsigned i=0; i<data.get_nbins(); ++i) {
-    log_decay[i] = (weightsums[i]>0) ? log_decay[i]/weightsums[i] : 0;
-    log_decay[i] += dlog_decay[i];
-    if (i>=2 && log_decay[i]>log_decay[i-1]) log_decay[i] = log_decay[i-1];
+    kappahat[i] = (weight[i]>0) ? kappahat[i]/weight[i] : 0;
+    kappahat[i] += log_decay[i];
+    distance.push_back(i+1);
+  }
+  return DecaySummary{distance,kappahat,weight};
+}
+
+DecayFit pointwise_log_decay_fit(const DecaySummary& dec) {
+  //forbid increase past first diagonal
+  std::vector<double> log_decay = dec.kappahat;
+  unsigned N = log_decay.size();
+  for (unsigned i=0; i<N; ++i) {
+    if (i>=2 && log_decay[i] > log_decay[i-1]) log_decay[i] = log_decay[i-1];
   }
   //compute weighted mean
   double avg=0;
   double wsum=0;
-  for (unsigned i=0; i<data.get_nbins(); ++i) {
-    avg += log_decay[i]*weightsums[i];
-    wsum += weightsums[i];
+  for (unsigned i=0; i<N; ++i) {
+    avg += log_decay[i]*dec.weight[i];
+    wsum += dec.weight[i];
   }
   avg = avg / wsum;
   //no smoothing, subtract average and return
-  for (unsigned i=0; i<data.get_nbins(); ++i) {
+  for (unsigned i=0; i<N; ++i) {
     log_decay[i] -= avg;
   }
-  return log_decay;
+  return DecayFit{log_decay,dec,-1};
+}
+
+//one IRLS iteration for log decay, with a poisson model
+std::vector<double> step_log_decay(const FastSignalData& data) {
+  //compute summary statistics for decay
+  DecaySummary dec = get_decay_summary(data);
+  //infer new decay from summaries
+  DecayFit fit = pointwise_log_decay_fit(dec);
+  /*Rcpp::Rcout << "distance log_decay kappahat weight\n";
+  for (unsigned i=0; i<fit.log_decay.size(); ++i)
+    Rcpp::Rcout << fit.dec.distance[i] << " " << fit.log_decay[i] << " "
+                << fit.dec.kappahat[i] << " " << fit.dec.weight[i] << "\n";*/
+  return fit.log_decay;
 }
 
 PrecisionPair get_precision(const std::vector<double>& weights, const std::vector<double>& weights_old) {
