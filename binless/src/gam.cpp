@@ -64,10 +64,16 @@ void GeneralizedAdditiveModel::optimize(unsigned max_iter, double tol_val) {
 Eigen::MatrixXd GeneralizedAdditiveModel::get_L(const Eigen::SparseMatrix<double>& A) {
   Eigen::SimplicialLLT<Eigen::SparseMatrix<double>, Eigen::Lower,
                        Eigen::NaturalOrdering<Eigen::SparseMatrix<double>::StorageIndex> > llt; //no permutation
-  llt.compute(A);
-  if(llt.info()!=Eigen::Success) Rcpp::stop("decomposition failed");
+  Rcpp::Rcout << "info init: " << llt.info() << "\n";
+  llt.analyzePattern(A);
+  Rcpp::Rcout << "info analyze: " << llt.info() << "\n";
+  llt.factorize(A);
+  Rcpp::Rcout << "info factorize: " << llt.info() << "\n";
+  if (llt.info() != Eigen::Success) Rcpp::stop("decomposition failed");
   return llt.matrixL();
 }
+
+
 
 Eigen::SparseMatrix<double> first_order_difference_matrix(unsigned K) {
   if (K<=1) return Eigen::SparseMatrix<double>();
