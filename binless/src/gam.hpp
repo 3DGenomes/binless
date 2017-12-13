@@ -31,8 +31,7 @@ public:
   // Update GAM to new conditions (avoids new Cholesky decomposition)
   // y: observations (vector of size N)
   // S: standard deviations for each observation (vector of size N)
-  //TODO
-  //void update(const Eigen::VectorXd& y, const Eigen::VectorXd& S);
+  void update(const Eigen::VectorXd& y, const Eigen::VectorXd& S) { y_=y; S_=S; }
   
   // Add n_eq equality constraints on \beta by passing a
   // n_eq x K matrix Ceq such that the constraint is Ceq \beta = 0
@@ -46,7 +45,8 @@ public:
   // max_iter: maximum number of iterations
   // tol_val: relative tolerance on the final values of X\beta
   void optimize(unsigned max_iter, double tol_val);
-  
+
+  //accessors
   Eigen::VectorXd get_beta() const { return beta_; }
   Eigen::VectorXd get_mean() const { return X_ * beta_; }
   double get_lambda() const { return lambda_; }
