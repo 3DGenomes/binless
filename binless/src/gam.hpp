@@ -1,8 +1,7 @@
 #ifndef GAM_HPP
 #define GAM_HPP
 
-#include <Eigen/Dense>
-#include <Eigen/Sparse>
+#include <Eigen/Core>
 
 namespace binless {
 
@@ -54,6 +53,9 @@ public:
   bool has_converged() const { return has_converged_; }
   
 private:
+  
+  Eigen::MatrixXd get_L(const Eigen::SparseMatrix<double>& A);
+    
   //data
   unsigned N_, K_;
   Eigen::VectorXd y_,S_;

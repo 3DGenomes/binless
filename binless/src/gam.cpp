@@ -26,30 +26,26 @@ void GeneralizedAdditiveModel::optimize(unsigned max_iter, double tol_val) {
   unsigned iter = 0;
   has_converged_ = false;
   do {
-    //compute A (convert to non-const dense for QuadProg++)
-    Eigen::MatrixXd A = XtSm2X + lambda_*lambda_*K2DtD;
+    //compute A
+    const Eigen::SparseMatrix<double> A = XtSm2X + lambda_*lambda_*K2DtD;
     
+    Rcpp::Rcout << "ready to go\n";
+    //compute L factor (convert to dense for quadprog++)
+    Eigen::MatrixXd L = get_L(A);
+   
     //compute new beta. In QuadProg++, G = A and g0 = -XtSm2y
     const Eigen::VectorXd g0 = -XtSm2y;
-    Rcpp::Rcout << "ready to go\n";
-    
-    // decompose the matrix G in the form L^T L
-    Rcpp::Rcout << "init\n";
-    QuadProgPP::init_qp(A);
     
     // Find the unconstrained minimizer of the quadratic form 0.5 * x G x + g0 x
     // this is a feasible point in the dual space
     // x = G^-1 * g0
-    Rcpp::Rcout << "unconstr\n";
-    beta_ = A.triangularView<Eigen::Lower>().solve(g0);
-    beta_ = A.triangularView<Eigen::Lower>().adjoint().solve(beta_);
+    beta_ = L.triangularView<Eigen::Lower>().solve(g0);
+    beta_ = L.triangularView<Eigen::Lower>().adjoint().solve(beta_);
     beta_ = -beta_;
     
-    Rcpp::Rcout << "constr\n";
     if (nin_>0) {
-      double score = 2*QuadProgPP::solve_quadprog_with_guess(A, g0, Ceq_.transpose(), Eigen::VectorXd::Zero(neq_),
+      double score = 2*QuadProgPP::solve_quadprog_with_guess(L, g0, Ceq_.transpose(), Eigen::VectorXd::Zero(neq_),
                                                              Cin_.transpose(), Eigen::VectorXd::Zero(nin_), beta_);
-      Rcpp::Rcout << "done quadprog with score= " << score << "\n";
     }
     
     //compute lambda
@@ -63,6 +59,14 @@ void GeneralizedAdditiveModel::optimize(unsigned max_iter, double tol_val) {
     beta_old = beta_;
     iter++;
   } while (iter < max_iter && (!has_converged_));
+}
+
+Eigen::MatrixXd GeneralizedAdditiveModel::get_L(const Eigen::SparseMatrix<double>& A) {
+  Eigen::SimplicialLLT<Eigen::SparseMatrix<double>, Eigen::Lower,
+                       Eigen::NaturalOrdering<Eigen::SparseMatrix<double>::StorageIndex> > llt; //no permutation
+  llt.compute(A);
+  if(llt.info()!=Eigen::Success) Rcpp::stop("decomposition failed");
+  return llt.matrixL();
 }
 
 Eigen::SparseMatrix<double> first_order_difference_matrix(unsigned K) {
