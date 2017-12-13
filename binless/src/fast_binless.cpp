@@ -10,6 +10,7 @@ using namespace Rcpp;
 #include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
 #include "spline.hpp"
+#include "gam.hpp"
 
 namespace binless {
 namespace fast {
@@ -214,38 +215,33 @@ DecayFit pointwise_log_decay_fit(const DecaySummary& dec) {
   return DecayFit{log_decay,dec,-1};
 }
 
-DecayFit spline_log_decay_fit(const DecaySummary& dec, double tol_val, unsigned Kdiag, unsigned max_iter) {
+DecayFit spline_log_decay_fit(const DecaySummary& dec, double tol_val, unsigned Kdiag, unsigned max_iter, double sigma) {
+  //extract data
+  const Eigen::Map<const Eigen::VectorXd> y(dec.kappahat.data(),dec.kappahat.size());
+  const Eigen::Map<const Eigen::VectorXd> w(dec.weight.data(),dec.weight.size());
+  const Eigen::VectorXd S = w.array().inverse().sqrt().matrix();
   //X: build spline base on log distance
-  const Eigen::VectorXd log_distance = Eigen::ArrayXd(dec.distance.data()).log().matrix();
-  const auto X = generate_spline_base(log_distance, Kdiag);
+  const Eigen::Map<const Eigen::ArrayXd> distance(dec.distance.data(), dec.distance.size());
+  const Eigen::VectorXd log_distance = distance.log().matrix();
+  const Eigen::SparseMatrix<double> X = generate_spline_base(log_distance, Kdiag);
   //D: build difference matrix
-  const auto D = difference_matrix(Kdiag);
-  auto D = Eigen::MatrixXd::Identity(Kdiag-2,Kdiag);
-  D.diagonal<1>().setConstant(-2);
-  D.diagonal<2>().setConstant(1);
-  //C: build constraint matrix to forbid increase past first diagonal
-  auto C = -Eigen::MatrixXd::Identity(Kdiag,Kdiag-1);
-  C.diagonal<-1>()setConstant(1);
-  //iteratively fit decay and estimate lambda
-  unsigned iter=0;
-  bool has_converged=false;
-  Eigen::VectorXd beta = Eigen::VectorXd::Constant(Kdiag,1);
-  do {
-    Eigen::VectorXd beta_new = constrained_QP(X,)
-  } while ( iter < max_iter && (!has_converged) );
+  const Eigen::SparseMatrix<double> D = second_order_difference_matrix(Kdiag);
+  //C: build constraint matrix to forbid increase
+  const Eigen::SparseMatrix<double> Cin = - first_order_difference_matrix(Kdiag);
+  
+  //iteratively fit GAM on decay and estimate lambda
+  GeneralizedAdditiveModel gam(y,S,X,D,sigma);
+  gam.set_inequality_constraints(Cin);
+  gam.optimize(max_iter,tol_val);
+  //Rcpp::Rcout << "gam converged: " << gam.has_converged() << "\n";
+  Eigen::VectorXd log_decay = gam.get_mean();
+  const double lambda = gam.get_lambda();
+  
   //compute weighted mean
-  double avg=0;
-  double wsum=0;
-  for (unsigned i=0; i<N; ++i) {
-    avg += log_decay[i]*dec.weight[i];
-    wsum += dec.weight[i];
-  }
-  avg = avg / wsum;
+  double avg = w.dot(log_decay)/w.sum();
   //subtract average and return
-  for (unsigned i=0; i<N; ++i) {
-    log_decay[i] -= avg;
-  }
-  return DecayFit{log_decay,dec,-1};
+  log_decay.array() -= avg;
+  return DecayFit{std::vector<double>(log_decay.data(),log_decay.data()+log_decay.rows()),dec,lambda};
 }
 
 //one IRLS iteration for log decay, with a poisson model

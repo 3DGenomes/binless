@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ### Changed
 - spline base construction now migrated to C++ side
+- fast binless now has smooth decay like optimized binless
 
 ### Fixed
 - better storage and reporting of residuals
