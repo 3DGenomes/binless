@@ -1,7 +1,7 @@
 #ifndef GAM_HPP
 #define GAM_HPP
 
-#include <Eigen/Core>
+#include <Eigen/Eigen>
 
 namespace binless {
 
@@ -54,7 +54,7 @@ public:
   
 private:
   
-  Eigen::MatrixXd get_L(const Eigen::SparseMatrix<double>& A);
+  Eigen::SparseMatrix<double> get_L(const Eigen::SparseMatrix<double>& A);
     
   //data
   unsigned N_, K_;
@@ -68,6 +68,12 @@ private:
   Eigen::VectorXd beta_;
   double lambda_;
   bool has_converged_;
+  
+  //helpers
+  bool llt_analyzed_;
+  Eigen::SimplicialLLT<Eigen::SparseMatrix<double>, Eigen::Lower,
+                       Eigen::NaturalOrdering<Eigen::SparseMatrix<double>::StorageIndex> > llt_; //no permutation
+  
 };
 
 Eigen::SparseMatrix<double> first_order_difference_matrix(unsigned K);

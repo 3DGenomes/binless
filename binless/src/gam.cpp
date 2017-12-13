@@ -11,7 +11,17 @@ GeneralizedAdditiveModel::GeneralizedAdditiveModel(const Eigen::VectorXd& y,
                            double sigma) :
   N_(X.rows()), K_(X.cols()), y_(y), S_(S), X_(X), D_(D), sigma_(sigma), neq_(0), nin_(0),
   Ceq_(Eigen::MatrixXd::Zero(neq_,K_)), Cin_(Eigen::MatrixXd::Zero(nin_,K_)),
-  beta_(Eigen::VectorXd::Constant(K_,1)), lambda_(1), has_converged_(false) {}
+  beta_(Eigen::VectorXd::Constant(K_,1)), lambda_(1), has_converged_(false), llt_analyzed_(false) {}
+  
+Eigen::SparseMatrix<double> GeneralizedAdditiveModel::get_L(const Eigen::SparseMatrix<double>& A) {
+  if (!llt_analyzed_) {
+    llt_.analyzePattern(A); // sparsity pattern will not change if X and D are fixed
+    llt_analyzed_ = true;
+  }
+  llt_.factorize(A);
+  if (llt_.info() != Eigen::Success) Rcpp::stop("decomposition failed");
+  return llt_.matrixL();
+}
   
 void GeneralizedAdditiveModel::optimize(unsigned max_iter, double tol_val) {
   //build fixed matrices
@@ -29,7 +39,6 @@ void GeneralizedAdditiveModel::optimize(unsigned max_iter, double tol_val) {
     //compute A
     const Eigen::SparseMatrix<double> A = XtSm2X + lambda_*lambda_*K2DtD;
     
-    Rcpp::Rcout << "ready to go\n";
     //compute L factor (convert to dense for quadprog++)
     Eigen::MatrixXd L = get_L(A);
    
@@ -59,18 +68,6 @@ void GeneralizedAdditiveModel::optimize(unsigned max_iter, double tol_val) {
     beta_old = beta_;
     iter++;
   } while (iter < max_iter && (!has_converged_));
-}
-
-Eigen::MatrixXd GeneralizedAdditiveModel::get_L(const Eigen::SparseMatrix<double>& A) {
-  Eigen::SimplicialLLT<Eigen::SparseMatrix<double>, Eigen::Lower,
-                       Eigen::NaturalOrdering<Eigen::SparseMatrix<double>::StorageIndex> > llt; //no permutation
-  Rcpp::Rcout << "info init: " << llt.info() << "\n";
-  llt.analyzePattern(A);
-  Rcpp::Rcout << "info analyze: " << llt.info() << "\n";
-  llt.factorize(A);
-  Rcpp::Rcout << "info factorize: " << llt.info() << "\n";
-  if (llt.info() != Eigen::Success) Rcpp::stop("decomposition failed");
-  return llt.matrixL();
 }
 
 
