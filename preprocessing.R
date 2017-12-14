@@ -40,7 +40,7 @@ size="2.3M"
 dsets=c("GM12878","IMR90")
 maxlens=c(900,600)
 foreach (dset=dsets, maxlen=maxlens) %do% {
-  csd=read_and_prepare(paste0("zcat example/",dset,"_MboI_HICall_",name,".tsv.gz"),
+  csd=read_and_prepare(paste0("gzcat example/",dset,"_MboI_HICall_",name,".tsv.gz"),
                        paste0("example/rao_HiCall_",dset,"_",name,"_",size), dset, "1",
                        enzyme="MboI", name=paste(name,dset,"all"), circularize=-1, dangling.L=c(0),
                        dangling.R=c(3), maxlen=maxlen, read.len=101, dmin=1000, save.data=T)
