@@ -52,3 +52,45 @@ double get_maximum_admissible_weight(const Rcpp::NumericVector& w, double percen
     //return its value
     return sw[i];
 }
+
+std::map<double,unsigned> make_even_bins(double lower, double upper, unsigned Nbins) {
+  double size = upper - lower;
+  std::map<double,unsigned> ret;
+  for (unsigned i=0; i<=Nbins; ++i) { //size of map is Nbins+1
+    double begin = lower + i*size/double(Nbins);
+    ret[begin]=i;
+  }
+  return ret;
+}
+
+Eigen::SparseMatrix<unsigned> bin_data(const Eigen::VectorXd& data, const std::map<double,unsigned>& begin2bin) {
+  unsigned Nbins = begin2bin.size()-1;
+  unsigned Ndata = data.rows();
+  std::vector<Eigen::Triplet<unsigned> > tripletList;
+  tripletList.reserve(Ndata);
+  for (unsigned i=0; i<Ndata; ++i) {
+    auto it = begin2bin.upper_bound(data(i));
+    if (it == begin2bin.end()) it = begin2bin.lower_bound(data(i));
+    unsigned j = it->second - 1; //upper_bound returns pointer to next bin
+    tripletList.push_back(Eigen::Triplet<unsigned>(j,i,1));
+  }
+  Eigen::SparseMatrix<unsigned> mat(Nbins,Ndata);
+  mat.setFromTriplets(tripletList.begin(), tripletList.end());
+  mat.makeCompressed();
+  return mat;
+}
+
+Eigen::SparseMatrix<unsigned> bin_data_evenly(const Eigen::VectorXd& data, unsigned Nbins) {
+  auto begin2bin = make_even_bins(data.minCoeff(),data.maxCoeff(),Nbins);
+  return bin_data(data,begin2bin);
+}
+
+
+
+
+
+
+
+
+
+
