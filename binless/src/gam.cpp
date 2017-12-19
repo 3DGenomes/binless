@@ -37,7 +37,10 @@ void GeneralizedAdditiveModel::optimize(unsigned max_iter, double tol_val) {
   has_converged_ = false;
   do {
     //compute A
-    const Eigen::SparseMatrix<double> A = XtSm2X + lambda_*lambda_*K2DtD;
+    auto jitter = Eigen::SparseMatrix<double>(K_,K_);
+    jitter.setIdentity();
+    jitter *= 1e-10;
+    const Eigen::SparseMatrix<double> A = XtSm2X + lambda_*lambda_*K2DtD + jitter;
     
     //compute L factor (convert to dense for quadprog++)
     Eigen::MatrixXd L = get_L(A);
