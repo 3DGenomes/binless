@@ -202,7 +202,9 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   Rcpp::Rcout << "init\n";
   FastSignalData out(obs, nbins);
   out.set_exposures(compute_poisson_lsq_exposures(out));
-  //out.set_log_decay(compute_poisson_lsq_log_decay(out));
+  DecayEstimate dec = init_decay(out);
+  auto log_decay_std = std::vector<double>(dec.log_decay.data(), dec.log_decay.data()+dec.log_decay.rows());
+  out.set_log_decay(log_decay_std);
   out.set_log_biases(compute_poisson_lsq_log_biases(out));
   double current_tol_val = 1.;
   std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
@@ -216,9 +218,10 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
     auto biases = step_log_biases(out);
     out.set_log_biases(biases);
     //compute decay
-    auto decay = step_log_decay(out, tol_val);
+    step_log_decay(out, dec, tol_val);
     if (step <= bg_steps) old_expected = out.get_log_expected();
-    out.set_log_decay(decay);
+    log_decay_std = std::vector<double>(dec.log_decay.data(), dec.log_decay.data()+dec.log_decay.rows());
+    out.set_log_decay(log_decay_std);
     if (step <= bg_steps) expected = out.get_log_expected();
     //compute signal
     if (step > bg_steps) {

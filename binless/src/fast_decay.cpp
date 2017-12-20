@@ -15,6 +15,15 @@ namespace binless {
 namespace fast {
 
 
+//here, initialize flat log decay
+DecayEstimate init_decay(const FastSignalData& data) {
+  DecaySchedule schedule;
+  DecaySummary summary;
+  Eigen::VectorXd log_decay = Eigen::VectorXd::Zero(data.get_nbins());
+  DecayEstimate dec{log_decay,summary,-1};
+  return dec;
+}
+
 //here, log decay is log ( sum_i observed / sum_i expected ) with i summed over counter diagonals
 std::vector<double> compute_poisson_lsq_log_decay(const FastSignalData& data) {
   //get observed and expected data
@@ -49,49 +58,51 @@ std::vector<double> compute_poisson_lsq_log_decay(const FastSignalData& data) {
   return log_decay;
 }
 
-DecaySummary get_decay_summary(const FastSignalData& data) {
+DecaySummary get_decay_summary(const FastSignalData& data, const DecayEstimate& dec) {
   //get residuals
   ResidualsPair z = get_poisson_residuals(data);
   //sum them along the diagonals
   auto dbin1 = data.get_bin1();
   auto dbin2 = data.get_bin2();
-  std::vector<double> kappahat(data.get_nbins(),0);
-  std::vector<double> weight(data.get_nbins(),0);
+  Eigen::VectorXd kappahat = Eigen::VectorXd::Zero(data.get_nbins());
+  Eigen::VectorXd weight = Eigen::VectorXd::Zero(data.get_nbins());
+  Eigen::VectorXd ncounts = Eigen::VectorXd::Zero(data.get_nbins());
   for (unsigned i=0; i<data.get_N(); ++i) {
     unsigned bin1 = dbin1[i]-1; //offset by 1 for vector indexing
     unsigned bin2 = dbin2[i]-1;
-    kappahat[bin2-bin1] += z.residuals[i]*z.weights[i];
-    weight[bin2-bin1] += z.weights[i];
+    kappahat(bin2-bin1) += z.residuals[i]*z.weights[i];
+    weight(bin2-bin1) += z.weights[i];
+    ncounts(bin2-bin1) += 1;
   }
   //add current bias and normalize
-  auto log_decay = data.get_log_decay();
-  std::vector<double> distance;
+  auto log_decay = dec.log_decay;
+  Eigen::VectorXd distance = Eigen::VectorXd::Zero(data.get_nbins());
   for (unsigned i=0; i<data.get_nbins(); ++i) {
-    kappahat[i] = (weight[i]>0) ? kappahat[i]/weight[i] : 0;
-    kappahat[i] += log_decay[i];
-    distance.push_back(i+1);
+    kappahat(i) = (weight(i)>0) ? kappahat(i)/weight(i) : 0;
+    kappahat(i) += log_decay(i);
+    distance(i) = i+1;
   }
-  return DecaySummary{distance,kappahat,weight};
+  return DecaySummary{distance,kappahat,weight,ncounts};
 }
 
-DecayFit spline_log_decay_fit(const DecaySummary& dec, double tol_val, unsigned Kdiag, unsigned max_iter, double sigma) {
+void spline_log_decay_fit(const DecaySummary& summary, DecayEstimate& dec, double tol_val, const DecaySchedule& schedule) {
   //extract data
-  const Eigen::Map<const Eigen::VectorXd> y(dec.kappahat.data(),dec.kappahat.size());
-  const Eigen::Map<const Eigen::VectorXd> w(dec.weight.data(),dec.weight.size());
+  const Eigen::VectorXd y(summary.kappahat);
+  const Eigen::VectorXd w(summary.weight);
   const Eigen::VectorXd S = w.array().inverse().sqrt().matrix();
   //X: build spline base on log distance
-  const Eigen::Map<const Eigen::ArrayXd> distance(dec.distance.data(), dec.distance.size());
+  const Eigen::ArrayXd distance(summary.distance.array());
   const Eigen::VectorXd log_distance = distance.log().matrix();
-  const Eigen::SparseMatrix<double> X = generate_spline_base(log_distance, Kdiag);
+  const Eigen::SparseMatrix<double> X = generate_spline_base(log_distance, schedule.Kdiag);
   //D: build difference matrix
-  const Eigen::SparseMatrix<double> D = second_order_difference_matrix(Kdiag);
+  const Eigen::SparseMatrix<double> D = second_order_difference_matrix(schedule.Kdiag);
   //C: build constraint matrix to forbid increase
-  const Eigen::SparseMatrix<double> Cin = - first_order_difference_matrix(Kdiag);
+  const Eigen::SparseMatrix<double> Cin = - first_order_difference_matrix(schedule.Kdiag);
   
   //iteratively fit GAM on decay and estimate lambda
-  GeneralizedAdditiveModel gam(y,S,X,D,sigma);
+  GeneralizedAdditiveModel gam(y,S,X,D,schedule.sigma);
   gam.set_inequality_constraints(Cin);
-  gam.optimize(max_iter,tol_val);
+  gam.optimize(schedule.max_iter,tol_val);
   //Rcpp::Rcout << "gam converged: " << gam.has_converged() << "\n";
   Eigen::VectorXd log_decay = gam.get_mean();
   const double lambda = gam.get_lambda();
@@ -100,20 +111,22 @@ DecayFit spline_log_decay_fit(const DecaySummary& dec, double tol_val, unsigned 
   double avg = w.dot(log_decay)/w.sum();
   //subtract average and return
   log_decay.array() -= avg;
-  return DecayFit{std::vector<double>(log_decay.data(),log_decay.data()+log_decay.rows()),dec,lambda};
+  dec.log_decay = log_decay;
+  dec.summary = summary;
+  dec.lambda_diag = lambda;
 }
 
 //one IRLS iteration for log decay, with a poisson model
-std::vector<double> step_log_decay(const FastSignalData& data, double tol_val) {
+void step_log_decay(const FastSignalData& data, DecayEstimate& dec, double tol_val) {
   //compute summary statistics for decay
-  DecaySummary dec = get_decay_summary(data);
+  DecaySchedule schedule;
+  DecaySummary summary = get_decay_summary(data, dec);
   //infer new decay from summaries
-  DecayFit fit = spline_log_decay_fit(dec, tol_val);
-  Rcpp::Rcout << "distance kappahat weight ncounts log_decay\n";
-  for (unsigned i=0; i<fit.log_decay.size(); ++i)
-  Rcpp::Rcout << fit.dec.distance[i] << " " << fit.dec.kappahat[i] << " "
-              << fit.dec.weight[i] << " -1 " << fit.log_decay[i] << "\n";
-  return fit.log_decay;
+  spline_log_decay_fit(summary, dec, tol_val, schedule);
+  Rcpp::Rcout << "AFTER\n";
+     Rcpp::Rcout << "distance kappahat weight ncounts log_decay\n";
+     Rcpp::Rcout << (Eigen::MatrixXd(summary.distance.rows(),5) << summary.distance, summary.kappahat,
+     summary.weight, summary.ncounts, dec.log_decay).finished();
 }
 
 }

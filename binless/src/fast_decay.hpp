@@ -1,7 +1,7 @@
 #ifndef FAST_DECAY_HPP
 #define FAST_DECAY_HPP
 
-#include <Rcpp.h>
+#include <RcppEigen.h>
 using namespace Rcpp;
 #include <vector>
 #include "FastData.hpp"
@@ -11,18 +11,30 @@ using namespace Rcpp;
 namespace binless {
 namespace fast {
 
-struct DecaySummary { std::vector<double> distance, kappahat, weight; };
-struct DecayFit {
-  std::vector<double> log_decay;
-  DecaySummary dec;
+struct DecaySummary {
+  Eigen::VectorXd distance, kappahat, weight, ncounts;
+};
+
+struct DecaySchedule {
+  unsigned Kdiag=50;
+  unsigned max_iter=100;
+  double sigma=1;
+  //unsigned bins_per_bf=10;
+};
+
+struct DecayEstimate {
+  Eigen::VectorXd log_decay;
+  DecaySummary summary;
   double lambda_diag;
 };
 
+DecayEstimate init_decay(const FastSignalData& data);
+
 std::vector<double> compute_poisson_lsq_log_decay(const FastSignalData& data);
 
-DecaySummary get_decay_summary(const FastSignalData& data);
-DecayFit spline_log_decay_fit(const DecaySummary& dec, double tol_val, unsigned Kdiag=50, unsigned max_iter=100, double sigma=0.1);
-std::vector<double> step_log_decay(const FastSignalData& data, double tol_val);
+DecaySummary get_decay_summary(const FastSignalData& data, const DecayEstimate& dec);
+void spline_log_decay_fit(const DecaySummary& summary, DecayEstimate& dec, double tol_val, const DecaySchedule& schedule);
+void step_log_decay(const FastSignalData& data, DecayEstimate& dec, double tol_val);
 
 }
 }
