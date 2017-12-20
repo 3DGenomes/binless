@@ -78,8 +78,6 @@ public:
     std::vector<double> get_signal_weights() const { return get_weights(); }
     void set_signal_weights(const std::vector<double>& weights) { set_weights(weights); }
 
-    Rcpp::DataFrame get_as_dataframe() const;
-
 };
 
 template<> class FastData<Difference> : public FastDataCore<FastData<Difference> > {
@@ -104,9 +102,7 @@ public:
     
     std::vector<double> get_log_signal() const;
     void set_log_signal(const std::vector<double>& log_signal);
-    
-    Rcpp::DataFrame get_as_dataframe() const;
-    
+
 private:
     std::vector<double> phi_ref_;
     unsigned ref_;

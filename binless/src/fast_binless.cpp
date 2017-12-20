@@ -8,6 +8,7 @@ using namespace Rcpp;
 
 #include "fast_binless.hpp"
 #include "fast_decay.hpp"
+#include "fast_dataframe.hpp"
 #include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
 #include "spline.hpp"
@@ -260,7 +261,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
       //compute exposures
       auto exposures = step_exposures(out, dec);
       out.set_exposures(exposures);
-      //diagnostics.push_back(out.get_as_dataframe());
+      //diagnostics.push_back(get_as_dataframe(out,dec));
       if (converged) {
         Rcpp::Rcout << "converged\n";
         break;
@@ -268,7 +269,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   }
   Rcpp::Rcout << "done\n";
   //finalize and return
-  return Rcpp::List::create(_["mat"]=out.get_as_dataframe(), _["log_biases"]=out.get_log_biases(),
+  return Rcpp::List::create(_["mat"]=get_as_dataframe(out,dec), _["log_biases"]=out.get_log_biases(),
                             _["log_decay"]=dec.get_log_decay(), _["exposures"]=out.get_exposures(),
                             //_["diagnostics"]=diagnostics,
                             _["nbins"]=nbins);
@@ -307,7 +308,7 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned gr
     out.set_log_signal(signal.beta);
     out.set_signal_phihat(signal.phihat);
     out.set_signal_weights(signal.weights);
-    diagnostics.push_back(out.get_as_dataframe());
+    diagnostics.push_back(get_as_dataframe(out,dec));
   }
   //finalize and return
   Rcpp::Rcout << "done\n";
@@ -345,7 +346,7 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   out.set_phi_ref(diff.phi_ref);
   //finalize and return
   Rcpp::Rcout << "done\n";
-  return out.get_as_dataframe();
+  return get_as_dataframe(out);
 }
 
 }
