@@ -109,10 +109,10 @@ std::vector<double> step_log_decay(const FastSignalData& data, double tol_val) {
   DecaySummary dec = get_decay_summary(data);
   //infer new decay from summaries
   DecayFit fit = spline_log_decay_fit(dec, tol_val);
-  /*Rcpp::Rcout << "distance log_decay kappahat weight\n";
+  Rcpp::Rcout << "distance kappahat weight ncounts log_decay\n";
   for (unsigned i=0; i<fit.log_decay.size(); ++i)
-  Rcpp::Rcout << fit.dec.distance[i] << " " << fit.log_decay[i] << " "
-              << fit.dec.kappahat[i] << " " << fit.dec.weight[i] << "\n";*/
+  Rcpp::Rcout << fit.dec.distance[i] << " " << fit.dec.kappahat[i] << " "
+              << fit.dec.weight[i] << " -1 " << fit.log_decay[i] << "\n";
   return fit.log_decay;
 }
 

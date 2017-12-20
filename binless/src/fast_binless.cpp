@@ -202,7 +202,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   Rcpp::Rcout << "init\n";
   FastSignalData out(obs, nbins);
   out.set_exposures(compute_poisson_lsq_exposures(out));
-  out.set_log_decay(compute_poisson_lsq_log_decay(out));
+  //out.set_log_decay(compute_poisson_lsq_log_decay(out));
   out.set_log_biases(compute_poisson_lsq_log_biases(out));
   double current_tol_val = 1.;
   std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
