@@ -204,7 +204,8 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   out.set_exposures(compute_poisson_lsq_exposures(out));
   DecayEstimate dec = init_decay(out);
   auto log_decay_std = std::vector<double>(dec.log_decay.data(), dec.log_decay.data()+dec.log_decay.rows());
-  out.set_log_decay(log_decay_std);
+  //out.set_log_decay(log_decay_std);
+  out.set_log_decay(compute_poisson_lsq_log_decay(out));
   out.set_log_biases(compute_poisson_lsq_log_biases(out));
   double current_tol_val = 1.;
   std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
