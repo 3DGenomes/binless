@@ -19,7 +19,9 @@ namespace fast {
 DecayEstimate init_decay(const FastSignalData& data) {
   DecaySchedule schedule;
   DecaySummary summary;
-  Eigen::VectorXd log_decay = Eigen::VectorXd::Zero(data.get_nbins());
+  auto log_decay_std = compute_poisson_lsq_log_decay(data);
+  //Eigen::VectorXd log_decay = Eigen::VectorXd::Zero(data.get_nbins());
+  Eigen::VectorXd log_decay = Eigen::Map<const Eigen::VectorXd>(log_decay_std.data(),log_decay_std.size());
   DecayEstimate dec{log_decay,summary,-1};
   return dec;
 }
@@ -123,10 +125,10 @@ void step_log_decay(const FastSignalData& data, DecayEstimate& dec, double tol_v
   DecaySummary summary = get_decay_summary(data, dec);
   //infer new decay from summaries
   spline_log_decay_fit(summary, dec, tol_val, schedule);
-  Rcpp::Rcout << "AFTER\n";
+  /*Rcpp::Rcout << "AFTER\n";
      Rcpp::Rcout << "distance kappahat weight ncounts log_decay\n";
      Rcpp::Rcout << (Eigen::MatrixXd(summary.distance.rows(),5) << summary.distance, summary.kappahat,
-     summary.weight, summary.ncounts, dec.log_decay).finished();
+     summary.weight, summary.ncounts, dec.log_decay).finished();*/
 }
 
 }
