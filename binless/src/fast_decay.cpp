@@ -74,28 +74,6 @@ DecaySummary get_decay_summary(const FastSignalData& data) {
   return DecaySummary{distance,kappahat,weight};
 }
 
-DecayFit pointwise_log_decay_fit(const DecaySummary& dec) {
-  //forbid increase past first diagonal
-  std::vector<double> log_decay = dec.kappahat;
-  unsigned N = log_decay.size();
-  for (unsigned i=0; i<N; ++i) {
-    if (i>=2 && log_decay[i] > log_decay[i-1]) log_decay[i] = log_decay[i-1];
-  }
-  //compute weighted mean
-  double avg=0;
-  double wsum=0;
-  for (unsigned i=0; i<N; ++i) {
-    avg += log_decay[i]*dec.weight[i];
-    wsum += dec.weight[i];
-  }
-  avg = avg / wsum;
-  //no smoothing, subtract average and return
-  for (unsigned i=0; i<N; ++i) {
-    log_decay[i] -= avg;
-  }
-  return DecayFit{log_decay,dec,-1};
-}
-
 DecayFit spline_log_decay_fit(const DecaySummary& dec, double tol_val, unsigned Kdiag, unsigned max_iter, double sigma) {
   //extract data
   const Eigen::Map<const Eigen::VectorXd> y(dec.kappahat.data(),dec.kappahat.size());
@@ -130,7 +108,6 @@ std::vector<double> step_log_decay(const FastSignalData& data, double tol_val) {
   //compute summary statistics for decay
   DecaySummary dec = get_decay_summary(data);
   //infer new decay from summaries
-  //DecayFit fit = pointwise_log_decay_fit(dec);
   DecayFit fit = spline_log_decay_fit(dec, tol_val);
   /*Rcpp::Rcout << "distance log_decay kappahat weight\n";
   for (unsigned i=0; i<fit.log_decay.size(); ++i)
