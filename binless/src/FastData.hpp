@@ -23,15 +23,25 @@ public:
     std::vector<unsigned> get_bin1() const { return bin1_; }
     std::vector<unsigned> get_bin2() const { return bin2_; }
     std::vector<unsigned> get_observed() const { return observed_; }
+    std::vector<double> get_distance() const { return distance_; }
     
     std::vector<double> get_log_biases() const { return log_biases_; }
-    void set_log_biases(const std::vector<double>& log_biases) { log_biases_ = log_biases; }
+    void set_log_biases(const std::vector<double>& log_biases) {
+      if (log_biases.size() != nbins_) Rcpp::stop("Incorrect size for log_biases");
+      log_biases_ = log_biases;
+    }
     
     std::vector<double> get_log_decay() const { return log_decay_; }
-    void set_log_decay(const std::vector<double>& log_decay) { log_decay_ = log_decay; }
+    void set_log_decay(const std::vector<double>& log_decay) {
+      if (log_decay.size() != nbins_) Rcpp::stop("Incorrect size for log_decay");
+      log_decay_ = log_decay;
+    }
     
     std::vector<double> get_beta() const { return beta_; }
-    void set_beta(const std::vector<double>& beta) { beta_ = beta; }
+    void set_beta(const std::vector<double>& beta) {
+      if (beta.size() != N_) Rcpp::stop("Incorrect size for beta");
+      beta_ = beta;
+    }
     
     std::vector<double> get_betahat() const { return betahat_; }
     void set_betahat(const std::vector<double>& betahat) { betahat_ = betahat; }
@@ -46,6 +56,7 @@ public:
     
 private:
     const std::vector<unsigned> name_,bin1_,bin2_,observed_; //N(N+1)/2
+    const std::vector<double> distance_;
     const unsigned nbins_, ncells_, ndatasets_, N_;
     std::vector<double> log_biases_,log_decay_; //N
     std::vector<double> beta_,betahat_,weights_; //N(N+1)/2

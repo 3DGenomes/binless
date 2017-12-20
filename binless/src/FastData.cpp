@@ -30,6 +30,7 @@ Rcpp::DataFrame FastData<Signal>::get_as_dataframe() const {
                                    _["bin1"]=dbin1,
                                    _["bin2"]=dbin2,
                                    _["observed"]=get_observed(),
+                                   _["distance"]=get_distance(),
                                    _["log_background"]=log_background,
                                    _["log_biases"]=biasmat,
                                    _["log_decay"]=decaymat,

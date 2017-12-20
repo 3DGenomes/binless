@@ -54,7 +54,7 @@ ggplot(data.table(bin=1:nlevels(mat[,bin1]),log_biases=out$log_biases))+geom_poi
 #biases matrix
 plot_binless_matrix(a, upper="log_biases", lower="log_biases", trans="identity")
 #fitted decay
-ggplot(unique(mat[,.(distance,log_decay=out$log_decay)]))+geom_line(aes(distance,log_decay))#+scale_x_log10()
+ggplot(unique(a[,.(distance,log_decay)]))+geom_line(aes(distance,log_decay))+scale_x_log10()
 #decay matrix
 plot_binless_matrix(a, upper="log_decay", lower="log_decay", trans="identity")
 #signal matrix ( = what is different from the background)
