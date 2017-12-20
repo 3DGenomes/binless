@@ -31,12 +31,6 @@ public:
       log_biases_ = log_biases;
     }
     
-    std::vector<double> get_log_decay() const { return log_decay_; }
-    void set_log_decay(const std::vector<double>& log_decay) {
-      if (log_decay.size() != nbins_) Rcpp::stop("Incorrect size for log_decay");
-      log_decay_ = log_decay;
-    }
-    
     std::vector<double> get_beta() const { return beta_; }
     void set_beta(const std::vector<double>& beta) {
       if (beta.size() != N_) Rcpp::stop("Incorrect size for beta");
@@ -56,7 +50,7 @@ private:
     const std::vector<unsigned> name_,bin1_,bin2_,observed_; //N(N+1)/2
     const std::vector<double> distance_;
     const unsigned nbins_, ncells_, ndatasets_, N_;
-    std::vector<double> log_biases_,log_decay_; //N
+    std::vector<double> log_biases_; //N
     std::vector<double> beta_,betahat_,weights_; //N(N+1)/2
     std::vector<double> exposures_; //ndatasets
 };
