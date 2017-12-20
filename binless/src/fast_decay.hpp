@@ -22,10 +22,24 @@ struct DecaySchedule {
   //unsigned bins_per_bf=10;
 };
 
-struct DecayEstimate {
-  Eigen::VectorXd log_decay;
-  DecaySummary summary;
-  double lambda_diag;
+class DecayEstimate {
+public:
+  DecayEstimate(const Eigen::VectorXd& log_decay, const DecaySummary& summary, double lambda_diag) :
+    log_decay_(log_decay), summary_(summary), lambda_diag_(lambda_diag) {}
+  
+  Eigen::VectorXd get_log_decay() const { return log_decay_; }
+  void set_log_decay(const Eigen::VectorXd& log_decay) { log_decay_ = log_decay; }
+  
+  DecaySummary get_summary() const { return summary_; }
+  void set_summary(const DecaySummary& summary) { summary_ = summary; }
+  
+  double get_lambda_diag() const { return lambda_diag_; }
+  void set_lambda_diag(double lambda_diag) { lambda_diag_ = lambda_diag; }
+  
+private:
+  Eigen::VectorXd log_decay_;
+  DecaySummary summary_;
+  double lambda_diag_;
 };
 
 DecayEstimate init_decay(unsigned nbins);

@@ -208,7 +208,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   auto log_decay_std = compute_poisson_lsq_log_decay(out, dec);
   out.set_log_decay(log_decay_std);
   Eigen::VectorXd log_decay = Eigen::Map<const Eigen::VectorXd>(log_decay_std.data(),log_decay_std.size());
-  dec.log_decay = log_decay;
+  dec.set_log_decay(log_decay);
   //
   out.set_log_biases(compute_poisson_lsq_log_biases(out, dec));
   double current_tol_val = 1.;
@@ -225,7 +225,8 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
     //compute decay
     step_log_decay(out, dec, tol_val);
     if (step <= bg_steps) old_expected = get_log_expected(out, dec);
-    log_decay_std = std::vector<double>(dec.log_decay.data(), dec.log_decay.data()+dec.log_decay.rows());
+    log_decay = dec.get_log_decay();
+    log_decay_std = std::vector<double>(log_decay.data(), log_decay.data()+log_decay.rows());
     out.set_log_decay(log_decay_std);
     if (step <= bg_steps) expected = get_log_expected(out, dec);
     //compute signal
@@ -268,7 +269,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   Rcpp::Rcout << "done\n";
   //finalize and return
   return Rcpp::List::create(_["mat"]=out.get_as_dataframe(), _["log_biases"]=out.get_log_biases(),
-                            _["log_decay"]=out.get_log_decay(), _["exposures"]=out.get_exposures(),
+                            _["log_decay"]=dec.get_log_decay(), _["exposures"]=out.get_exposures(),
                             //_["diagnostics"]=diagnostics,
                             _["nbins"]=nbins);
 }
@@ -287,7 +288,7 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned gr
   auto log_decay_std = Rcpp::as<std::vector<double> >(obs["log_decay"]);
   out.set_log_decay(log_decay_std);
   Eigen::VectorXd log_decay = Eigen::Map<const Eigen::VectorXd>(log_decay_std.data(),log_decay_std.size());
-  dec.log_decay = log_decay;
+  dec.set_log_decay(log_decay);
   //
   auto log_biases = Rcpp::as<std::vector<double> >(obs["log_biases"]);
   out.set_log_biases(log_biases);
@@ -326,7 +327,7 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   auto log_decay_std = Rcpp::as<std::vector<double> >(obs["log_decay"]);
   out.set_log_decay(log_decay_std);
   Eigen::VectorXd log_decay = Eigen::Map<const Eigen::VectorXd>(log_decay_std.data(),log_decay_std.size());
-  dec.log_decay = log_decay;
+  dec.set_log_decay(log_decay);
   //
   auto log_biases = Rcpp::as<std::vector<double> >(obs["log_biases"]);
   out.set_log_biases(log_biases);

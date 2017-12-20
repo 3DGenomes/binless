@@ -21,7 +21,7 @@ DecayEstimate init_decay(unsigned nbins) {
   DecaySchedule schedule;
   DecaySummary summary;
   Eigen::VectorXd log_decay = Eigen::VectorXd::Zero(nbins);
-  DecayEstimate dec{log_decay,summary,-1};
+  DecayEstimate dec(log_decay,summary,-1);
   return dec;
 }
 
@@ -76,7 +76,7 @@ DecaySummary get_decay_summary(const FastSignalData& data, const DecayEstimate& 
     ncounts(bin2-bin1) += 1;
   }
   //add current bias and normalize
-  auto log_decay = dec.log_decay;
+  auto log_decay = dec.get_log_decay();
   Eigen::VectorXd distance = Eigen::VectorXd::Zero(data.get_nbins());
   for (unsigned i=0; i<data.get_nbins(); ++i) {
     kappahat(i) = (weight(i)>0) ? kappahat(i)/weight(i) : 0;
@@ -112,9 +112,9 @@ void spline_log_decay_fit(const DecaySummary& summary, DecayEstimate& dec, doubl
   double avg = w.dot(log_decay)/w.sum();
   //subtract average and return
   log_decay.array() -= avg;
-  dec.log_decay = log_decay;
-  dec.summary = summary;
-  dec.lambda_diag = lambda;
+  dec.set_log_decay(log_decay);
+  dec.set_summary(summary);
+  dec.set_lambda_diag(lambda);
 }
 
 //one IRLS iteration for log decay, with a poisson model
@@ -127,7 +127,7 @@ void step_log_decay(const FastSignalData& data, DecayEstimate& dec, double tol_v
   /*Rcpp::Rcout << "AFTER\n";
      Rcpp::Rcout << "distance kappahat weight ncounts log_decay\n";
      Rcpp::Rcout << (Eigen::MatrixXd(summary.distance.rows(),5) << summary.distance, summary.kappahat,
-     summary.weight, summary.ncounts, dec.log_decay).finished();*/
+     summary.weight, summary.ncounts, dec.get_log_decay()).finished();*/
 }
 
 }
