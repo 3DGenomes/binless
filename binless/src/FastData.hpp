@@ -52,8 +52,6 @@ public:
     std::vector<double> get_exposures() const { return exposures_; }
     void set_exposures(const std::vector<double>& exposures) { exposures_ = exposures; }
     
-    std::vector<double> get_log_expected() const;
-    
 private:
     const std::vector<unsigned> name_,bin1_,bin2_,observed_; //N(N+1)/2
     const std::vector<double> distance_;

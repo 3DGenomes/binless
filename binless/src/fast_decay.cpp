@@ -10,28 +10,27 @@ using namespace Rcpp;
 #include "fast_residuals.hpp"
 #include "spline.hpp"
 #include "gam.hpp"
+#include "fast_expected.hpp"
 
 namespace binless {
 namespace fast {
 
 
 //here, initialize flat log decay
-DecayEstimate init_decay(const FastSignalData& data) {
+DecayEstimate init_decay(unsigned nbins) {
   DecaySchedule schedule;
   DecaySummary summary;
-  auto log_decay_std = compute_poisson_lsq_log_decay(data);
-  //Eigen::VectorXd log_decay = Eigen::VectorXd::Zero(data.get_nbins());
-  Eigen::VectorXd log_decay = Eigen::Map<const Eigen::VectorXd>(log_decay_std.data(),log_decay_std.size());
+  Eigen::VectorXd log_decay = Eigen::VectorXd::Zero(nbins);
   DecayEstimate dec{log_decay,summary,-1};
   return dec;
 }
 
 //here, log decay is log ( sum_i observed / sum_i expected ) with i summed over counter diagonals
-std::vector<double> compute_poisson_lsq_log_decay(const FastSignalData& data) {
+std::vector<double> compute_poisson_lsq_log_decay(const FastSignalData& data, const DecayEstimate& dec) {
   //get observed and expected data
   std::vector<double> sum_obs(data.get_nbins(),0);
   std::vector<double> sum_exp(data.get_nbins(),0);
-  auto log_expected = data.get_log_expected();
+  auto log_expected = get_log_expected(data, dec);
   auto observed = data.get_observed();
   //sum them along the counter diagonals
   auto dbin1 = data.get_bin1();
@@ -62,7 +61,7 @@ std::vector<double> compute_poisson_lsq_log_decay(const FastSignalData& data) {
 
 DecaySummary get_decay_summary(const FastSignalData& data, const DecayEstimate& dec) {
   //get residuals
-  ResidualsPair z = get_poisson_residuals(data);
+  ResidualsPair z = get_poisson_residuals(data, dec);
   //sum them along the diagonals
   auto dbin1 = data.get_bin1();
   auto dbin2 = data.get_bin2();

@@ -17,11 +17,11 @@ namespace binless {
 namespace fast {
 
 //here, exposures are log ( sum_i observed / sum_i expected ) with i summed over datasets
-std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data) {
+std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data, const DecayEstimate& dec) {
   //get observed and expected
   std::vector<double> sum_obs(data.get_ndatasets(),0);
   std::vector<double> sum_exp(data.get_ndatasets(),0);
-  auto log_expected = data.get_log_expected();
+  auto log_expected = get_log_expected(data, dec);
   auto observed = data.get_observed();
   //sum them for each dataset
   auto names = data.get_name();
@@ -40,9 +40,9 @@ std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data) {
 }
 
 //one IRLS iteration for exposures, with a poisson model
-std::vector<double> step_exposures(const FastSignalData& data) {
+std::vector<double> step_exposures(const FastSignalData& data, const DecayEstimate& dec) {
   //get residuals
-  ResidualsPair z = get_poisson_residuals(data);
+  ResidualsPair z = get_poisson_residuals(data, dec);
   //average by name
   std::vector<double> exposures(data.get_ndatasets(),0);
   std::vector<double> weightsums(data.get_ndatasets(),0);
@@ -61,11 +61,11 @@ std::vector<double> step_exposures(const FastSignalData& data) {
 }
 
 //here, biases are log ( sum_i observed / sum_i expected ) with i summed over rows/columns
-std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data) {
+std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, const DecayEstimate& dec) {
   //get observed and expected data
   std::vector<double> sum_obs(data.get_nbins(),0);
   std::vector<double> sum_exp(data.get_nbins(),0);
-  auto log_expected = data.get_log_expected();
+  auto log_expected = get_log_expected(data, dec);
   auto observed = data.get_observed();
   //sum them along the rows/columns
   auto dbin1 = data.get_bin1();
@@ -96,9 +96,9 @@ std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data) {
 }
 
 //one IRLS iteration for log biases, with a poisson model
-std::vector<double> step_log_biases(const FastSignalData& data) {
+std::vector<double> step_log_biases(const FastSignalData& data, const DecayEstimate& dec) {
   //get residuals
-  ResidualsPair z = get_poisson_residuals(data);
+  ResidualsPair z = get_poisson_residuals(data, dec);
   //sum them along the rows/columns
   auto dbin1 = data.get_bin1();
   auto dbin2 = data.get_bin2();
@@ -201,11 +201,16 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   //initialize return values, exposures and fused lasso optimizer
   Rcpp::Rcout << "init\n";
   FastSignalData out(obs, nbins);
-  out.set_exposures(compute_poisson_lsq_exposures(out));
-  DecayEstimate dec = init_decay(out);
-  auto log_decay_std = std::vector<double>(dec.log_decay.data(), dec.log_decay.data()+dec.log_decay.rows());
+  DecayEstimate dec = init_decay(out.get_nbins());
+  //
+  out.set_exposures(compute_poisson_lsq_exposures(out, dec));
+  //
+  auto log_decay_std = compute_poisson_lsq_log_decay(out, dec);
   out.set_log_decay(log_decay_std);
-  out.set_log_biases(compute_poisson_lsq_log_biases(out));
+  Eigen::VectorXd log_decay = Eigen::Map<const Eigen::VectorXd>(log_decay_std.data(),log_decay_std.size());
+  dec.log_decay = log_decay;
+  //
+  out.set_log_biases(compute_poisson_lsq_log_biases(out, dec));
   double current_tol_val = 1.;
   std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
                                                              FusedLassoGaussianEstimator<GFLLibrary>(nbins, current_tol_val/20.));
@@ -215,22 +220,22 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
     Rcpp::Rcout << "step " << step;
     std::vector<double> expected,old_expected;
     //compute biases
-    auto biases = step_log_biases(out);
+    auto biases = step_log_biases(out, dec);
     out.set_log_biases(biases);
     //compute decay
     step_log_decay(out, dec, tol_val);
-    if (step <= bg_steps) old_expected = out.get_log_expected();
+    if (step <= bg_steps) old_expected = get_log_expected(out, dec);
     log_decay_std = std::vector<double>(dec.log_decay.data(), dec.log_decay.data()+dec.log_decay.rows());
     out.set_log_decay(log_decay_std);
-    if (step <= bg_steps) expected = out.get_log_expected();
+    if (step <= bg_steps) expected = get_log_expected(out, dec);
     //compute signal
     if (step > bg_steps) {
-      old_expected = out.get_log_expected();
-      auto signal = step_signal(out, flos, lam2);
+      old_expected = get_log_expected(out, dec);
+      auto signal = step_signal(out, dec, flos, lam2);
       out.set_log_signal(signal.beta);
       out.set_signal_phihat(signal.phihat);
       out.set_signal_weights(signal.weights);
-      expected = out.get_log_expected();
+      expected = get_log_expected(out, dec);
     }
     //compute precision and convergence
     auto precision = get_precision(expected,old_expected);
@@ -252,7 +257,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
         out.set_log_signal(adjust);
       }
       //compute exposures
-      auto exposures = step_exposures(out);
+      auto exposures = step_exposures(out, dec);
       out.set_exposures(exposures);
       //diagnostics.push_back(out.get_as_dataframe());
       if (converged) {
@@ -277,8 +282,13 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned gr
   if (out.get_ndatasets() != 1) Rcpp::stop("Provide only 1 dataset!");
   auto signal_ori = Rcpp::as<std::vector<double> >(mat["signal"]);
   out.set_log_signal(signal_ori); //fills-in phi_ref and delta
-  auto log_decay = Rcpp::as<std::vector<double> >(obs["log_decay"]);
-  out.set_log_decay(log_decay);
+  //
+  DecayEstimate dec = init_decay(out.get_nbins());
+  auto log_decay_std = Rcpp::as<std::vector<double> >(obs["log_decay"]);
+  out.set_log_decay(log_decay_std);
+  Eigen::VectorXd log_decay = Eigen::Map<const Eigen::VectorXd>(log_decay_std.data(),log_decay_std.size());
+  dec.log_decay = log_decay;
+  //
   auto log_biases = Rcpp::as<std::vector<double> >(obs["log_biases"]);
   out.set_log_biases(log_biases);
   auto exposures = Rcpp::as<std::vector<double> >(obs["exposures"]);
@@ -292,7 +302,7 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned gr
     Rcpp::checkUserInterrupt();
     Rcpp::Rcout << "lambda2= " << lam2[i] << "\n";
     out.set_log_signal(signal_ori); //fills-in phi_ref and delta
-    auto signal = step_signal(out, flos, lam2[i], group);
+    auto signal = step_signal(out, dec, flos, lam2[i], group);
     out.set_log_signal(signal.beta);
     out.set_signal_phihat(signal.phihat);
     out.set_signal_weights(signal.weights);
@@ -311,8 +321,13 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   FastDifferenceData out(mat, nbins, ref);
   auto signal = Rcpp::as<std::vector<double> >(mat["log_signal"]);
   out.set_log_signal(signal); //fills-in phi_ref and delta
-  auto log_decay = Rcpp::as<std::vector<double> >(obs["log_decay"]);
-  out.set_log_decay(log_decay);
+  //
+  DecayEstimate dec = init_decay(out.get_nbins());
+  auto log_decay_std = Rcpp::as<std::vector<double> >(obs["log_decay"]);
+  out.set_log_decay(log_decay_std);
+  Eigen::VectorXd log_decay = Eigen::Map<const Eigen::VectorXd>(log_decay_std.data(),log_decay_std.size());
+  dec.log_decay = log_decay;
+  //
   auto log_biases = Rcpp::as<std::vector<double> >(obs["log_biases"]);
   out.set_log_biases(log_biases);
   auto exposures = Rcpp::as<std::vector<double> >(obs["exposures"]);
@@ -322,7 +337,7 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
                                                              FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge));
   //compute differences
   Rcpp::Rcout << "compute\n";
-  auto diff = step_difference(out, flos, lam2, ref);
+  auto diff = step_difference(out, dec, flos, lam2, ref);
   out.set_log_difference(diff.delta);
   out.set_deltahat(diff.deltahat);
   out.set_difference_weights(diff.weights);
