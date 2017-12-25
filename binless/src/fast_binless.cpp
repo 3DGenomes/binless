@@ -206,8 +206,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   //
   out.set_exposures(compute_poisson_lsq_exposures(out, dec));
   //
-  auto log_decay_std = compute_poisson_lsq_log_decay(out, dec);
-  Eigen::VectorXd log_decay = Eigen::Map<const Eigen::VectorXd>(log_decay_std.data(),log_decay_std.size());
+  auto log_decay = compute_poisson_lsq_log_decay(out, dec);
   dec.set_log_decay(log_decay);
   //
   out.set_log_biases(compute_poisson_lsq_log_biases(out, dec));

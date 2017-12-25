@@ -44,7 +44,7 @@ private:
 
 DecayEstimate init_decay(unsigned nbins);
 
-std::vector<double> compute_poisson_lsq_log_decay(const FastSignalData& data, const DecayEstimate& dec);
+Eigen::VectorXd compute_poisson_lsq_log_decay(const FastSignalData& data, const DecayEstimate& dec);
 
 DecaySummary get_decay_summary(const FastSignalData& data, const DecayEstimate& dec);
 void spline_log_decay_fit(const DecaySummary& summary, DecayEstimate& dec, double tol_val, const DecaySchedule& schedule);

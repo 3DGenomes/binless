@@ -26,10 +26,10 @@ DecayEstimate init_decay(unsigned nbins) {
 }
 
 //here, log decay is log ( sum_i observed / sum_i expected ) with i summed over counter diagonals
-std::vector<double> compute_poisson_lsq_log_decay(const FastSignalData& data, const DecayEstimate& dec) {
+Eigen::VectorXd compute_poisson_lsq_log_decay(const FastSignalData& data, const DecayEstimate& dec) {
   //get observed and expected data
-  std::vector<double> sum_obs(data.get_nbins(),0);
-  std::vector<double> sum_exp(data.get_nbins(),0);
+  Eigen::VectorXd sum_obs = Eigen::VectorXd::Zero(data.get_nbins());
+  Eigen::VectorXd sum_exp = Eigen::VectorXd::Zero(data.get_nbins());
   auto log_expected = get_log_expected(data, dec);
   auto observed = data.get_observed();
   //sum them along the counter diagonals
@@ -38,24 +38,21 @@ std::vector<double> compute_poisson_lsq_log_decay(const FastSignalData& data, co
   for (unsigned i=0; i<data.get_N(); ++i) {
     unsigned dist = dbin2[i]-dbin1[i];
     double expected = std::exp(log_expected[i]);
-    sum_obs[dist] += observed[i];
-    sum_exp[dist] += expected;
+    sum_obs(dist) += observed[i];
+    sum_exp(dist) += expected;
   }
   //compute log_decay
-  std::vector<double> log_decay;
-  log_decay.reserve(data.get_nbins());
+  Eigen::VectorXd log_decay = Eigen::VectorXd::Zero(data.get_nbins());
   for (unsigned i=0; i<data.get_nbins(); ++i) {
-    if (sum_obs[i]==0) {
+    if (sum_obs(i)==0) {
       Rcpp::Rcout << "counter diag " << i << " is zero!\n";
       Rcpp::stop(" Aborting...");
     }
-    log_decay.push_back(std::log(sum_obs[i]/sum_exp[i]));
   }
+  log_decay = (sum_obs.array()/sum_exp.array()).log().matrix();
   //center log_decay
-  double avg = std::accumulate(log_decay.begin(), log_decay.end(), 0.)/log_decay.size();
-  for (unsigned i=0; i<data.get_nbins(); ++i) {
-    log_decay[i] -= avg;
-  }
+  double avg = log_decay.sum()/log_decay.rows();
+  log_decay = (log_decay.array() - avg).matrix();
   return log_decay;
 }
 
