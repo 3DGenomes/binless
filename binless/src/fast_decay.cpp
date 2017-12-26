@@ -73,13 +73,13 @@ DecaySummary get_decay_summary(const FastSignalData& data, const DecayEstimate& 
     ncounts(bin2-bin1) += 1;
   }
   //add current bias and normalize
-  auto log_decay = dec.get_log_decay();
   Eigen::VectorXd distance = Eigen::VectorXd::Zero(data.get_nbins());
   for (unsigned i=0; i<data.get_nbins(); ++i) {
     kappahat(i) = (weight(i)>0) ? kappahat(i)/weight(i) : 0;
-    kappahat(i) += log_decay(i);
     distance(i) = i+1;
   }
+  auto log_decay = dec.get_log_decay(distance.array().log().matrix());
+  kappahat += log_decay;
   return DecaySummary{distance,kappahat,weight,ncounts};
 }
 
@@ -124,7 +124,7 @@ void step_log_decay(const FastSignalData& data, DecayEstimate& dec, double tol_v
   /*Rcpp::Rcout << "AFTER\n";
      Rcpp::Rcout << "distance kappahat weight ncounts log_decay\n";
      Rcpp::Rcout << (Eigen::MatrixXd(summary.distance.rows(),5) << summary.distance, summary.kappahat,
-     summary.weight, summary.ncounts, dec.get_log_decay()).finished();*/
+     summary.weight, summary.ncounts, dec.get_log_decay(summary.distance.array().log().matrix())).finished();*/
 }
 
 }

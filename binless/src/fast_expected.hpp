@@ -14,7 +14,6 @@ namespace fast {
 template<typename Derived>
 std::vector<double> get_log_expected(const FastDataCore<Derived>& data, const DecayEstimate& dec);
 
-
 #include "fast_expected.ipp"
 
 }

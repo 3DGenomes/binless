@@ -12,7 +12,8 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const DecayEstima
   binless.reserve(data.get_N());
   std::vector<unsigned> dname(data.get_name()), dbin1(data.get_bin1()), dbin2(data.get_bin2());
   std::vector<double> log_biases(data.get_log_biases()), log_signal(data.get_log_signal()), exposures(data.get_exposures());
-  Eigen::VectorXd log_decay = dec.get_log_decay();
+  Eigen::VectorXd dlog_distance = Eigen::ArrayXd::LinSpaced(data.get_nbins(),1,data.get_nbins()).log().matrix();
+  Eigen::VectorXd log_decay = dec.get_log_decay(dlog_distance);
   for (unsigned i=0; i<data.get_N(); ++i) {
     unsigned bin1 = dbin1[i]-1; //offset by 1 for vector indexing
     unsigned bin2 = dbin2[i]-1;

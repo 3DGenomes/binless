@@ -222,9 +222,8 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
     auto biases = step_log_biases(out, dec);
     out.set_log_biases(biases);
     //compute decay
-    step_log_decay(out, dec, tol_val);
     if (step <= bg_steps) old_expected = get_log_expected(out, dec);
-    log_decay = dec.get_log_decay();
+    step_log_decay(out, dec, tol_val);
     if (step <= bg_steps) expected = get_log_expected(out, dec);
     //compute signal
     if (step > bg_steps) {
@@ -265,8 +264,9 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   }
   Rcpp::Rcout << "done\n";
   //finalize and return
+  Eigen::VectorXd dlog_distance = Eigen::ArrayXd::LinSpaced(out.get_nbins(),1,out.get_nbins()).log().matrix();
   return Rcpp::List::create(_["mat"]=get_as_dataframe(out,dec), _["log_biases"]=out.get_log_biases(),
-                            _["log_decay"]=dec.get_log_decay(), _["exposures"]=out.get_exposures(),
+                            _["log_decay"]=dec.get_log_decay(dlog_distance), _["exposures"]=out.get_exposures(),
                             //_["diagnostics"]=diagnostics,
                             _["nbins"]=nbins);
 }

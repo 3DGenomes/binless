@@ -27,7 +27,7 @@ public:
   DecayEstimate(const Eigen::VectorXd& log_decay, const DecaySummary& summary, double lambda_diag) :
     log_decay_(log_decay), summary_(summary), lambda_diag_(lambda_diag) {}
   
-  Eigen::VectorXd get_log_decay() const { return log_decay_; }
+  Eigen::VectorXd get_log_decay(const Eigen::VectorXd&) const { return log_decay_; }
   void set_log_decay(const Eigen::VectorXd& log_decay) { log_decay_ = log_decay; }
   
   DecaySummary get_summary() const { return summary_; }
