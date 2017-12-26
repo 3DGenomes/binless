@@ -17,7 +17,7 @@ namespace fast {
 
 
 //here, log decay is log ( sum_i observed / sum_i expected ) with i summed over counter diagonals
-Eigen::VectorXd compute_poisson_lsq_log_decay(const FastSignalData& data, const DecayEstimate& dec) {
+DecaySummary compute_poisson_lsq_log_decay(const FastSignalData& data, const DecayEstimate& dec) {
   //get observed and expected data
   Eigen::VectorXd sum_obs = Eigen::VectorXd::Zero(data.get_nbins());
   Eigen::VectorXd sum_exp = Eigen::VectorXd::Zero(data.get_nbins());
@@ -44,7 +44,8 @@ Eigen::VectorXd compute_poisson_lsq_log_decay(const FastSignalData& data, const 
   //center log_decay
   double avg = log_decay.sum()/log_decay.rows();
   log_decay = (log_decay.array() - avg).matrix();
-  return log_decay;
+  Eigen::VectorXd distance = Eigen::VectorXd::LinSpaced(data.get_nbins(),1,data.get_nbins());
+  return DecaySummary{distance,log_decay,Eigen::VectorXd::Ones(data.get_nbins()),Eigen::VectorXd::Ones(data.get_nbins())};
 }
 
 DecaySummary get_decay_summary(const FastSignalData& data, const DecayEstimate& dec) {
@@ -82,7 +83,7 @@ void spline_log_decay_fit(const DecaySummary& summary, DecayEstimate& dec, doubl
   //X: build spline base on log distance
   const Eigen::ArrayXd distance(summary.distance.array());
   const Eigen::VectorXd log_distance = distance.log().matrix();
-  const Eigen::SparseMatrix<double> X = generate_spline_base(log_distance, log_distance.minCoeff(), log_distance.maxCoeff(), schedule.Kdiag);
+  const Eigen::SparseMatrix<double> X = dec.get_design(log_distance);
   //D: build difference matrix
   const Eigen::SparseMatrix<double> D = second_order_difference_matrix(schedule.Kdiag);
   //C: build constraint matrix to forbid increase
@@ -93,16 +94,10 @@ void spline_log_decay_fit(const DecaySummary& summary, DecayEstimate& dec, doubl
   gam.set_inequality_constraints(Cin);
   gam.optimize(schedule.max_iter,tol_val);
   //Rcpp::Rcout << "gam converged: " << gam.has_converged() << "\n";
-  Eigen::VectorXd log_decay = gam.get_mean();
-  const double lambda = gam.get_lambda();
-  
-  //compute weighted mean
-  double avg = w.dot(log_decay)/w.sum();
-  //subtract average and return
-  log_decay.array() -= avg;
-  dec.set_log_decay(log_decay);
+  dec.set_beta_diag(gam.get_beta());
+  dec.center_log_decay(log_distance, w);
+  dec.set_lambda_diag(gam.get_lambda());
   dec.set_summary(summary);
-  dec.set_lambda_diag(lambda);
 }
 
 //one IRLS iteration for log decay, with a poisson model

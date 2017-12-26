@@ -206,8 +206,8 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   //
   out.set_exposures(compute_poisson_lsq_exposures(out, dec));
   //
-  auto log_decay = compute_poisson_lsq_log_decay(out, dec);
-  dec.set_log_decay(log_decay);
+  auto decay_summary = compute_poisson_lsq_log_decay(out, dec);
+  spline_log_decay_fit(decay_summary, dec, tol_val, DecaySchedule());
   //
   out.set_log_biases(compute_poisson_lsq_log_biases(out, dec));
   double current_tol_val = 1.;
@@ -264,9 +264,8 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   }
   Rcpp::Rcout << "done\n";
   //finalize and return
-  Eigen::VectorXd dlog_distance = Eigen::ArrayXd::LinSpaced(out.get_nbins(),1,out.get_nbins()).log().matrix();
   return Rcpp::List::create(_["mat"]=get_as_dataframe(out,dec), _["log_biases"]=out.get_log_biases(),
-                            _["log_decay"]=dec.get_log_decay(dlog_distance), _["exposures"]=out.get_exposures(),
+                            _["beta_diag"]=dec.get_beta_diag(), _["exposures"]=out.get_exposures(),
                             //_["diagnostics"]=diagnostics,
                             _["nbins"]=nbins);
 }
@@ -282,8 +281,8 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned gr
   out.set_log_signal(signal_ori); //fills-in phi_ref and delta
   //
   DecayEstimate dec = init_decay(out);
-  auto log_decay = Rcpp::as<Eigen::VectorXd >(obs["log_decay"]);
-  dec.set_log_decay(log_decay);
+  auto beta_diag = Rcpp::as<Eigen::VectorXd >(obs["beta_diag"]);
+  dec.set_beta_diag(beta_diag);
   //
   auto log_biases = Rcpp::as<std::vector<double> >(obs["log_biases"]);
   out.set_log_biases(log_biases);
@@ -319,8 +318,8 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   out.set_log_signal(signal); //fills-in phi_ref and delta
   //
   DecayEstimate dec = init_decay(out);
-  auto log_decay = Rcpp::as<Eigen::VectorXd >(obs["log_decay"]);
-  dec.set_log_decay(log_decay);
+  auto beta_diag = Rcpp::as<Eigen::VectorXd >(obs["beta_diag"]);
+  dec.set_beta_diag(beta_diag);
   //
   auto log_biases = Rcpp::as<std::vector<double> >(obs["log_biases"]);
   out.set_log_biases(log_biases);
