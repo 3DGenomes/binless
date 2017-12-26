@@ -27,7 +27,10 @@ public:
   DecayEstimate(const Eigen::VectorXd& log_decay, const DecaySummary& summary, double lambda_diag) :
     log_decay_(log_decay), summary_(summary), lambda_diag_(lambda_diag) {}
   
-  Eigen::VectorXd get_log_decay(const Eigen::VectorXd&) const { return log_decay_; }
+  Eigen::VectorXd get_log_decay(const Eigen::VectorXd& log_distance) const {
+    return log_decay_; 
+  }
+  
   void set_log_decay(const Eigen::VectorXd& log_decay) { log_decay_ = log_decay; }
   
   DecaySummary get_summary() const { return summary_; }
@@ -42,7 +45,15 @@ private:
   double lambda_diag_;
 };
 
-DecayEstimate init_decay(unsigned nbins);
+//here, initialize flat log decay
+template<typename FastData>
+DecayEstimate init_decay(const FastData& data) {
+  DecaySchedule schedule;
+  DecaySummary summary;
+  Eigen::VectorXd log_decay = Eigen::VectorXd::Zero(data.get_nbins());
+  DecayEstimate dec(log_decay,summary,-1);
+  return dec;
+}
 
 Eigen::VectorXd compute_poisson_lsq_log_decay(const FastSignalData& data, const DecayEstimate& dec);
 

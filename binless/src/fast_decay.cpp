@@ -16,15 +16,6 @@ namespace binless {
 namespace fast {
 
 
-//here, initialize flat log decay
-DecayEstimate init_decay(unsigned nbins) {
-  DecaySchedule schedule;
-  DecaySummary summary;
-  Eigen::VectorXd log_decay = Eigen::VectorXd::Zero(nbins);
-  DecayEstimate dec(log_decay,summary,-1);
-  return dec;
-}
-
 //here, log decay is log ( sum_i observed / sum_i expected ) with i summed over counter diagonals
 Eigen::VectorXd compute_poisson_lsq_log_decay(const FastSignalData& data, const DecayEstimate& dec) {
   //get observed and expected data

@@ -202,7 +202,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   //initialize return values, exposures and fused lasso optimizer
   Rcpp::Rcout << "init\n";
   FastSignalData out(obs, nbins);
-  DecayEstimate dec = init_decay(out.get_nbins());
+  DecayEstimate dec = init_decay(out);
   //
   out.set_exposures(compute_poisson_lsq_exposures(out, dec));
   //
@@ -281,7 +281,7 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned gr
   auto signal_ori = Rcpp::as<std::vector<double> >(mat["signal"]);
   out.set_log_signal(signal_ori); //fills-in phi_ref and delta
   //
-  DecayEstimate dec = init_decay(out.get_nbins());
+  DecayEstimate dec = init_decay(out);
   auto log_decay = Rcpp::as<Eigen::VectorXd >(obs["log_decay"]);
   dec.set_log_decay(log_decay);
   //
@@ -318,7 +318,7 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   auto signal = Rcpp::as<std::vector<double> >(mat["log_signal"]);
   out.set_log_signal(signal); //fills-in phi_ref and delta
   //
-  DecayEstimate dec = init_decay(out.get_nbins());
+  DecayEstimate dec = init_decay(out);
   auto log_decay = Rcpp::as<Eigen::VectorXd >(obs["log_decay"]);
   dec.set_log_decay(log_decay);
   //
