@@ -95,7 +95,7 @@ void spline_log_decay_fit(const DecaySummary& summary, DecayEstimate& dec, doubl
   gam.optimize(schedule.max_iter,tol_val);
   //Rcpp::Rcout << "gam converged: " << gam.has_converged() << "\n";
   dec.set_beta_diag(gam.get_beta());
-  dec.center_log_decay(log_distance, w);
+  dec.center_log_decay(log_distance, summary.ncounts);
   dec.set_lambda_diag(gam.get_lambda());
   dec.set_summary(summary);
 }
