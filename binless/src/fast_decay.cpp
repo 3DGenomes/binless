@@ -82,7 +82,7 @@ void spline_log_decay_fit(const DecaySummary& summary, DecayEstimate& dec, doubl
   //X: build spline base on log distance
   const Eigen::ArrayXd distance(summary.distance.array());
   const Eigen::VectorXd log_distance = distance.log().matrix();
-  const Eigen::SparseMatrix<double> X = generate_spline_base(log_distance, schedule.Kdiag);
+  const Eigen::SparseMatrix<double> X = generate_spline_base(log_distance, log_distance.minCoeff(), log_distance.maxCoeff(), schedule.Kdiag);
   //D: build difference matrix
   const Eigen::SparseMatrix<double> D = second_order_difference_matrix(schedule.Kdiag);
   //C: build constraint matrix to forbid increase

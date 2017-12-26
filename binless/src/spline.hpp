@@ -12,6 +12,7 @@
 Eigen::MatrixXd cardinal_cubic_bspline_design(const Eigen::VectorXd& x, double dx, const Eigen::RowVectorXd& knots);
 
 //generate sparse cubic spline base along x with K evenly spaced basis functions
-Eigen::SparseMatrix<double> generate_spline_base(const Eigen::VectorXd& x, unsigned K);
+// provided lowest and highest spline knots. Set to min and max of x if unknown.
+Eigen::SparseMatrix<double> generate_spline_base(const Eigen::VectorXd& x, double xmin, double xmax, unsigned K);
 
 #endif

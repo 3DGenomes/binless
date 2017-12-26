@@ -16,10 +16,10 @@ Eigen::MatrixXd cardinal_cubic_bspline_design(const Eigen::VectorXd& x, double d
   return B.matrix().leftCols(K-degree-1);
 }
 
-Eigen::SparseMatrix<double> generate_spline_base(const Eigen::VectorXd& x, unsigned K){
+Eigen::SparseMatrix<double> generate_spline_base(const Eigen::VectorXd& x, double xmin, double xmax, unsigned K){
   const unsigned degree = 3;
-  const double dx = 1.01*(x.maxCoeff()-x.minCoeff())/(K-degree);
-  const double lower = x.minCoeff()-dx*0.01;
+  const double dx = 1.01*(xmax-xmin)/(K-degree);
+  const double lower = xmin-dx*0.01;
   const Eigen::RowVectorXd knots = Eigen::RowVectorXd::LinSpaced(K+degree+1,lower-degree*dx,lower+K*dx);
   auto ret = cardinal_cubic_bspline_design(x,dx,knots);
   return ret.sparseView();
