@@ -13,9 +13,9 @@ namespace fast {
 struct ResidualsPair { std::vector<double> residuals,weights; };
 
 template<typename FastData>
-ResidualsPair get_normal_residuals(const FastData& data, const DecayEstimate& dec);
+ResidualsPair get_normal_residuals(const FastData& data, const Decay& dec);
 template<typename FastData>
-ResidualsPair get_poisson_residuals(const FastData& data, const DecayEstimate& dec);
+ResidualsPair get_poisson_residuals(const FastData& data, const Decay& dec);
 
 #include "fast_residuals.ipp"
 

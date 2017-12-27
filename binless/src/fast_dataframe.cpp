@@ -4,7 +4,7 @@
 namespace binless {
 namespace fast {
 
-Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const DecayEstimate& dec) {
+Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const Decay& dec) {
   //bias, decay, signal with decay and exposures, and log_background matrix (w/ offset)
   std::vector<double> biasmat,binless,log_background;
   biasmat.reserve(data.get_N());

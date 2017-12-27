@@ -12,7 +12,7 @@ using namespace Rcpp;
 namespace binless {
 namespace fast {
 
-Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const DecayEstimate& dec);
+Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const Decay& dec);
 
 Rcpp::DataFrame get_as_dataframe(const FastData<Difference>& data);
 
