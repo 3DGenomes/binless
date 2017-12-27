@@ -21,17 +21,23 @@ DecaySummary compute_poisson_lsq_log_decay(const FastSignalData& data, const Dec
   //get observed and expected data
   Eigen::VectorXd sum_obs = Eigen::VectorXd::Zero(data.get_nbins());
   Eigen::VectorXd sum_exp = Eigen::VectorXd::Zero(data.get_nbins());
+  Eigen::VectorXd distance = Eigen::VectorXd::Zero(data.get_nbins());
+  Eigen::VectorXd ncounts = Eigen::VectorXd::Zero(data.get_nbins());
   auto log_expected = get_log_expected(data, dec);
   auto observed = data.get_observed();
   //sum them along the counter diagonals
   auto dbin1 = data.get_bin1();
   auto dbin2 = data.get_bin2();
+  auto ddistance = data.get_distance();
   for (unsigned i=0; i<data.get_N(); ++i) {
     unsigned dist = dbin2[i]-dbin1[i];
     double expected = std::exp(log_expected[i]);
     sum_obs(dist) += observed[i];
     sum_exp(dist) += expected;
+    distance(dist) += ddistance[i];
+    ncounts(dist) += 1;
   }
+  distance = (distance.array() / ncounts.array()).matrix();
   //compute log_decay
   Eigen::VectorXd log_decay = Eigen::VectorXd::Zero(data.get_nbins());
   for (unsigned i=0; i<data.get_nbins(); ++i) {
@@ -44,8 +50,7 @@ DecaySummary compute_poisson_lsq_log_decay(const FastSignalData& data, const Dec
   //center log_decay
   double avg = log_decay.sum()/log_decay.rows();
   log_decay = (log_decay.array() - avg).matrix();
-  Eigen::VectorXd distance = Eigen::VectorXd::LinSpaced(data.get_nbins(),1,data.get_nbins());
-  return DecaySummary{distance,log_decay,Eigen::VectorXd::Ones(data.get_nbins()),Eigen::VectorXd::Ones(data.get_nbins())};
+  return DecaySummary{distance,log_decay,log_decay.array().exp().matrix(),ncounts};
 }
 
 DecaySummary get_decay_summary(const FastSignalData& data, const DecayEstimate& dec) {
@@ -54,21 +59,23 @@ DecaySummary get_decay_summary(const FastSignalData& data, const DecayEstimate& 
   //sum them along the diagonals
   auto dbin1 = data.get_bin1();
   auto dbin2 = data.get_bin2();
+  auto ddist = data.get_distance();
   Eigen::VectorXd kappahat = Eigen::VectorXd::Zero(data.get_nbins());
   Eigen::VectorXd weight = Eigen::VectorXd::Zero(data.get_nbins());
+  Eigen::VectorXd distance = Eigen::VectorXd::Zero(data.get_nbins());
   Eigen::VectorXd ncounts = Eigen::VectorXd::Zero(data.get_nbins());
   for (unsigned i=0; i<data.get_N(); ++i) {
     unsigned bin1 = dbin1[i]-1; //offset by 1 for vector indexing
     unsigned bin2 = dbin2[i]-1;
     kappahat(bin2-bin1) += z.residuals[i]*z.weights[i];
     weight(bin2-bin1) += z.weights[i];
+    distance(bin2-bin1) += ddist[i];
     ncounts(bin2-bin1) += 1;
   }
+  distance = (distance.array() / ncounts.array()).matrix();
   //add current bias and normalize
-  Eigen::VectorXd distance = Eigen::VectorXd::Zero(data.get_nbins());
   for (unsigned i=0; i<data.get_nbins(); ++i) {
     kappahat(i) = (weight(i)>0) ? kappahat(i)/weight(i) : 0;
-    distance(i) = i+1;
   }
   auto log_decay = dec.get_log_decay(distance.array().log().matrix());
   kappahat += log_decay;
@@ -98,6 +105,10 @@ void spline_log_decay_fit(const DecaySummary& summary, DecayEstimate& dec, doubl
   dec.center_log_decay(log_distance, summary.ncounts);
   dec.set_lambda_diag(gam.get_lambda());
   dec.set_summary(summary);
+  /*Rcpp::Rcout << "spline_log_decay_fit\n";
+  Rcpp::Rcout << "distance kappahat weight ncounts log_decay\n";
+  Rcpp::Rcout << (Eigen::MatrixXd(summary.distance.rows(),5) << summary.distance, summary.kappahat,
+                  summary.weight, summary.ncounts, dec.get_log_decay(summary.distance.array().log().matrix())).finished();*/
 }
 
 //one IRLS iteration for log decay, with a poisson model
@@ -107,10 +118,6 @@ void step_log_decay(const FastSignalData& data, DecayEstimate& dec, double tol_v
   DecaySummary summary = get_decay_summary(data, dec);
   //infer new decay from summaries
   spline_log_decay_fit(summary, dec, tol_val, schedule);
-  /*Rcpp::Rcout << "AFTER\n";
-     Rcpp::Rcout << "distance kappahat weight ncounts log_decay\n";
-     Rcpp::Rcout << (Eigen::MatrixXd(summary.distance.rows(),5) << summary.distance, summary.kappahat,
-     summary.weight, summary.ncounts, dec.get_log_decay(summary.distance.array().log().matrix())).finished();*/
 }
 
 }

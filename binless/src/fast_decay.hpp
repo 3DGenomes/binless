@@ -70,11 +70,11 @@ template<typename FastData>
 DecayEstimate init_decay(const FastData& data) {
   DecaySchedule schedule;
   DecaySummary summary;
-  /*auto distance_std = data.get_distance();
+  auto distance_std = data.get_distance();
   const Eigen::Map<const Eigen::VectorXd> distance(distance_std.data(),distance_std.size());
-  Eigen::ArrayXd log_distance = distance.array().log();*/
-  double ldmin = 0; //log_distance.minCoeff();
-  double ldmax = std::log(data.get_nbins()); //log_distance.maxCoeff();
+  Eigen::ArrayXd log_distance = distance.array().log();
+  double ldmin = log_distance.minCoeff();
+  double ldmax = log_distance.maxCoeff();
   DecayEstimate dec(ldmin, ldmax, schedule.Kdiag, summary, -1);
   return dec;
 }

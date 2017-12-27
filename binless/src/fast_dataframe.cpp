@@ -6,22 +6,22 @@ namespace fast {
 
 Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const DecayEstimate& dec) {
   //bias, decay, signal with decay and exposures, and log_background matrix (w/ offset)
-  std::vector<double> biasmat,decaymat,binless,log_background;
+  std::vector<double> biasmat,binless,log_background;
   biasmat.reserve(data.get_N());
-  decaymat.reserve(data.get_N());
   binless.reserve(data.get_N());
   std::vector<unsigned> dname(data.get_name()), dbin1(data.get_bin1()), dbin2(data.get_bin2());
   std::vector<double> log_biases(data.get_log_biases()), log_signal(data.get_log_signal()), exposures(data.get_exposures());
-  Eigen::VectorXd dlog_distance = Eigen::ArrayXd::LinSpaced(data.get_nbins(),1,data.get_nbins()).log().matrix();
-  Eigen::VectorXd log_decay = dec.get_log_decay(dlog_distance);
+  auto distance_std = data.get_distance();
+  Eigen::VectorXd dlog_distance = Eigen::Map<const Eigen::VectorXd>(distance_std.data(),distance_std.size());
+  dlog_distance = dlog_distance.array().log().matrix();
+  Eigen::VectorXd decaymat = dec.get_log_decay(dlog_distance);
   for (unsigned i=0; i<data.get_N(); ++i) {
     unsigned bin1 = dbin1[i]-1; //offset by 1 for vector indexing
     unsigned bin2 = dbin2[i]-1;
     double bi = log_biases[bin1];
     double bj = log_biases[bin2];
     biasmat.push_back(bi + bj);
-    double decay = log_decay[bin2-bin1];
-    decaymat.push_back(decay);
+    double decay = decaymat(i);
     double signal = log_signal[i];
     unsigned name = dname[i]-1;
     double exposure = exposures[name];
