@@ -17,69 +17,77 @@ namespace fast {
 
 
 //here, log decay is log ( sum_i observed / sum_i expected ) with i summed over counter diagonals
-DecaySummary compute_poisson_lsq_log_decay(const FastSignalData& data, const DecayEstimate& dec) {
-  //get observed and expected data
-  Eigen::VectorXd sum_obs = Eigen::VectorXd::Zero(data.get_nbins());
-  Eigen::VectorXd sum_exp = Eigen::VectorXd::Zero(data.get_nbins());
-  Eigen::VectorXd distance = Eigen::VectorXd::Zero(data.get_nbins());
-  Eigen::VectorXd ncounts = Eigen::VectorXd::Zero(data.get_nbins());
-  auto log_expected = get_log_expected(data, dec);
-  auto observed = data.get_observed();
-  //sum them along the counter diagonals
-  auto dbin1 = data.get_bin1();
-  auto dbin2 = data.get_bin2();
-  auto ddistance = data.get_distance();
-  for (unsigned i=0; i<data.get_N(); ++i) {
-    unsigned dist = dbin2[i]-dbin1[i];
-    double expected = std::exp(log_expected[i]);
-    sum_obs(dist) += observed[i];
-    sum_exp(dist) += expected;
-    distance(dist) += ddistance[i];
-    ncounts(dist) += 1;
-  }
-  distance = (distance.array() / ncounts.array()).matrix();
+DecaySummary compute_poisson_lsq_log_decay(const FastSignalData& data, const DecayEstimate& dec, const DecaySchedule& schedule) {
+  auto distance_std = data.get_distance();
+  const Eigen::Map<const Eigen::VectorXd> distance(distance_std.data(),distance_std.size());
+  Eigen::ArrayXd log_distance = distance.array().log();
+  const auto bin_mat = bin_data_evenly(log_distance, schedule.bins_per_bf*schedule.Kdiag, true); //true to drop unused bins
+  //compute ncounts
+  Eigen::VectorXd ncounts = bin_mat * Eigen::VectorXd::Ones(log_distance.size());
+  //compute mean distance
+  Eigen::VectorXd mean_distance = ((bin_mat * log_distance.matrix()).array() / ncounts.array()).exp().matrix();
+  //compute observed data
+  auto observed_std = data.get_observed();
+  Eigen::VectorXd observed = Eigen::VectorXd::Zero(observed_std.size());
+  for (unsigned i=0; i<observed.rows(); ++i) observed(i) = observed_std[i]; // cast to double
+  Eigen::VectorXd sum_obs = bin_mat * observed;
+  //compute expected data
+  auto log_expected_std = get_log_expected(data, dec);
+  const Eigen::Map<const Eigen::VectorXd> log_expected(log_expected_std.data(),log_expected_std.size());
+  Eigen::VectorXd sum_exp = bin_mat * (log_expected.array().exp().matrix());
   //compute log_decay
-  Eigen::VectorXd log_decay = Eigen::VectorXd::Zero(data.get_nbins());
   for (unsigned i=0; i<data.get_nbins(); ++i) {
     if (sum_obs(i)==0) {
       Rcpp::Rcout << "counter diag " << i << " is zero!\n";
       Rcpp::stop(" Aborting...");
     }
   }
-  log_decay = (sum_obs.array()/sum_exp.array()).log().matrix();
+  Eigen::VectorXd log_decay = (sum_obs.array()/sum_exp.array()).log().matrix();
   //center log_decay
   double avg = log_decay.sum()/log_decay.rows();
   log_decay = (log_decay.array() - avg).matrix();
-  return DecaySummary{distance,log_decay,log_decay.array().exp().matrix(),ncounts};
+  //compute weight
+  Eigen::VectorXd weight = log_decay.array().exp().matrix();
+  /*Rcpp::Rcout << "BEFORE\n";
+  Rcpp::Rcout << "distance kappahat weight ncounts\n";
+  Rcpp::Rcout << (Eigen::MatrixXd(mean_distance.rows(),4) << mean_distance, log_decay,
+                  weight, ncounts).finished();*/
+  return DecaySummary{mean_distance,log_decay,weight,ncounts};
 }
 
-DecaySummary get_decay_summary(const FastSignalData& data, const DecayEstimate& dec) {
+DecaySummary get_decay_summary(const FastSignalData& data, const DecayEstimate& dec, const DecaySchedule& schedule) {
   //get residuals
   ResidualsPair z = get_poisson_residuals(data, dec);
-  //sum them along the diagonals
-  auto dbin1 = data.get_bin1();
-  auto dbin2 = data.get_bin2();
-  auto ddist = data.get_distance();
-  Eigen::VectorXd kappahat = Eigen::VectorXd::Zero(data.get_nbins());
-  Eigen::VectorXd weight = Eigen::VectorXd::Zero(data.get_nbins());
-  Eigen::VectorXd distance = Eigen::VectorXd::Zero(data.get_nbins());
-  Eigen::VectorXd ncounts = Eigen::VectorXd::Zero(data.get_nbins());
-  for (unsigned i=0; i<data.get_N(); ++i) {
-    unsigned bin1 = dbin1[i]-1; //offset by 1 for vector indexing
-    unsigned bin2 = dbin2[i]-1;
-    kappahat(bin2-bin1) += z.residuals[i]*z.weights[i];
-    weight(bin2-bin1) += z.weights[i];
-    distance(bin2-bin1) += ddist[i];
-    ncounts(bin2-bin1) += 1;
+  //build bins to agglomerate them
+  auto distance_std = data.get_distance();
+  const Eigen::Map<const Eigen::VectorXd> distance(distance_std.data(),distance_std.size());
+  Eigen::ArrayXd log_distance = distance.array().log();
+  const auto bin_mat = bin_data_evenly(log_distance, schedule.bins_per_bf*schedule.Kdiag, true); //true to drop unused bins
+  //compute ncounts
+  Eigen::VectorXd ncounts = bin_mat * Eigen::VectorXd::Ones(log_distance.size());
+  //compute mean distance
+  Eigen::VectorXd mean_distance = ((bin_mat * log_distance.matrix()).array() / ncounts.array()).exp().matrix();
+  //compute weight
+  const Eigen::Map<const Eigen::VectorXd> weights(z.weights.data(),z.weights.size());
+  Eigen::VectorXd mean_weight = bin_mat * weights;
+  //compute kappahat
+  const Eigen::Map<const Eigen::VectorXd> residuals(z.residuals.data(),z.residuals.size());
+  Eigen::VectorXd kappahat = bin_mat * (residuals.array() * weights.array()).matrix();
+  for (unsigned i=0; i<kappahat.rows(); ++i) {
+    if (mean_weight(i)>0) {
+      kappahat(i) =  kappahat(i)/mean_weight(i);
+    } else {
+      kappahat(i) = 0;
+    }
   }
-  distance = (distance.array() / ncounts.array()).matrix();
-  //add current bias and normalize
-  for (unsigned i=0; i<data.get_nbins(); ++i) {
-    kappahat(i) = (weight(i)>0) ? kappahat(i)/weight(i) : 0;
-  }
-  auto log_decay = dec.get_log_decay(distance.array().log().matrix());
+  Eigen::VectorXd log_decay = dec.get_log_decay(mean_distance.array().log());
   kappahat += log_decay;
-  return DecaySummary{distance,kappahat,weight,ncounts};
+  /*Rcpp::Rcout << "BEFORE\n";
+  Rcpp::Rcout << "distance kappahat weight ncounts log_decay\n";
+  Rcpp::Rcout << mean_distance.rows() << " " << kappahat.rows() << " " << mean_weight.rows() << " " << ncounts.rows() << "\n";
+  Rcpp::Rcout << (Eigen::MatrixXd(mean_distance.rows(),5) << mean_distance, kappahat,
+                  mean_weight, ncounts, log_decay).finished();*/
+  return DecaySummary{mean_distance,kappahat,mean_weight,ncounts};
 }
 
 void spline_log_decay_fit(const DecaySummary& summary, DecayEstimate& dec, double tol_val, const DecaySchedule& schedule) {
@@ -115,7 +123,7 @@ void spline_log_decay_fit(const DecaySummary& summary, DecayEstimate& dec, doubl
 void step_log_decay(const FastSignalData& data, DecayEstimate& dec, double tol_val) {
   //compute summary statistics for decay
   DecaySchedule schedule;
-  DecaySummary summary = get_decay_summary(data, dec);
+  DecaySummary summary = get_decay_summary(data, dec, schedule);
   //infer new decay from summaries
   spline_log_decay_fit(summary, dec, tol_val, schedule);
 }

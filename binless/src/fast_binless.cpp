@@ -206,7 +206,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   //
   out.set_exposures(compute_poisson_lsq_exposures(out, dec));
   //
-  auto decay_summary = compute_poisson_lsq_log_decay(out, dec);
+  auto decay_summary = compute_poisson_lsq_log_decay(out, dec, DecaySchedule());
   spline_log_decay_fit(decay_summary, dec, tol_val, DecaySchedule());
   //
   out.set_log_biases(compute_poisson_lsq_log_biases(out, dec));

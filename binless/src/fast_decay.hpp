@@ -20,7 +20,7 @@ struct DecaySchedule {
   unsigned Kdiag=50;
   unsigned max_iter=100;
   double sigma=1;
-  //unsigned bins_per_bf=10;
+  unsigned bins_per_bf=100;
 };
 
 class DecayEstimate {
@@ -79,9 +79,9 @@ DecayEstimate init_decay(const FastData& data) {
   return dec;
 }
 
-DecaySummary compute_poisson_lsq_log_decay(const FastSignalData& data, const DecayEstimate& dec);
+DecaySummary compute_poisson_lsq_log_decay(const FastSignalData& data, const DecayEstimate& dec, const DecaySchedule& schedule);
 
-DecaySummary get_decay_summary(const FastSignalData& data, const DecayEstimate& dec);
+DecaySummary get_decay_summary(const FastSignalData& data, const DecayEstimate& dec, const DecaySchedule& schedule);
 void spline_log_decay_fit(const DecaySummary& summary, DecayEstimate& dec, double tol_val, const DecaySchedule& schedule);
 void step_log_decay(const FastSignalData& data, DecayEstimate& dec, double tol_val);
 
