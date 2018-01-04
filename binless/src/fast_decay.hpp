@@ -110,13 +110,6 @@ public:
     return log_decay;
   }
   
-  void center_log_decay(const Eigen::VectorXd& log_distance, const Eigen::VectorXd& w) {
-    auto log_decay = get_log_decay(log_distance);
-    double avg = w.dot(log_decay)/w.sum();
-    //Rcpp::Rcout << "center log decay: before " << mean_ << " calc  " << avg << " after " << mean_+avg << "\n";
-    params_.mean += avg;
-  }
-  
   DecaySummary get_summary() const { return summary_; }
   void set_summary(const DecaySummary& summary) { summary_ = summary; }
   
