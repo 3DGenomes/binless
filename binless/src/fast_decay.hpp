@@ -38,7 +38,8 @@ public:
     log_dmin_ = log_distance_data.minCoeff();
     log_dmax_ = log_distance_data.maxCoeff();
     //binner matrix
-    binner_ = bin_data_evenly(log_distance_data, get_nbins(), true); //true to drop unused bins
+    binner_ = bin_data_evenly(log_distance_data, conf_.Kdiag*conf_.bins_per_bf, true); //true to drop unused bins
+    nbins_ = binner_.rows();
     //ncounts
     ncounts_ = binner_ * Eigen::VectorXd::Ones(log_distance_data.size());
     //compute mean log distance
@@ -52,7 +53,7 @@ public:
   }
   
   double get_Kdiag() const { return conf_.Kdiag; }
-  unsigned get_nbins() const { return conf_.Kdiag*conf_.bins_per_bf; }
+  unsigned get_nbins() const { return nbins_; }
   unsigned get_max_iter() const { return conf_.max_iter; }
   double get_tol_val() const { return conf_.tol_val; }
   double get_sigma() const { return conf_.sigma; }
@@ -71,6 +72,7 @@ private:
   Eigen::VectorXd log_distance_;
   double log_dmin_, log_dmax_;
   Eigen::SparseMatrix<double> binner_; // Nbins x Ndata binary matrix
+  unsigned nbins_;
   Eigen::VectorXd ncounts_;
   Eigen::SparseMatrix<double> X_,D_,Cin_; // design, difference and constraint matrices
 };
@@ -97,17 +99,17 @@ public:
   //compute group sums of a vector of the size of the input data into the bins formed for the decay calculation
   Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return schedule_.get_binner()*vec; }
   
-  Eigen::SparseMatrix<double> get_design(const Eigen::VectorXd& log_distance) const {
-    return generate_spline_base(log_distance, schedule_.get_log_dmin(), schedule_.get_log_dmax(), schedule_.get_Kdiag());
-  }
-  
   Eigen::VectorXd get_beta_diag() const { return params_.beta_diag; }
   void set_beta_diag(const Eigen::VectorXd& beta) { params_.beta_diag = beta; }
   
-  Eigen::VectorXd get_log_decay(const Eigen::VectorXd& log_distance) const {
-    const Eigen::SparseMatrix<double> X = get_design(log_distance);
-    auto log_decay = X * params_.beta_diag - Eigen::VectorXd::Constant(log_distance.rows(), params_.mean);
-    return log_decay;
+  //get log decay along binned distances
+  Eigen::VectorXd get_binned_log_decay() const {
+    return schedule_.get_X() * params_.beta_diag - Eigen::VectorXd::Constant(schedule_.get_nbins(), params_.mean);
+  }
+  
+  //get approximate log decay along distances in original data (same approx as during fitting)
+  Eigen::VectorXd get_data_log_decay() const {
+    return schedule_.get_binner().transpose()*get_binned_log_decay();
   }
   
   DecaySummary get_summary() const { return summary_; }

@@ -55,10 +55,6 @@ void Decay::set_poisson_lsq_summary(const FastSignalData& data) {
 void Decay::update_summary(const FastSignalData& data) {
   //get residuals
   ResidualsPair z = get_poisson_residuals(data, *this);
-  //compute ncounts
-  Eigen::VectorXd ncounts = schedule_.get_ncounts();
-  //compute mean distance
-  Eigen::VectorXd mean_distance = schedule_.get_log_distance().array().exp().matrix();
   //compute weight
   const Eigen::Map<const Eigen::VectorXd> weights(z.weights.data(),z.weights.size());
   Eigen::VectorXd weight_sum = summarize(weights);
@@ -74,13 +70,12 @@ void Decay::update_summary(const FastSignalData& data) {
       kappahat(i) = 0;
     }
   }
-  Eigen::VectorXd log_decay = get_log_decay(mean_distance.array().log());
+  Eigen::VectorXd log_decay = get_binned_log_decay();
   kappahat += log_decay;
   /*Rcpp::Rcout << "BEFORE\n";
   Rcpp::Rcout << "distance kappahat weight ncounts log_decay\n";
-  Rcpp::Rcout << mean_distance.rows() << " " << kappahat.rows() << " " << weight_sum.rows() << " " << ncounts.rows() << "\n";
-  Rcpp::Rcout << (Eigen::MatrixXd(mean_distance.rows(),5) << mean_distance, kappahat,
-                  weight_sum, ncounts, log_decay).finished();*/
+  Rcpp::Rcout << (Eigen::MatrixXd(kappahat.rows(),5) << schedule_.get_log_distance().array().exp().matrix(), kappahat,
+                  weight_sum, log_decay).finished();*/
   summary_.kappahat = kappahat;
   summary_.weight = weight_sum;
 }
@@ -102,12 +97,12 @@ void Decay::update_params() {
   set_lambda_diag(gam.get_lambda());
   set_beta_diag(gam.get_beta());
   //center log decay
-  double avg = schedule_.get_ncounts().dot(get_log_decay(schedule_.get_log_distance()))/schedule_.get_ncounts().sum();
+  double avg = schedule_.get_ncounts().dot(get_binned_log_decay())/schedule_.get_ncounts().sum();
   params_.mean += avg;
   /*Rcpp::Rcout << "spline_log_decay_fit\n";
   Rcpp::Rcout << "distance kappahat weight ncounts log_decay\n";
-  Rcpp::Rcout << (Eigen::MatrixXd(summary.distance.rows(),5) << summary.distance, summary.kappahat,
-                  summary.weight, summary.ncounts, dec.get_log_decay(summary.distance.array().log().matrix())).finished();*/
+  Rcpp::Rcout << (Eigen::MatrixXd(schedule_.get_nbins(),5) << schedule.get_log_distance().array().exp().matrix(),
+                  summary_.kappahat, summary_.weight, schedule_.get_ncounts(), get_binned_log_decay()).finished();*/
 }
 
 }
