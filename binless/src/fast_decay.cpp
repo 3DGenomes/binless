@@ -79,19 +79,12 @@ void Decay::update_summary(const FastSignalData& data) {
 void Decay::update_params() {
   //extract data
   const Eigen::VectorXd y(summary_.kappahat);
-  const Eigen::VectorXd w(summary_.weight);
-  const Eigen::VectorXd Sm1 = w.array().sqrt().matrix();
-  const Eigen::SparseMatrix<double> X = schedule_.get_X();
-  const Eigen::SparseMatrix<double> D = schedule_.get_D();
-  const Eigen::SparseMatrix<double> Cin = schedule_.get_Cin();
+  const Eigen::VectorXd Sm1 = summary_.weight.array().sqrt().matrix();
   
-  //iteratively fit GAM on decay and estimate lambda
-  GeneralizedAdditiveModel gam(X,D,schedule_.get_sigma());
-  gam.set_inequality_constraints(Cin);
-  gam.optimize(y,Sm1,schedule_.get_max_iter(),schedule_.get_tol_val());
+  gam_.optimize(y,Sm1,schedule_.get_max_iter(),schedule_.get_tol_val());
   //Rcpp::Rcout << "gam converged: " << gam.has_converged() << "\n";
-  set_lambda_diag(gam.get_lambda());
-  set_beta_diag(gam.get_beta());
+  set_lambda_diag(gam_.get_lambda());
+  set_beta_diag(gam_.get_beta());
   //center log decay
   center_log_decay();
   /*Rcpp::Rcout << "spline_log_decay_fit\n";

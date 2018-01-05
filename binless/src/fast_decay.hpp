@@ -94,7 +94,10 @@ public:
   //here, initialize flat log decay
   template<typename FastData>
   Decay(const FastData& data, const DecayConfig& conf) :
-   schedule_(DecaySchedule(data,conf)), summary_(DecaySummary()), params_(DecayParams(schedule_)) {}
+   schedule_(data,conf), summary_(), params_(schedule_),
+   gam_(schedule_.get_X(), schedule_.get_D(), schedule_.get_sigma())
+    { gam_.set_inequality_constraints(schedule_.get_Cin()); }
+  
   
   //compute group sums of a vector of the size of the input data into the bins formed for the decay calculation
   Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return schedule_.get_binner()*vec; }
@@ -140,6 +143,7 @@ private:
   const DecaySchedule schedule_; // parameters for performing the binning, constant, data-independent
   DecaySummary summary_; // transformed data, iteration-specific
   DecayParams params_; // resulting fit, iteration-specific
+  GeneralizedAdditiveModel gam_; //used to fit parameters
 };
 
 }
