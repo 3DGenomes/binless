@@ -112,6 +112,11 @@ public:
     return schedule_.get_binner().transpose()*get_binned_log_decay();
   }
   
+  //compute average log decay (weighted by ncounts) in order to center it
+  void center_log_decay() {
+    params_.mean = schedule_.get_ncounts().dot(schedule_.get_X() * params_.beta_diag)/schedule_.get_ncounts().sum();
+  }
+  
   DecaySummary get_summary() const { return summary_; }
   void set_summary(const DecaySummary& summary) { summary_ = summary; }
   
