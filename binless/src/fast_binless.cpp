@@ -18,7 +18,7 @@ namespace binless {
 namespace fast {
 
 //here, exposures are log ( sum_i observed / sum_i expected ) with i summed over datasets
-std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data, const DecayEstimator& dec) {
+std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data, const DecayEstimator& dec, double pseudocount) {
   //get observed and expected
   std::vector<double> sum_obs(data.get_ndatasets(),0);
   std::vector<double> sum_exp(data.get_ndatasets(),0);
@@ -35,7 +35,7 @@ std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data, co
   std::vector<double> exposures;
   exposures.reserve(data.get_ndatasets());
   for (unsigned i=0; i<data.get_ndatasets(); ++i) {
-    exposures.push_back(std::log(sum_obs[i]/sum_exp[i]));
+    exposures.push_back(std::log((sum_obs[i]+pseudocount)/sum_exp[i]));
   }
   return exposures;
 }
@@ -62,7 +62,7 @@ std::vector<double> step_exposures(const FastSignalData& data, const DecayEstima
 }
 
 //here, biases are log ( sum_i observed / sum_i expected ) with i summed over rows/columns
-std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, const DecayEstimator& dec) {
+std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, const DecayEstimator& dec, double pseudocount) {
   //get observed and expected data
   std::vector<double> sum_obs(data.get_nbins(),0);
   std::vector<double> sum_exp(data.get_nbins(),0);
@@ -86,7 +86,7 @@ std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, c
   std::vector<double> log_bias;
   log_bias.reserve(data.get_nbins());
   for (unsigned i=0; i<data.get_nbins(); ++i) {
-    log_bias.push_back(std::log(sum_obs[i]/sum_exp[i]));
+    log_bias.push_back(std::log((sum_obs[i]+pseudocount)/sum_exp[i]));
   }
   //center log_bias
   double avg = std::accumulate(log_bias.begin(), log_bias.end(), 0.)/log_bias.size();
@@ -131,6 +131,13 @@ std::vector<double> step_log_biases(const FastSignalData& data, const DecayEstim
   //no smoothing, subtract average and return
   for (unsigned i=0; i<data.get_nbins(); ++i) {
     log_biases[i] -= avg;
+  }
+  //cap estimates at 3SD from the mean
+  double sq_sum = std::inner_product(log_biases.begin(),log_biases.end(),log_biases.begin(),0.0);
+  double stdev = std::sqrt(sq_sum/log_biases.size());
+  for (unsigned i=0; i<data.get_nbins(); ++i) {
+    if (log_biases[i] > 3*stdev) log_biases[i] = 3*stdev;
+    if (log_biases[i] < -3*stdev) log_biases[i] = -3*stdev;
   }
   return log_biases;
 }

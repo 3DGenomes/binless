@@ -17,10 +17,6 @@ mat=binless:::bin_data(cs,resolution=5000)
 #write.table(mat,file = "example/rao_HiCall_FOXP1ext_2.3M_mat_5kb.dat", quote = T, row.names = F)
 
 
-#In fast binless, you must ensure no row/column is completely zero
-#if there are not too many, you can add 1 to the observed counts
-rbind(mat[,.(bin=bin1,observed)],mat[,.(bin=bin2,observed)])[,.(sum(observed)),by=bin][V1==0]
-
 #The fast binless algorithm computes a binless normalization without estimating
 #the fusion penalty and the significance threshold.
 #We do a maximum of nouter steps (or less if the relative precision is lower than tol_val)
