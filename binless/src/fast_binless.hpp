@@ -7,41 +7,24 @@ using namespace Rcpp;
 #include "FastData.hpp"
 #include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
+#include "fast_residuals.hpp"
 
 namespace binless {
 namespace fast {
-
-struct ResidualsPair { std::vector<double> residuals,weights; };
+ 
 struct PrecisionPair { double abs,rel; };
 struct SignalTriplet { std::vector<double> phihat, weights, beta; };
 struct DifferenceQuadruplet { std::vector<double> deltahat,weights,delta,phi_ref; };
-struct DecaySummary { std::vector<double> distance, kappahat, weight; };
-struct DecayFit {
-  std::vector<double> log_decay;
-  DecaySummary dec;
-  double lambda_diag;
-};
 
-template<typename FastData>
-ResidualsPair get_normal_residuals(const FastData& data);
-template<typename FastData>
-ResidualsPair get_poisson_residuals(const FastData& data);
-
-std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data);
-std::vector<double> step_exposures(const FastSignalData& data);
-std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data);
-std::vector<double> step_log_biases(const FastSignalData& data);
-std::vector<double> compute_poisson_lsq_log_decay(const FastSignalData& data);
-
-DecaySummary get_decay_summary(const FastSignalData& data);
-DecayFit pointwise_log_decay_fit(const DecaySummary& dec);
-DecayFit spline_log_decay_fit(const DecaySummary& dec, double tol_val, unsigned Kdiag=50, unsigned max_iter=100, double sigma=0.1);
-std::vector<double> step_log_decay(const FastSignalData& data, double tol_val);
+std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data, const DecayEstimator& dec, double pseudocount=0.01);
+std::vector<double> step_exposures(const FastSignalData& data, const DecayEstimator& dec);
+std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, const DecayEstimator& dec, double pseudocount=0.01);
+std::vector<double> step_log_biases(const FastSignalData& data, const DecayEstimator& dec);
 
 template<typename Lasso>
-SignalTriplet step_signal(const FastSignalData& data, std::vector<Lasso>& flo, double lam2, unsigned group=0);
+SignalTriplet step_signal(const FastSignalData& data, const DecayEstimator& dec, std::vector<Lasso>& flo, double lam2, unsigned group=0);
 template<typename Lasso>
-DifferenceQuadruplet step_difference(const FastDifferenceData& data, std::vector<Lasso>& flos, double lam2, unsigned ref);
+DifferenceQuadruplet step_difference(const FastDifferenceData& data, const DecayEstimator& dec, std::vector<Lasso>& flos, double lam2, unsigned ref);
 
 PrecisionPair get_precision(const std::vector<double>& weights, const std::vector<double>& weights_old);
 std::vector<double> remove_signal_degeneracy(const FastSignalData& data);

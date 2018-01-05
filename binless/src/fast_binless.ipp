@@ -1,47 +1,9 @@
 
-
-//residuals: normal with log-link, 0 drops data
-template<typename FastData>
-ResidualsPair get_normal_residuals(const FastData& data) {
-    std::vector<double> residuals;
-    std::vector<double> weights;
-    residuals.reserve(data.get_N());
-    weights.reserve(data.get_N());
-    auto log_expected = data.get_log_expected();
-    auto observed = data.get_observed();
-    for (unsigned i=0; i<data.get_N(); ++i) {
-        if (observed[i]>0) {
-            residuals.push_back( log(observed[i]) - log_expected[i] );
-            weights.push_back( 1 );
-        } else {
-            residuals.push_back(  0 );
-            weights.push_back( 0 );
-        }
-    }
-    return ResidualsPair{residuals,weights};
-}
-
-//residuals: poisson with log-link
-template<typename FastData>
-ResidualsPair get_poisson_residuals(const FastData& data) {
-    std::vector<double> residuals;
-    std::vector<double> weights;
-    residuals.reserve(data.get_N());
-    weights.reserve(data.get_N());
-    auto log_expected = data.get_log_expected();
-    auto observed = data.get_observed();
-    for (unsigned i=0; i<data.get_N(); ++i) {
-        double expected_i = std::exp(log_expected[i]);
-        residuals.push_back( (observed[i]/expected_i) - 1);
-        weights.push_back( expected_i );
-    }
-    return ResidualsPair{residuals,weights};
-}
-
 template<typename Lasso>
-SignalTriplet step_signal(const FastSignalData& data, std::vector<Lasso>& flos, double lam2, unsigned group) {
+SignalTriplet step_signal(const FastSignalData& data, const DecayEstimator& dec,
+                          std::vector<Lasso>& flos, double lam2, unsigned group) {
     //get residuals
-    ResidualsPair z = get_poisson_residuals(data);
+    ResidualsPair z = get_poisson_residuals(data, dec);
     //build signal matrix
     auto dlog_signal = data.get_log_signal();
     std::vector<double> phihat,weights;
@@ -80,9 +42,10 @@ SignalTriplet step_signal(const FastSignalData& data, std::vector<Lasso>& flos, 
 
 
 template<typename Lasso>
-DifferenceQuadruplet step_difference(const FastDifferenceData& data, std::vector<Lasso>& flos, double lam2, unsigned ref) {
+DifferenceQuadruplet step_difference(const FastDifferenceData& data, const DecayEstimator& dec,
+                                     std::vector<Lasso>& flos, double lam2, unsigned ref) {
     //get residuals
-    ResidualsPair z = get_poisson_residuals(data);
+    ResidualsPair z = get_poisson_residuals(data, dec);
     //build difference matrices
     auto dsignal = data.get_log_signal();
     auto dphi_ref = data.get_phi_ref();

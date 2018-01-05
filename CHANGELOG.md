@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - provide means to increase nperf during binning
 - updated documentation
 
+### Removed
+- requirement that rows and counter diagonals be nonzero in fast binless
+
 ## [0.10.2] - 2017-12-07
 ### Fixed
 - bug causing decay to be flat in the first few basis functions
