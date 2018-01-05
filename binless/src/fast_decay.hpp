@@ -127,7 +127,7 @@ public:
   void set_lambda_diag(double lambda_diag) { params_.lambda_diag = lambda_diag; }
 
   //initial guess of IRLS weights using poisson model
-  void set_poisson_lsq_summary(const FastSignalData& data);
+  void set_poisson_lsq_summary(const FastSignalData& data, double pseudocount=0.01);
   //incremental update of IRLS weights
   void update_summary(const FastSignalData& data);
   //perform spline fit of summary data

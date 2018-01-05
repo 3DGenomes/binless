@@ -17,15 +17,9 @@ mat=binless:::bin_data(cs,resolution=5000)
 #write.table(mat,file = "example/rao_HiCall_FOXP1ext_2.3M_mat_5kb.dat", quote = T, row.names = F)
 
 
-#In fast binless, you must ensure no counter diagonal nor row/column is completely zero
+#In fast binless, you must ensure no row/column is completely zero
 #if there are not too many, you can add 1 to the observed counts
-#also, because of the simplified decay, the very last bin cannot be zero in all datasets
-#empty rows:
 rbind(mat[,.(bin=bin1,observed)],mat[,.(bin=bin2,observed)])[,.(sum(observed)),by=bin][V1==0]
-#empty counter diagonals:
-mat[,.(d=unclass(bin2)-unclass(bin1),observed)][,sum(observed),by=d][V1==0]
-#last bin:
-mat[unclass(bin1)==1&unclass(bin2)==max(unclass(bin2))]
 
 #The fast binless algorithm computes a binless normalization without estimating
 #the fusion penalty and the significance threshold.

@@ -17,7 +17,7 @@ namespace fast {
 
 
 //here, log decay is log ( sum_i observed / sum_i expected ) with i summed over counter diagonals
-void Decay::set_poisson_lsq_summary(const FastSignalData& data) {
+void Decay::set_poisson_lsq_summary(const FastSignalData& data, double pseudocount) {
   //compute observed data
   auto observed_std = data.get_observed();
   Eigen::VectorXd observed = Eigen::VectorXd::Zero(observed_std.size());
@@ -28,22 +28,17 @@ void Decay::set_poisson_lsq_summary(const FastSignalData& data) {
   const Eigen::Map<const Eigen::VectorXd> log_expected(log_expected_std.data(),log_expected_std.size());
   Eigen::VectorXd sum_exp = summarize(log_expected.array().exp().matrix());
   //compute log_decay
-  for (unsigned i=0; i<data.get_nbins(); ++i) {
-    if (sum_obs(i)==0) {
-      Rcpp::Rcout << "counter diag " << i << " is zero!\n";
-      Rcpp::stop(" Aborting...");
-    }
-  }
-  Eigen::VectorXd log_decay = (sum_obs.array()/sum_exp.array()).log().matrix();
+  Eigen::VectorXd log_decay = ((sum_obs.array() + pseudocount)/sum_exp.array()).log().matrix();
   //center log_decay
   double avg = log_decay.sum()/log_decay.rows();
   log_decay = (log_decay.array() - avg).matrix();
   //compute weight
   Eigen::VectorXd weight = log_decay.array().exp().matrix();
   /*Rcpp::Rcout << "BEFORE\n";
-  Rcpp::Rcout << "distance kappahat weight\n";
-  Rcpp::Rcout << (Eigen::MatrixXd(kappahat.rows(),3) << schedule_.get_log_distance().array().exp().matrix(),
-                  log_decay, weight).finished();*/
+  Rcpp::Rcout << "distance kappahat weight sum_obs sum_exp\n";
+  Rcpp::Rcout << (Eigen::MatrixXd(log_decay.rows(),5) << schedule_.get_log_distance().array().exp().matrix(),
+                  log_decay, weight, sum_obs, sum_exp).finished();*/
+  //report back
   summary_.kappahat = log_decay;
   summary_.weight = weight;
 }
@@ -57,17 +52,8 @@ void Decay::update_summary(const FastSignalData& data) {
   //compute kappahat
   const Eigen::Map<const Eigen::VectorXd> residuals(z.residuals.data(),z.residuals.size());
   Eigen::VectorXd kappahat = summarize(residuals.array() * weights.array()).matrix();
-  for (unsigned i=0; i<kappahat.rows(); ++i) {
-    if (weight_sum(i)>0) {
-      kappahat(i) =  kappahat(i)/weight_sum(i);
-    } else {
-      Rcpp::Rcout << "weight sum is zero for distance bin " << i << "\n";
-      Rcpp::stop("aborting");
-      kappahat(i) = 0;
-    }
-  }
   Eigen::VectorXd log_decay = get_binned_log_decay();
-  kappahat += log_decay;
+  kappahat = (kappahat.array() / weight_sum.array()).matrix() + log_decay;
   /*Rcpp::Rcout << "BEFORE\n";
   Rcpp::Rcout << "distance kappahat weight\n";
   Rcpp::Rcout << (Eigen::MatrixXd(kappahat.rows(),3) << schedule_.get_log_distance().array().exp().matrix(), kappahat,
