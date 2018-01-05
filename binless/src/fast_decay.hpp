@@ -26,11 +26,11 @@ struct DecayConfig {
   
 };
 
-class DecaySchedule {
+class DecaySettings {
   
 public:
   template<typename FastData>
-  DecaySchedule(const FastData& data, const DecayConfig& conf) : conf_(conf) {
+  DecaySettings(const FastData& data, const DecayConfig& conf) : conf_(conf) {
     //log_distance and bounds
     auto distance_std = data.get_distance();
     const Eigen::Map<const Eigen::VectorXd> distance_data(distance_std.data(),distance_std.size());
@@ -82,7 +82,7 @@ struct DecaySummary {
 };
 
 struct DecayParams {
-  DecayParams(const DecaySchedule& schedule) : beta_diag(Eigen::VectorXd::Zero(schedule.get_Kdiag())),
+  DecayParams(const DecaySettings& settings) : beta_diag(Eigen::VectorXd::Zero(settings.get_Kdiag())),
     lambda_diag(-1), mean(0) {}
   Eigen::VectorXd beta_diag;
   double lambda_diag, mean;
@@ -94,25 +94,25 @@ public:
   //here, initialize flat log decay
   template<typename FastData>
   Decay(const FastData& data, const DecayConfig& conf) :
-   schedule_(data,conf), summary_(), params_(schedule_),
-   gam_(schedule_.get_X(), schedule_.get_D(), schedule_.get_sigma())
-    { gam_.set_inequality_constraints(schedule_.get_Cin()); }
+   settings_(data,conf), summary_(), params_(settings_),
+   gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
+    { gam_.set_inequality_constraints(settings_.get_Cin()); }
   
   
   //compute group sums of a vector of the size of the input data into the bins formed for the decay calculation
-  Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return schedule_.get_binner()*vec; }
+  Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return settings_.get_binner()*vec; }
   
   Eigen::VectorXd get_beta_diag() const { return params_.beta_diag; }
   void set_beta_diag(const Eigen::VectorXd& beta) { params_.beta_diag = beta; }
   
   //get log decay along binned distances
   Eigen::VectorXd get_binned_log_decay() const {
-    return schedule_.get_X() * params_.beta_diag - Eigen::VectorXd::Constant(schedule_.get_nbins(), params_.mean);
+    return settings_.get_X() * params_.beta_diag - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.mean);
   }
   
   //get approximate log decay along distances in original data (same approx as during fitting)
   Eigen::VectorXd get_data_log_decay() const {
-    return schedule_.get_binner().transpose()*get_binned_log_decay();
+    return settings_.get_binner().transpose()*get_binned_log_decay();
   }
   
   double get_lambda_diag() const { return params_.lambda_diag; }
@@ -134,10 +134,10 @@ public:
 private:
   //compute average log decay (weighted by ncounts) in order to center it
   void center_log_decay() {
-    params_.mean = schedule_.get_ncounts().dot(schedule_.get_X() * params_.beta_diag)/schedule_.get_ncounts().sum();
+    params_.mean = settings_.get_ncounts().dot(settings_.get_X() * params_.beta_diag)/settings_.get_ncounts().sum();
   }
   
-  const DecaySchedule schedule_; // parameters for performing the binning, constant, data-independent
+  const DecaySettings settings_; // parameters for performing the binning, constant
   DecaySummary summary_; // transformed data, iteration-specific
   DecayParams params_; // resulting fit, iteration-specific
   GeneralizedAdditiveModel gam_; //used to fit parameters
