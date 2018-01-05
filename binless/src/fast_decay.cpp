@@ -52,7 +52,7 @@ void DecayEstimator::update_summary(const FastSignalData& data) {
   //compute kappahat
   const Eigen::Map<const Eigen::VectorXd> residuals(z.residuals.data(),z.residuals.size());
   Eigen::VectorXd kappahat = summarize(residuals.array() * weights.array()).matrix();
-  Eigen::VectorXd log_decay = get_binned_log_decay();
+  Eigen::VectorXd log_decay = get_binned_estimate();
   kappahat = (kappahat.array() / weight_sum.array()).matrix() + log_decay;
   /*Rcpp::Rcout << "BEFORE\n";
   Rcpp::Rcout << "distance kappahat weight\n";
@@ -69,10 +69,10 @@ void DecayEstimator::update_params() {
   
   gam_.optimize(y,Sm1,settings_.get_max_iter(),settings_.get_tol_val());
   //Rcpp::Rcout << "gam converged: " << gam.has_converged() << "\n";
-  set_lambda_diag(gam_.get_lambda());
-  set_beta_diag(gam_.get_beta());
+  set_lambda(gam_.get_lambda());
+  set_beta(gam_.get_beta());
   //center log decay
-  center_log_decay();
+  center_estimate();
   /*Rcpp::Rcout << "spline_log_decay_fit\n";
   Rcpp::Rcout << "distance kappahat weight ncounts log_decay\n";
   Rcpp::Rcout << (Eigen::MatrixXd(settings_.get_nbins(),5) << settings.get_log_distance().array().exp().matrix(),

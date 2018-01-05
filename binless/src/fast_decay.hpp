@@ -82,10 +82,10 @@ struct DecaySummary {
 };
 
 struct DecayParams {
-  DecayParams(const DecaySettings& settings) : beta_diag(Eigen::VectorXd::Zero(settings.get_Kdiag())),
-    lambda_diag(-1), mean(0) {}
-  Eigen::VectorXd beta_diag;
-  double lambda_diag, mean;
+  DecayParams(const DecaySettings& settings) : beta(Eigen::VectorXd::Zero(settings.get_Kdiag())), lambda(-1), mean(0) {}
+  
+  Eigen::VectorXd beta;
+  double lambda, mean;
 };
 
 class DecayEstimator {
@@ -102,21 +102,21 @@ public:
   //compute group sums of a vector of the size of the input data into the bins formed for the decay calculation
   Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return settings_.get_binner()*vec; }
   
-  Eigen::VectorXd get_beta_diag() const { return params_.beta_diag; }
-  void set_beta_diag(const Eigen::VectorXd& beta) { params_.beta_diag = beta; }
+  Eigen::VectorXd get_beta() const { return params_.beta; }
+  void set_beta(const Eigen::VectorXd& beta) { params_.beta = beta; }
   
   //get log decay along binned distances
-  Eigen::VectorXd get_binned_log_decay() const {
-    return settings_.get_X() * params_.beta_diag - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.mean);
+  Eigen::VectorXd get_binned_estimate() const {
+    return settings_.get_X() * params_.beta - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.mean);
   }
   
   //get approximate log decay along distances in original data (same approx as during fitting)
-  Eigen::VectorXd get_data_log_decay() const {
-    return settings_.get_binner().transpose()*get_binned_log_decay();
+  Eigen::VectorXd get_data_estimate() const {
+    return settings_.get_binner().transpose()*get_binned_estimate();
   }
   
-  double get_lambda_diag() const { return params_.lambda_diag; }
-  void set_lambda_diag(double lambda_diag) { params_.lambda_diag = lambda_diag; }
+  double get_lambda() const { return params_.lambda; }
+  void set_lambda(double lambda) { params_.lambda = lambda; }
 
   //initial guess of IRLS weights using poisson model
   void set_poisson_lsq_summary(const FastSignalData& data, double pseudocount=0.01);
@@ -125,7 +125,7 @@ public:
   //perform spline fit of summary data
   void update_params();
   //one complete IRLS iteration for log decay
-  void step_log_decay(const FastSignalData& data) {
+  void step_irls(const FastSignalData& data) {
     update_summary(data);
     update_params();
   }
@@ -133,8 +133,8 @@ public:
   
 private:
   //compute average log decay (weighted by ncounts) in order to center it
-  void center_log_decay() {
-    params_.mean = settings_.get_ncounts().dot(settings_.get_X() * params_.beta_diag)/settings_.get_ncounts().sum();
+  void center_estimate() {
+    params_.mean = settings_.get_ncounts().dot(settings_.get_X() * params_.beta)/settings_.get_ncounts().sum();
   }
   
   const DecaySettings settings_; // parameters for performing the binning, constant

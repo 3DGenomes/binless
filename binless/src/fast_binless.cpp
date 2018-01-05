@@ -224,7 +224,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
     out.set_log_biases(biases);
     //compute decay
     if (step <= bg_steps) old_expected = get_log_expected(out, dec);
-    dec.step_log_decay(out);
+    dec.step_irls(out);
     if (step <= bg_steps) expected = get_log_expected(out, dec);
     //compute signal
     if (step > bg_steps) {
@@ -266,7 +266,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   Rcpp::Rcout << "done\n";
   //finalize and return
   return Rcpp::List::create(_["mat"]=get_as_dataframe(out,dec), _["log_biases"]=out.get_log_biases(),
-                            _["beta_diag"]=dec.get_beta_diag(), _["exposures"]=out.get_exposures(),
+                            _["beta_diag"]=dec.get_beta(), _["exposures"]=out.get_exposures(),
                             //_["diagnostics"]=diagnostics,
                             _["nbins"]=nbins);
 }
@@ -284,7 +284,7 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned gr
   DecayConfig conf(tol_val);
   DecayEstimator dec(out, conf);
   auto beta_diag = Rcpp::as<Eigen::VectorXd >(obs["beta_diag"]);
-  dec.set_beta_diag(beta_diag);
+  dec.set_beta(beta_diag);
   //
   auto log_biases = Rcpp::as<std::vector<double> >(obs["log_biases"]);
   out.set_log_biases(log_biases);
@@ -322,7 +322,7 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   DecayConfig conf(tol_val);
   DecayEstimator dec(out, conf);
   auto beta_diag = Rcpp::as<Eigen::VectorXd >(obs["beta_diag"]);
-  dec.set_beta_diag(beta_diag);
+  dec.set_beta(beta_diag);
   //
   auto log_biases = Rcpp::as<std::vector<double> >(obs["log_biases"]);
   out.set_log_biases(log_biases);

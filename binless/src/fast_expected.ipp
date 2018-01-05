@@ -9,7 +9,7 @@ std::vector<double> get_log_expected(const FastData<Derived>& data, const DecayE
     std::vector<double> dsignal = data.get_log_signal();
     std::vector<unsigned> dname = data.get_name();
     std::vector<double> dexposures = data.get_exposures();
-    Eigen::VectorXd dlog_decay = dec.get_data_log_decay();
+    Eigen::VectorXd dlog_decay = dec.get_data_estimate();
     //
     for (unsigned i=0; i<data.get_N(); ++i) {
         unsigned bin1 = dbin1[i]-1; //offset by 1 for vector indexing
