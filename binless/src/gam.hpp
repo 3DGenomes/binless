@@ -17,21 +17,12 @@ namespace binless {
 class GeneralizedAdditiveModel {
 public:
   // Start an unconstrained generalized additive model calculation
-  // y: observations (vector of size N)
-  // S: standard deviations for each observation (vector of size N)
   // X: design matrix (NxK)
   // D: difference matrix (must have K columns)
   // sigma: prior standard deviation on lambda
-  GeneralizedAdditiveModel(const Eigen::VectorXd& y,
-                           const Eigen::VectorXd& S,
-                           const Eigen::SparseMatrix<double>& X,
+  GeneralizedAdditiveModel(const Eigen::SparseMatrix<double>& X,
                            const Eigen::SparseMatrix<double>& D,
                            double sigma);
-  
-  // Update GAM to new conditions (avoids new Cholesky decomposition)
-  // y: observations (vector of size N)
-  // S: standard deviations for each observation (vector of size N)
-  void update(const Eigen::VectorXd& y, const Eigen::VectorXd& S) { y_=y; S_=S; }
   
   // Add n_eq equality constraints on \beta by passing a
   // n_eq x K matrix Ceq such that the constraint is Ceq \beta = 0
@@ -42,9 +33,12 @@ public:
   // n_in x K matrix Cin such that the constraint is Cin \beta >= 0
   void set_inequality_constraints(const Eigen::MatrixXd& Cin) { Cin_ = Cin; nin_ = Cin_.rows(); }
   
+  // Fit GAM to y and Sm1. Cholesky decomposition is only computed the first time.
+  // y: observations (vector of size N)
+  // Sm1: inverse standard deviations for each observation (vector of size N)
   // max_iter: maximum number of iterations
   // tol_val: relative tolerance on the final values of X\beta
-  void optimize(unsigned max_iter, double tol_val);
+  void optimize(const Eigen::VectorXd& y, const Eigen::VectorXd& Sm1, unsigned max_iter, double tol_val);
 
   //accessors
   Eigen::VectorXd get_beta() const { return beta_; }
@@ -58,7 +52,6 @@ private:
     
   //data
   unsigned N_, K_;
-  Eigen::VectorXd y_,S_;
   Eigen::SparseMatrix<double> X_, D_;
   double sigma_;
   unsigned neq_, nin_;

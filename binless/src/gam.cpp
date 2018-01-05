@@ -4,12 +4,10 @@
 
 namespace binless {
 
-GeneralizedAdditiveModel::GeneralizedAdditiveModel(const Eigen::VectorXd& y,
-                           const Eigen::VectorXd& S,
-                           const Eigen::SparseMatrix<double>& X,
+GeneralizedAdditiveModel::GeneralizedAdditiveModel(const Eigen::SparseMatrix<double>& X,
                            const Eigen::SparseMatrix<double>& D,
                            double sigma) :
-  N_(X.rows()), K_(X.cols()), y_(y), S_(S), X_(X), D_(D), sigma_(sigma), neq_(0), nin_(0),
+  N_(X.rows()), K_(X.cols()), X_(X), D_(D), sigma_(sigma), neq_(0), nin_(0),
   Ceq_(Eigen::MatrixXd::Zero(neq_,K_)), Cin_(Eigen::MatrixXd::Zero(nin_,K_)),
   beta_(Eigen::VectorXd::Constant(K_,1)), lambda_(1), has_converged_(false), llt_analyzed_(false) {}
   
@@ -23,12 +21,13 @@ Eigen::SparseMatrix<double> GeneralizedAdditiveModel::get_L(const Eigen::SparseM
   return llt_.matrixL();
 }
   
-void GeneralizedAdditiveModel::optimize(unsigned max_iter, double tol_val) {
+void GeneralizedAdditiveModel::optimize(const Eigen::VectorXd& y, const Eigen::VectorXd& Sm1,
+                                        unsigned max_iter, double tol_val) {
   //build fixed matrices
-  const auto XtSm1                         = (S_.asDiagonal().inverse()*X_).transpose();
+  const auto XtSm1                         = (Sm1.asDiagonal()*X_).transpose();
   const Eigen::SparseMatrix<double> XtSm2X = Eigen::SparseMatrix<double>(K_,K_)
                                              .selfadjointView<Eigen::Lower>().rankUpdate(XtSm1);
-  const auto XtSm2y                        = XtSm1 * (S_.asDiagonal().inverse() * y_);
+  const auto XtSm2y                        = XtSm1 * (Sm1.asDiagonal() * y);
   const Eigen::SparseMatrix<double> K2DtD  = Eigen::SparseMatrix<double>(K_,K_)
                                              .selfadjointView<Eigen::Lower>().rankUpdate(K_*D_.transpose());
   //prepare loop
