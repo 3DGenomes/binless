@@ -12,7 +12,7 @@ namespace binless {
 namespace fast {
 
 template<typename Derived>
-std::vector<double> get_log_expected(const FastData<Derived>& data, const Decay& dec);
+std::vector<double> get_log_expected(const FastData<Derived>& data, const DecayEstimator& dec);
 
 #include "fast_expected.ipp"
 

@@ -18,7 +18,7 @@ namespace binless {
 namespace fast {
 
 //here, exposures are log ( sum_i observed / sum_i expected ) with i summed over datasets
-std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data, const Decay& dec) {
+std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data, const DecayEstimator& dec) {
   //get observed and expected
   std::vector<double> sum_obs(data.get_ndatasets(),0);
   std::vector<double> sum_exp(data.get_ndatasets(),0);
@@ -41,7 +41,7 @@ std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data, co
 }
 
 //one IRLS iteration for exposures, with a poisson model
-std::vector<double> step_exposures(const FastSignalData& data, const Decay& dec) {
+std::vector<double> step_exposures(const FastSignalData& data, const DecayEstimator& dec) {
   //get residuals
   ResidualsPair z = get_poisson_residuals(data, dec);
   //average by name
@@ -62,7 +62,7 @@ std::vector<double> step_exposures(const FastSignalData& data, const Decay& dec)
 }
 
 //here, biases are log ( sum_i observed / sum_i expected ) with i summed over rows/columns
-std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, const Decay& dec) {
+std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, const DecayEstimator& dec) {
   //get observed and expected data
   std::vector<double> sum_obs(data.get_nbins(),0);
   std::vector<double> sum_exp(data.get_nbins(),0);
@@ -97,7 +97,7 @@ std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, c
 }
 
 //one IRLS iteration for log biases, with a poisson model
-std::vector<double> step_log_biases(const FastSignalData& data, const Decay& dec) {
+std::vector<double> step_log_biases(const FastSignalData& data, const DecayEstimator& dec) {
   //get residuals
   ResidualsPair z = get_poisson_residuals(data, dec);
   //sum them along the rows/columns
@@ -203,7 +203,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
   Rcpp::Rcout << "init\n";
   FastSignalData out(obs, nbins);
   DecayConfig conf(tol_val);
-  Decay dec(out, conf);
+  DecayEstimator dec(out, conf);
   //
   out.set_exposures(compute_poisson_lsq_exposures(out, dec));
   //
@@ -282,7 +282,7 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned gr
   out.set_log_signal(signal_ori); //fills-in phi_ref and delta
   //
   DecayConfig conf(tol_val);
-  Decay dec(out, conf);
+  DecayEstimator dec(out, conf);
   auto beta_diag = Rcpp::as<Eigen::VectorXd >(obs["beta_diag"]);
   dec.set_beta_diag(beta_diag);
   //
@@ -320,7 +320,7 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   out.set_log_signal(signal); //fills-in phi_ref and delta
   //
   DecayConfig conf(tol_val);
-  Decay dec(out, conf);
+  DecayEstimator dec(out, conf);
   auto beta_diag = Rcpp::as<Eigen::VectorXd >(obs["beta_diag"]);
   dec.set_beta_diag(beta_diag);
   //

@@ -88,12 +88,12 @@ struct DecayParams {
   double lambda_diag, mean;
 };
 
-class Decay {
+class DecayEstimator {
 public:
   
   //here, initialize flat log decay
   template<typename FastData>
-  Decay(const FastData& data, const DecayConfig& conf) :
+  DecayEstimator(const FastData& data, const DecayConfig& conf) :
    settings_(data,conf), summary_(), params_(settings_),
    gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
     { gam_.set_inequality_constraints(settings_.get_Cin()); }

@@ -1,5 +1,5 @@
 template<typename Derived>
-std::vector<double> get_log_expected(const FastData<Derived>& data, const Decay& dec) {
+std::vector<double> get_log_expected(const FastData<Derived>& data, const DecayEstimator& dec) {
     //
     std::vector<double> log_expected;
     log_expected.reserve(data.get_N());

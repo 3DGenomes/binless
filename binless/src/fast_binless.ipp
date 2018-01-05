@@ -1,6 +1,6 @@
 
 template<typename Lasso>
-SignalTriplet step_signal(const FastSignalData& data, const Decay& dec,
+SignalTriplet step_signal(const FastSignalData& data, const DecayEstimator& dec,
                           std::vector<Lasso>& flos, double lam2, unsigned group) {
     //get residuals
     ResidualsPair z = get_poisson_residuals(data, dec);
@@ -42,7 +42,7 @@ SignalTriplet step_signal(const FastSignalData& data, const Decay& dec,
 
 
 template<typename Lasso>
-DifferenceQuadruplet step_difference(const FastDifferenceData& data, const Decay& dec,
+DifferenceQuadruplet step_difference(const FastDifferenceData& data, const DecayEstimator& dec,
                                      std::vector<Lasso>& flos, double lam2, unsigned ref) {
     //get residuals
     ResidualsPair z = get_poisson_residuals(data, dec);

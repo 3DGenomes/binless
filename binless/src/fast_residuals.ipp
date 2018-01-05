@@ -2,7 +2,7 @@
 
 //residuals: normal with log-link, 0 drops data
 template<typename FastData>
-ResidualsPair get_normal_residuals(const FastData& data, const Decay& dec) {
+ResidualsPair get_normal_residuals(const FastData& data, const DecayEstimator& dec) {
     std::vector<double> residuals;
     std::vector<double> weights;
     residuals.reserve(data.get_N());
@@ -23,7 +23,7 @@ ResidualsPair get_normal_residuals(const FastData& data, const Decay& dec) {
 
 //residuals: poisson with log-link
 template<typename FastData>
-ResidualsPair get_poisson_residuals(const FastData& data, const Decay& dec) {
+ResidualsPair get_poisson_residuals(const FastData& data, const DecayEstimator& dec) {
     std::vector<double> residuals;
     std::vector<double> weights;
     residuals.reserve(data.get_N());
