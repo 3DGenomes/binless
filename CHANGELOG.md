@@ -4,6 +4,8 @@ All notable changes to *binless* will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 for versions 0.x of binless, minor releases might break backwards compatibility.
 
+## [Unreleased]
+
 ## [0.11.0]
 ### Changed
 - spline base construction now migrated to C++ side
