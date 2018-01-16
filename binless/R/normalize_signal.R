@@ -39,7 +39,7 @@ get_signal_metadata = function(cs, cts, resolution) {
     ,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=bin1]
   bad.biases[,z:=scale(z)]
   bad.biases[,is.out:=-abs(z)<qnorm(cs@settings$qmin)]
-  #ggplot(bad.biases)+geom_point(aes(bin1,z,colour=is.out))
+  #ggplot(bad.biases)+geom_point(aes(bin1,z,colour=is.out))+geom_hline(aes(yintercept=qnorm(cs@settings$qmin)))
   bad.rows=bad.biases[is.out==T,bin1]
   if (bad.biases[,sum(is.out)/.N>0.1]) cat(" Warning: removing ",bad.biases[,100*sum(is.out)/.N],"% of all rows!\n")
   #decay

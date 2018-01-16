@@ -4,7 +4,7 @@
 \alias{prepare_signal_estimation}
 \title{Prepare grouped signal matrix and settings}
 \usage{
-prepare_signal_estimation(cs, csg, resolution, tol.val)
+prepare_signal_estimation(cs, csg, resolution, tol.val, nperf)
 }
 \description{
 Prepare grouped signal matrix and settings

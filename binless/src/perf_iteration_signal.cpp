@@ -45,17 +45,16 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     if (nouter==1) { nwarm=1; } else { nwarm=nouter/2; }
     ncold=nouter-nwarm;
     irls.optimize(nwarm, beta, lam2);
-    unsigned step = irls.get_nouter();
+    converged = irls.has_converged();
     //cold start if failed
-    if (ncold>0 && step>=nwarm) {
+    if (ncold>0 && (!converged)) {
         std::fill(beta.begin(), beta.end(), 0);
         flo.reset();
         irls.optimize(ncold, beta, lam2);
-        step = irls.get_nouter();
-        if (step>nouter) {
-            //Rcout << " warning: cold start did not converge" <<std::endl;
-            converged = false;
-        }
+        converged = irls.has_converged();
+        /*if (!converged) {
+            Rcout << " warning: cold start did not converge" <<std::endl;
+        }*/
     }
     
     //store GFL state for next round

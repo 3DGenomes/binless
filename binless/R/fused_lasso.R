@@ -139,9 +139,8 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
 #' @keywords internal
 optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA) {
   obj = function(x) {
-    l2vals = csig@state$l2vals
     ret = binless:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
-    ret$l2vals = rbind(csig@state$l2vals,data.table(lambda2=10^(x),BIC=ret$BIC,BIC.sd=ret$BIC.sd))
+    ret$l2vals = rbind(csig@state$l2vals,data.table(lambda2=10^(x),BIC=ret$BIC,BIC.sd=ret$BIC.sd,converged=ret$converged))
     csig@state <<- ret
     #cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
     #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " BIC.sd= ", csig@state$BIC.sd, " dof= ",csig@state$dof,"\n")
@@ -155,7 +154,9 @@ optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixe
   op = foreach (lam=lvals,.combine=rbind) %do% obj(log10(lam))
   op = copy(csig@state$l2vals)
   setkey(op,lambda2)
-  #ggplot(op)+geom_point(aes(lambda2,BIC))+geom_errorbar(aes(lambda2,ymin=BIC-BIC.sd,ymax=BIC+BIC.sd))+scale_x_log10()+scale_y_log10()
+  #ggplot(op)+geom_point(aes(lambda2,BIC,colour=converged))+geom_errorbar(aes(lambda2,ymin=BIC-BIC.sd,ymax=BIC+BIC.sd,colour=converged))+scale_x_log10()+scale_y_log10()
+  #fail if too few runs have converged
+  if (csig@settings$nperf>1 && op[1:5,sum(converged)<4]) stop("Fused lasso fails to converge, increase nperf!")
   #now find the lowest minimum and extract flanking values
   l2min=op[BIC==min(BIC),min(lambda2)]
   minlambda=op[lambda2<=l2min][.N-1,lambda2]

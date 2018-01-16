@@ -70,7 +70,7 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     }
     SD = bbegin[2]-bbegin[1]
     cutsites = biases[,pos][bbegin[1]:(bbegin[2]-1)]
-    Bsp = generate_cubic_spline(cutsites, Krow, sparse=T)
+    Bsp = generate_spline_base(cutsites, min(cutsites), max(cutsites), Krow)
     X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
     if (constrain == T) {
       sbinned=biases[bbegin[1]:(bbegin[2]-1), cut(pos, sbins, ordered_result=T,
@@ -106,7 +106,7 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
     if (Dsets > 1) {
       for (d in 2:Dsets) {
         ncutsites = biases[,pos][bbegin[(2*d-1)]:(bbegin[2*d]-1)]
-        nBsp  = generate_cubic_spline(ncutsites, Krow, sparse=T)
+        nBsp  = generate_spline_base(ncutsites, min(ncutsites), max(ncutsites), Krow)
         cutsites = c(cutsites,ncutsites)
         nX = rbind(cbind(nBsp/2,nBsp/2),bdiag(nBsp,nBsp),bdiag(nBsp,nBsp))
         SDd = bbegin[2*d]-bbegin[(2*d-1)]
@@ -314,7 +314,7 @@ gauss_genomic = function(cs, cts.common, verbose=T, update.eC=T, constrain=F) {
 generate_genomic_biases = function(cs, points_per_kb=10) {
   cutsites = cs@biases[, seq(min(pos), max(pos), by = 1000/points_per_kb)]
   Krow = cs@settings$Krow
-  Bsp = binless:::generate_cubic_spline(cutsites, Krow, sparse=T)
+  Bsp = binless:::generate_spline_base(cutsites, Krow)
   Dsets = cs@experiments[,.N]
   X = bdiag(lapply(1:Dsets,function(x){Bsp}))
   stopifnot(ncol(X) == length(cs@par$beta_iota), ncol(X) == length(cs@par$beta_rho))

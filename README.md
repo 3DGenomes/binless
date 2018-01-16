@@ -101,6 +101,7 @@ make sure their column names are different.
 1. `bin1`: the label for the bin on the x axis. For example `"[begin1,end1)"`
 1. `bin2`: The label for the bin on the y axis.
 1. `observed`: How many paired-end reads were mapped within (bin1,bin2)
+1. `distance`: The average distance (in bases) between the two bins
 
 Note that `name`, `bin1` and `bin2` will be converted to R factors, so you an also
 provide them as integers starting at 1 (i.e. use 1 for the first dataset, 2 for the second etc.).

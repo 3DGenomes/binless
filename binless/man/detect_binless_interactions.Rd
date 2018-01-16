@@ -7,20 +7,25 @@
 detect_binless_interactions(cs, resolution = cs@settings$base.res,
   group = "all", ncores = 1, tol.val = cs@settings$tol, verbose = T,
   fix.lambda1 = F, fix.lambda1.at = NA, fix.lambda2 = F,
-  fix.lambda2.at = NA)
+  fix.lambda2.at = NA, nperf = 50)
 }
 \arguments{
-\item{cs}{}
+\item{cs}{a normalized CSnorm object}
 
-\item{resolution}{}
+\item{resolution}{The base resolution (default: the one used during normalization)}
 
-\item{group}{}
+\item{group}{Default "all", but also various groupings, see \code{\link{group_datasets}}}
 
-\item{ncores}{}
+\item{ncores}{How many cores to parallelize on (default: the one used during normalization)}
 
-\item{ref}{}
+\item{tol.val}{Tolerance on computed quantities}
 
-\item{niter}{number of IRLS iterations, and BIC iterations within}
+\item{verbose}{Whether to be verbose (default) or not}
+
+\item{fix.lambda1, fix.lambda1.at, fix.lambda2, fix.lambda2.at}{Default FALSE. if TRUE, sets lambda1
+(resp. lambda2) to the provided value instead of optimizing it}
+
+\item{nperf}{number of IRLS iterations (default 50)}
 }
 \description{
 Perform binless interaction detection using fused lasso

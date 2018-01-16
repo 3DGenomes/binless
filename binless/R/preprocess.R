@@ -123,6 +123,7 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
   }
   #
   counts = add_bin_begin_and_end(counts)
+  counts[,distance:=begin2-begin1+resolution/2]
   return(counts)
 }
 

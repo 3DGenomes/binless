@@ -2,7 +2,21 @@
 All notable changes to *binless* will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
-and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
+for versions 0.x of binless, minor releases might break backwards compatibility.
+
+## [0.11.0]
+### Changed
+- spline base construction now migrated to C++ side
+- fast binless now has smooth decay like optimized binless
+
+### Fixed
+- better storage and reporting of residuals
+- correctly report when fused lasso does not converge
+- provide means to increase nperf during binning
+- updated documentation
+
+### Removed
+- requirement that rows and counter diagonals be nonzero in fast binless
 
 ## [0.10.2] - 2017-12-07
 ### Fixed
@@ -46,6 +60,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Initial commit
 
 
+[Unreleased]: ../../compare/v0.11.0...HEAD
+[0.11.0]: ../../compare/v0.10.2...v0.11.0
 [0.10.2]: ../../compare/v0.10.1...v0.10.2
 [0.10.1]: ../../compare/v0.10.0...v0.10.1
 [0.10.0]: ../../compare/v0.9.0...v0.10.0
