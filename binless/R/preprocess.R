@@ -421,8 +421,8 @@ examine_dataset = function(infile, window=15, maxlen=1000, skip.fbm=T, read.len=
 #' 
 #' @param infile character. Path to TadBit .tsv file
 #' @param outprefix character. Prefix to output intermediate files.
-#' @param condition character. WT, KO etc.
-#' @param replicate character. Replicate number
+#' @param condition character. WT, KO, cell type etc.
+#' @param replicate character. Replicate ID.
 #' @param name character. A name for the experiment. By default, it is
 #'   condition, enzyme and replicate
 #' @param enzyme character. HindIII, DpnII etc.
