@@ -70,18 +70,6 @@ get_nzeros = function(cs, sbins, ncores=1) {
   return(zeros)
 }
 
-#' Compute initial exposures assuming a poisson model
-#' @keywords internal
-#' 
-initial_guess_exposures = function(cs, cts.common, pseudocount=1e-2) {
-  #biases
-  cs@par$eDE=as.array(cs@biases[,log(pseudocount+mean(dangling.L+dangling.R)/2),keyby=c("name")]$V1)
-  cs@par$eRJ=as.array(cs@biases[,log(pseudocount+mean(rejoined)),keyby=c("name")]$V1)
-  cs@par$eC=array(0,cs@experiments[,.N])
-  cs@par$eC = as.array(cts.common[,log(pseudocount+weighted.mean(count,weight)),keyby=c("name")]$V1)
-  return(cs)
-}
-
 #' Cleanup a CSnorm object, store settings and populate it with initial guesses of all required parameters
 #' @keywords internal
 #' 
@@ -318,7 +306,7 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     #compute residuals once for this round
     if(verbose==T) cat(" Residuals\n")
     cts.common = binless:::gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
-    residuals = get_residuals(cts.common, viewpoint = cts.common[,min(bin1)])
+    residuals = binless:::get_residuals(cts.common, viewpoint = cts.common[,min(bin1)])
     residuals[,step:=i]
     cs@diagnostics$residuals = rbind(cs@diagnostics$residuals, residuals)
     #fit iota and rho

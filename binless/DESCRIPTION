@@ -43,6 +43,7 @@ Collate:
     'normalize.R'
     'normalize_decay.R'
     'normalize_dispersion.R'
+    'normalize_exposures.R'
     'normalize_genomic.R'
     'normalize_signal.R'
     'onAttach.R'
