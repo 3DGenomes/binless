@@ -13,5 +13,13 @@ initial_guess_exposures = function(cs, cts.common, pseudocount=1e-2) {
   return(cs)
 }
 
-
+#' Compute eC using previous mean
+#' @keywords internal
+#' 
+gauss_exposures = function(cs, cts.common, verbose=T) {
+  if (verbose==T) cat(" Exposures\n")
+  csd = cts.common[,.(eC=weighted.mean(z+eC, weight/var)), keyby=c("name")]
+  cs@par$eC = as.array(csd[,eC])
+  return(cs)
+}
 

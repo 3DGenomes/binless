@@ -286,12 +286,9 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
                      tol = tol, ncores = ncores, fix.lambda1 = fix.lambda1, fix.lambda1.at = fix.lambda1.at,
                      fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
     laststep=0
-    #update eC everywhere in the first step
-    update.eC=T
   } else {
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
-    update.eC = !(fit.signal==T && laststep > cs@settings$bg.steps)
     cs@groups=list()
   }
   #
@@ -309,16 +306,19 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     residuals = binless:::get_residuals(cts.common, viewpoint = cts.common[,min(bin1)])
     residuals[,step:=i]
     cs@diagnostics$residuals = rbind(cs@diagnostics$residuals, residuals)
+    #
+    #fit exposures
+    a=system.time(cs <- binless:::gauss_exposures(cs, cts.common, verbose=verbose))
+    #
     #fit iota and rho
     constrain.bias = fit.signal==T && i <= cs@settings$bg.steps+1
-    a=system.time(cs <- binless:::gauss_genomic(cs, cts.common, update.eC=update.eC, verbose=verbose, constrain=constrain.bias))
+    a=system.time(cs <- binless:::gauss_genomic(cs, cts.common, verbose=verbose, constrain=constrain.bias))
     cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
     #
     if (fit.signal==T && i > cs@settings$bg.steps) {
       if(verbose==T) cat(" Residuals\n")
       cts.common = binless:::gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
       #fit signal using sparse fused lasso
-      update.eC=F
       a=system.time(cs <- binless:::gauss_signal(cs, cts.common, verbose=verbose, ncores=ncores,
                                                        fix.lambda1=cs@settings$fix.lambda1,
                                                        fix.lambda1.at=cs@settings$fix.lambda1.at,
@@ -327,7 +327,7 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
       cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
     } else {
       #fit diagonal decay
-      a=system.time(cs <- binless:::gauss_decay(cs, cts.common, update.eC=update.eC, verbose=verbose))
+      a=system.time(cs <- binless:::gauss_decay(cs, cts.common, verbose=verbose))
       cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
     }
     #

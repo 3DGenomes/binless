@@ -159,7 +159,7 @@ gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
 #' Single-cpu simplified fitting for iota and rho
 #' @keywords internal
 #' 
-gauss_decay = function(cs, cts.common, verbose=T, update.eC=T) {
+gauss_decay = function(cs, cts.common, verbose=T) {
   if (verbose==T) cat(" Decay\n")
   csd = binless:::gauss_decay_muhat_mean(cs, cts.common)
   #run optimization
@@ -170,7 +170,7 @@ gauss_decay = function(cs, cts.common, verbose=T, update.eC=T) {
   precision = max(abs(op$log_decay - cs@par$log_decay))
   cs@par$tol_decay = min(cs@par$tol_decay, max(cs@settings$tol,precision/10))
   #update par slot
-  if (update.eC==F) op$eC=NULL
+  op$eC=NULL
   cs@par=modifyList(cs@par, op)
   if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
   return(cs)

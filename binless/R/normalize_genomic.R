@@ -278,7 +278,7 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-gauss_genomic = function(cs, cts.common, verbose=T, update.eC=T, constrain=F) {
+gauss_genomic = function(cs, cts.common, verbose=T, constrain=F) {
   if (verbose==T) cat(" Genomic\n")
   a = binless:::gauss_genomic_muhat_mean(cs, cts.common)
   #run optimization
@@ -291,9 +291,7 @@ gauss_genomic = function(cs, cts.common, verbose=T, update.eC=T, constrain=F) {
   precision = max(max(abs(op$log_iota - cs@par$log_iota)), max(abs(op$log_rho - cs@par$log_rho)))
   cs@par$tol_genomic = min(cs@par$tol_genomic, max(cs@settings$tol, precision/10))
   #update par slot
-  if (update.eC==F) {
-    op$eC=NULL
-  }
+  op$eC=NULL
   op$eRJ=NULL
   op$eDE=NULL
   cs@par=modifyList(cs@par, op)
