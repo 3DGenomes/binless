@@ -86,12 +86,18 @@ get_raw_reads = function(data, b1, e1, b2=NULL, e2=NULL) {
 }
 
 #' Bin a reads data.table into a matrix of a given resolution
-#' 
+#'
 #' @param obj a CSnorm object, or a data.table containing data to be binned
 #' @param resolution the target resolution
-#' @param b2,e2 (optional) if provided, give extradiagonal portion 
+#' @param b2,e2 (optional) if provided, give extradiagonal portion
 #'
-#' @return a data.table representing the binned data
+#' @return a data.table representing the binned data. Will contain
+#'   name,bin1,bin2 (bin coordinates), observed data and mean distance between
+#'   these bins and nobs. If a CSnorm object is passed, will also compute the
+#'   number of observables in this bin (i.e. 4x the number of cut site
+#'   intersections). For the sake of speed, nobs is approximate along the
+#'   diagonal as it assumes that all intersections have observables, which is
+#'   not true since we discard all counts smaller than dmin.
 #' @export
 #'
 #' @examples
@@ -112,7 +118,19 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
     bin_borders=cs@biases[,seq(min(pos)-1,max(pos)+1,resolution)] #we discard the last incomplete bin
     bins=cut(head(bin_borders,n=length(bin_borders)-1)+resolution/2, bin_borders,
              ordered_result=T, right=F, include.lowest=T,dig.lab=12)
+    #build empty counts matrix
     counts=CJ(name=cs@experiments[,name],bin1=bins,bin2=bins)[bin2>=bin1]
+    #add number of observables
+    ncounts=cs@biases[,.(name,bin=cut(pos, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12))][
+      !is.na(bin),.(nobs=.N),keyby=c("name","bin")]
+    setnames(ncounts,c("bin","nobs"),c("bin1","nobs1"))
+    counts=ncounts[counts,,on=c("name","bin1")]
+    setnames(ncounts,c("bin1","nobs1"),c("bin2","nobs2"))
+    counts=ncounts[counts,,on=c("name","bin2")]
+    counts=counts[,.(name,bin1,bin2,nobs=as.integer(4*nobs1*nobs2))]
+    counts[bin1==bin2,nobs:=as.integer(nobs/2)]
+    setkeyv(counts,c("name","bin1","bin2"))
+    #count reads and fill matrix
     poscounts=cs@counts[,.(name,bin1=cut(pos1, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                                 bin2=cut(pos2, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                            observed=contact.close+contact.far+contact.up+contact.down)][
