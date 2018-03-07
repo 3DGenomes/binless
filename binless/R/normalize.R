@@ -156,10 +156,10 @@ update_diagnostics = function(cs, step, leg, runtime) {
 #' @examples
 get_all_values = function(cs, param, trans) {
   #get value in tmp as vector of lists, remove NULL lists
-  legs=c("bias","decay","signal","disp")
+  legs=c("expo","bias","decay","signal","disp")
   if (!(param %in% names(cs@diagnostics$param))) return(data.table())
   values=cs@diagnostics$params[,.(step,leg=ordered(leg,legs),tmp=get(param))][!sapply(tmp,is.null)]
-  values[,step:=step+((unclass(leg)-1)%%8)/8]
+  values[,step:=step+((unclass(leg)-1)%%10)/10]
   #melt it
   melted=as.data.table(values[,melt(tmp)])
   if ("Var1" %in% names(melted)) {
@@ -205,15 +205,16 @@ has_converged = function(cs) {
   rel.precision=function(name,fn=identity){merge(params[step==laststep,.(leg,get(name))],
                                                  params[step==laststep-1,.(leg,get(name))],by="leg")[
                                                    leg==leg[.N], max( abs(fn(V2.x[[1]])-fn(V2.y[[1]])) ) / ( max(fn(V2.x[[1]]))-min(fn(V2.x[[1]])) ) ]}
+  conv.eC = rel.precision("eC")
   conv.log_iota = rel.precision("log_iota")
   conv.log_rho = rel.precision("log_rho")
   conv.log_decay = rel.precision("log_decay")
   conv.signal = max(rel.precision("beta.phi"))
   #cat(" conv.log_iota ", conv.log_iota,
   #    " conv.log_rho ", conv.log_rho, " conv.log_decay ", conv.log_decay, " conv.phi ", conv.phi, "\n")
-  cat(" relative precision for this iteration: iota ", conv.log_iota,
+  cat(" relative precision for this iteration: eC ", conv.eC, " iota ", conv.log_iota,
       " rho ", conv.log_rho, " decay ", conv.log_decay, " signal ", conv.signal, "\n")
-  conv.param = all(c(conv.log_iota,conv.log_rho,
+  conv.param = all(c(conv.eC, conv.log_iota,conv.log_rho,
                      conv.log_decay,conv.signal)<cs@settings$tol, na.rm=T)
   return(conv.param)
 }
@@ -309,6 +310,7 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     #
     #fit exposures
     a=system.time(cs <- binless:::gauss_exposures(cs, cts.common, verbose=verbose))
+    cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="expo", runtime=a[1]+a[4])
     #
     #fit iota and rho
     constrain.bias = fit.signal==T && i <= cs@settings$bg.steps+1

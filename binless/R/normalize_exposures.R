@@ -18,8 +18,10 @@ initial_guess_exposures = function(cs, cts.common, pseudocount=1e-2) {
 #' 
 gauss_exposures = function(cs, cts.common, verbose=T) {
   if (verbose==T) cat(" Exposures\n")
-  csd = cts.common[,.(eC=weighted.mean(z+eC, weight/var)), keyby=c("name")]
+  csd = cts.common[,.(eC=weighted.mean(z+eC, weight/var), std=1/sqrt(sum(weight/(2*var)))), keyby=c("name")] #each count appears twice
   cs@par$eC = as.array(csd[,eC])
+  cs@par$value = sum(dnorm(0, mean = 0, sd = csd[,std], log = TRUE))
+  if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
   return(cs)
 }
 
