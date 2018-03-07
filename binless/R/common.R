@@ -14,8 +14,8 @@ NULL
 #' - lmu.nosig: the log(mean) of the background model (exposure+bias+decay)
 #' - phi: the log(signal)
 #' - mu: the mean, including signal
-#' - weight: how many observations in this signal/distance/direction/category bin have this count.
-#'  Note that sum(weight) is twice the total number of observable counts (per dataset).
+#' - nobs: how many observations in this signal/distance/direction/category bin have this count.
+#'  Note that sum(nobs) is twice the total number of observable counts (per dataset).
 #' - eC, log_decay, log_bias: exposure, log(decay) and log(bias) of this dataset. The bias is either iota or rho depending on cat.
 #' - z: count/mu-1
 #' - var: 1/mu+1/dispersion
@@ -44,23 +44,23 @@ gauss_common_muhat_mean = function(cs, zeros, sbins) {
                                                            log_mu.base+log_iota1+log_iota2)]
   cpos[,log_mu.base:=NULL]
   cpos=rbind(cpos[contact.close>0,.(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact R", dir="fwd",
-                                    count=contact.close, lmu.nosig=lmu.close, weight=1, eC, log_decay, log_bias=log_rho1)],
+                                    count=contact.close, lmu.nosig=lmu.close, nobs=1, eC, log_decay, log_bias=log_rho1)],
              cpos[contact.far>0,  .(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact L", dir="fwd",
-                                    count=contact.far,   lmu.nosig=lmu.far,   weight=1, eC, log_decay, log_bias=log_iota1)],
+                                    count=contact.far,   lmu.nosig=lmu.far,   nobs=1, eC, log_decay, log_bias=log_iota1)],
              cpos[contact.down>0, .(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact R", dir="fwd",
-                                    count=contact.down,  lmu.nosig=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho1)],
+                                    count=contact.down,  lmu.nosig=lmu.down,  nobs=1, eC, log_decay, log_bias=log_rho1)],
              cpos[contact.up>0,   .(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact L", dir="fwd",
-                                    count=contact.up,    lmu.nosig=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota1)],
+                                    count=contact.up,    lmu.nosig=lmu.up,    nobs=1, eC, log_decay, log_bias=log_iota1)],
              cpos[contact.far>0,  .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact R", dir="rev",
-                                    count=contact.far,   lmu.nosig=lmu.far,   weight=1, eC, log_decay, log_bias=log_rho2)],
+                                    count=contact.far,   lmu.nosig=lmu.far,   nobs=1, eC, log_decay, log_bias=log_rho2)],
              cpos[contact.close>0,.(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact L", dir="rev",
-                                    count=contact.close, lmu.nosig=lmu.close, weight=1, eC, log_decay, log_bias=log_iota2)],
+                                    count=contact.close, lmu.nosig=lmu.close, nobs=1, eC, log_decay, log_bias=log_iota2)],
              cpos[contact.down>0, .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact R", dir="rev",
-                                    count=contact.down,  lmu.nosig=lmu.down,  weight=1, eC, log_decay, log_bias=log_rho2)],
+                                    count=contact.down,  lmu.nosig=lmu.down,  nobs=1, eC, log_decay, log_bias=log_rho2)],
              cpos[contact.up>0,   .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact L", dir="rev",
-                                    count=contact.up,    lmu.nosig=lmu.up,    weight=1, eC, log_decay, log_bias=log_iota2)])
+                                    count=contact.up,    lmu.nosig=lmu.up,    nobs=1, eC, log_decay, log_bias=log_iota2)])
   ### zero counts (twice, in both directions)
-  czero = init$decay[zeros,.(name,dbin,bin1,bin2,cat,dir,id1,pos1,weight=nzero,log_decay),on=c("name","dbin")]
+  czero = init$decay[zeros,.(name,dbin,bin1,bin2,cat,dir,id1,pos1,nobs=nzero,log_decay),on=c("name","dbin")]
   setkeyv(czero,key(zeros))
   stopifnot(czero[is.na(log_decay),.N]==0)
   setnames(bsub,"id","id1")

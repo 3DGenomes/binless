@@ -5,10 +5,10 @@ NULL
 #' @keywords internal
 #' 
 initial_guess_genomic = function(cs, cts.common, pseudocount=1e-2) {
-  iotas=cts.common[cat=="contact L",log((pseudocount+weighted.mean(count,weight))/(weighted.mean(exp(lmu.nosig),weight))),keyby=c("name","id1")]
+  iotas=cts.common[cat=="contact L",log((pseudocount+weighted.mean(count,nobs))/(weighted.mean(exp(lmu.nosig),nobs))),keyby=c("name","id1")]
   iotas[,V1:=V1-mean(V1),by=name]
   cs@par$log_iota=as.array(iotas[,V1])
-  rhos=cts.common[cat=="contact R",log((pseudocount+weighted.mean(count,weight))/(weighted.mean(exp(lmu.nosig),weight))),keyby=c("name","id1")]
+  rhos=cts.common[cat=="contact R",log((pseudocount+weighted.mean(count,nobs))/(weighted.mean(exp(lmu.nosig),nobs))),keyby=c("name","id1")]
   rhos[,V1:=V1-mean(V1),by=name]
   cs@par$log_rho=as.array(rhos[,V1])
   return(cs)
@@ -36,7 +36,7 @@ gauss_genomic_muhat_mean = function(cs, cts.common) {
   stopifnot(bts[,.N]==3*cs@biases[,.N])
   #counts
   cts.common[,etaij:=eC+log_bias]
-  cts = cts.common[,.(etahat=weighted.mean(z+etaij, weight/var), std=1/sqrt(sum(weight/(2*var)))),
+  cts = cts.common[,.(etahat=weighted.mean(z+etaij, nobs/var), std=1/sqrt(sum(nobs/(2*var)))),
                    keyby=c("id1","name","cat")]
   cts = merge(cs@biases[,.(name,id,pos)],cts,by.x=c("name","id"),by.y=c("name","id1"))
   setkey(cts, id, name, cat)

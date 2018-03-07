@@ -5,8 +5,8 @@ NULL
 #' @keywords internal
 #' 
 initial_guess_decay = function(cs, cts.common, pseudocount=1e-2) {
-  decay=cts.common[,.(log_decay=log((pseudocount+weighted.mean(count,weight))/(weighted.mean(exp(lmu.nosig),weight))),
-                      ncounts=sum(weight)),keyby=c("name","dbin")]
+  decay=cts.common[,.(log_decay=log((pseudocount+weighted.mean(count,nobs))/(weighted.mean(exp(lmu.nosig),nobs))),
+                      ncounts=sum(nobs)),keyby=c("name","dbin")]
   decay[,log_decay:=log_decay-weighted.mean(log_decay,ncounts),by=name]
   decay[,ncounts:=NULL]
   cs@par$decay=decay
@@ -20,8 +20,8 @@ gauss_decay_muhat_mean = function(cs, cts.common) {
   cts.common[,kappaij:=eC+log_decay]
   dbins=cs@settings$dbins
   csd = cts.common[,.(distance=sqrt(dbins[unclass(dbin)+1]*dbins[unclass(dbin)]),
-                      kappahat=weighted.mean(z+kappaij, weight/var),
-                      std=1/sqrt(sum(weight/(2*var))), weight=sum(weight)/2), keyby=c("name", "dbin")] #each count appears twice
+                      kappahat=weighted.mean(z+kappaij, nobs/var),
+                      std=1/sqrt(sum(nobs/(2*var))), nobs=sum(nobs)/2), keyby=c("name", "dbin")] #each count appears twice
   return(csd)
 }
 
@@ -55,7 +55,7 @@ gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
     cutsites = csd[,distance][cbegin[1]:(cbegin[2]-1)]
     lcs = log(cutsites)
     X = as.matrix(generate_spline_base(lcs,min(lcs),max(lcs), Kdiag))
-    W=csd[,weight][cbegin[1]:(cbegin[2]-1)]
+    W=csd[,nobs][cbegin[1]:(cbegin[2]-1)]
     diags = list(rep(1,Kdiag), rep(-2,Kdiag))
     D = bandSparse(Kdiag-2, Kdiag, k=0:2, diagonals=c(diags, diags[1]))
     if (!is.null(original_lambda_diag)) {
@@ -149,7 +149,7 @@ gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
   decay_out$beta_diag=as.matrix(decay_out$beta_diag)
   decay_out$beta_diag_diff=as.matrix(decay_out$beta_diag_diff)
   #make decay data table, reused at next call
-  dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=weight,kappa=decay_out$log_mean_counts,log_decay=decay_out$log_decay)]
+  dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=nobs,kappa=decay_out$log_mean_counts,log_decay=decay_out$log_decay)]
   setkey(dmat,name,dbin)
   decay_out$decay=dmat
   decay_out[c("beta_diag","beta_diag_diff","beta_diag_centered","log_mean_counts")]=NULL

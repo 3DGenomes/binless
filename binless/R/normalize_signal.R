@@ -21,7 +21,7 @@ prepare_first_signal_estimation = function(biases, names, base.res) {
 #' 
 gauss_signal_muhat_mean = function(cs, cts.common) {
   cts = cts.common[,.(name,bin1=pmin(bin1,bin2),bin2=pmax(bin1,bin2),count,z,var,mu,lmu.nosig,
-                      log_decay,log_bias,weight=weight/2)]
+                      log_decay,log_bias,nobs=nobs/2)]
   stopifnot(cts[,all(bin1<=bin2)])
   return(cts)
 }
@@ -32,11 +32,11 @@ gauss_signal_muhat_mean = function(cs, cts.common) {
 #' @keywords internal
 #' 
 get_signal_metadata = function(cs, cts, resolution) {
-  cts_compressed = cts[,.(weight=sum(weight), z=weighted.mean(z,weight/var),var=1/weighted.mean(1/var,weight)),
+  cts_compressed = cts[,.(nobs=sum(nobs), z=weighted.mean(z,nobs/var),var=1/weighted.mean(1/var,nobs)),
                        keyby=c("name","bin1","bin2")]
   #biases
-  bad.biases=rbind(cts_compressed[,.(bin1,bin2,weight,var,z)],cts_compressed[,.(bin1=bin2,bin2=bin1,weight,var,z)])[
-    ,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=bin1]
+  bad.biases=rbind(cts_compressed[,.(bin1,bin2,nobs,var,z)],cts_compressed[,.(bin1=bin2,bin2=bin1,nobs,var,z)])[
+    ,.(z=sum(nobs*z/var)/sum(nobs^2/var^2)),by=bin1]
   bad.biases[,z:=scale(z)]
   bad.biases[,is.out:=-abs(z)<qnorm(cs@settings$qmin)]
   #ggplot(bad.biases)+geom_point(aes(bin1,z,colour=is.out))+geom_hline(aes(yintercept=qnorm(cs@settings$qmin)))
@@ -44,7 +44,7 @@ get_signal_metadata = function(cs, cts, resolution) {
   if (bad.biases[,sum(is.out)/.N>0.1]) cat(" Warning: removing ",bad.biases[,100*sum(is.out)/.N],"% of all rows!\n")
   #decay
   cts_compressed[,diag.idx:=unclass(bin2)-unclass(bin1)]
-  # bad.decays=cts_compressed[,.(z=sum(weight*z/var)/sum(weight^2/var^2)),by=diag.idx]
+  # bad.decays=cts_compressed[,.(z=sum(nobs*z/var)/sum(nobs^2/var^2)),by=diag.idx]
   # bad.decays[,z:=scale(z)]
   # bad.decays[,is.out:=-abs(z)<qnorm(cs@settings$qmin)]
   diag.rm = ceiling(cs@settings$dmin/resolution)
@@ -66,11 +66,11 @@ get_signal_metadata = function(cs, cts, resolution) {
 #' @keywords internal
 #' 
 compress_cts = function(cs, cts) {
-  cts.new = cts[,.(phihat=weighted.mean(count/mu-1,weight/(2*var)), weight=sum(weight/(2*var)),
-                   log_decay=weighted.mean(log_decay,weight)), keyby=c("name","bin1","bin2")]
+  cts.new = cts[,.(phihat=weighted.mean(count/mu-1,nobs/(2*var)), nobs=sum(nobs/(2*var)),
+                   log_decay=weighted.mean(log_decay,nobs)), keyby=c("name","bin1","bin2")]
   cts.new[,count:=phihat+2] #or any strictly positive number (but beware of exp(lmu.nosig) )
   cts.new = cs@par$signal[,.(name,bin1,bin2,phi)][cts.new]
-  cts.new[,.(name,bin1,bin2,count,lmu.nosig=log(count/(phihat+1))-phi, log_decay, weight=2*weight*(1/cs@par$alpha + (1+phihat)/count))]
+  cts.new[,.(name,bin1,bin2,count,lmu.nosig=log(count/(phihat+1))-phi, log_decay, nobs=2*nobs*(1/cs@par$alpha + (1+phihat)/count))]
 }
 
 #' fit signal using sparse fused lasso

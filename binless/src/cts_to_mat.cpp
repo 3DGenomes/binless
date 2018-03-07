@@ -45,7 +45,7 @@ void cts_to_signal_mat(const RawData<Signal>& raw, BinnedData<Signal>& binned) {
     std::vector<int> cts_bin2 = as<std::vector<int> >(cts["bin2"]);
     std::vector<double> count = as<std::vector<double> >(cts["count"]);
     std::vector<double> lmu_nosig = as<std::vector<double> >(cts["lmu.nosig"]);
-    std::vector<double> weight = as<std::vector<double> >(cts["weight"]); //not related to 1/var !
+    std::vector<double> nobs = as<std::vector<double> >(cts["nobs"]);
     std::vector<double> log_decay = as<std::vector<double> >(cts["log_decay"]);
     
     //outputs
@@ -60,7 +60,7 @@ void cts_to_signal_mat(const RawData<Signal>& raw, BinnedData<Signal>& binned) {
     //build mat from cts
     double* pphi = const_cast<double*>(&phi[0]);
     cts_to_signal_mat_core(N, &cts_bin1[0], &cts_bin2[0], &count[0], &lmu_nosig[0],
-                           &weight[0], &log_decay[0], nbins, dispersion,
+                           &nobs[0], &log_decay[0], nbins, dispersion,
                            pphi, &phihat[0], &phihat_var[0], &phihat_var_nodecay[0], &ncounts[0], &bin1[0], &bin2[0]);
     //remove outliers
     remove_outliers(bin1, bin2, phihat_var, metadata);

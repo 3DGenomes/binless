@@ -17,14 +17,14 @@ NULL
 predict_binned_matrices_irls = function(cts, dispersion) {
   #predict means
   cts[,c("decay","biases","mu.nosig"):=list(exp(log_decay),exp(log_bias),exp(lmu.nosig))]
-  mat=cts[,.(ncounts=sum(weight),
-             observed=sum(count*weight),
-             biasmat=weighted.mean(biases,weight),
-             decaymat=weighted.mean(decay,weight),
-             background=sum(mu.nosig*weight),
-             background.sd=sqrt(sum((mu.nosig+mu.nosig^2/dispersion)*weight)),
-             residual=sum(count*weight)/sum(mu*weight),
-             normalized=sum(count*weight)/sum(exp(lmu.nosig-log_decay)*weight))
+  mat=cts[,.(ncounts=sum(nobs),
+             observed=sum(count*nobs),
+             biasmat=weighted.mean(biases,nobs),
+             decaymat=weighted.mean(decay,nobs),
+             background=sum(mu.nosig*nobs),
+             background.sd=sqrt(sum((mu.nosig+mu.nosig^2/dispersion)*nobs)),
+             residual=sum(count*nobs)/sum(mu*nobs),
+             normalized=sum(count*nobs)/sum(exp(lmu.nosig-log_decay)*nobs))
           ,keyby=c("name","bin1","bin2")]
   #fill missing data
   bl1=cts[,levels(bin1)]

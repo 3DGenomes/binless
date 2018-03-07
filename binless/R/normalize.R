@@ -224,12 +224,12 @@ has_converged = function(cs) {
 #' @keywords internal
 #' 
 get_residuals = function(cts.common, viewpoint) {
-  a=cts.common[bin1==viewpoint,.(signal=sum(exp(phi)*weight),
-                               decay=sum(exp(log_decay)*weight),
-                               bias=sum(exp(log_bias)*weight),
-                               mean=sum(exp(lmu.nosig+phi)*weight),
-                               ncounts=sum(weight),
-                               count=sum(count*weight)),
+  a=cts.common[bin1==viewpoint,.(signal=sum(exp(phi)*nobs),
+                               decay=sum(exp(log_decay)*nobs),
+                               bias=sum(exp(log_bias)*nobs),
+                               mean=sum(exp(lmu.nosig+phi)*nobs),
+                               ncounts=sum(nobs),
+                               count=sum(count*nobs)),
              keyby=c("name","bin2")]
   setnames(a,"bin2","bin")
   a[bin==viewpoint,c("signal","decay","bias","mean","ncounts","count"):=list(signal/2,decay/2,bias/2,mean/2,ncounts/2,count/2)]

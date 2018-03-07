@@ -15,7 +15,7 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val, nperf) {
                 dispersion = csg@par$alpha,
                 tol.val = tol.val,
                 nperf = nperf)
-  cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight,log_decay)]
+  cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,nobs,log_decay)]
   csi=new("CSbsig", mat=mat, cts=cts, settings=settings)
   return(csi)
 }
@@ -29,8 +29,8 @@ prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val, nper
     merge(csi@mat[name==n],csi@mat[name==ref,.(bin1,bin2,phi1=phi)],all=T,by=c("bin1","bin2"))
   mat[,c("phi.ref","delta"):=list(phi1,(phi-phi1)/2)]
   mat[,c("phi","phi1"):=NULL]
-  cts=csg@cts[name!=ref,.(name,bin1,bin2,count,lmu.nosig,weight,log_decay)]
-  cts.ref=csg@cts[name==ref,.(name,bin1,bin2,count,lmu.nosig,weight,log_decay)]
+  cts=csg@cts[name!=ref,.(name,bin1,bin2,count,lmu.nosig,nobs,log_decay)]
+  cts.ref=csg@cts[name==ref,.(name,bin1,bin2,count,lmu.nosig,nobs,log_decay)]
   csi=new("CSbdiff", mat=mat, cts=cts, cts.ref=cts.ref,
           ref=as.character(ref), settings=csi@settings)
   return(csi)
