@@ -5,8 +5,11 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 for versions 0.x of binless, minor releases might break backwards compatibility.
 
 ## [Unreleased]
-## Changed
+### Changed
 - Exposures are now fit separately
+
+### Fixed
+- sigma parameter was ignored in `GeneralizedAdditiveModel`
 
 ## [0.11.0]
 ### Changed

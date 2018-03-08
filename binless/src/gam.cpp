@@ -7,7 +7,7 @@ namespace binless {
 GeneralizedAdditiveModel::GeneralizedAdditiveModel(const Eigen::SparseMatrix<double>& X,
                            const Eigen::SparseMatrix<double>& D,
                            double sigma) :
-  N_(X.rows()), K_(X.cols()), X_(X), D_(D), sigma_(sigma), neq_(0), nin_(0),
+  N_(X.rows()), K_(X.cols()), X_(X), D_(D), sigmasq_(sigma*sigma), neq_(0), nin_(0),
   Ceq_(Eigen::MatrixXd::Zero(neq_,K_)), Cin_(Eigen::MatrixXd::Zero(nin_,K_)),
   beta_(Eigen::VectorXd::Constant(K_,1)), lambda_(1), has_converged_(false), llt_analyzed_(false) {}
   
@@ -60,7 +60,7 @@ void GeneralizedAdditiveModel::optimize(const Eigen::VectorXd& y, const Eigen::V
     }
     
     //compute lambda
-    lambda_ = std::sqrt((K_ - 2)/((K_*D_*beta_).squaredNorm()+1));
+    lambda_ = std::sqrt((K_ - 2)/((K_*D_*beta_).squaredNorm()+sigmasq_));
     
     //compute relative precision on beta and check convergence
     double precision = beta_.maxCoeff()-beta_.minCoeff();

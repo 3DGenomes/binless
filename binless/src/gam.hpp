@@ -53,7 +53,7 @@ private:
   //data
   unsigned N_, K_;
   Eigen::SparseMatrix<double> X_, D_;
-  double sigma_;
+  double sigmasq_;
   unsigned neq_, nin_;
   Eigen::MatrixXd Ceq_, Cin_;
   
