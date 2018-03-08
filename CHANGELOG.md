@@ -7,6 +7,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 ## [Unreleased]
 ### Changed
 - Exposures are now fit separately
+- Use `nobs` column in fast binless. Set to 1 to reproduce behaviour of previous versions
 
 ### Fixed
 - sigma parameter was ignored in `GeneralizedAdditiveModel`

@@ -7,6 +7,7 @@ SignalTriplet step_signal(const FastSignalData& data, const DecayEstimator& dec,
     //build signal matrix
     auto dlog_signal = data.get_log_signal();
     std::vector<double> phihat,weights;
+    std::vector<unsigned> nobs = data.get_nobs();
     phihat.reserve(data.get_N());
     weights.reserve(data.get_N());
     auto dbin1 = data.get_bin1();
@@ -28,10 +29,18 @@ SignalTriplet step_signal(const FastSignalData& data, const DecayEstimator& dec,
         //run fused lasso
         std::vector<double> y(phihat.cbegin() + dset*data.get_ncells(), phihat.cbegin() + (dset+1)*data.get_ncells());
         std::vector<double> wt(weights.cbegin() + dset*data.get_ncells(), weights.cbegin() + (dset+1)*data.get_ncells());
+        std::vector<unsigned> no(nobs.cbegin() + dset*data.get_ncells(), nobs.cbegin() + (dset+1)*data.get_ncells());
         flos[dset].optimize(y, wt, lam2);
-        //subtract average and return
+        //compute weighted average
         std::vector<double> beta = flos[dset].get();
-        double avg = std::accumulate(beta.begin(),beta.end(),0.)/beta.size();
+        double avg=0;
+        double wsum=0;
+        for (unsigned i=0; i<data.get_ncells(); ++i) {
+          avg += beta[i]*no[i];
+          wsum += no[i];
+        }
+        avg = avg / wsum;
+        //subtract and store
         for (unsigned i=0; i<data.get_ncells(); ++i) {
             beta[i] = beta[i] - avg;
         }

@@ -23,6 +23,7 @@ public:
     std::vector<unsigned> get_bin1() const { return bin1_; }
     std::vector<unsigned> get_bin2() const { return bin2_; }
     std::vector<unsigned> get_observed() const { return observed_; }
+    std::vector<unsigned> get_nobs() const { return nobs_; }
     std::vector<double> get_distance() const { return distance_; }
     
     std::vector<double> get_log_biases() const { return log_biases_; }
@@ -47,7 +48,7 @@ public:
     void set_exposures(const std::vector<double>& exposures) { exposures_ = exposures; }
     
 private:
-    const std::vector<unsigned> name_,bin1_,bin2_,observed_; //N(N+1)/2
+    const std::vector<unsigned> name_,bin1_,bin2_,observed_, nobs_; //N(N+1)/2
     const std::vector<double> distance_;
     const unsigned nbins_, ncells_, ndatasets_, N_;
     std::vector<double> log_biases_; //N

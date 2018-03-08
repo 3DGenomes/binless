@@ -24,12 +24,13 @@ std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data, co
   std::vector<double> sum_exp(data.get_ndatasets(),0);
   auto log_expected = get_log_expected(data, dec);
   auto observed = data.get_observed();
+  auto nobs = data.get_nobs();
   //sum them for each dataset
   auto names = data.get_name();
   for (unsigned i=0; i<data.get_N(); ++i) {
     unsigned name = names[i]-1; //offset by 1 for vector indexing
-    sum_obs[name] += observed[i];
-    sum_exp[name] += std::exp(log_expected[i]);
+    sum_obs[name] += observed[i]*nobs[i];
+    sum_exp[name] += std::exp(log_expected[i])*nobs[i];
   }
   //compute exposure
   std::vector<double> exposures;
@@ -66,8 +67,10 @@ std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, c
   //get observed and expected data
   std::vector<double> sum_obs(data.get_nbins(),0);
   std::vector<double> sum_exp(data.get_nbins(),0);
+  std::vector<unsigned> sum_nobs(data.get_nbins(),0);
   auto log_expected = get_log_expected(data, dec);
   auto observed = data.get_observed();
+  auto nobs = data.get_nobs();
   //sum them along the rows/columns
   auto dbin1 = data.get_bin1();
   auto dbin2 = data.get_bin2();
@@ -75,11 +78,13 @@ std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, c
     unsigned bin1 = dbin1[i]-1; //offset by 1 for vector indexing
     unsigned bin2 = dbin2[i]-1;
     double expected = std::exp(log_expected[i]);
-    sum_obs[bin1] += observed[i];
-    sum_exp[bin1] += expected;
+    sum_obs[bin1] += observed[i]*nobs[i];
+    sum_exp[bin1] += expected*nobs[i];
+    sum_nobs[bin1] += nobs[i];
     if (bin1!=bin2) {
-      sum_obs[bin2] += observed[i];
-      sum_exp[bin2] += expected;
+      sum_obs[bin2] += observed[i]*nobs[i];
+      sum_exp[bin2] += expected*nobs[i];
+      sum_nobs[bin2] += nobs[i];
     }
   }
   //compute log_bias
@@ -88,8 +93,15 @@ std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, c
   for (unsigned i=0; i<data.get_nbins(); ++i) {
     log_bias.push_back(std::log((sum_obs[i]+pseudocount)/sum_exp[i]));
   }
-  //center log_bias
-  double avg = std::accumulate(log_bias.begin(), log_bias.end(), 0.)/log_bias.size();
+  //compute weighted average
+  double avg=0;
+  double wsum=0;
+  for (unsigned i=0; i<data.get_nbins(); ++i) {
+    avg += log_bias[i]*sum_nobs[i];
+    wsum += sum_nobs[i];
+  }
+  avg = avg / wsum;
+  //subtract and return
   for (unsigned i=0; i<data.get_nbins(); ++i) {
     log_bias[i] -= avg;
   }
@@ -103,8 +115,10 @@ std::vector<double> step_log_biases(const FastSignalData& data, const DecayEstim
   //sum them along the rows/columns
   auto dbin1 = data.get_bin1();
   auto dbin2 = data.get_bin2();
+  auto nobs = data.get_nobs();
   std::vector<double> log_biases(data.get_nbins(),0);
   std::vector<double> weightsums(data.get_nbins(),0);
+  std::vector<unsigned> sum_nobs(data.get_nbins(),0);
   for (unsigned i=0; i<data.get_N(); ++i) {
     unsigned bin1 = dbin1[i]-1; //offset by 1 for vector indexing
     unsigned bin2 = dbin2[i]-1;
@@ -112,20 +126,25 @@ std::vector<double> step_log_biases(const FastSignalData& data, const DecayEstim
     double b = z.residuals[i]*w;
     log_biases[bin1] += b;
     weightsums[bin1] += w;
+    sum_nobs[bin1] += nobs[i];
     if (bin1!=bin2) {
       log_biases[bin2] += b;
       weightsums[bin2] += w;
+      sum_nobs[bin2] += nobs[i];
     }
   }
-  //add current bias and compute weighted average
-  double avg=0;
-  double wsum=0;
+  //add current bias
   auto ori_log_biases = data.get_log_biases();
   for (unsigned i=0; i<data.get_nbins(); ++i) {
     log_biases[i] = (weightsums[i]>0) ? log_biases[i]/weightsums[i] : 0;
     log_biases[i] += ori_log_biases[i];
-    avg += log_biases[i]*weightsums[i];
-    wsum += weightsums[i];
+  }
+  //compute weighted average
+  double avg=0;
+  double wsum=0;
+  for (unsigned i=0; i<data.get_nbins(); ++i) {
+    avg += log_biases[i]*sum_nobs[i];
+    wsum += sum_nobs[i];
   }
   avg = avg / wsum;
   //no smoothing, subtract average and return

@@ -40,10 +40,13 @@ public:
     //binner matrix
     binner_ = bin_data_evenly(log_distance_data, conf_.Kdiag*conf_.bins_per_bf, true); //true to drop unused bins
     nbins_ = binner_.rows();
-    //ncounts
-    ncounts_ = binner_ * Eigen::VectorXd::Ones(log_distance_data.size());
+    //nobs
+    auto nobs_std = data.get_nobs();
+    Eigen::VectorXd nobs_data = Eigen::VectorXd::Zero(nobs_std.size());
+    for (unsigned i=0; i<nobs_data.rows(); ++i) nobs_data(i) = nobs_std[i]; // cast to double
+    nobs_ = binner_ * nobs_data;
     //compute mean log distance
-    log_distance_ = ((binner_ * log_distance_data).array() / ncounts_.array()).matrix();
+    log_distance_ = ((binner_ * (log_distance_data.array() * nobs_data.array()).matrix()).array() / nobs_.array()).matrix();
     //X: design matrix
     X_ = generate_spline_base(log_distance_, log_dmin_, log_dmax_, conf_.Kdiag);
     //D: build difference matrix
@@ -62,7 +65,7 @@ public:
   double get_log_dmin() const { return log_dmin_; }
   double get_log_dmax() const { return log_dmax_; }
   Eigen::SparseMatrix<double> get_binner() const { return binner_; }
-  Eigen::VectorXd get_ncounts() const { return ncounts_; }
+  Eigen::VectorXd get_nobs() const { return nobs_; }
   Eigen::SparseMatrix<double> get_X() const { return X_; }
   Eigen::SparseMatrix<double> get_D() const { return D_; }
   Eigen::SparseMatrix<double> get_Cin() const { return Cin_; }
@@ -73,7 +76,7 @@ private:
   double log_dmin_, log_dmax_;
   Eigen::SparseMatrix<double> binner_; // Nbins x Ndata binary matrix
   unsigned nbins_;
-  Eigen::VectorXd ncounts_;
+  Eigen::VectorXd nobs_;
   Eigen::SparseMatrix<double> X_,D_,Cin_; // design, difference and constraint matrices
 };
 
@@ -132,9 +135,9 @@ public:
   
   
 private:
-  //compute average log decay (weighted by ncounts) in order to center it
+  //compute average log decay (weighted by nobs) in order to center it
   void center_estimate() {
-    params_.mean = settings_.get_ncounts().dot(settings_.get_X() * params_.beta)/settings_.get_ncounts().sum();
+    params_.mean = settings_.get_nobs().dot(settings_.get_X() * params_.beta)/settings_.get_nobs().sum();
   }
   
   const DecaySettings settings_; // parameters for performing the binning, constant
