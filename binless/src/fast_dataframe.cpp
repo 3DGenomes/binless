@@ -29,6 +29,7 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const DecayEstima
                                  _["bin1"]=dbin1,
                                  _["bin2"]=dbin2,
                                  _["observed"]=data.get_observed(),
+                                 _["nobs"]=data.get_nobs(),
                                  _["distance"]=data.get_distance(),
                                  _["log_background"]=log_background,
                                  _["log_biases"]=biasmat,
