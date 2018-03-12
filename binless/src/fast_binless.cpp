@@ -224,8 +224,8 @@ std::vector<double> shift_signal(const FastSignalData& data) {
 List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, double tol_val, unsigned bg_steps) {
   //initialize return values, exposures and fused lasso optimizer
   Rcpp::Rcout << "init\n";
-  PoissonDistribution nb_dist;
-  Sampler<PoissonDistribution> nb_sampler(nb_dist);
+  NegativeBinomialDistribution nb_dist;
+  Sampler<NegativeBinomialDistribution> nb_sampler(nb_dist);
   nb_sampler.init();
   FastSignalData out(obs, nbins);
   DecayConfig conf(tol_val);
@@ -304,8 +304,8 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
 
 Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned group, double tol_val) {
   //setup distribution
-  PoissonDistribution nb_dist;
-  Sampler<PoissonDistribution> nb_sampler(nb_dist);
+  NegativeBinomialDistribution nb_dist;
+  Sampler<NegativeBinomialDistribution> nb_sampler(nb_dist);
   nb_sampler.init();
   //
   //read normalization data
@@ -349,8 +349,8 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned gr
 
 Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, double tol_val) {
   //setup distribution
-  PoissonDistribution nb_dist;
-  Sampler<PoissonDistribution> nb_sampler(nb_dist);
+  NegativeBinomialDistribution nb_dist;
+  Sampler<NegativeBinomialDistribution> nb_sampler(nb_dist);
   nb_sampler.init();
   //
   //read normalization data
