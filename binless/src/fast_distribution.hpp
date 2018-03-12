@@ -38,7 +38,7 @@ public:
 template<> class Sampler<NegativeBinomialDistribution> {
 public:
   Sampler(NegativeBinomialDistribution& nb) : nb_(nb) {}
-  void init() { nb_.alpha = 1; }
+  void init(double alpha = 1.) { nb_.alpha = alpha; }
   void sample() {}
 private:
   NegativeBinomialDistribution& nb_;

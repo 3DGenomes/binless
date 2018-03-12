@@ -26,9 +26,10 @@ mat=binless:::bin_data(cs,resolution=5000)
 #which determines the significance of a given signal/difference contribution
 nouter=25
 lam2=5
+alpha=10
 tol_val=2e-1
 bg_steps=5
-out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, nouter, tol_val, bg_steps)
+out=binless:::fast_binless(mat, mat[,nlevels(bin1)], 10*lam2, alpha, nouter, tol_val, bg_steps)
 
 
 #Here follow the plots of the observed and fitted quantities (be sure to check out signal and binless plots)
@@ -63,8 +64,9 @@ plot_binless_matrix(a, upper="log_binless", lower="log(observed)", trans="identi
 #now we compute differences between the two datasets
 ref=1
 lam2=5
+alpha=1
 tol_val=2e-1
-diff=as.data.table(binless:::fast_binless_difference(out, lam2, ref, tol_val))
+diff=as.data.table(binless:::fast_binless_difference(out, lam2, ref, alpha, tol_val))
 
 #log(observed)
 plot_binless_matrix(diff, upper="observed", lower="observed")
