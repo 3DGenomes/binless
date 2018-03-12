@@ -30,11 +30,9 @@ template<typename Dist> class Sampler {};
 
 template<> class Sampler<PoissonDistribution> {
 public:
-  Sampler(PoissonDistribution& nb) : nb_(nb) {}
+  Sampler(PoissonDistribution&) {}
   void init() {}
   void sample() {}
-private:
-  PoissonDistribution& nb_;
 };
 
 template<> class Sampler<NegativeBinomialDistribution> {

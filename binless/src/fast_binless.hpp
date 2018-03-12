@@ -8,6 +8,7 @@ using namespace Rcpp;
 #include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
 #include "fast_residuals.hpp"
+#include "fast_distribution.hpp"
 
 namespace binless {
 namespace fast {

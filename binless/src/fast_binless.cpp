@@ -224,6 +224,9 @@ std::vector<double> shift_signal(const FastSignalData& data) {
 List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, double tol_val, unsigned bg_steps) {
   //initialize return values, exposures and fused lasso optimizer
   Rcpp::Rcout << "init\n";
+  PoissonDistribution nb_dist;
+  Sampler<PoissonDistribution> nb_sampler(nb_dist);
+  nb_sampler.init();
   FastSignalData out(obs, nbins);
   DecayConfig conf(tol_val);
   DecayEstimator dec(out, conf);
@@ -244,18 +247,18 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
     Rcpp::Rcout << "step " << step;
     std::vector<double> expected,old_expected;
     //compute biases
-    z = get_poisson_residuals(out, dec);
+    z = get_residuals(nb_dist, out, dec);
     auto biases = step_log_biases(out, z);
     out.set_log_biases(biases);
     //compute decay
     if (step <= bg_steps) old_expected = get_log_expected(out, dec);
-    z = get_poisson_residuals(out, dec);
+    z = get_residuals(nb_dist, out, dec);
     dec.step_irls(out, z);
     if (step <= bg_steps) expected = get_log_expected(out, dec);
     //compute signal
     if (step > bg_steps) {
       old_expected = get_log_expected(out, dec);
-      z = get_poisson_residuals(out, dec);
+      z = get_residuals(nb_dist, out, dec);
       auto signal = step_signal(out, z, flos, lam2);
       out.set_log_signal(signal.beta);
       out.set_signal_phihat(signal.phihat);
@@ -282,7 +285,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
         out.set_log_signal(adjust);
       }
       //compute exposures
-      z = get_poisson_residuals(out, dec);
+      z = get_residuals(nb_dist, out, dec);
       auto exposures = step_exposures(out, z);
       out.set_exposures(exposures);
       //diagnostics.push_back(get_as_dataframe(out,dec));
@@ -300,6 +303,11 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, unsigned ngibbs, 
 }
 
 Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned group, double tol_val) {
+  //setup distribution
+  PoissonDistribution nb_dist;
+  Sampler<PoissonDistribution> nb_sampler(nb_dist);
+  nb_sampler.init();
+  //
   //read normalization data
   Rcpp::Rcout << "init\n";
   const unsigned nbins = obs["nbins"];
@@ -327,7 +335,7 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned gr
     Rcpp::checkUserInterrupt();
     Rcpp::Rcout << "lambda2= " << lam2[i] << "\n";
     out.set_log_signal(signal_ori); //fills-in phi_ref and delta
-    ResidualsPair z = get_poisson_residuals(out, dec);
+    ResidualsPair z = get_residuals(nb_dist, out, dec);
     auto signal = step_signal(out, z, flos, lam2[i], group);
     out.set_log_signal(signal.beta);
     out.set_signal_phihat(signal.phihat);
@@ -340,6 +348,11 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, unsigned gr
 }
 
 Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, double tol_val) {
+  //setup distribution
+  PoissonDistribution nb_dist;
+  Sampler<PoissonDistribution> nb_sampler(nb_dist);
+  nb_sampler.init();
+  //
   //read normalization data
   Rcpp::Rcout << "init\n";
   const unsigned nbins = obs["nbins"];
@@ -362,7 +375,7 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
                                                              FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge));
   //compute differences
   Rcpp::Rcout << "compute\n";
-  ResidualsPair z = get_poisson_residuals(out, dec);
+  ResidualsPair z = get_residuals(nb_dist, out, dec);
   auto diff = step_difference(out, z, flos, lam2, ref);
   out.set_log_difference(diff.delta);
   out.set_deltahat(diff.deltahat);
