@@ -205,16 +205,15 @@ has_converged = function(cs) {
   rel.precision=function(name,fn=identity){merge(params[step==laststep,.(leg,get(name))],
                                                  params[step==laststep-1,.(leg,get(name))],by="leg")[
                                                    leg==leg[.N], max( abs(fn(V2.x[[1]])-fn(V2.y[[1]])) ) / ( max(fn(V2.x[[1]]))-min(fn(V2.x[[1]])) ) ]}
-  conv.eC = rel.precision("eC")
   conv.log_iota = rel.precision("log_iota")
   conv.log_rho = rel.precision("log_rho")
   conv.log_decay = rel.precision("log_decay")
   conv.signal = max(rel.precision("beta.phi"))
   #cat(" conv.log_iota ", conv.log_iota,
   #    " conv.log_rho ", conv.log_rho, " conv.log_decay ", conv.log_decay, " conv.phi ", conv.phi, "\n")
-  cat(" relative precision for this iteration: eC ", conv.eC, " iota ", conv.log_iota,
+  cat(" relative precision for this iteration: iota ", conv.log_iota,
       " rho ", conv.log_rho, " decay ", conv.log_decay, " signal ", conv.signal, "\n")
-  conv.param = all(c(conv.eC, conv.log_iota,conv.log_rho,
+  conv.param = all(c(conv.log_iota,conv.log_rho,
                      conv.log_decay,conv.signal)<cs@settings$tol, na.rm=T)
   return(conv.param)
 }
