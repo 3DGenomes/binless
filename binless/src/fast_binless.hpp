@@ -17,14 +17,14 @@ struct SignalTriplet { std::vector<double> phihat, weights, beta; };
 struct DifferenceQuadruplet { std::vector<double> deltahat,weights,delta,phi_ref; };
 
 std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data, const DecayEstimator& dec, double pseudocount=0.01);
-std::vector<double> step_exposures(const FastSignalData& data, const DecayEstimator& dec);
+std::vector<double> step_exposures(const FastSignalData& data, const ResidualsPair& z);
 std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, const DecayEstimator& dec, double pseudocount=0.01);
-std::vector<double> step_log_biases(const FastSignalData& data, const DecayEstimator& dec);
+std::vector<double> step_log_biases(const FastSignalData& data, const ResidualsPair& z);
 
 template<typename Lasso>
-SignalTriplet step_signal(const FastSignalData& data, const DecayEstimator& dec, std::vector<Lasso>& flo, double lam2, unsigned group=0);
+SignalTriplet step_signal(const FastSignalData& data, const ResidualsPair& z, std::vector<Lasso>& flo, double lam2, unsigned group=0);
 template<typename Lasso>
-DifferenceQuadruplet step_difference(const FastDifferenceData& data, const DecayEstimator& dec, std::vector<Lasso>& flos, double lam2, unsigned ref);
+DifferenceQuadruplet step_difference(const FastDifferenceData& data, const ResidualsPair& z, std::vector<Lasso>& flos, double lam2, unsigned ref);
 
 PrecisionPair get_precision(const std::vector<double>& weights, const std::vector<double>& weights_old);
 std::vector<double> remove_signal_degeneracy(const FastSignalData& data);

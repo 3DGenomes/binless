@@ -46,9 +46,7 @@ void DecayEstimator::set_poisson_lsq_summary(const FastSignalData& data, double 
   summary_.weight = weight;
 }
 
-void DecayEstimator::update_summary(const FastSignalData& data) {
-  //get residuals
-  ResidualsPair z = get_poisson_residuals(data, *this);
+void DecayEstimator::update_summary(const FastSignalData& data, const ResidualsPair& z) {
   //compute weight
   const Eigen::Map<const Eigen::VectorXd> weights(z.weights.data(),z.weights.size());
   Eigen::VectorXd weight_sum = summarize(weights);
