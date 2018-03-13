@@ -33,8 +33,8 @@ ResidualsPair get_poisson_residuals(const FastData& data, const DecayEstimator& 
     auto observed = data.get_observed();
     auto nobs = data.get_nobs();
     for (unsigned i=0; i<data.get_N(); ++i) {
-        double expected_i = std::exp(log_expected[i])*nobs[i];
-        residuals.push_back( (observed[i]/expected_i) - 1 );
+        double expected_i = std::exp(log_expected[i]);
+        residuals.push_back( observed[i]/(nobs[i] * expected_i) - 1 );
         weights.push_back( nobs[i] * expected_i );
     }
     return ResidualsPair{residuals,weights};
