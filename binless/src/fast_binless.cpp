@@ -29,14 +29,15 @@ std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data, co
   auto names = data.get_name();
   for (unsigned i=0; i<data.get_N(); ++i) {
     unsigned name = names[i]-1; //offset by 1 for vector indexing
-    sum_obs[name] += observed[i]*nobs[i];
+    sum_obs[name] += observed[i];
     sum_exp[name] += std::exp(log_expected[i])*nobs[i];
   }
   //compute exposure
   std::vector<double> exposures;
   exposures.reserve(data.get_ndatasets());
   for (unsigned i=0; i<data.get_ndatasets(); ++i) {
-    exposures.push_back(std::log((sum_obs[i]+pseudocount)/sum_exp[i]));
+    exposures.push_back(std::log(pseudocount + sum_obs[i]/sum_exp[i]));
+    Rcpp::Rcout << "expo: sum_obs=" << sum_obs[i] << " sum_exp=" << sum_exp[i] << " expo=" << exposures.back() << "\n";
   }
   return exposures;
 }
@@ -75,13 +76,13 @@ std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, c
   for (unsigned i=0; i<data.get_N(); ++i) {
     unsigned bin1 = dbin1[i]-1; //offset by 1 for vector indexing
     unsigned bin2 = dbin2[i]-1;
-    double expected = std::exp(log_expected[i]);
-    sum_obs[bin1] += observed[i]*nobs[i];
-    sum_exp[bin1] += expected*nobs[i];
+    double expected = std::exp(log_expected[i])*nobs[i];
+    sum_obs[bin1] += observed[i];
+    sum_exp[bin1] += expected;
     sum_nobs[bin1] += nobs[i];
     if (bin1!=bin2) {
-      sum_obs[bin2] += observed[i]*nobs[i];
-      sum_exp[bin2] += expected*nobs[i];
+      sum_obs[bin2] += observed[i];
+      sum_exp[bin2] += expected;
       sum_nobs[bin2] += nobs[i];
     }
   }
@@ -89,7 +90,7 @@ std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, c
   std::vector<double> log_bias;
   log_bias.reserve(data.get_nbins());
   for (unsigned i=0; i<data.get_nbins(); ++i) {
-    log_bias.push_back(std::log((sum_obs[i]+pseudocount)/sum_exp[i]));
+    log_bias.push_back(std::log(pseudocount + sum_obs[i]/sum_exp[i]));
   }
   //compute weighted average
   double avg=0;

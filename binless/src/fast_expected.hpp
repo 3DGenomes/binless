@@ -11,6 +11,7 @@ using namespace Rcpp;
 namespace binless {
 namespace fast {
 
+// returns the expected log mean for each observation (must be multiplied by nobs to match with observed counts per bin)
 template<typename Derived>
 std::vector<double> get_log_expected(const FastData<Derived>& data, const DecayEstimator& dec);
 
