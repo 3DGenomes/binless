@@ -119,30 +119,36 @@ base.res=5000
 tol_val=1e-1
 bg_steps=5
 cs2 <- normalize_binless(cs, ngibbs = 0, ncores = 1, base.res = base.res, bg.steps = bg_steps, tol = tol_val)
-cts.common = binless:::gauss_common_muhat_mean(cs2, cs@zeros, cs@settings$sbins)
+cts.common = binless:::gauss_common_muhat_mean(cs2, cs2@zeros, cs2@settings$sbins)
 cts.common = cts.common[,.(name,bin1=pmin(bin1,bin2),bin2=pmax(bin1,bin2),count,z,var,mu,lmu.nosig,
                     log_decay,log_bias,nobs=nobs/2)]
-pred.opt=cts.common[,.(observed=sum(count*nobs),nobs=sum(nobs),log_background=weighted.mean(lmu.nosig,nobs)),by=c("name","bin1","bin2")]
+pred.opt=cts.common[,.(observed=sum(count*nobs),nobs=sum(nobs),log_background=weighted.mean(lmu.nosig,nobs),weight=sum(nobs/var)),by=c("name","bin1","bin2")]
 pred.opt[,c("name","bin1","bin2"):=list(unclass(name),unclass(bin1),unclass(bin2))]
 pred.opt=pred.opt[bin1<max(bin2)&bin2<max(bin2)] #in fast binless, last row is discarded
 mat = binless:::bin_data(cs,resolution=base.res)
 nouter=0
 lam2=5
-out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, nouter, tol_val, bg_steps)
+out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, cs2@par$alpha, nouter, tol_val, bg_steps)
 pred.fast=as.data.table(out$mat)[,.(name,bin1,bin2,distance,observed,nobs,log_background)]
+pred.fast[,weight:=nobs/(1/exp(log_background)+1/cs2@par$alpha)]
 
-#compare background
+#compare observed
 pred=merge(pred.opt,pred.fast,all=T,by=c("name","bin1","bin2"),suffixes=c(".opt",".fast"))
 pred[,summary(observed.opt-observed.fast)]
 ggplot(pred)+geom_raster(aes(bin1,bin2,fill=observed.opt-observed.fast))+scale_fill_gradient2() #all equal except most distant corner, on purpose
-#
+#compare nobs
 pred[,summary(nobs.opt-nobs.fast)]
 ggplot(pred)+geom_raster(aes(bin1,bin2,fill=nobs.opt-nobs.fast))+scale_fill_gradient2() #all equal except most distant corner, on purpose
 ggplot(pred)+geom_point(aes(nobs.opt,nobs.fast,colour=distance<=base.res/2+cs2@settings$dmin))+stat_function(fun=identity)
-#
+#compare log_background
 pred[,summary(log_background.opt-log_background.fast)]
 ggplot(pred)+geom_raster(aes(bin1,bin2,fill=log_background.opt-log_background.fast))+scale_fill_gradient2() #all equal except most distant corner, on purpose
 ggplot(pred)+geom_point(aes(log_background.opt,log_background.fast,colour=distance<=base.res/2+cs2@settings$dmin))+stat_function(fun=identity)
+pred[,summary(lm(log_background.fast~log_background.opt+0))]
+#compare weights
+pred[,summary((weight.opt-weight.fast)/weight.opt)]
+ggplot(pred)+geom_raster(aes(bin1,bin2,fill=(weight.opt-weight.fast)/weight.opt))+scale_fill_gradient2() #all equal except most distant corner, on purpose
+ggplot(pred)+geom_point(aes(weight.opt,weight.fast,colour=distance<=base.res/2+cs2@settings$dmin))+stat_function(fun=identity)+scale_x_log10()+scale_y_log10()
 pred[,summary(lm(log_background.fast~log_background.opt+0))]
 
 
