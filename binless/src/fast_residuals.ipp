@@ -50,7 +50,7 @@ ResidualsPair get_residuals(const NegativeBinomialDistribution& dist, const Fast
   auto nobs = data.get_nobs();
   for (unsigned i=0; i<data.get_N(); ++i) {
     double expected_i = std::exp(log_expected[i]);
-    residuals.push_back( (observed[i]/expected_i) - 1);
+    residuals.push_back( observed[i]/(nobs[i] * expected_i) - 1);
     weights.push_back( nobs[i]/(1/expected_i + 1/dist.alpha) );
   }
   return ResidualsPair{residuals,weights};
