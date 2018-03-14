@@ -1,8 +1,7 @@
 
 
-//residuals: normal with log-link, 0 drops data
 template<typename FastData>
-ResidualsPair get_normal_residuals(const FastData& data, const DecayEstimator& dec) {
+ResidualsPair get_residuals(const NormalDistribution& dist, const FastData& data, const DecayEstimator& dec) {
     std::vector<double> residuals;
     std::vector<double> weights;
     residuals.reserve(data.get_N());
@@ -22,9 +21,8 @@ ResidualsPair get_normal_residuals(const FastData& data, const DecayEstimator& d
     return ResidualsPair{residuals,weights};
 }
 
-//residuals: poisson with log-link
 template<typename FastData>
-ResidualsPair get_poisson_residuals(const FastData& data, const DecayEstimator& dec) {
+ResidualsPair get_residuals(const PoissonDistribution& dist, const FastData& data, const DecayEstimator& dec) {
     std::vector<double> residuals;
     std::vector<double> weights;
     residuals.reserve(data.get_N());
@@ -39,3 +37,22 @@ ResidualsPair get_poisson_residuals(const FastData& data, const DecayEstimator& 
     }
     return ResidualsPair{residuals,weights};
 }
+
+//residuals: negative binomial with log-link
+template<typename FastData>
+ResidualsPair get_residuals(const NegativeBinomialDistribution& dist, const FastData& data, const DecayEstimator& dec) {
+  std::vector<double> residuals;
+  std::vector<double> weights;
+  residuals.reserve(data.get_N());
+  weights.reserve(data.get_N());
+  auto log_expected = get_log_expected(data, dec);
+  auto observed = data.get_observed();
+  auto nobs = data.get_nobs();
+  for (unsigned i=0; i<data.get_N(); ++i) {
+    double expected_i = std::exp(log_expected[i]);
+    residuals.push_back( observed[i]/(nobs[i] * expected_i) - 1);
+    weights.push_back( nobs[i]/(1/expected_i + 1/dist.alpha) );
+  }
+  return ResidualsPair{residuals,weights};
+}
+
