@@ -72,9 +72,9 @@ ggplot(decay)+geom_line(aes(distance,decay,colour="decay"))+
 
 #residuals at last step (along first row of the matrix)
 a=cs@diagnostics$residuals[step==max(step)]
-ggplot()+geom_point(aes(unclass(bin),count/ncounts),alpha=0.5,data=a)+facet_wrap(~name)+scale_y_log10()+
-  geom_line(aes(unclass(bin),value/ncounts,colour=variable),
-            data=melt(a[,.(name,bin,signal,decay,bias,mean,ncounts)],id=c("name","bin","ncounts")))
+ggplot()+geom_point(aes(unclass(bin),count/nobs),alpha=0.5,data=a)+facet_wrap(~name)+scale_y_log10()+
+  geom_line(aes(unclass(bin),value/nobs,colour=variable),
+            data=melt(a[,.(name,bin,signal,decay,bias,mean,nobs)],id=c("name","bin","nobs")))
 
 
 

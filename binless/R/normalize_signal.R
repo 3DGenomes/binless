@@ -116,7 +116,7 @@ gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.
   precision = max(abs(mat[,beta]-cs@par$beta.phi))
   cs@par$tol_signal = min(cs@par$tol_signal, max(cs@settings$tol, precision/10))
   #set new parameters
-  cs@par$signal=mat[,.(name,bin1,bin2,phihat,weight,ncounts,phi,beta,diag.grp,diag.idx)]
+  cs@par$signal=mat[,.(name,bin1,bin2,phihat,weight,nobs,phi,beta,diag.grp,diag.idx)]
   cs@par$beta.phi=mat[,beta]
   params=merge(cbind(cs@design[,.(name)],eC=cs@par$eC), params, by="name",all=T)
   cs@par$eC=as.array(params[,eC+eCprime])

@@ -41,11 +41,11 @@ private:
 //BIC
 template<> class ScoreAssembler<BIC> {
 public:
-    typedef Rcpp::NumericVector var_t; //type of ncounts
+    typedef Rcpp::NumericVector var_t; //type of nobs
     typedef std::pair<double,double> value_t; //score return type
     const std::string score_name = "BIC";
     
-    ScoreAssembler(const var_t& ncounts) : lsnc_(log(Rcpp::sum(ncounts))) {}
+    ScoreAssembler(const var_t& nobs) : lsnc_(log(Rcpp::sum(nobs))) {}
     
     value_t assemble(const Rcpp::NumericVector& chisq, double dof) const {
         const double BIC = sum(chisq)+ lsnc_*dof;

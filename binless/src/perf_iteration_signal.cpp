@@ -143,7 +143,7 @@ List wgfl_signal_BIC(const DataFrame cts, double dispersion, int nouter, int nbi
     DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
                                       _["bin2"]=binned.get_bin2(),
                                       _["phihat"]=binned.get_phihat(),
-                                      _["ncounts"]=binned.get_ncounts(),
+                                      _["nobs"]=binned.get_nobs(),
                                       _["weight"]=binned.get_weight(),
                                       _["diag.idx"]=binned.get_diag_idx(),
                                       _["diag.grp"]=binned.get_diag_grp(),

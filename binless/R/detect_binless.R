@@ -91,7 +91,7 @@ detect_binless_interactions = function(cs, resolution=cs@settings$base.res, grou
   ### store interaction
   #store back
   csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],eCprime=params[,eCprime],name=params[,name])
-  mat[,ncounts:=NULL]
+  mat[,nobs:=NULL]
   csi@mat=mat
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
@@ -149,7 +149,7 @@ detect_binless_differences = function(cs, ref, resolution=cs@settings$base.res, 
   mat = rbindlist(params[,mat])
   #store back
   csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],eCprime=params[,eCprime],name=params[,name])
-  mat[,ncounts:=NULL]
+  mat[,nobs:=NULL]
   csi@mat=mat
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg

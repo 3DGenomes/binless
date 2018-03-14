@@ -227,11 +227,11 @@ get_residuals = function(cts.common, viewpoint) {
                                decay=sum(exp(log_decay)*nobs),
                                bias=sum(exp(log_bias)*nobs),
                                mean=sum(exp(lmu.nosig+phi)*nobs),
-                               ncounts=sum(nobs),
+                               nobs=sum(nobs),
                                count=sum(count*nobs)),
              keyby=c("name","bin2")]
   setnames(a,"bin2","bin")
-  a[bin==viewpoint,c("signal","decay","bias","mean","ncounts","count"):=list(signal/2,decay/2,bias/2,mean/2,ncounts/2,count/2)]
+  a[bin==viewpoint,c("signal","decay","bias","mean","nobs","count"):=list(signal/2,decay/2,bias/2,mean/2,nobs/2,count/2)]
   return(a)
 }
 

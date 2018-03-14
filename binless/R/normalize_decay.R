@@ -6,9 +6,9 @@ NULL
 #' 
 initial_guess_decay = function(cs, cts.common, pseudocount=1e-2) {
   decay=cts.common[,.(log_decay=log((pseudocount+weighted.mean(count,nobs))/(weighted.mean(exp(lmu.nosig),nobs))),
-                      ncounts=sum(nobs)),keyby=c("name","dbin")]
-  decay[,log_decay:=log_decay-weighted.mean(log_decay,ncounts),by=name]
-  decay[,ncounts:=NULL]
+                      nobs=sum(nobs)),keyby=c("name","dbin")]
+  decay[,log_decay:=log_decay-weighted.mean(log_decay,nobs),by=name]
+  decay[,nobs:=NULL]
   cs@par$decay=decay
   return(cs)
 }
@@ -149,7 +149,7 @@ gauss_decay_optimize = function(csd, design, Kdiag, original_lambda_diag,
   decay_out$beta_diag=as.matrix(decay_out$beta_diag)
   decay_out$beta_diag_diff=as.matrix(decay_out$beta_diag_diff)
   #make decay data table, reused at next call
-  dmat=csd[,.(name,dbin,distance,kappahat,std,ncounts=nobs,kappa=decay_out$log_mean_counts,log_decay=decay_out$log_decay)]
+  dmat=csd[,.(name,dbin,distance,kappahat,std,nobs,kappa=decay_out$log_mean_counts,log_decay=decay_out$log_decay)]
   setkey(dmat,name,dbin)
   decay_out$decay=dmat
   decay_out[c("beta_diag","beta_diag_diff","beta_diag_centered","log_mean_counts")]=NULL

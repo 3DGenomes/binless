@@ -17,8 +17,8 @@ NULL
 predict_binned_matrices_irls = function(cts, dispersion) {
   #predict means
   cts[,c("decay","biases","mu.nosig"):=list(exp(log_decay),exp(log_bias),exp(lmu.nosig))]
-  mat=cts[,.(ncounts=sum(nobs),
-             observed=sum(count*nobs),
+  mat=cts[,.(observed=sum(count*nobs),
+             nobs=sum(nobs),
              biasmat=weighted.mean(biases,nobs),
              decaymat=weighted.mean(decay,nobs),
              background=sum(mu.nosig*nobs),
@@ -32,7 +32,7 @@ predict_binned_matrices_irls = function(cts, dispersion) {
   levels(bins) <- bl1
   fullmat=CJ(name=cts[,unique(name)],bin1=bins,bin2=bins,sorted=T)[bin2>=bin1]
   mat=mat[fullmat]
-  mat[is.na(observed),c("ncounts","observed","normalized"):=list(0,0,0)]
+  mat[is.na(observed),c("nobs","observed","normalized"):=list(0,0,0)]
   mat[,diag.idx:=unclass(bin2)-unclass(bin1)]
   mat[,decaymat:=mean(decaymat,na.rm = T),by=c("name","diag.idx")]
   mat[,diag.idx:=NULL]

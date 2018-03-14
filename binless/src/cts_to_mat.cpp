@@ -92,7 +92,7 @@ void cts_to_signal_mat(const RawData<Signal>& raw, BinnedData<Signal>& binned) {
     binned.set_phihat(phihat_i);
     binned.set_weight(weight_i);
     binned.set_weight_nodecay(weight_nodecay_i);
-    binned.set_ncounts(ncounts_i);
+    binned.set_nobs(ncounts_i);
     binned.set_diag_idx(didx_i);
     binned.set_diag_grp(dgrp_i);
 }
@@ -115,7 +115,7 @@ void cts_to_diff_mat(const RawData<Difference>& raw, BinnedData<Difference>& bin
     binned.set_weight(sbinned_oth.get_weight());
     binned.set_weight_nodecay(sbinned_oth.get_weight_nodecay());
     binned.set_deltahat(sbinned_oth.get_phihat() - binned.get_phi_ref());
-    binned.set_ncounts(sbinned_oth.get_ncounts() + sbinned_ref.get_ncounts());
+    binned.set_nobs(sbinned_oth.get_nobs() + sbinned_ref.get_nobs());
     binned.set_diag_idx(sbinned_ref.get_diag_idx());
     binned.set_diag_grp(sbinned_ref.get_diag_grp());
     binned.set_weight_ref(sbinned_ref.get_weight());
