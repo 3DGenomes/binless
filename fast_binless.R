@@ -38,6 +38,8 @@ a=as.data.table(out$mat)
 #observed matrix (input data)
 plot_binless_matrix(a, upper="observed", lower="observed")
 #ggsave(filename="example/rao_HiCall_FOXP1ext_2.3M_fast_binless_observed.pdf", width=18,height=8)
+#number of observables (input data)
+plot_binless_matrix(a, upper="nobs", lower="nobs")
 #fitted background
 plot_binless_matrix(a, upper="log_background", lower="log_background", trans="identity")
 #fitted biases
