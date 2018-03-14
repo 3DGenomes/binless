@@ -37,7 +37,6 @@ std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data, co
   exposures.reserve(data.get_ndatasets());
   for (unsigned i=0; i<data.get_ndatasets(); ++i) {
     exposures.push_back(std::log(pseudocount + sum_obs[i]/sum_exp[i]));
-    Rcpp::Rcout << "expo: sum_obs=" << sum_obs[i] << " sum_exp=" << sum_exp[i] << " expo=" << exposures.back() << "\n";
   }
   return exposures;
 }
@@ -298,6 +297,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, uns
   //finalize and return
   return Rcpp::List::create(_["mat"]=get_as_dataframe(out,dec), _["log_biases"]=out.get_log_biases(),
                             _["beta_diag"]=dec.get_beta(), _["exposures"]=out.get_exposures(),
+                            _["log_signal"]=out.get_log_signal(),
                             //_["diagnostics"]=diagnostics,
                             _["nbins"]=nbins);
 }
@@ -358,8 +358,8 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   const unsigned nbins = obs["nbins"];
   const Rcpp::DataFrame mat = Rcpp::as<Rcpp::DataFrame>(obs["mat"]);
   FastDifferenceData out(mat, nbins, ref);
-  auto signal = Rcpp::as<std::vector<double> >(mat["log_signal"]);
-  out.set_log_signal(signal); //fills-in phi_ref and delta
+  auto log_signal = Rcpp::as<std::vector<double> >(obs["log_signal"]);
+  out.set_log_signal(log_signal); //fills-in phi_ref and delta
   //
   DecayConfig conf(tol_val);
   DecayEstimator dec(out, conf);

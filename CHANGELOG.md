@@ -9,6 +9,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - Exposures are now fit separately
 - Use `nobs` column in fast binless
 - `ncounts` becomes `nobs` in optimized binless
+- Use same column names in fast and optimized binless outputs
 - fast binless model now mimicks that of slow binless
   - using binwise averages (breaks backwards compatibility)
   - using negative binomial with fixed dispersion
