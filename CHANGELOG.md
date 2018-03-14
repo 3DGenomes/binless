@@ -8,8 +8,9 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 ### Changed
 - Exposures are now fit separately
 - Use `nobs` column in fast binless
-- fast binless model now mimicks that of slow binless using binwise averages
- (breaks backwards compatibility)
+- fast binless model now mimicks that of slow binless
+  - using binwise averages (breaks backwards compatibility)
+  - using negative binomial with fixed dispersion
 
 ### Fixed
 - sigma parameter was ignored in `GeneralizedAdditiveModel`
