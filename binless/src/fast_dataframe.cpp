@@ -25,9 +25,9 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const DecayEstima
     binless.push_back(decay + signal + exposure);
     log_background.push_back(bi + bj + decay + exposure);
   }
-  return Rcpp::DataFrame::create(_["name"]=dname,
-                                 _["bin1"]=dbin1,
-                                 _["bin2"]=dbin2,
+  return Rcpp::DataFrame::create(_["name"]=data.get_name_factor(),
+                                 _["bin1"]=data.get_bin1_factor(),
+                                 _["bin2"]=data.get_bin2_factor(),
                                  _["observed"]=data.get_observed(),
                                  _["nobs"]=data.get_nobs(),
                                  _["distance"]=data.get_distance(),
@@ -42,9 +42,9 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const DecayEstima
 
 
 Rcpp::DataFrame get_as_dataframe(const FastData<Difference>& data) {
-  return Rcpp::DataFrame::create(_["name"]=data.get_name(),
-                                 _["bin1"]=data.get_bin1(),
-                                 _["bin2"]=data.get_bin2(),
+  return Rcpp::DataFrame::create(_["name"]=data.get_name_factor(),
+                                 _["bin1"]=data.get_bin1_factor(),
+                                 _["bin2"]=data.get_bin2_factor(),
                                  _["observed"]=data.get_observed(),
                                  _["log_difference"]=data.get_log_difference(),
                                  _["deltahat"]=data.get_deltahat(),
