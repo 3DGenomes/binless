@@ -31,21 +31,21 @@ predict_all = function(cs, counts) {
                                                            log_mu.base+log_iota1+log_iota2)]
   cpos[,log_mu.base:=NULL]
   cpos=rbind(cpos[,.(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact R", dir="fwd", id2=id2, variable="close",
-                                    count=contact.close, lmu.nosig=lmu.close, nobs=1, eC, log_decay, log_bias=log_rho1)],
+                     count=contact.close, lmu.nosig=lmu.close, nobs=1, eC, log_decay, log_bias=log_rho1)],
              cpos[,.(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact L", dir="fwd", id2=id2, variable="far",
-                                    count=contact.far,   lmu.nosig=lmu.far,   nobs=1, eC, log_decay, log_bias=log_iota1)],
+                     count=contact.far,   lmu.nosig=lmu.far,   nobs=1, eC, log_decay, log_bias=log_iota1)],
              cpos[,.(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact R", dir="fwd", id2=id2, variable="down",
-                                    count=contact.down,  lmu.nosig=lmu.down,  nobs=1, eC, log_decay, log_bias=log_rho1)],
+                     count=contact.down,  lmu.nosig=lmu.down,  nobs=1, eC, log_decay, log_bias=log_rho1)],
              cpos[,.(name, id1=id1, pos1=pos1, bin1=bin1, bin2=bin2, dbin, cat="contact L", dir="fwd", id2=id2, variable="up",
-                                    count=contact.up,    lmu.nosig=lmu.up,    nobs=1, eC, log_decay, log_bias=log_iota1)],
+                     count=contact.up,    lmu.nosig=lmu.up,    nobs=1, eC, log_decay, log_bias=log_iota1)],
              cpos[,.(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact R", dir="rev", id2=id1, variable="far",
-                                    count=contact.far,   lmu.nosig=lmu.far,   nobs=1, eC, log_decay, log_bias=log_rho2)],
+                     count=contact.far,   lmu.nosig=lmu.far,   nobs=1, eC, log_decay, log_bias=log_rho2)],
              cpos[,.(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact L", dir="rev", id2=id1, variable="close",
-                                    count=contact.close, lmu.nosig=lmu.close, nobs=1, eC, log_decay, log_bias=log_iota2)],
+                     count=contact.close, lmu.nosig=lmu.close, nobs=1, eC, log_decay, log_bias=log_iota2)],
              cpos[,.(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact R", dir="rev", id2=id1, variable="down",
-                                    count=contact.down,  lmu.nosig=lmu.down,  nobs=1, eC, log_decay, log_bias=log_rho2)],
+                     count=contact.down,  lmu.nosig=lmu.down,  nobs=1, eC, log_decay, log_bias=log_rho2)],
              cpos[,.(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact L", dir="rev", id2=id1, variable="up",
-                                    count=contact.up,    lmu.nosig=lmu.up,    nobs=1, eC, log_decay, log_bias=log_iota2)])
+                     count=contact.up,    lmu.nosig=lmu.up,    nobs=1, eC, log_decay, log_bias=log_iota2)])
   cts=cpos
   setkeyv(cts,key(cs@zeros))
   ### add signal
@@ -121,25 +121,41 @@ bg_steps=5
 cs2 <- normalize_binless(cs, ngibbs = 0, ncores = 1, base.res = base.res, bg.steps = bg_steps, tol = tol_val)
 cts.common = binless:::gauss_common_muhat_mean(cs2, cs2@zeros, cs2@settings$sbins)
 cts.common = cts.common[,.(name,bin1=pmin(bin1,bin2),bin2=pmax(bin1,bin2),count,z,var,mu,lmu.nosig,
-                    log_decay,log_bias,nobs=nobs/2)]
-pred.opt=cts.common[,.(observed=sum(count*nobs),nobs=sum(nobs),log_background=weighted.mean(lmu.nosig,nobs),weight=sum(nobs/var)),by=c("name","bin1","bin2")]
+                           log_decay,log_bias,nobs=nobs/2)]
+pred.opt=cts.common[,.(observed=sum(count*nobs),nobs=sum(nobs),log_background=log(sum(exp(lmu.nosig)*nobs)),
+                       weight=sum(nobs/var),log_bias=weighted.mean(log_bias,nobs),log_decay=weighted.mean(log_decay,nobs)),by=c("name","bin1","bin2")]
 pred.opt[,c("name","bin1","bin2"):=list(unclass(name),unclass(bin1),unclass(bin2))]
 pred.opt=pred.opt[bin1<max(bin2)&bin2<max(bin2)] #in fast binless, last row is discarded
 mat = binless:::bin_data(cs,resolution=base.res)
 nouter=0
 lam2=5
 out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, cs2@par$alpha, nouter, tol_val, bg_steps)
-pred.fast=as.data.table(out$mat)[,.(name,bin1,bin2,distance,observed,nobs,log_background)]
-pred.fast[,weight:=nobs/(1/exp(log_background)+1/cs2@par$alpha)]
+pred.fast=as.data.table(out$mat)[,.(name,bin1,bin2,distance,observed,nobs,log_background=log(background),log_bias=log(biasmat),log_decay=log(decaymat))]
+pred.fast[,weight:=nobs/(nobs/exp(log_background)+1/cs2@par$alpha)]
+pred.fast[,c("name","bin1","bin2"):=list(unclass(name),unclass(bin1),unclass(bin2))]
 
-#compare observed
 pred=merge(pred.opt,pred.fast,all=T,by=c("name","bin1","bin2"),suffixes=c(".opt",".fast"))
+#exposures
+cs2@par$eC
+out$exposures
+#compare observed
 pred[,summary(observed.opt-observed.fast)]
 ggplot(pred)+geom_raster(aes(bin1,bin2,fill=observed.opt-observed.fast))+scale_fill_gradient2() #all equal except most distant corner, on purpose
 #compare nobs
 pred[,summary(nobs.opt-nobs.fast)]
 ggplot(pred)+geom_raster(aes(bin1,bin2,fill=nobs.opt-nobs.fast))+scale_fill_gradient2() #all equal except most distant corner, on purpose
 ggplot(pred)+geom_point(aes(nobs.opt,nobs.fast,colour=distance<=base.res/2+cs2@settings$dmin))+stat_function(fun=identity)
+#compare log_decay
+pred[,summary(log_decay.opt-log_decay.fast)]
+ggplot(pred)+geom_raster(aes(bin1,bin2,fill=log_decay.opt-log_decay.fast))+scale_fill_gradient2() #all equal except most distant corner, on purpose
+ggplot(pred)+geom_point(aes(log_decay.opt,log_decay.fast,colour=distance<=base.res/2+cs2@settings$dmin))+stat_function(fun=identity)
+ggplot(pred)+geom_point(aes(distance,log_decay.fast,colour="fast"))+geom_point(aes(distance,log_decay.opt,colour="opt"))
+pred[,summary(lm(log_decay.fast~log_decay.opt+0))]
+#compare log_bias
+pred[,summary(log_bias.opt-log_bias.fast)]
+ggplot(pred)+geom_raster(aes(bin1,bin2,fill=log_bias.opt-log_bias.fast))+scale_fill_gradient2() #all equal except most distant corner, on purpose
+ggplot(pred)+geom_point(aes(log_bias.opt,log_bias.fast,colour=distance<=base.res/2+cs2@settings$dmin))+stat_function(fun=identity)
+pred[,summary(lm(log_bias.fast~log_bias.opt+0))]
 #compare log_background
 pred[,summary(log_background.opt-log_background.fast)]
 ggplot(pred)+geom_raster(aes(bin1,bin2,fill=log_background.opt-log_background.fast))+scale_fill_gradient2() #all equal except most distant corner, on purpose
@@ -149,8 +165,39 @@ pred[,summary(lm(log_background.fast~log_background.opt+0))]
 pred[,summary((weight.opt-weight.fast)/weight.opt)]
 ggplot(pred)+geom_raster(aes(bin1,bin2,fill=(weight.opt-weight.fast)/weight.opt))+scale_fill_gradient2() #all equal except most distant corner, on purpose
 ggplot(pred)+geom_point(aes(weight.opt,weight.fast,colour=distance<=base.res/2+cs2@settings$dmin))+stat_function(fun=identity)+scale_x_log10()+scale_y_log10()
-pred[,summary(lm(log_background.fast~log_background.opt+0))]
 
 
+
+### compare final models with the same lambda and dispersion
+
+#normalize using optimized binless
+cs <- normalize_binless(cs, ngibbs = 15, ncores = 1, base.res = 5000, bg.steps = 5, tol = 1e-1)
+cs=bin_all_datasets(cs, ncores=ncores)
+cs=detect_binless_interactions(cs, ncores=ncores)
+pred.opt=get_binless_interactions(cs)
+pred.opt[,c("name","bin1","bin2"):=list(unclass(name),unclass(bin1),unclass(bin2))]
+pred.opt=pred.opt[bin1<max(bin2)&bin2<max(bin2)] #in fast binless, last row is discarded
+mat = binless:::bin_data(cs,resolution=base.res)
+nouter=25
+lam2=cs@groups[[1]]@interactions[[1]]@par$lambda2
+out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, cs2@par$alpha, nouter, tol_val, bg_steps)
+pred.fast=as.data.table(out$mat)
+pred.fast[,c("name","bin1","bin2"):=list(unclass(name),unclass(bin1),unclass(bin2))]
+
+pred=merge(pred.opt,pred.fast,all=T,by=c("name","bin1","bin2"),suffixes=c(".opt",".fast"))
+
+plot_binless_matrix(pred,upper="observed.opt",lower="observed.fast")
+plot_binless_matrix(pred,upper="biasmat.opt",lower="biasmat.fast")
+ggplot(pred)+geom_point(aes(distance,biasmat.fast,colour="fast"))+geom_point(aes(distance,biasmat.opt,colour="opt"))
+plot_binless_matrix(pred,upper="decaymat.opt",lower="decaymat.fast")
+ggplot(pred)+geom_point(aes(distance,decaymat.fast,colour="fast"))+geom_point(aes(distance,decaymat.opt,colour="opt"))
+plot_binless_matrix(pred,upper="phihat.opt",lower="phihat.fast")
+ggplot(pred)+geom_point(aes(distance,phihat.fast,colour="fast"))+geom_point(aes(distance,phihat.opt,colour="opt"))+scale_y_log10()
+plot_binless_matrix(pred,upper="weight.opt",lower="weight.fast")
+ggplot(pred)+geom_point(aes(distance,weight.fast,colour="fast"))+geom_point(aes(distance,weight.opt,colour="opt"))+scale_y_log10()
+plot_binless_matrix(pred,upper="signal.opt",lower="signal.fast")
+ggplot(pred)+geom_point(aes(distance,signal.fast,colour="fast"))+geom_point(aes(distance,signal.opt,colour="opt"))+scale_y_log10()
+plot_binless_matrix(pred,upper="binless.opt",lower="binless.fast")
+ggplot(pred)+geom_point(aes(distance,binless.fast,colour="fast"))+geom_point(aes(distance,binless.opt,colour="opt"))+scale_y_log10()
 
 
