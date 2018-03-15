@@ -25,7 +25,7 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const DecayEstima
     signal.push_back(std::exp(lsig));
     unsigned name = dname[i]-1;
     double exposure = exposures[name];
-    binless.push_back(mean_nobs*std::exp(ldec + lsig + exposure));
+    binless.push_back(std::exp(ldec + lsig));
     background.push_back(nobs[i]*std::exp(bi + bj + ldec + exposure));
   }
   return Rcpp::DataFrame::create(_["name"]=data.get_name_factor(),
