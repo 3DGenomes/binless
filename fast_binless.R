@@ -67,7 +67,7 @@ plot_binless_matrix(a, upper="binless", lower="observed")
 ### Difference detection
 
 #now we compute differences between the two datasets
-ref=1
+ref=mat[,name[1]]
 lam2=5
 alpha=1
 tol_val=2e-1
@@ -76,8 +76,8 @@ diff=as.data.table(binless:::fast_binless_difference(out, lam2, ref, alpha, tol_
 #log(observed)
 plot_binless_matrix(diff, upper="observed", lower="observed")
 #log difference of all datasets wrt ref
-plot_binless_difference_matrix(diff[name!=ref])
+plot_binless_difference_matrix(diff[as.character(name)!=as.character(ref)])
 #ggsave(filename="example/rao_HiCall_FOXP1ext_2.3M_fast_binless_difference.pdf", width=10,height=8)
 #patch number
-plot_binless_matrix(diff[name!=ref], upper="patchno", lower="patchno", trans="identity")
+plot_binless_matrix(diff[as.character(name)!=as.character(ref)], upper="patchno", lower="patchno", trans="identity")
 
