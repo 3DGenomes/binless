@@ -55,6 +55,8 @@ plot_binless_matrix(a, upper="decaymat", lower="decaymat")
 plot_binless_signal_matrix(a)
 #weights ( = 1/variance )
 plot_binless_matrix(a, upper="weight", lower="weight")
+#patch number
+plot_binless_matrix(a, upper="patchno", lower="patchno", trans="identity")
 #binless matrix ( = signal + decay)
 plot_binless_matrix(a, upper="binless", lower="binless")
 #binless and observed
@@ -76,4 +78,6 @@ plot_binless_matrix(diff, upper="observed", lower="observed")
 #log difference of all datasets wrt ref
 plot_binless_difference_matrix(diff[name!=ref])
 #ggsave(filename="example/rao_HiCall_FOXP1ext_2.3M_fast_binless_difference.pdf", width=10,height=8)
+#patch number
+plot_binless_matrix(diff[name!=ref], upper="patchno", lower="patchno", trans="identity")
 

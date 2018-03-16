@@ -57,7 +57,7 @@ public:
     D_ = second_order_difference_matrix(conf_.Kdiag);
     //C: build constraint matrix to forbid increase
     unsigned free_first = conf_.Kdiag * (std::log(conf_.free_decay)-log_dmin_)/(log_dmax_-log_dmin_);
-    Rcpp::Rcout << "Free decay in " << free_first << " out of " << conf_.Kdiag << " basis functions\n";
+    //Rcpp::Rcout << "Free decay in " << free_first << " out of " << conf_.Kdiag << " basis functions\n";
     Cin_ = decreasing_constraint(conf_.Kdiag, free_first);
   }
   

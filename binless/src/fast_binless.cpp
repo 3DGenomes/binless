@@ -287,7 +287,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, uns
       z = get_residuals(nb_dist, out, dec);
       auto exposures = step_exposures(out, z);
       out.set_exposures(exposures);
-      //diagnostics.push_back(get_as_dataframe(out,dec));
+      //diagnostics.push_back(get_as_dataframe(out,dec,tol_val));
       if (converged) {
         Rcpp::Rcout << "converged\n";
         break;
@@ -295,7 +295,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, uns
   }
   Rcpp::Rcout << "done\n";
   //finalize and return
-  return Rcpp::List::create(_["mat"]=get_as_dataframe(out,dec), _["log_biases"]=out.get_log_biases(),
+  return Rcpp::List::create(_["mat"]=get_as_dataframe(out,dec,tol_val), _["log_biases"]=out.get_log_biases(),
                             _["beta_diag"]=dec.get_beta(), _["exposures"]=out.get_exposures(),
                             _["log_signal"]=out.get_log_signal(),
                             //_["diagnostics"]=diagnostics,
@@ -340,7 +340,7 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, double alph
     out.set_log_signal(signal.beta);
     out.set_signal_phihat(signal.phihat);
     out.set_signal_weights(signal.weights);
-    diagnostics.push_back(get_as_dataframe(out,dec));
+    diagnostics.push_back(get_as_dataframe(out,dec,tol_val));
   }
   //finalize and return
   Rcpp::Rcout << "done\n";
@@ -383,7 +383,7 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   out.set_phi_ref(diff.phi_ref);
   //finalize and return
   Rcpp::Rcout << "done\n";
-  return get_as_dataframe(out);
+  return get_as_dataframe(out,tol_val);
 }
 
 }
