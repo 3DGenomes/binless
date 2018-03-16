@@ -220,14 +220,14 @@ std::vector<double> shift_signal(const FastSignalData& data) {
   return log_signal;
 }
 
-List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, unsigned ngibbs, double tol_val, unsigned bg_steps) {
+List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, unsigned ngibbs, double tol_val, unsigned bg_steps, unsigned free_decay) {
   //initialize return values, exposures and fused lasso optimizer
   Rcpp::Rcout << "init\n";
   NegativeBinomialDistribution nb_dist;
   Sampler<NegativeBinomialDistribution> nb_sampler(nb_dist);
   nb_sampler.init(alpha);
   FastSignalData out(obs, nbins);
-  DecayConfig conf(tol_val);
+  DecayConfig conf(tol_val, free_decay);
   DecayEstimator dec(out, conf);
   //
   out.set_exposures(compute_poisson_lsq_exposures(out, dec));
@@ -317,7 +317,7 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, double alph
   auto signal_ori = Rcpp::as<std::vector<double> >(mat["signal"]);
   out.set_log_signal(signal_ori); //fills-in phi_ref and delta
   //
-  DecayConfig conf(tol_val);
+  DecayConfig conf(tol_val, 10000); //no need to pass free_diag as parameter because it is not used anyway
   DecayEstimator dec(out, conf);
   auto beta_diag = Rcpp::as<Eigen::VectorXd >(obs["beta_diag"]);
   dec.set_beta(beta_diag);
@@ -361,7 +361,7 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   auto log_signal = Rcpp::as<std::vector<double> >(obs["log_signal"]);
   out.set_log_signal(log_signal); //fills-in phi_ref and delta
   //
-  DecayConfig conf(tol_val);
+  DecayConfig conf(tol_val, 10000); //no need to pass free_diag as parameter because it is not used anyway
   DecayEstimator dec(out, conf);
   auto beta_diag = Rcpp::as<Eigen::VectorXd >(obs["beta_diag"]);
   dec.set_beta(beta_diag);

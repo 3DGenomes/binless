@@ -16,7 +16,7 @@ namespace fast {
 struct ResidualsPair;
 
 struct DecayConfig {
-  DecayConfig(double tol_val) : tol_val(tol_val) {}
+  DecayConfig(double tol_val, double free_decay) : tol_val(tol_val), free_decay(free_decay) {}
   
   //parameters for decay calculation
   unsigned Kdiag=50;
@@ -24,7 +24,9 @@ struct DecayConfig {
   double sigma=1;
   unsigned bins_per_bf=100;
   
-  double tol_val; //default value will be overwritten
+  //default values will be overwritten
+  double tol_val;      // tolerance on decay convergence
+  unsigned free_decay; // distance in bases until which decay is not forced to decrease
   
 };
 
@@ -54,7 +56,9 @@ public:
     //D: build difference matrix
     D_ = second_order_difference_matrix(conf_.Kdiag);
     //C: build constraint matrix to forbid increase
-    Cin_ = - first_order_difference_matrix(conf_.Kdiag);
+    unsigned free_first = conf_.Kdiag * (std::log(conf_.free_decay)-log_dmin_)/(log_dmax_-log_dmin_);
+    Rcpp::Rcout << "Free decay in " << free_first << " out of " << conf_.Kdiag << " basis functions\n";
+    Cin_ = decreasing_constraint(conf_.Kdiag, free_first);
   }
   
   double get_Kdiag() const { return conf_.Kdiag; }

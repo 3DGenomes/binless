@@ -129,7 +129,8 @@ pred.opt=pred.opt[bin1<max(bin2)&bin2<max(bin2)] #in fast binless, last row is d
 mat = binless:::bin_data(cs,resolution=base.res)
 nouter=0
 lam2=5
-out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, cs2@par$alpha, nouter, tol_val, bg_steps)
+free_decay=10000
+out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, cs2@par$alpha, nouter, tol_val, bg_steps, free_decay)
 pred.fast=as.data.table(out$mat)[,.(name,bin1,bin2,distance,observed,nobs,log_background=log(background),log_bias=log(biasmat),log_decay=log(decaymat))]
 pred.fast[,weight:=nobs/(nobs/exp(log_background)+1/cs2@par$alpha)]
 pred.fast[,c("name","bin1","bin2"):=list(unclass(name),unclass(bin1),unclass(bin2))]
@@ -180,7 +181,7 @@ pred.opt=pred.opt[bin1<max(bin2)&bin2<max(bin2)] #in fast binless, last row is d
 mat = binless:::bin_data(cs,resolution=base.res)
 nouter=25
 lam2=cs@groups[[1]]@interactions[[1]]@par$lambda2
-out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, cs2@par$alpha, nouter, tol_val, bg_steps)
+out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, cs2@par$alpha, nouter, tol_val, bg_steps, free_decay)
 pred.fast=as.data.table(out$mat)
 pred.fast[,c("name","bin1","bin2"):=list(unclass(name),unclass(bin1),unclass(bin2))]
 

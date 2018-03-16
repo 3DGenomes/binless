@@ -69,7 +69,7 @@ private:
   
 };
 
-Eigen::SparseMatrix<double> first_order_difference_matrix(unsigned K);
+Eigen::SparseMatrix<double> decreasing_constraint(unsigned K, unsigned Kfree);
 Eigen::SparseMatrix<double> second_order_difference_matrix(unsigned K);
 
 }

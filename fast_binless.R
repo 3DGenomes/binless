@@ -29,7 +29,8 @@ lam2=5
 alpha=10
 tol_val=2e-1
 bg_steps=5
-out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, alpha, nouter, tol_val, bg_steps)
+free_decay=10000
+out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, alpha, nouter, tol_val, bg_steps, free_decay)
 
 
 #Here follow the plots of the observed and fitted quantities (be sure to check out signal and binless plots)
