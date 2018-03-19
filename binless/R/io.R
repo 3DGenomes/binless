@@ -41,8 +41,19 @@ save_stripped = function(cs, fname) {
 #' 
 #' @examples
 load_stripped = function(fname, ncores=1) {
+  cat("Loading stripped file\n")
   cs=get(load(fname))
+  cat("Filling zeros\n")
   cs@zeros = binless:::get_nzeros(cs, cs@settings$sbins, ncores=ncores)
+  cat("Computing cts\n")
+  groups=cs@groups
+  cs@groups=list()
+  cs@groups = foreach (csg=groups) %do% {
+    cs=group_datasets(cs, group=csg@group, resolution=csg@resolution, ncores=ncores)
+    csg.new=tail(cs@groups,1)[[1]]
+    csg.new@interactions = csg@interactions #do not populate each csi@cts
+    csg.new
+  }
   return(cs)
 }
 
