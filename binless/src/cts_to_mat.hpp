@@ -17,6 +17,8 @@ void cts_to_signal_mat(const RawData<Signal>& raw, BinnedData<Signal>& binned);
 
 void cts_to_diff_mat(const RawData<Difference>& raw, BinnedData<Difference>& binned);
 
+Rcpp::DataFrame rcpp_cts_to_signal_mat(int nbins, double alpha, Rcpp::DataFrame cts, Rcpp::List metadata);
+
 
 #endif
 

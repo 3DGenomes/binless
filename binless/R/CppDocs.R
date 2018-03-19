@@ -34,5 +34,23 @@ NULL
 #' @name fast_binless_difference 
 NULL
 
+#' Build binned matrix using raw cts data
+#' 
+#' @param cs 
+#' @param cts 
+#' @param resolution 
+bin_cts_to_mat = function(cs, cts, resolution) {
+  nbins = cts[,nlevels(bin1)]
+  alpha = cs@par$alpha
+  mat=foreach(n=cts[,unique(name)],.combine=rbind) %do% {
+    metadata = binless:::get_signal_metadata(cs, cts[name==n], resolution)
+    mat = as.data.table(binless:::rcpp_cts_to_signal_mat(nbins, alpha, cts[name==n], metadata))
+    mat[,name:=n]
+    mat
+  }
+  return(mat)
+}
+
+
 
 

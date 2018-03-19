@@ -5,6 +5,7 @@ using namespace Rcpp;
 #include "perf_iteration_diff.hpp"
 #include "fast_binless.hpp"
 #include "spline.hpp"
+#include "cts_to_mat.hpp"
 
 RCPP_MODULE(binless_cpp) {
     using namespace Rcpp ;
@@ -18,5 +19,7 @@ RCPP_MODULE(binless_cpp) {
     function("fast_binless_difference", &binless::fast::binless_difference, "documentation for fast_binless_difference ");
     
     function("generate_spline_base", &generate_spline_base, "documentation for generate_spline_base ");
+    
+    function("rcpp_cts_to_signal_mat", &rcpp_cts_to_signal_mat, "documentation for rcpp_cts_to_signal_mat ");
 }
 

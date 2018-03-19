@@ -123,3 +123,27 @@ void cts_to_diff_mat(const RawData<Difference>& raw, BinnedData<Difference>& bin
     binned.set_phihat_ref(sbinned_ref.get_phihat());
 }
 
+Rcpp::DataFrame rcpp_cts_to_signal_mat(int nbins, double alpha, const Rcpp::DataFrame cts, const Rcpp::List metadata) {
+  RawData<Signal> raw(nbins, alpha, cts, metadata);
+  BinnedData<Signal> binned;
+  Rcpp::NumericVector beta(nbins*(nbins+1)/2);
+  binned.set_beta_phi(beta);
+  cts_to_signal_mat(raw,binned);
+  binned.get_bin1();
+  binned.get_nobs();
+  binned.get_weight();
+  binned.get_diag_idx();
+  binned.get_diag_grp();
+  binned.get_beta();
+  DataFrame mat = DataFrame::create(_["bin1"]=binned.get_bin1(),
+                                    _["bin2"]=binned.get_bin2(),
+                                    _["phihat"]=binned.get_phihat(),
+                                    _["nobs"]=binned.get_nobs(),
+                                    _["weight"]=binned.get_weight(),
+                                    _["diag.idx"]=binned.get_diag_idx(),
+                                    _["diag.grp"]=binned.get_diag_grp(),
+                                    _["beta"]=binned.get_beta());
+  return mat;
+}
+
+
