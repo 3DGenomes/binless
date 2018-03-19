@@ -70,6 +70,7 @@ gen_optimized_lasso = function(cs, lambda2) {
   fix.lambda1.at=0
   fix.lambda2=T
   fix.lambda2.at=lambda2
+  ncores=4
   #
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
@@ -248,8 +249,21 @@ ggplot(pred)+geom_point(aes(distance,binless.fast,colour="fast"))+geom_point(aes
 
 
 ### take an optimized dataset, generate matrices at various lambdas in both fast and optimized and compare
-cs=load_stripped("data/rao_HiCall_FOXP1ext_2.3M_csnorm_optimized_base5k_stripped.RData")
-mat.opt = gen_optimized_lasso(cs, 3)
-mat.fast = gen_fast_lasso(cs, 3, nouter=50)
-ggplot(rbind(mat.opt,mat.fast))+geom_raster(aes(bin1,bin2,fill=log_signal))+scale_fill_gradient2()+facet_wrap(ori~name)
+load("data/rao_HiCall_FOXP1ext_2.3M_csnorm_optimized_base5k.RData")
+mat = foreach(lam2=c(3),.combine=rbind) %do% {
+  mat.opt = gen_optimized_lasso(cs, lam2)
+  mat.fast = gen_fast_lasso(cs, lam2, nouter=25)
+  mat=dcast(rbind(mat.opt,mat.fast),lam2+name+bin1+bin2~ori,value.var = c("phihat","weight","log_signal","patchno"))
+  mat
+}
+plot_binless_matrix(mat,upper="log_signal_fast",lower="log_signal_opt",trans="identity",facet=c("name","lam2"))
+mat[,c("lsf","lso"):=list(pmin(log_signal_fast,5),pmin(log_signal_opt,5))]
+plot_binless_matrix(mat,upper="lsf",lower="lso",trans="identity",facet=c("name","lam2"))
+ggplot(mat)+geom_point(aes(log_signal_fast,log_signal_opt))+stat_function(fun=identity)+facet_wrap(lam2~name)
+
+plot_binless_matrix(mat,upper="phihat_fast",lower="phihat_opt",trans="identity",facet=c("name","lam2"))
+ggplot(mat)+geom_point(aes(phihat_fast,phihat_opt))+stat_function(fun=identity)+facet_wrap(lam2~name)
+
+plot_binless_matrix(mat,upper="weight_fast",lower="weight_opt",trans="identity",facet=c("name","lam2"))
+ggplot(mat[name==name[1]])+geom_point(aes(weight_fast,weight_opt))+stat_function(fun=identity)+facet_wrap(lam2~name)
 
