@@ -21,12 +21,12 @@ void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
     double z = count[i]/mu-1;
     double var = 1/mu + 1/dispersion;
     double var_nodecay = 1/mu_nodecay + 1/dispersion;
-    double w2v = nobs[i]/(2*var);
-    double w2v_nodecay = nobs[i]/(2*var_nodecay);
+    double wt = nobs[i]/var;
+    double wt_nodecay = nobs[i]/var_nodecay;
     ncounts[pos] += nobs[i];
-    phihat_var[pos] += w2v;
-    phihat_var_nodecay[pos] += w2v_nodecay;
-    phihat[pos] += (z+phi[pos])*w2v;
+    phihat_var[pos] += wt;
+    phihat_var_nodecay[pos] += wt_nodecay;
+    phihat[pos] += (z+phi[pos])*wt;
   }
   
   //finish mat
