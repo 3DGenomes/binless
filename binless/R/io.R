@@ -185,7 +185,7 @@ plot_raw = function(dt, b1=NULL, e1=NULL, b2=NULL, e2=NULL, diagonal=T, rsites=T
 #' @param mat the binless matrix
 #' @param upper,lower the name of the column to plot in upper (resp. lower)
 #'  triangle. Default: phi. Formulae are allowed (ggplot2 aes syntax)
-#' @param facet what to facet on. Default: name
+#' @param facet what to facet on. Default: name. Pass a character vector for multiple facets
 #' @param limits set to a pair of values to enforce plot and colour scale to be within these values
 #'
 #' @return
@@ -213,7 +213,7 @@ plot_binless_matrix = function(mat, upper="binless", lower="observed", trans="lo
   #plot data
   p=ggplot(data)+geom_raster(aes_string(bin1,bin2,fill=upper),hjust=just,vjust=just)+
     geom_raster(aes_string(bin2,bin1,fill=lower),hjust=just,vjust=just)
-  if (facet %in% names(data)) p = p + facet_wrap(facet)
+  if (all(facet %in% names(data))) p = p + facet_wrap(facet)
   #set colour scale
   p=p+scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value = "white", limits=limits, oob=squish, trans=trans)
   #set visual appearance
