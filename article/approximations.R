@@ -60,6 +60,50 @@ predict_all = function(cs, counts) {
   return(cts)
 }
 
+
+gen_optimized_lasso = function(cs, lambda2) {
+  resolution=5000
+  group="all"
+  tol.val=cs@settings$tol
+  nperf=50
+  fix.lambda1=T
+  fix.lambda1.at=0
+  fix.lambda2=T
+  fix.lambda2.at=lambda2
+  #
+  idx1=get_cs_group_idx(cs, resolution, group, raise=T)
+  csg=cs@groups[[idx1]]
+  csi = binless:::prepare_signal_estimation(cs, csg, resolution, tol.val, nperf)
+  groupnames=csi@cts[,unique(name)]
+  csigs = foreach(g=groupnames) %do% {
+    csig = new("CSbsig", mat=csi@mat[name==g], cts=csi@cts[name==g], settings=csi@settings)
+    csig@settings$last.beta=csi@mat[name==g,phi]
+    csig@state = binless:::gfl_compute_initial_state(csig, diff=F)
+    csig
+  }
+  registerDoParallel(cores=min(ncores,length(groupnames)))
+  params = foreach(csig=csigs, .combine=rbind) %dopar% {
+    binless:::fused_lasso(csig, positive=T, fixed=T, constrained=F, verbose=verbose,
+                          fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
+                          fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
+  }
+  stopImplicitCluster()
+  mat.opt=rbindlist(params[,mat])
+  mat.opt[,c("ori","lam2"):=list("opt",lambda2)]
+  return(mat.opt[,.(ori,lam2,name,bin1,bin2,phihat,weight,log_signal=beta,patchno)])
+}
+
+gen_fast_lasso = function(cs, lambda2, nouter=25) {
+  mat=binless:::bin_data(cs,resolution=5000)
+  tol_val=cs@settings$tol
+  bg_steps=5
+  free_decay=10000
+  mat.fast = as.data.table(binless:::fast_binless(mat, mat[,nlevels(bin1)], lambda2, cs@par$alpha, nouter, tol_val, bg_steps, free_decay)$mat)
+  mat.fast[,c("ori","lam2"):=list("fast",lambda2)]
+  return(mat.fast[,.(ori,lam2,name,bin1,bin2,phihat,weight,log_signal=log(signal),patchno)])
+}
+
+
 #load dataset and create CS object
 load("data/rao_HiCall_GM12878_SELP_150k_csdata.RData")
 cs=merge_cs_norm_datasets(list(csd), different.decays="none")
@@ -201,4 +245,11 @@ ggplot(pred)+geom_point(aes(distance,signal.fast,colour="fast"))+geom_point(aes(
 plot_binless_matrix(pred,upper="binless.opt",lower="binless.fast")
 ggplot(pred)+geom_point(aes(distance,binless.fast,colour="fast"))+geom_point(aes(distance,binless.opt,colour="opt"))+scale_y_log10()
 
+
+
+### take an optimized dataset, generate matrices at various lambdas in both fast and optimized and compare
+cs=load_stripped("data/rao_HiCall_FOXP1ext_2.3M_csnorm_optimized_base5k_stripped.RData")
+mat.opt = gen_optimized_lasso(cs, 3)
+mat.fast = gen_fast_lasso(cs, 3, nouter=50)
+ggplot(rbind(mat.opt,mat.fast))+geom_raster(aes(bin1,bin2,fill=log_signal))+scale_fill_gradient2()+facet_wrap(ori~name)
 
