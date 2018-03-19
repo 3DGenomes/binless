@@ -13,7 +13,7 @@ plot_binless_matrix(mat, upper = "binless", lower = "observed",
 \item{upper, lower}{the name of the column to plot in upper (resp. lower)
 triangle. Default: phi. Formulae are allowed (ggplot2 aes syntax)}
 
-\item{facet}{what to facet on. Default: name}
+\item{facet}{what to facet on. Default: name. Pass a character vector for multiple facets}
 
 \item{limits}{set to a pair of values to enforce plot and colour scale to be within these values}
 }
