@@ -13,12 +13,10 @@ template<typename> class BinnedData;
 void remove_outliers(const std::vector<int>& bin1, const std::vector<int>& bin2,
                      std::vector<double>& phihat_var, List outliers);
 
-void cts_to_signal_mat(const RawData<Signal>& raw, BinnedData<Signal>& binned);
-
-void cts_to_diff_mat(const RawData<Difference>& raw, BinnedData<Difference>& binned);
+template<typename Calculation>
+void cts_to_mat(const RawData<Calculation>& raw, BinnedData<Calculation>& binned);
 
 Rcpp::DataFrame rcpp_cts_to_signal_mat(int nbins, double alpha, Rcpp::DataFrame cts, Rcpp::List metadata);
-
 
 #endif
 
