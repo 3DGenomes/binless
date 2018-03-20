@@ -6,6 +6,7 @@ using namespace Rcpp;
 #include <vector>
 #include "FastData.hpp"
 #include "GFLLibrary.hpp"
+#include "util.hpp" //bin_data_evenly
 #include "spline.hpp"
 #include "gam.hpp"
 #include "QuadProgGAMLibrary.hpp"
