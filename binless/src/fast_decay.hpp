@@ -6,7 +6,6 @@ using namespace Rcpp;
 #include <vector>
 #include "FastData.hpp"
 #include "GFLLibrary.hpp"
-#include "FusedLassoGaussianEstimator.hpp"
 #include "spline.hpp"
 #include "gam.hpp"
 #include "QuadProgGAMLibrary.hpp"
