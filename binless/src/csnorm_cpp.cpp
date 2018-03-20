@@ -7,13 +7,6 @@ using namespace Rcpp;
 #include "spline.hpp"
 #include "cts_to_mat.hpp"
 
-#include "FastData.hpp"
-#include "fast_binless.hpp"
-
-RCPP_EXPOSED_CLASS_NODECL(binless::fast::FastSignalData);
-RCPP_EXPOSED_CLASS_NODECL(binless::fast::DecayConfig);
-
-
 RCPP_MODULE(binless_cpp) {
     using namespace Rcpp ;
 
@@ -28,19 +21,5 @@ RCPP_MODULE(binless_cpp) {
     function("generate_spline_base", &generate_spline_base, "documentation for generate_spline_base ");
     
     function("rcpp_cts_to_signal_mat", &rcpp_cts_to_signal_mat, "documentation for rcpp_cts_to_signal_mat ");
-    
-    class_<binless::fast::DecayConfig>("DecayConfig")
-     .constructor<double,double>()
-     .field("Kdiag", &binless::fast::DecayConfig::Kdiag)
-     .field("max_iter", &binless::fast::DecayConfig::max_iter)
-     .field("sigma", &binless::fast::DecayConfig::sigma)
-     .field("bins_per_bf", &binless::fast::DecayConfig::bins_per_bf)
-     .field("tol_val", &binless::fast::DecayConfig::tol_val)
-     .field("free_decay", &binless::fast::DecayConfig::free_decay)
-    ;
-    
-    class_<binless::fast::DecayEstimator>("DecayEstimator")
-     .constructor<const binless::fast::FastSignalData&, const binless::fast::DecayConfig&>()
-    ;
 }
 
