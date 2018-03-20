@@ -95,18 +95,20 @@ the following columns
 
 Binned raw matrix (used for fast binless): tab or space-separated text file
 containing multiple datasets. The first line is a header that must start with
-`"name" "bin1" "bin2" "observed"`. Optionally, more columns can be added but
-make sure their column names are different.
+`"name" "bin1" "pos1" "bin2" "pos2" "distance" "observed" "nobs"`. Optionally, more columns
+can be added but make sure their column names are different.
 1. `name`: The name of the dataset. Put in "" if you use spaces
 1. `bin1`: the label for the bin on the x axis. For example `"[begin1,end1)"`
-1. `bin2`: The label for the bin on the y axis.
+1. `pos1`: The position in bases of the center of the bin on the x axis
+1. `bin2`: The label for the bin on the y axis
+1. `pos2`: The position on the y axis
+1. `distance`: The average distance (in bases) between the two bins
 1. `observed`: How many paired-end reads were mapped within (bin1,bin2)
 1. `nobs`: The number of observables, i.e. four times the number of cut site intersections in that bin 
-1. `distance`: The average distance (in bases) between the two bins
 
-Note that `name`, `bin1` and `bin2` will be converted to R factors, so you an also
+Note that `name` will be converted to R factors, so you an also
 provide them as integers starting at 1 (i.e. use 1 for the first dataset, 2 for the second etc.).
-Also, **you must have bin2 >= bin1, and the data must be sorted by name, bin1 and bin2, in that order**.
+Also, **you must have pos2 >= pos1, and the data must be sorted by name, pos1 and pos2, in that order**.
 
 
 

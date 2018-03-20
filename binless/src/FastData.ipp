@@ -3,7 +3,9 @@ template<typename Derived>
 FastDataCore<Derived>::FastDataCore(const DataFrame& obs, unsigned nbins) :
 name_(Rcpp::as<std::vector<unsigned> >(obs["name"])),
 bin1_(Rcpp::as<std::vector<unsigned> >(obs["bin1"])),
+pos1_(Rcpp::as<std::vector<unsigned> >(obs["pos1"])),
 bin2_(Rcpp::as<std::vector<unsigned> >(obs["bin2"])),
+pos2_(Rcpp::as<std::vector<unsigned> >(obs["pos2"])),
 name_levels_(Rcpp::as<Rcpp::IntegerVector>(obs["name"]).attr("levels")),
 bin1_levels_(Rcpp::as<Rcpp::IntegerVector>(obs["bin1"]).attr("levels")),
 bin2_levels_(Rcpp::as<Rcpp::IntegerVector>(obs["bin2"]).attr("levels")),

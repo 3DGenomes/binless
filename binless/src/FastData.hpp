@@ -21,7 +21,9 @@ public:
   unsigned get_ndatasets() const { return ndatasets_; }
   std::vector<unsigned> get_name() const { return name_; }
   std::vector<unsigned> get_bin1() const { return bin1_; }
+  std::vector<unsigned> get_pos1() const { return pos1_; }
   std::vector<unsigned> get_bin2() const { return bin2_; }
+  std::vector<unsigned> get_pos2() const { return pos2_; }
   Rcpp::IntegerVector get_name_factor() const { return wrap_ordered(name_, name_levels_); }
   Rcpp::IntegerVector get_bin1_factor() const { return wrap_ordered(bin1_, bin1_levels_); }
   Rcpp::IntegerVector get_bin2_factor() const { return wrap_ordered(bin2_, bin2_levels_); } 
@@ -58,7 +60,7 @@ private:
     return rvec;
   }
   
-  const std::vector<unsigned> name_,bin1_,bin2_;  //N(N+1)/2
+  const std::vector<unsigned> name_,bin1_,pos1_,bin2_,pos2_;  //N(N+1)/2
   Rcpp::CharacterVector name_levels_, bin1_levels_, bin2_levels_;
   const std::vector<unsigned> observed_, nobs_; //N(N+1)/2
   const std::vector<double> distance_;

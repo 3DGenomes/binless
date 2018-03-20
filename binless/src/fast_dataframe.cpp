@@ -41,7 +41,9 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const DecayEstima
   //return
   return Rcpp::DataFrame::create(_["name"]=data.get_name_factor(),
                                  _["bin1"]=data.get_bin1_factor(),
+                                 _["pos1"]=data.get_pos1(),
                                  _["bin2"]=data.get_bin2_factor(),
+                                 _["pos2"]=data.get_pos2(),
                                  _["observed"]=data.get_observed(),
                                  _["nobs"]=data.get_nobs(),
                                  _["distance"]=data.get_distance(),
@@ -74,7 +76,9 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Difference>& data, double tol_va
   }
   return Rcpp::DataFrame::create(_["name"]=data.get_name_factor(),
                                  _["bin1"]=data.get_bin1_factor(),
+                                 _["pos1"]=data.get_pos1(),
                                  _["bin2"]=data.get_bin2_factor(),
+                                 _["pos2"]=data.get_pos2(),
                                  _["observed"]=data.get_observed(),
                                  _["nobs"]=data.get_nobs(),
                                  _["difference"]=difference,
