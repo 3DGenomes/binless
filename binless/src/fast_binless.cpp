@@ -252,7 +252,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, uns
     //compute decay
     if (step <= bg_steps) old_expected = get_log_expected(out, dec);
     z = get_residuals(nb_dist, out, dec);
-    dec.step_irls(out, z);
+    dec.step_irls(z);
     if (step <= bg_steps) expected = get_log_expected(out, dec);
     //compute signal
     if (step > bg_steps) {
