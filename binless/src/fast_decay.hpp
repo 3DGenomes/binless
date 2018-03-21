@@ -9,6 +9,7 @@ using namespace Rcpp;
 #include "FusedLassoGaussianEstimator.hpp"
 #include "spline.hpp"
 #include "gam.hpp"
+#include "QuadProgGAMLibrary.hpp"
 
 namespace binless {
 namespace fast {
@@ -149,7 +150,7 @@ private:
   const DecaySettings settings_; // parameters for performing the binning, constant
   DecaySummary summary_; // transformed data, iteration-specific
   DecayParams params_; // resulting fit, iteration-specific
-  GeneralizedAdditiveModel gam_; //used to fit parameters
+  GeneralizedAdditiveModel<QuadProgGAMLibrary> gam_; //used to fit parameters
 };
 
 }
