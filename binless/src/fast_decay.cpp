@@ -25,13 +25,13 @@ void DecayEstimator::set_poisson_lsq_summary(const FastSignalData& data, double 
   Eigen::VectorXd nobs = Eigen::VectorXd::Zero(nobs_std.size());
   for (unsigned i=0; i<observed.rows(); ++i) observed(i) = observed_std[i]; // cast to double
   for (unsigned i=0; i<observed.rows(); ++i) nobs(i) = nobs_std[i]; // cast to double
-  Eigen::VectorXd sum_obs = summarize((observed.array()*nobs.array()).matrix());
+  Eigen::VectorXd sum_obs = summarize(observed);
   //compute expected data
   auto log_expected_std = get_log_expected(data, *this);
   const Eigen::Map<const Eigen::VectorXd> log_expected(log_expected_std.data(),log_expected_std.size());
   Eigen::VectorXd sum_exp = summarize((log_expected.array().exp()*nobs.array()).matrix());
   //compute log_decay
-  Eigen::VectorXd log_decay = ((sum_obs.array() + pseudocount)/sum_exp.array()).log().matrix();
+  Eigen::VectorXd log_decay = (pseudocount + sum_obs.array()/sum_exp.array()).log().matrix();
   //center log_decay
   double avg = settings_.get_nobs().dot(log_decay)/settings_.get_nobs().sum();
   log_decay = (log_decay.array() - avg).matrix();
