@@ -232,7 +232,9 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, uns
   //
   out.set_exposures(compute_poisson_lsq_exposures(out, dec));
   //
-  dec.set_poisson_lsq_summary(out);
+  std::vector<double> expected;
+  expected = get_log_expected(out, dec);
+  dec.set_poisson_lsq_summary(expected, out);
   dec.update_params();
   //
   out.set_log_biases(compute_poisson_lsq_log_biases(out, dec));
@@ -244,7 +246,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, uns
   for (unsigned step=1; step <= ngibbs; ++step) {
     Rcpp::checkUserInterrupt();
     Rcpp::Rcout << "step " << step;
-    std::vector<double> expected,old_expected;
+    std::vector<double> old_expected;
     //compute biases
     z = get_residuals(nb_dist, out, dec);
     auto biases = step_log_biases(out, z);

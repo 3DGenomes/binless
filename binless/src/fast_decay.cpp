@@ -17,7 +17,7 @@ namespace fast {
 
 
 //here, log decay is log ( sum_i observed / sum_i expected ) with i summed over counter diagonals
-void DecayEstimator::set_poisson_lsq_summary(const FastSignalData& data, double pseudocount) {
+void DecayEstimator::set_poisson_lsq_summary(const std::vector<double>& log_expected_std, const FastSignalData& data, double pseudocount) {
   //compute observed data
   auto observed_std = data.get_observed();
   auto nobs_std = data.get_nobs();
@@ -27,7 +27,6 @@ void DecayEstimator::set_poisson_lsq_summary(const FastSignalData& data, double 
   for (unsigned i=0; i<observed.rows(); ++i) nobs(i) = nobs_std[i]; // cast to double
   Eigen::VectorXd sum_obs = summarize(observed);
   //compute expected data
-  auto log_expected_std = get_log_expected(data, *this);
   const Eigen::Map<const Eigen::VectorXd> log_expected(log_expected_std.data(),log_expected_std.size());
   Eigen::VectorXd sum_exp = summarize((log_expected.array().exp()*nobs.array()).matrix());
   //compute log_decay
