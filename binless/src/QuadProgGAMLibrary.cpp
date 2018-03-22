@@ -7,7 +7,7 @@ namespace binless {
 QuadProgGAMLibrary::QuadProgGAMLibrary(const Eigen::SparseMatrix<double>& X,
                            const Eigen::SparseMatrix<double>& D,
                            double sigma) :
-  N_(X.rows()), K_(X.cols()), X_(X), D_(D), sigmasq_(sigma*sigma), neq_(0), nin_(0),
+  N_(X.rows()), K_(X.cols()), X_(X), D_(D), sigmasqinv_(1./(sigma*sigma)), neq_(0), nin_(0),
   Ceq_(Eigen::MatrixXd::Zero(neq_,K_)), Cin_(Eigen::MatrixXd::Zero(nin_,K_)),
   beta_(Eigen::VectorXd::Constant(K_,1)), lambda_(1), has_converged_(false), llt_analyzed_(false) {}
   
@@ -60,7 +60,7 @@ void QuadProgGAMLibrary::optimize(const Eigen::VectorXd& y, const Eigen::VectorX
     }
     
     //compute lambda
-    lambda_ = std::sqrt((K_ - 2)/((K_*D_*beta_).squaredNorm()+sigmasq_));
+    lambda_ = std::sqrt((K_ - 2)/((K_*D_*beta_).squaredNorm()+sigmasqinv_));
     
     //compute relative precision on beta and check convergence
     double precision = beta_.maxCoeff()-beta_.minCoeff();
