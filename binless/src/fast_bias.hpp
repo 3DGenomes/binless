@@ -5,10 +5,10 @@
 using namespace Rcpp;
 #include <vector>
 #include "FastData.hpp"
-#include "GFLLibrary.hpp"
 #include "util.hpp" //bin_data_evenly
 #include "spline.hpp"
 #include "gam.hpp"
+#include "AnalyticalGAMLibrary.hpp"
 
 namespace binless {
 namespace fast {
@@ -138,7 +138,7 @@ public:
   void set_lambda(double lambda) { params_.lambda = lambda; }
 
   //initial guess of IRLS weights using poisson model
-  void set_poisson_lsq_summary(const FastSignalData& data, double pseudocount=0.01);
+  void set_poisson_lsq_summary(const std::vector<double>& log_expected, const FastSignalData& data, double pseudocount=0.01);
   //incremental update of IRLS weights
   void update_summary(const ResidualsPair& z);
   //perform spline fit of summary data
@@ -159,7 +159,7 @@ private:
   const BiasSettings settings_; // parameters for performing the binning, constant
   BiasSummary summary_; // transformed data, iteration-specific
   BiasParams params_; // resulting fit, iteration-specific
-  GeneralizedAdditiveModel gam_; //used to fit parameters
+  GeneralizedAdditiveModel<AnalyticalGAMLibrary> gam_; //used to fit parameters
 };
 
 }
