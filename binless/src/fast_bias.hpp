@@ -49,18 +49,23 @@ public:
     const unsigned Nbins = Krow_ * conf_.bins_per_bf;
     const auto design = make_even_bins(pos_min_, pos_max_, Nbins);
     const bool drop = true; //drop unused bins
-    binner_ = (  bin_data(pos1_data.cast<double>(), design, drop) + bin_data(pos2_data.cast<double>(), design, drop) );
+    auto binner1 = bin_data(pos1_data.cast<double>(), design, drop);
+    auto binner2 = bin_data(pos2_data.cast<double>(), design, drop);
+    binner_ = (  binner1 + binner2 );
     nbins_ = binner_.rows();
     //nobs
     auto nobs_std = data.get_nobs();
     Eigen::VectorXd nobs_data = Eigen::VectorXd::Zero(nobs_std.size());
     for (unsigned i=0; i<nobs_data.rows(); ++i) nobs_data(i) = nobs_std[i]; // cast to double
     nobs_ = binner_ * nobs_data / 2.; // each obs is used twice in the binner matrix
-    Rcpp::Rcout << "verif: sum(nobs_data)=" << nobs_data.sum() << " 2*sum(nobs_)=" << 2*nobs_.sum() << "\n";
+    Rcpp::Rcout << "verif: sum(nobs_data)=" << nobs_data.sum() << " sum(nobs_)=" << nobs_.sum() << "\n";
     //compute mean position (currently, positions dont change within a bin but that might evolve)
-    position_ = ((binner_ * (pos_data.array() * nobs_data.array()).matrix()).array() / (2*nobs_).array()).matrix();
+    position_ =((  binner1*(pos1_data.cast<double>().array()*nobs_data.array()).matrix()
+                 + binner2*(pos1_data.cast<double>().array()*nobs_data.array()).matrix() ).array() / (2*nobs_).array()).matrix();
     Rcpp::Rcout << "verif: min(position_)=" << position_.minCoeff() << " max(position_)=" << position_.maxCoeff();
     Rcpp::Rcout << " pos_min_=" << pos_min_ << " pos_max_=" << pos_max_ << "\n";
+    Rcpp::Rcout << position_.head(5);
+    Rcpp::Rcout << position_.tail(5);
     //X: design matrix
     X_ = generate_spline_base(position_, pos_min_, pos_max_, Krow_);
     //D: build difference matrix
