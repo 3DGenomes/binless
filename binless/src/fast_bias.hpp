@@ -26,7 +26,7 @@ struct BiasConfig {
   
   //default values will be overwritten
   double tol_val;      // tolerance on bias convergence
-  unsigned constraint_every; // if constrained, the bias is forced to be centered every so many bases
+  unsigned constraint_every; // if > 0, the bias is forced to be centered every so many bases
   
 };
 
@@ -38,10 +38,10 @@ public:
     //log_distance and bounds
     auto pos1_std = data.get_pos1();
     auto pos2_std = data.get_pos2();
-    const Eigen::Map<const Eigen::VectorXd> pos1_data(pos1_std.data(),pos1_std.size());
-    const Eigen::Map<const Eigen::VectorXd> pos2_data(pos2_std.data(),pos2_std.size());
+    const Eigen::Map<const Eigen::Matrix<unsigned,Eigen::Dynamic,1> > pos1_data(pos1_std.data(),pos1_std.size());
+    const Eigen::Map<const Eigen::Matrix<unsigned,Eigen::Dynamic,1> > pos2_data(pos2_std.data(),pos2_std.size());
     Eigen::VectorXd pos_data(pos1_data.rows()+pos2_data.rows());
-    pos_data << pos1_data, pos2_data;
+    pos_data << pos1_data.cast<double>(), pos2_data.cast<double>();
     pos_min_ = pos_data.minCoeff();
     pos_max_ = pos_data.maxCoeff();
     //binner matrix
@@ -49,25 +49,31 @@ public:
     const unsigned Nbins = Krow_ * conf_.bins_per_bf;
     const auto design = make_even_bins(pos_min_, pos_max_, Nbins);
     const bool drop = true; //drop unused bins
-    binner_ = (  bin_data(pos1_data, design, drop)
-               + bin_data(pos2_data, design, drop) )/2.; //divide by 2 because we use the data twice
+    binner_ = (  bin_data(pos1_data.cast<double>(), design, drop) + bin_data(pos2_data.cast<double>(), design, drop) );
     nbins_ = binner_.rows();
     //nobs
     auto nobs_std = data.get_nobs();
     Eigen::VectorXd nobs_data = Eigen::VectorXd::Zero(nobs_std.size());
     for (unsigned i=0; i<nobs_data.rows(); ++i) nobs_data(i) = nobs_std[i]; // cast to double
-    nobs_ = binner_ * nobs_data;
+    nobs_ = binner_ * nobs_data / 2.; // each obs is used twice in the binner matrix
+    Rcpp::Rcout << "verif: sum(nobs_data)=" << nobs_data.sum() << " 2*sum(nobs_)=" << 2*nobs_.sum() << "\n";
     //compute mean position (currently, positions dont change within a bin but that might evolve)
-    position_ = ((binner_ * (pos_data.array() * nobs_data.array()).matrix()).array() / nobs_.array()).matrix();
+    position_ = ((binner_ * (pos_data.array() * nobs_data.array()).matrix()).array() / (2*nobs_).array()).matrix();
+    Rcpp::Rcout << "verif: min(position_)=" << position_.minCoeff() << " max(position_)=" << position_.maxCoeff();
+    Rcpp::Rcout << " pos_min_=" << pos_min_ << " pos_max_=" << pos_max_ << "\n";
     //X: design matrix
     X_ = generate_spline_base(position_, pos_min_, pos_max_, Krow_);
     //D: build difference matrix
     D_ = second_order_difference_matrix(Krow_);
     //C: build constraint matrix to center
-    unsigned constraint_number = (pos_max_-pos_min_)/conf_.constraint_every;
-    Rcpp::Rcout << "Using " << constraint_number << "=" << (pos_max_-pos_min_) << "/" << conf_.constraint_every << " constraints to model bias\n";
-    const auto design2 = make_even_bins(pos_min_, pos_max_, constraint_number);
-    Ceq_ = bin_data(position_, design2, drop);
+    if (conf_.constraint_every > 0) {
+      unsigned constraint_number = (pos_max_-pos_min_)/conf_.constraint_every;
+      Rcpp::Rcout << "Using " << constraint_number << "=" << (pos_max_-pos_min_) << "/" << conf_.constraint_every << " constraints to model bias\n";
+      const auto design2 = make_even_bins(pos_min_, pos_max_, constraint_number);
+      Ceq_ = bin_data(position_, design2, drop);
+    } else {
+      Ceq_ = Eigen::SparseMatrix<double, Eigen::RowMajor>(0,Krow_);
+    }
   }
   
   double get_Krow() const { return Krow_; }
@@ -129,7 +135,7 @@ public:
     return settings_.get_X() * params_.beta - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.mean);
   }
   
-  //get approximate log bias along distances in original data (same approx as during fitting)
+  //get approximate log bias (bi + bj) along distances in original data (same approx as during fitting)
   Eigen::VectorXd get_data_estimate() const {
     return settings_.get_binner().transpose()*get_binned_estimate();
   }

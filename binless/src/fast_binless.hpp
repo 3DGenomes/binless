@@ -17,10 +17,8 @@ struct PrecisionPair { double abs,rel; };
 struct SignalTriplet { std::vector<double> phihat, weights, beta; };
 struct DifferenceQuadruplet { std::vector<double> deltahat,weights,delta,phi_ref; };
 
-std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data, const DecayEstimator& dec, double pseudocount=0.01);
+std::vector<double> compute_poisson_lsq_exposures(const FastSignalData& data, const BiasEstimator& bias, const DecayEstimator& dec, double pseudocount=0.01);
 std::vector<double> step_exposures(const FastSignalData& data, const ResidualsPair& z);
-std::vector<double> compute_poisson_lsq_log_biases(const FastSignalData& data, const DecayEstimator& dec, double pseudocount=0.01);
-std::vector<double> step_log_biases(const FastSignalData& data, const ResidualsPair& z);
 
 template<typename Lasso>
 SignalTriplet step_signal(const FastSignalData& data, const ResidualsPair& z, std::vector<Lasso>& flo, double lam2, unsigned group=0);
