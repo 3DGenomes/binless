@@ -15,8 +15,8 @@ namespace fast {
 
 struct ResidualsPair;
 
-struct BiasConfig {
-  BiasConfig(double tol_val, double constraint_every) : tol_val(tol_val), constraint_every(constraint_every) {}
+struct BiasGAMConfig {
+  BiasGAMConfig(double tol_val, double constraint_every) : tol_val(tol_val), constraint_every(constraint_every) {}
   
   //parameters for bias calculation
   double bf_per_kb=5;
@@ -30,11 +30,11 @@ struct BiasConfig {
   
 };
 
-class BiasSettings {
+class BiasGAMSettings {
   
 public:
   template<typename FastData>
-  BiasSettings(const FastData& data, const BiasConfig& conf) : conf_(conf) {
+  BiasGAMSettings(const FastData& data, const BiasGAMConfig& conf) : conf_(conf) {
     //log_distance and bounds
     auto pos1_std = data.get_pos1();
     auto pos2_std = data.get_pos2();
@@ -97,7 +97,7 @@ public:
   Eigen::SparseMatrix<double> get_Ceq() const { return Ceq_; }
   
 private:
-  const BiasConfig& conf_;
+  const BiasGAMConfig& conf_;
   Eigen::VectorXd position_;
   double pos_min_, pos_max_;
   unsigned Krow_;
@@ -112,18 +112,18 @@ struct BiasSummary {
 };
 
 struct BiasParams {
-  BiasParams(const BiasSettings& settings) : beta(Eigen::VectorXd::Zero(settings.get_Krow())), lambda(-1), mean(0) {}
+  BiasParams(const BiasGAMSettings& settings) : beta(Eigen::VectorXd::Zero(settings.get_Krow())), lambda(-1), mean(0) {}
   
   Eigen::VectorXd beta;
   double lambda, mean;
 };
 
-class BiasEstimator {
+class BiasGAMEstimator {
 public:
   
   //here, initialize flat log bias
   template<typename FastData>
-  BiasEstimator(const FastData& data, const BiasConfig& conf) :
+  BiasGAMEstimator(const FastData& data, const BiasGAMConfig& conf) :
    settings_(data,conf), summary_(), params_(settings_),
    gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
     { gam_.set_equality_constraints(settings_.get_Ceq()); }
@@ -167,11 +167,15 @@ private:
     params_.mean = settings_.get_nobs().dot(settings_.get_X() * params_.beta)/settings_.get_nobs().sum();
   }
   
-  const BiasSettings settings_; // parameters for performing the binning, constant
+  const BiasGAMSettings settings_; // parameters for performing the binning, constant
   BiasSummary summary_; // transformed data, iteration-specific
   BiasParams params_; // resulting fit, iteration-specific
   GeneralizedAdditiveModel<AnalyticalGAMLibrary> gam_; //used to fit parameters
 };
+
+typedef BiasGAMConfig BiasConfig;
+typedef BiasGAMSettings BiasSettings;
+typedef BiasGAMEstimator BiasEstimator;
 
 }
 }

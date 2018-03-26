@@ -17,7 +17,7 @@ namespace fast {
 
 
 //here, log bias is log ( sum_i observed / sum_i expected ) with i summed over counter diagonals
-void BiasEstimator::set_poisson_lsq_summary(const std::vector<double>& log_expected_std, const FastSignalData& data, double pseudocount) {
+void BiasGAMEstimator::set_poisson_lsq_summary(const std::vector<double>& log_expected_std, const FastSignalData& data, double pseudocount) {
   //compute observed data
   auto observed_std = data.get_observed();
   auto nobs_std = data.get_nobs();
@@ -45,7 +45,7 @@ void BiasEstimator::set_poisson_lsq_summary(const std::vector<double>& log_expec
   summary_.weight = weight;
 }
 
-void BiasEstimator::update_summary(const ResidualsPair& z) {
+void BiasGAMEstimator::update_summary(const ResidualsPair& z) {
   //compute weight
   const Eigen::Map<const Eigen::VectorXd> weights(z.weights.data(),z.weights.size());
   Eigen::VectorXd weight_sum = summarize(weights);
@@ -62,7 +62,7 @@ void BiasEstimator::update_summary(const ResidualsPair& z) {
   summary_.weight = weight_sum;
 }
 
-void BiasEstimator::update_params() {
+void BiasGAMEstimator::update_params() {
   //extract data
   const Eigen::VectorXd y(summary_.etahat);
   const Eigen::VectorXd Sm1 = summary_.weight.array().sqrt().matrix();
