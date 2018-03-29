@@ -8,7 +8,7 @@ using namespace Rcpp;
 
 #include "fast_binless.hpp"
 #include "fast_decay.hpp"
-#include "fast_bias.hpp"
+#include "fast_bias_mean.hpp"
 #include "fast_dataframe.hpp"
 #include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
@@ -134,8 +134,9 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, uns
   //
   DecayConfig dconf(tol_val, free_decay);
   DecayEstimator dec(out, dconf);
-  unsigned constraint_every = 0;
-  BiasConfig bconf(tol_val, constraint_every);
+  //unsigned constraint_every = 0;
+  //BiasConfig bconf(tol_val, constraint_every);
+  BiasConfig bconf(nbins);
   BiasEstimator bias(out, bconf);
   //
   out.set_exposures(compute_poisson_lsq_exposures(out, bias, dec));
@@ -233,7 +234,7 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, double alph
   auto beta_diag = Rcpp::as<Eigen::VectorXd >(obs["beta_diag"]);
   dec.set_beta(beta_diag);
   unsigned constraint_every = 0;
-  BiasConfig bconf(tol_val, constraint_every);
+  BiasConfig bconf(nbins); //bconf(tol_val, constraint_every);
   BiasEstimator bias(out, bconf);
   //
   auto log_biases = Rcpp::as<std::vector<double> >(obs["log_biases"]);
@@ -280,7 +281,7 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   auto beta_diag = Rcpp::as<Eigen::VectorXd >(obs["beta_diag"]);
   dec.set_beta(beta_diag);
   unsigned constraint_every = 0;
-  BiasConfig bconf(tol_val, constraint_every);
+  BiasConfig bconf(nbins); //bconf(tol_val, constraint_every);
   BiasEstimator bias(out, bconf);
   //
   auto log_biases = Rcpp::as<std::vector<double> >(obs["log_biases"]);

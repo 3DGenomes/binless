@@ -8,7 +8,7 @@ using namespace Rcpp;
 #include "Traits.hpp"
 #include "FastData.hpp"
 #include "fast_decay.hpp"
-#include "fast_bias.hpp"
+#include "fast_bias_mean.hpp"
 
 namespace binless {
 namespace fast {
