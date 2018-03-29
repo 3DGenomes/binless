@@ -5,8 +5,7 @@
 using namespace Rcpp;
 #include <vector>
 #include "FastData.hpp"
-#include "GFLLibrary.hpp"
-#include "FusedLassoGaussianEstimator.hpp"
+#include "util.hpp" //bin_data_evenly
 #include "spline.hpp"
 #include "gam.hpp"
 #include "QuadProgGAMLibrary.hpp"
@@ -129,14 +128,14 @@ public:
   void set_lambda(double lambda) { params_.lambda = lambda; }
 
   //initial guess of IRLS weights using poisson model
-  void set_poisson_lsq_summary(const FastSignalData& data, double pseudocount=0.01);
+  void set_poisson_lsq_summary(const std::vector<double>& log_expected, const FastSignalData& data, double pseudocount=0.01);
   //incremental update of IRLS weights
-  void update_summary(const FastSignalData& data, const ResidualsPair& z);
+  void update_summary(const ResidualsPair& z);
   //perform spline fit of summary data
   void update_params();
   //one complete IRLS iteration for log decay
-  void step_irls(const FastSignalData& data, const ResidualsPair& z) {
-    update_summary(data, z);
+  void step_irls(const ResidualsPair& z) {
+    update_summary(z);
     update_params();
   }
   

@@ -4,21 +4,18 @@
 namespace binless {
 namespace fast {
 
-Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const DecayEstimator& dec, double tol_val) {
+Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const BiasEstimator& bias, const DecayEstimator& dec, double tol_val) {
   //bias, decay, signal with decay and exposures, and log_background matrix (w/ offset)
   std::vector<double> biasmat,decaymat,signal,binless,background;
   biasmat.reserve(data.get_N());
   binless.reserve(data.get_N());
-  std::vector<unsigned> dname(data.get_name()), dbin1(data.get_bin1()), dbin2(data.get_bin2()), nobs(data.get_nobs());
-  std::vector<double> log_biases(data.get_log_biases()), log_signal(data.get_log_signal()), exposures(data.get_exposures());
+  std::vector<unsigned> dname(data.get_name()), nobs(data.get_nobs());
+  std::vector<double> log_signal(data.get_log_signal()), exposures(data.get_exposures());
+  Eigen::VectorXd log_biases = bias.get_data_estimate();
   Eigen::VectorXd log_decay = dec.get_data_estimate();
-  double mean_nobs = std::accumulate(nobs.begin(), nobs.end(), 0.)/nobs.size();
   for (unsigned i=0; i<data.get_N(); ++i) {
-    unsigned bin1 = dbin1[i]-1; //offset by 1 for vector indexing
-    unsigned bin2 = dbin2[i]-1;
-    double bi = log_biases[bin1];
-    double bj = log_biases[bin2];
-    biasmat.push_back(std::exp(bi + bj));
+    double bipbj = log_biases(i);
+    biasmat.push_back(std::exp(bipbj));
     double ldec = log_decay(i);
     decaymat.push_back(std::exp(ldec));
     double lsig = log_signal[i];
@@ -26,10 +23,11 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const DecayEstima
     unsigned name = dname[i]-1;
     double exposure = exposures[name];
     binless.push_back(std::exp(ldec + lsig));
-    background.push_back(nobs[i]*std::exp(bi + bj + ldec + exposure));
+    background.push_back(nobs[i]*std::exp(bipbj + ldec + exposure));
   }
   //build patchnos
   std::vector<double> patchnos;
+  std::vector<unsigned> dbin1(data.get_bin1()), dbin2(data.get_bin2());
   patchnos.reserve(data.get_N());
   for (unsigned dset=0; dset<data.get_ndatasets(); ++dset) {
     std::vector<unsigned> d_bin1(dbin1.cbegin() + dset*data.get_ncells(), dbin1.cbegin() + (dset+1)*data.get_ncells());
@@ -41,7 +39,9 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const DecayEstima
   //return
   return Rcpp::DataFrame::create(_["name"]=data.get_name_factor(),
                                  _["bin1"]=data.get_bin1_factor(),
+                                 _["pos1"]=data.get_pos1(),
                                  _["bin2"]=data.get_bin2_factor(),
+                                 _["pos2"]=data.get_pos2(),
                                  _["observed"]=data.get_observed(),
                                  _["nobs"]=data.get_nobs(),
                                  _["distance"]=data.get_distance(),
@@ -74,7 +74,9 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Difference>& data, double tol_va
   }
   return Rcpp::DataFrame::create(_["name"]=data.get_name_factor(),
                                  _["bin1"]=data.get_bin1_factor(),
+                                 _["pos1"]=data.get_pos1(),
                                  _["bin2"]=data.get_bin2_factor(),
+                                 _["pos2"]=data.get_pos2(),
                                  _["observed"]=data.get_observed(),
                                  _["nobs"]=data.get_nobs(),
                                  _["difference"]=difference,

@@ -8,11 +8,12 @@ using namespace Rcpp;
 #include "Traits.hpp"
 #include "FastData.hpp"
 #include "fast_decay.hpp"
+#include "fast_bias_mean.hpp"
 
 namespace binless {
 namespace fast {
 
-Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const DecayEstimator& dec, double tol_val);
+Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const BiasEstimator& bias, const DecayEstimator& dec, double tol_val);
 
 Rcpp::DataFrame get_as_dataframe(const FastData<Difference>& data, double tol_val);
 

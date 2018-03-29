@@ -21,19 +21,15 @@ public:
   unsigned get_ndatasets() const { return ndatasets_; }
   std::vector<unsigned> get_name() const { return name_; }
   std::vector<unsigned> get_bin1() const { return bin1_; }
+  std::vector<unsigned> get_pos1() const { return pos1_; }
   std::vector<unsigned> get_bin2() const { return bin2_; }
+  std::vector<unsigned> get_pos2() const { return pos2_; }
   Rcpp::IntegerVector get_name_factor() const { return wrap_ordered(name_, name_levels_); }
   Rcpp::IntegerVector get_bin1_factor() const { return wrap_ordered(bin1_, bin1_levels_); }
   Rcpp::IntegerVector get_bin2_factor() const { return wrap_ordered(bin2_, bin2_levels_); } 
   std::vector<unsigned> get_observed() const { return observed_; }
   std::vector<unsigned> get_nobs() const { return nobs_; }
   std::vector<double> get_distance() const { return distance_; }
-  
-  std::vector<double> get_log_biases() const { return log_biases_; }
-  void set_log_biases(const std::vector<double>& log_biases) {
-    if (log_biases.size() != nbins_) Rcpp::stop("Incorrect size for log_biases");
-    log_biases_ = log_biases;
-  }
   
   std::vector<double> get_beta() const { return beta_; }
   void set_beta(const std::vector<double>& beta) {
@@ -58,12 +54,11 @@ private:
     return rvec;
   }
   
-  const std::vector<unsigned> name_,bin1_,bin2_;  //N(N+1)/2
+  const std::vector<unsigned> name_,bin1_,pos1_,bin2_,pos2_;  //N(N+1)/2
   Rcpp::CharacterVector name_levels_, bin1_levels_, bin2_levels_;
   const std::vector<unsigned> observed_, nobs_; //N(N+1)/2
   const std::vector<double> distance_;
   const unsigned nbins_, ncells_, ndatasets_, N_;
-  std::vector<double> log_biases_; //N
   std::vector<double> beta_,betahat_,weights_; //N(N+1)/2
   std::vector<double> exposures_; //ndatasets
 };
