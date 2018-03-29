@@ -207,7 +207,7 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, uns
   }
   Rcpp::Rcout << "done\n";
   //finalize and return
-  return Rcpp::List::create(_["mat"]=get_as_dataframe(out, bias, dec, tol_val), _["log_biases"]=out.get_log_biases(),
+  return Rcpp::List::create(_["mat"]=get_as_dataframe(out, bias, dec, tol_val), _["log_biases"]=bias.get_binned_estimate(),
                             _["beta_diag"]=dec.get_beta(), _["exposures"]=out.get_exposures(),
                             _["log_signal"]=out.get_log_signal(),
                             //_["diagnostics"]=diagnostics,
@@ -237,8 +237,7 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, double alph
   BiasConfig bconf(nbins); //bconf(tol_val, constraint_every);
   BiasEstimator bias(out, bconf);
   //
-  auto log_biases = Rcpp::as<std::vector<double> >(obs["log_biases"]);
-  out.set_log_biases(log_biases);
+  bias.set_estimate(Rcpp::as<Eigen::VectorXd>(obs["log_biases"]));
   auto exposures = Rcpp::as<std::vector<double> >(obs["exposures"]);
   out.set_exposures(exposures);
   const double converge = tol_val/20.;
@@ -284,8 +283,7 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   BiasConfig bconf(nbins); //bconf(tol_val, constraint_every);
   BiasEstimator bias(out, bconf);
   //
-  auto log_biases = Rcpp::as<std::vector<double> >(obs["log_biases"]);
-  out.set_log_biases(log_biases);
+  bias.set_estimate(Rcpp::as<Eigen::VectorXd>(obs["log_biases"]));
   auto exposures = Rcpp::as<std::vector<double> >(obs["exposures"]);
   out.set_exposures(exposures);
   const double converge = tol_val/20.;

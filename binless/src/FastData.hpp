@@ -31,12 +31,6 @@ public:
   std::vector<unsigned> get_nobs() const { return nobs_; }
   std::vector<double> get_distance() const { return distance_; }
   
-  std::vector<double> get_log_biases() const { return log_biases_; }
-  void set_log_biases(const std::vector<double>& log_biases) {
-    if (log_biases.size() != nbins_) Rcpp::stop("Incorrect size for log_biases");
-    log_biases_ = log_biases;
-  }
-  
   std::vector<double> get_beta() const { return beta_; }
   void set_beta(const std::vector<double>& beta) {
     if (beta.size() != N_) Rcpp::stop("Incorrect size for beta");
@@ -65,7 +59,6 @@ private:
   const std::vector<unsigned> observed_, nobs_; //N(N+1)/2
   const std::vector<double> distance_;
   const unsigned nbins_, ncells_, ndatasets_, N_;
-  std::vector<double> log_biases_; //N
   std::vector<double> beta_,betahat_,weights_; //N(N+1)/2
   std::vector<double> exposures_; //ndatasets
 };
