@@ -160,11 +160,13 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, uns
     std::vector<double> old_expected;
     //compute biases
     z = get_residuals(nb_dist, out, bias, dec);
-    bias.step_irls(z);
+    bias.update_summary(z);
+    bias.update_params();
     //compute decay
     if (step <= bg_steps) old_expected = get_log_expected(out, bias, dec);
     z = get_residuals(nb_dist, out, bias, dec);
-    dec.step_irls(z);
+    dec.update_summary(z);
+    dec.update_params();
     if (step <= bg_steps) expected = get_log_expected(out, bias, dec);
     //compute signal
     if (step > bg_steps) {
