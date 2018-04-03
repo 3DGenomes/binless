@@ -36,11 +36,11 @@ void BiasMeanEstimator::set_poisson_lsq_summary(const std::vector<double>& log_e
   //compute weight
   Eigen::VectorXd weight = (log_bias.array().exp()*settings_.get_nobs().array()).matrix();
   /*Rcpp::Rcout << "BEFORE\n";
-  Rcpp::Rcout << "distance etahat weight sum_obs sum_exp\n";
+  Rcpp::Rcout << "distance phihat weight sum_obs sum_exp\n";
   Rcpp::Rcout << (Eigen::MatrixXd(log_bias.rows(),5) << settings_.get_log_distance().array().exp().matrix(),
                   log_bias, weight, sum_obs, sum_exp).finished();*/
   //report back
-  summary_.set_etahat(log_bias);
+  summary_.set_phihat(log_bias);
   summary_.set_weight(weight);
 }
 
@@ -48,23 +48,23 @@ void BiasMeanEstimator::update_summary(const ResidualsPair& z) {
   //compute weight
   const Eigen::Map<const Eigen::VectorXd> weights(z.weights.data(),z.weights.size());
   Eigen::VectorXd weight_sum = summarize(weights);
-  //compute etahat
+  //compute phihat
   const Eigen::Map<const Eigen::VectorXd> residuals(z.residuals.data(),z.residuals.size());
-  Eigen::VectorXd etahat = summarize(residuals.array() * weights.array()).matrix();
+  Eigen::VectorXd phihat = summarize(residuals.array() * weights.array()).matrix();
   Eigen::VectorXd log_bias = get_binned_estimate();
-  etahat = (etahat.array() / weight_sum.array()).matrix() + log_bias;
+  phihat = (phihat.array() / weight_sum.array()).matrix() + log_bias;
   /*Rcpp::Rcout << "BEFORE\n";
-  Rcpp::Rcout << "distance etahat weight\n";
-  Rcpp::Rcout << (Eigen::MatrixXd(etahat.rows(),3) << settings_.get_log_distance().array().exp().matrix(), etahat,
+  Rcpp::Rcout << "distance phihat weight\n";
+  Rcpp::Rcout << (Eigen::MatrixXd(phihat.rows(),3) << settings_.get_log_distance().array().exp().matrix(), phihat,
                   weight_sum).finished();*/
-  summary_.set_etahat(etahat);
+  summary_.set_phihat(phihat);
   summary_.set_weight(weight_sum);
 }
 
 void BiasMeanEstimator::update_params() {
   //center log_bias (no smoothing)
-  double avg = settings_.get_nobs().dot(summary_.get_etahat())/settings_.get_nobs().sum();
-  Eigen::VectorXd log_biases = (summary_.get_etahat().array() - avg).matrix();
+  double avg = settings_.get_nobs().dot(summary_.get_phihat())/settings_.get_nobs().sum();
+  Eigen::VectorXd log_biases = (summary_.get_phihat().array() - avg).matrix();
   //cap estimates at 3SD from the mean
   double stdev = std::sqrt(log_biases.squaredNorm()/log_biases.rows());
   log_biases = log_biases.array().min(3*stdev).max(-3*stdev).matrix();

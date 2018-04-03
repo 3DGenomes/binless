@@ -19,7 +19,7 @@ struct DecayConfig {
   DecayConfig(double tol_val, double free_decay) : tol_val(tol_val), free_decay(free_decay) {}
   
   //parameters for decay calculation
-  unsigned Kdiag=50;
+  unsigned K=50;
   unsigned max_iter=100;
   double sigma=1;
   unsigned bins_per_bf=100;
@@ -42,7 +42,7 @@ public:
     log_dmin_ = log_distance_data.minCoeff();
     log_dmax_ = log_distance_data.maxCoeff();
     //binner matrix
-    binner_ = bin_data_evenly(log_distance_data, conf_.Kdiag*conf_.bins_per_bf, true); //true to drop unused bins
+    binner_ = bin_data_evenly(log_distance_data, conf_.K*conf_.bins_per_bf, true); //true to drop unused bins
     nbins_ = binner_.rows();
     //nobs
     auto nobs_std = data.get_nobs();
@@ -52,16 +52,16 @@ public:
     //compute mean log distance
     log_distance_ = ((binner_ * (log_distance_data.array() * nobs_data.array()).matrix()).array() / nobs_.array()).matrix();
     //X: design matrix
-    X_ = generate_spline_base(log_distance_, log_dmin_, log_dmax_, conf_.Kdiag);
+    X_ = generate_spline_base(log_distance_, log_dmin_, log_dmax_, conf_.K);
     //D: build difference matrix
-    D_ = second_order_difference_matrix(conf_.Kdiag);
+    D_ = second_order_difference_matrix(conf_.K);
     //C: build constraint matrix to forbid increase
-    unsigned free_first = conf_.Kdiag * (std::log(conf_.free_decay)-log_dmin_)/(log_dmax_-log_dmin_);
-    //Rcpp::Rcout << "Free decay in " << free_first << " out of " << conf_.Kdiag << " basis functions\n";
-    Cin_ = decreasing_constraint(conf_.Kdiag, free_first);
+    unsigned free_first = conf_.K * (std::log(conf_.free_decay)-log_dmin_)/(log_dmax_-log_dmin_);
+    //Rcpp::Rcout << "Free decay in " << free_first << " out of " << conf_.K << " basis functions\n";
+    Cin_ = decreasing_constraint(conf_.K, free_first);
   }
   
-  double get_Kdiag() const { return conf_.Kdiag; }
+  double get_K() const { return conf_.K; }
   unsigned get_nbins() const { return nbins_; }
   unsigned get_max_iter() const { return conf_.max_iter; }
   double get_tol_val() const { return conf_.tol_val; }
@@ -87,13 +87,13 @@ private:
 };
 
 struct DecaySummary {
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, kappahat);
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, phihat);
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
 };
 
 struct DecayParams {
   
-  DecayParams(const DecaySettings& settings) : beta_(Eigen::VectorXd::Zero(settings.get_Kdiag())), lambda_(-1), mean_(0) {}
+  DecayParams(const DecaySettings& settings) : beta_(Eigen::VectorXd::Zero(settings.get_K())), lambda_(-1), mean_(0) {}
 
   DecayParams(const Rcpp::List& state) { set_state(state); }
   Rcpp::List get_state() const {

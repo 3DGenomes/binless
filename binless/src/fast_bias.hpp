@@ -45,8 +45,8 @@ public:
     pos_min_ = pos_data.minCoeff();
     pos_max_ = pos_data.maxCoeff();
     //binner matrix
-    Krow_ = conf_.bf_per_kb*(pos_max_-pos_min_)/1000.;
-    const unsigned Nbins = Krow_ * conf_.bins_per_bf;
+    K_ = conf_.bf_per_kb*(pos_max_-pos_min_)/1000.;
+    const unsigned Nbins = K_ * conf_.bins_per_bf;
     const auto design = make_even_bins(pos_min_, pos_max_, Nbins);
     const bool drop = true; //drop unused bins
     auto binner1 = bin_data(pos1_data.cast<double>(), design, drop);
@@ -67,9 +67,9 @@ public:
     Rcpp::Rcout << position_.head(5);
     Rcpp::Rcout << position_.tail(5);
     //X: design matrix
-    X_ = generate_spline_base(position_, pos_min_, pos_max_, Krow_);
+    X_ = generate_spline_base(position_, pos_min_, pos_max_, K_);
     //D: build difference matrix
-    D_ = second_order_difference_matrix(Krow_);
+    D_ = second_order_difference_matrix(K_);
     //C: build constraint matrix to center
     if (conf_.constraint_every > 0) {
       unsigned constraint_number = (pos_max_-pos_min_)/conf_.constraint_every;
@@ -77,11 +77,11 @@ public:
       const auto design2 = make_even_bins(pos_min_, pos_max_, constraint_number);
       Ceq_ = bin_data(position_, design2, drop);
     } else {
-      Ceq_ = Eigen::SparseMatrix<double, Eigen::RowMajor>(0,Krow_);
+      Ceq_ = Eigen::SparseMatrix<double, Eigen::RowMajor>(0,K_);
     }
   }
   
-  double get_Krow() const { return Krow_; }
+  double get_K() const { return K_; }
   unsigned get_nbins() const { return nbins_; }
   unsigned get_max_iter() const { return conf_.max_iter; }
   double get_tol_val() const { return conf_.tol_val; }
@@ -100,7 +100,7 @@ private:
   const BiasGAMConfig& conf_;
   Eigen::VectorXd position_;
   double pos_min_, pos_max_;
-  unsigned Krow_;
+  unsigned K_;
   Eigen::SparseMatrix<double> binner_; // Nbins x Ndata binary matrix
   unsigned nbins_;
   Eigen::VectorXd nobs_;
@@ -108,12 +108,12 @@ private:
 };
 
 struct BiasSummary {
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, etahat);
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, phihat);
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
 };
 
 struct BiasParams {
-  BiasParams(const BiasGAMSettings& settings) : beta_(Eigen::VectorXd::Zero(settings.get_Krow())), lambda_(-1), mean_(0) {}
+  BiasParams(const BiasGAMSettings& settings) : beta_(Eigen::VectorXd::Zero(settings.get_K())), lambda_(-1), mean_(0) {}
 
   BiasParams(const Rcpp::List& state) { set_state(state); }
   Rcpp::List get_state() const {

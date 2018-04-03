@@ -70,7 +70,7 @@ private:
 };
 
 struct BiasMeanSummary {
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, etahat);
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, phihat);
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
 };
 
