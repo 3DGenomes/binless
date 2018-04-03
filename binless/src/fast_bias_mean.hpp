@@ -77,6 +77,15 @@ struct BiasMeanSummary {
 struct BiasMeanParams {
   BiasMeanParams(const BiasMeanSettings& settings) : estimate_(Eigen::VectorXd::Zero(settings.get_nbins())), mean_(0) {}
   
+  BiasMeanParams(const Rcpp::List& state) { set_state(state); }
+  Rcpp::List get_state() const {
+    return Rcpp::List::create(_["estimate"]=get_estimate(), _["mean"]=get_mean());
+  }
+  void set_state(const Rcpp::List& state) {
+    set_estimate(Rcpp::as<Eigen::VectorXd>(state["estimate"]));
+    set_mean(Rcpp::as<double>(state["mean"]));
+  }
+  
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, estimate);
   BINLESS_GET_SET_DECL(double, double, mean);
 };
@@ -93,9 +102,6 @@ public:
   //compute group sums of a vector of the size of the input data into the bins formed for the bias calculation
   Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return settings_.get_binner()*vec; }
   
-  //set log bias
-  void set_estimate(const Eigen::VectorXd& log_bias) { params_.set_estimate(log_bias); }
-  
   //get log bias along binned distances
   Eigen::VectorXd get_binned_estimate() const {
     return params_.get_estimate() - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.get_mean());
@@ -106,6 +112,10 @@ public:
     return settings_.get_binner().transpose()*get_binned_estimate();
   }
   
+  //provide a way to store and recall the state of the estimator
+  Rcpp::List get_state() const { return params_.get_state(); }
+  void set_state(const Rcpp::List& state) { params_.set_state(state); }
+  
   //initial guess of IRLS weights using poisson model
   void set_poisson_lsq_summary(const std::vector<double>& log_expected, const FastSignalData& data, double pseudocount=0.01);
   //incremental update of IRLS weights
@@ -114,6 +124,9 @@ public:
   void update_params();
   
 private:
+  //set log bias
+  void set_estimate(const Eigen::VectorXd& log_bias) { params_.set_estimate(log_bias); }
+  
   //compute average log bias (weighted by nobs) in order to center it
   void center_estimate() {
     params_.set_mean(settings_.get_nobs().dot(params_.get_estimate())/settings_.get_nobs().sum());
