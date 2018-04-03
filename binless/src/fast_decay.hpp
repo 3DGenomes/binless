@@ -127,7 +127,7 @@ public:
    
   //get log decay along binned distances
   Eigen::VectorXd get_binned_estimate() const {
-    return settings_.get_X() * params_.get_beta() - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.get_mean());
+    return get_estimate() - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.get_mean());
   }
   
   //get approximate log decay along distances in original data (same approx as during fitting)
@@ -147,6 +147,9 @@ public:
   void update_params();
   
 private:
+  //get X*beta
+  Eigen::VectorXd get_estimate() const { return settings_.get_X() * params_.get_beta(); }
+  
   Eigen::VectorXd get_beta() const { return params_.get_beta(); }
   void set_beta(const Eigen::VectorXd& beta) { params_.set_beta(beta); }
   

@@ -104,7 +104,7 @@ public:
   
   //get log bias along binned distances
   Eigen::VectorXd get_binned_estimate() const {
-    return params_.get_estimate() - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.get_mean());
+    return get_estimate() - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.get_mean());
   }
   
   //get approximate log bias (bi + bj) along distances in original data (same approx as during fitting)
@@ -124,7 +124,8 @@ public:
   void update_params();
   
 private:
-  //set log bias
+  //get and set log bias
+  Eigen::VectorXd get_estimate() const { return params_.get_estimate(); }
   void set_estimate(const Eigen::VectorXd& log_bias) { params_.set_estimate(log_bias); }
   
   //compute average log bias (weighted by nobs) in order to center it
