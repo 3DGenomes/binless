@@ -69,6 +69,9 @@ public:
   double get_tol_val() const { return conf_.tol_val; }
   double get_sigma() const { return conf_.sigma; }
   
+  //this estimate is always centered after fitting
+  bool is_centered() const { return true; }
+  
   Eigen::VectorXd get_log_distance() const { return log_distance_; }
   double get_log_dmin() const { return log_dmin_; }
   double get_log_dmax() const { return log_dmax_; }
@@ -123,8 +126,7 @@ class DecayImpl {
 public:
   template<typename FastData>
   DecayImpl(const FastData& data, const DecayConfig& conf) : 
-    settings_(data, conf), gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma()),
-    params_(settings_)
+    settings_(data, conf), summary_(), params_(settings_), gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
      { gam_.set_inequality_constraints(settings_.get_Cin()); }
   
   void update_params();

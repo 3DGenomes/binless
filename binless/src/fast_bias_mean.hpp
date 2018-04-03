@@ -8,6 +8,7 @@ using namespace Rcpp;
 #include "util.hpp" //bin_data_evenly
 #include "macros.hpp"
 #include "spline.hpp"
+#include "fast_estimator.hpp"
 
 namespace binless {
 namespace fast {
@@ -56,11 +57,16 @@ public:
   
   unsigned get_nbins() const { return conf_.nbins; }
   
+  //this estimate is never centered after fitting (internal centering)
+  bool is_centered() const { return false; }
+  
   Eigen::VectorXd get_position() const { return position_; }
   double get_pos_min() const { return pos_min_; }
   double get_pos_max() const { return pos_max_; }
   Eigen::SparseMatrix<double> get_binner() const { return binner_; }
   Eigen::VectorXd get_nobs() const { return nobs_; }
+  
+  BINLESS_FORBID_COPY(BiasMeanSettings);
   
 private:
   const BiasMeanConfig& conf_;
@@ -71,6 +77,8 @@ private:
 };
 
 struct BiasMeanSummary {
+  BiasMeanSummary() : phihat_(Eigen::VectorXd()), weight_(Eigen::VectorXd()) {}
+  BINLESS_FORBID_COPY(BiasMeanSummary);
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, phihat);
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
 };
@@ -87,61 +95,36 @@ struct BiasMeanParams {
     set_mean(Rcpp::as<double>(state["mean"]));
   }
   
+  BINLESS_FORBID_COPY(BiasMeanParams);
+  
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, estimate);
   BINLESS_GET_SET_DECL(double, double, mean);
 };
 
-class BiasMeanEstimator {
+
+class BiasMeanImpl {
 public:
-  
-  //here, initialize flat log bias
   template<typename FastData>
-  BiasMeanEstimator(const FastData& data, const BiasMeanConfig& conf) :
-   settings_(data,conf), summary_(), params_(settings_) {}
+  BiasMeanImpl(const FastData& data, const BiasMeanConfig& conf) : 
+    settings_(data, conf), summary_(), params_(settings_) {}
   
-  
-  //compute group sums of a vector of the size of the input data into the bins formed for the bias calculation
-  Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return settings_.get_binner()*vec; }
-  
-  //get log bias along binned distances
-  Eigen::VectorXd get_binned_estimate() const {
-    return get_estimate() - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.get_mean());
-  }
-  
-  //get approximate log bias (bi + bj) along distances in original data (same approx as during fitting)
-  Eigen::VectorXd get_data_estimate() const {
-    return settings_.get_binner().transpose()*get_binned_estimate();
-  }
-  
-  //provide a way to store and recall the state of the estimator
-  Rcpp::List get_state() const { return params_.get_state(); }
-  void set_state(const Rcpp::List& state) { params_.set_state(state); }
-  
-  //initial guess of IRLS weights using poisson model
-  void set_poisson_lsq_summary(const std::vector<double>& log_expected, const FastSignalData& data, double pseudocount=0.01);
-  //incremental update of IRLS weights
-  void update_summary(const ResidualsPair& z);
-  //perform spline fit of summary data
   void update_params();
   
-private:
-  //get and set log bias
+  //get X*beta
   Eigen::VectorXd get_estimate() const { return params_.get_estimate(); }
-  void set_estimate(const Eigen::VectorXd& log_bias) { params_.set_estimate(log_bias); }
   
-  //compute average log bias (weighted by nobs) in order to center it
-  void center_estimate() {
-    params_.set_mean(settings_.get_nobs().dot(params_.get_estimate())/settings_.get_nobs().sum());
-  }
+  BINLESS_GET_CONSTREF_DECL(BiasMeanSettings, settings);
+  BINLESS_GET_REF_DECL(BiasMeanSummary, summary);
+  BINLESS_GET_REF_DECL(BiasMeanParams, params);
   
-  const BiasMeanSettings settings_; // parameters for performing the binning, constant
-  BiasMeanSummary summary_; // transformed data, iteration-specific
-  BiasMeanParams params_; // resulting fit, iteration-specific
+private:
+  void set_estimate(const Eigen::VectorXd& estimate) { params_.set_estimate(estimate); }
+  
 };
 
 typedef BiasMeanConfig BiasConfig;
 typedef BiasMeanSettings BiasSettings;
-typedef BiasMeanEstimator BiasEstimator;
+typedef Estimator<BiasMeanImpl> BiasEstimator;
 
 }
 }

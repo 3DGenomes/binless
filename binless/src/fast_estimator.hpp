@@ -6,6 +6,7 @@ using namespace Rcpp;
 #include <vector>
 #include "util.hpp" //bin_data_evenly
 #include "fast_residuals_pair.hpp"
+#include "FastData.hpp"
 
 namespace binless {
 namespace fast {
@@ -40,13 +41,13 @@ public:
   //perform spline fit of summary data and center final estimate
   void update_params() {
     EstimatorImpl::update_params();
-    center_estimate(); 
+    if (EstimatorImpl::get_settings().is_centered()) center_estimate(); 
   }
   
 private:
   //compute average of estimate in order to center it
   void center_estimate() {
-    EstimatorImpl::get_params().set_mean(EstimatorImpl::get_settings().get_nobs().dot(EstimatorImpl::get_settings().get_X() * EstimatorImpl::get_params().get_beta())
+    EstimatorImpl::get_params().set_mean(EstimatorImpl::get_settings().get_nobs().dot(EstimatorImpl::get_estimate())
                                            /EstimatorImpl::get_settings().get_nobs().sum());
   }
   

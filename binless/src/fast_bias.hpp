@@ -10,6 +10,7 @@ using namespace Rcpp;
 #include "spline.hpp"
 #include "gam.hpp"
 #include "AnalyticalGAMLibrary.hpp"
+#include "fast_estimator.hpp"
 
 namespace binless {
 namespace fast {
@@ -88,6 +89,9 @@ public:
   double get_tol_val() const { return conf_.tol_val; }
   double get_sigma() const { return conf_.sigma; }
   
+  //this estimate is always centered after fitting
+  bool is_centered() const { return true; }
+  
   Eigen::VectorXd get_position() const { return position_; }
   double get_pos_min() const { return pos_min_; }
   double get_pos_max() const { return pos_max_; }
@@ -96,6 +100,8 @@ public:
   Eigen::SparseMatrix<double> get_X() const { return X_; }
   Eigen::SparseMatrix<double> get_D() const { return D_; }
   Eigen::SparseMatrix<double> get_Ceq() const { return Ceq_; }
+  
+  BINLESS_FORBID_COPY(BiasGAMSettings);
   
 private:
   const BiasGAMConfig& conf_;
@@ -109,6 +115,8 @@ private:
 };
 
 struct BiasSummary {
+  BiasSummary() : phihat_(Eigen::VectorXd()), weight_(Eigen::VectorXd()) {}
+  BINLESS_FORBID_COPY(BiasSummary);
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, phihat);
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
 };
@@ -126,70 +134,43 @@ struct BiasParams {
     set_mean(Rcpp::as<double>(state["mean"]));
   }
   
+  BINLESS_FORBID_COPY(BiasParams);
+  
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, beta);
   BINLESS_GET_SET_DECL(double, double, lambda);
   BINLESS_GET_SET_DECL(double, double, mean);
 };
 
-class BiasGAMEstimator {
+class BiasGAMImpl {
 public:
-  
-  //here, initialize flat log bias
   template<typename FastData>
-  BiasGAMEstimator(const FastData& data, const BiasGAMConfig& conf) :
-   settings_(data,conf), summary_(), params_(settings_),
-   gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
-    { gam_.set_equality_constraints(settings_.get_Ceq()); }
+  BiasGAMImpl(const FastData& data, const BiasGAMConfig& conf) : 
+    settings_(data, conf), summary_(), params_(settings_), gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
+  { gam_.set_equality_constraints(settings_.get_Ceq()); }
   
-  
-  //compute group sums of a vector of the size of the input data into the bins formed for the bias calculation
-  Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return settings_.get_binner()*vec; }
-  
-  //get log bias along binned distances
-  Eigen::VectorXd get_binned_estimate() const {
-    return get_estimate() - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.get_mean());
-  }
-  
-  //get approximate log bias (bi + bj) along distances in original data (same approx as during fitting)
-  Eigen::VectorXd get_data_estimate() const {
-    return settings_.get_binner().transpose()*get_binned_estimate();
-  }
-  
-  //provide a way to store and recall the state of the estimator
-  Rcpp::List get_state() const { return params_.get_state(); }
-  void set_state(const Rcpp::List& state) { params_.set_state(state); }
-  
-  //initial guess of IRLS weights using poisson model
-  void set_poisson_lsq_summary(const std::vector<double>& log_expected, const FastSignalData& data, double pseudocount=0.01);
-  //incremental update of IRLS weights
-  void update_summary(const ResidualsPair& z);
-  //perform spline fit of summary data
   void update_params();
   
-private:
   //get X*beta
   Eigen::VectorXd get_estimate() const { return settings_.get_X() * params_.get_beta(); }
   
+  BINLESS_GET_CONSTREF_DECL(BiasGAMSettings, settings);
+  BINLESS_GET_REF_DECL(BiasSummary, summary);
+  BINLESS_GET_REF_DECL(BiasParams, params);
+  
+private:
   Eigen::VectorXd get_beta() const { return params_.get_beta(); }
   void set_beta(const Eigen::VectorXd& beta) { params_.set_beta(beta); }
   
   double get_lambda() const { return params_.get_lambda(); }
   void set_lambda(double lambda) { params_.set_lambda(lambda); }
   
-  //compute average log bias (weighted by nobs) in order to center it
-  void center_estimate() {
-    params_.set_mean(settings_.get_nobs().dot(settings_.get_X() * params_.get_beta())/settings_.get_nobs().sum());
-  }
-  
-  const BiasGAMSettings settings_; // parameters for performing the binning, constant
-  BiasSummary summary_; // transformed data, iteration-specific
-  BiasParams params_; // resulting fit, iteration-specific
+private:
   GeneralizedAdditiveModel<AnalyticalGAMLibrary> gam_; //used to fit parameters
 };
 
 //typedef BiasGAMConfig BiasConfig;
 //typedef BiasGAMSettings BiasSettings;
-//typedef BiasGAMEstimator BiasEstimator;
+//typedef Estimator<BiasGAMImpl> BiasEstimator;
 
 }
 }
