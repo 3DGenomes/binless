@@ -78,6 +78,8 @@ public:
   Eigen::SparseMatrix<double> get_D() const { return D_; }
   Eigen::SparseMatrix<double> get_Cin() const { return Cin_; }
   
+  BINLESS_FORBID_COPY(DecaySettings);
+  
 private:
   const DecayConfig& conf_;
   Eigen::VectorXd log_distance_;
@@ -89,12 +91,13 @@ private:
 };
 
 struct DecaySummary {
+  DecaySummary() : phihat_(Eigen::VectorXd()), weight_(Eigen::VectorXd()) {}
+  BINLESS_FORBID_COPY(DecaySummary);
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, phihat);
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
 };
 
 struct DecayParams {
-  
   DecayParams(const DecaySettings& settings) : beta_(Eigen::VectorXd::Zero(settings.get_K())), lambda_(-1), mean_(0) {}
 
   DecayParams(const Rcpp::List& state) { set_state(state); }
@@ -107,6 +110,8 @@ struct DecayParams {
     set_mean(Rcpp::as<double>(state["mean"]));
   }
 
+  BINLESS_FORBID_COPY(DecayParams);
+  
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, beta);
   BINLESS_GET_SET_DECL(double, double, lambda);
   BINLESS_GET_SET_DECL(double, double, mean);
@@ -127,7 +132,7 @@ public:
   //get X*beta
   Eigen::VectorXd get_estimate() const { return settings_.get_X() * params_.get_beta(); }
   
-  BINLESS_GET_CONST_DECL(DecaySettings, settings);
+  BINLESS_GET_CONSTREF_DECL(DecaySettings, settings);
   BINLESS_GET_REF_DECL(DecaySummary, summary);
   BINLESS_GET_REF_DECL(DecayParams, params);
   
