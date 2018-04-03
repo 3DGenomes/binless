@@ -3,13 +3,22 @@
 
 #include <RcppEigen.h>
 using namespace Rcpp;
-#include <vector>
+#include <Eigen/Core>
+
 #include "util.hpp" //bin_data_evenly
 #include "fast_residuals_pair.hpp"
 #include "FastData.hpp"
+#include "macros.hpp"
 
 namespace binless {
 namespace fast {
+
+struct Summary {
+  Summary() : phihat_(Eigen::VectorXd()), weight_(Eigen::VectorXd()) {}
+  BINLESS_FORBID_COPY(Summary);
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, phihat);
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
+};
 
 template<class EstimatorImpl>
 class Estimator : private EstimatorImpl {

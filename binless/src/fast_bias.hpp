@@ -114,13 +114,6 @@ private:
   Eigen::SparseMatrix<double> X_,D_,Ceq_; // design, difference and constraint matrices
 };
 
-struct BiasSummary {
-  BiasSummary() : phihat_(Eigen::VectorXd()), weight_(Eigen::VectorXd()) {}
-  BINLESS_FORBID_COPY(BiasSummary);
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, phihat);
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
-};
-
 struct BiasParams {
   BiasParams(const BiasGAMSettings& settings) : beta_(Eigen::VectorXd::Zero(settings.get_K())), lambda_(-1), mean_(0) {}
 
@@ -154,7 +147,7 @@ public:
   Eigen::VectorXd get_estimate() const { return settings_.get_X() * params_.get_beta(); }
   
   BINLESS_GET_CONSTREF_DECL(BiasGAMSettings, settings);
-  BINLESS_GET_REF_DECL(BiasSummary, summary);
+  BINLESS_GET_REF_DECL(Summary, summary);
   BINLESS_GET_REF_DECL(BiasParams, params);
   
 private:

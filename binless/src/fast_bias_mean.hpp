@@ -76,13 +76,6 @@ private:
   Eigen::VectorXd nobs_;
 };
 
-struct BiasMeanSummary {
-  BiasMeanSummary() : phihat_(Eigen::VectorXd()), weight_(Eigen::VectorXd()) {}
-  BINLESS_FORBID_COPY(BiasMeanSummary);
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, phihat);
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
-};
-
 struct BiasMeanParams {
   BiasMeanParams(const BiasMeanSettings& settings) : estimate_(Eigen::VectorXd::Zero(settings.get_nbins())), mean_(0) {}
   
@@ -114,7 +107,7 @@ public:
   Eigen::VectorXd get_estimate() const { return params_.get_estimate(); }
   
   BINLESS_GET_CONSTREF_DECL(BiasMeanSettings, settings);
-  BINLESS_GET_REF_DECL(BiasMeanSummary, summary);
+  BINLESS_GET_REF_DECL(Summary, summary);
   BINLESS_GET_REF_DECL(BiasMeanParams, params);
   
 private:
