@@ -9,6 +9,7 @@ using namespace Rcpp;
 #include "spline.hpp"
 #include "gam.hpp"
 #include "QuadProgGAMLibrary.hpp"
+#include "fast_estimator.hpp"
 
 namespace binless {
 namespace fast {
@@ -111,61 +112,36 @@ struct DecayParams {
   
 };
 
-class DecayEstimator {
-public:
-  
-  //here, initialize flat log decay
-  template<typename FastData>
-  DecayEstimator(const FastData& data, const DecayConfig& conf) :
-   settings_(data,conf), summary_(), params_(settings_),
-   gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
-    { gam_.set_inequality_constraints(settings_.get_Cin()); }
-  
-  
-  //compute group sums of a vector of the size of the input data into the bins formed for the decay calculation
-  Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return settings_.get_binner()*vec; }
-   
-  //get log decay along binned distances
-  Eigen::VectorXd get_binned_estimate() const {
-    return get_estimate() - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.get_mean());
-  }
-  
-  //get approximate log decay along distances in original data (same approx as during fitting)
-  Eigen::VectorXd get_data_estimate() const {
-    return settings_.get_binner().transpose()*get_binned_estimate();
-  }
-  
-  //provide a way to store and recall the state of the estimator
-  Rcpp::List get_state() const { return params_.get_state(); }
-  void set_state(const Rcpp::List& state) { params_.set_state(state); }
 
-  //initial guess of IRLS weights using poisson model
-  void set_poisson_lsq_summary(const std::vector<double>& log_expected, const FastSignalData& data, double pseudocount=0.01);
-  //incremental update of IRLS weights
-  void update_summary(const ResidualsPair& z);
-  //perform spline fit of summary data
+class DecayImpl {
+public:
+  template<typename FastData>
+  DecayImpl(const FastData& data, const DecayConfig& conf) : 
+    settings_(data, conf), gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma()),
+    params_(settings_)
+     { gam_.set_inequality_constraints(settings_.get_Cin()); }
+  
   void update_params();
   
-private:
   //get X*beta
   Eigen::VectorXd get_estimate() const { return settings_.get_X() * params_.get_beta(); }
   
+  BINLESS_GET_CONST_DECL(DecaySettings, settings);
+  BINLESS_GET_REF_DECL(DecaySummary, summary);
+  BINLESS_GET_REF_DECL(DecayParams, params);
+  
+private:
   Eigen::VectorXd get_beta() const { return params_.get_beta(); }
   void set_beta(const Eigen::VectorXd& beta) { params_.set_beta(beta); }
   
   double get_lambda() const { return params_.get_lambda(); }
   void set_lambda(double lambda) { params_.set_lambda(lambda); }
-
-  //compute average log decay (weighted by nobs) in order to center it
-  void center_estimate() {
-    params_.set_mean(settings_.get_nobs().dot(settings_.get_X() * params_.get_beta())/settings_.get_nobs().sum());
-  }
   
-  const DecaySettings settings_; // parameters for performing the binning, constant
-  DecaySummary summary_; // transformed data, iteration-specific
-  DecayParams params_; // resulting fit, iteration-specific
+private:
   GeneralizedAdditiveModel<QuadProgGAMLibrary> gam_; //used to fit parameters
 };
+
+typedef Estimator<DecayImpl> DecayEstimator;
 
 }
 }
