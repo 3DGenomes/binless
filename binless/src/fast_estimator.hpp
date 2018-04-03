@@ -13,6 +13,7 @@ using namespace Rcpp;
 namespace binless {
 namespace fast {
 
+// class that holds summary statistics (aka IRLS weights)
 struct Summary {
   Summary() : phihat_(Eigen::VectorXd()), weight_(Eigen::VectorXd()) {}
   BINLESS_FORBID_COPY(Summary);
@@ -20,6 +21,51 @@ struct Summary {
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
 };
 
+// class that holds parameters that were output by a GAM fit
+struct GAMParams {
+  template<typename Settings>
+  GAMParams(const Settings& settings) : beta_(Eigen::VectorXd::Zero(settings.get_K())), lambda_(-1), mean_(0) {}
+  
+  GAMParams(const Rcpp::List& state) { set_state(state); }
+  Rcpp::List get_state() const {
+    return Rcpp::List::create(_["beta"]=get_beta(), _["lambda"]=get_lambda(), _["mean"]=get_mean());
+  }
+  void set_state(const Rcpp::List& state) {
+    set_beta(Rcpp::as<Eigen::VectorXd>(state["beta"]));
+    set_lambda(Rcpp::as<double>(state["lambda"]));
+    set_mean(Rcpp::as<double>(state["mean"]));
+  }
+  
+  BINLESS_FORBID_COPY(GAMParams);
+  
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, beta);
+  BINLESS_GET_SET_DECL(double, double, lambda);
+  BINLESS_GET_SET_DECL(double, double, mean);
+  
+};
+
+// class that holds parameters that were output by fitting the mean of some statistic
+struct MeanParams {
+  template<typename Settings>
+  MeanParams(const Settings& settings) : estimate_(Eigen::VectorXd::Zero(settings.get_nbins())), mean_(0) {}
+  
+  MeanParams(const Rcpp::List& state) { set_state(state); }
+  Rcpp::List get_state() const {
+    return Rcpp::List::create(_["estimate"]=get_estimate(), _["mean"]=get_mean());
+  }
+  void set_state(const Rcpp::List& state) {
+    set_estimate(Rcpp::as<Eigen::VectorXd>(state["estimate"]));
+    set_mean(Rcpp::as<double>(state["mean"]));
+  }
+  
+  BINLESS_FORBID_COPY(MeanParams);
+  
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, estimate);
+  BINLESS_GET_SET_DECL(double, double, mean);
+};
+
+
+// Estimator is a policy class that takes data and some configuration info and performs a complete IRLS step on it
 template<class EstimatorImpl>
 class Estimator : private EstimatorImpl {
 public:

@@ -114,26 +114,6 @@ private:
   Eigen::SparseMatrix<double> X_,D_,Ceq_; // design, difference and constraint matrices
 };
 
-struct BiasParams {
-  BiasParams(const BiasGAMSettings& settings) : beta_(Eigen::VectorXd::Zero(settings.get_K())), lambda_(-1), mean_(0) {}
-
-  BiasParams(const Rcpp::List& state) { set_state(state); }
-  Rcpp::List get_state() const {
-    return Rcpp::List::create(_["beta"]=get_beta(), _["lambda"]=get_lambda(), _["mean"]=get_mean());
-  }
-  void set_state(const Rcpp::List& state) {
-    set_beta(Rcpp::as<Eigen::VectorXd>(state["beta"]));
-    set_lambda(Rcpp::as<double>(state["lambda"]));
-    set_mean(Rcpp::as<double>(state["mean"]));
-  }
-  
-  BINLESS_FORBID_COPY(BiasParams);
-  
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, beta);
-  BINLESS_GET_SET_DECL(double, double, lambda);
-  BINLESS_GET_SET_DECL(double, double, mean);
-};
-
 class BiasGAMImpl {
 public:
   template<typename FastData>
@@ -148,7 +128,7 @@ public:
   
   BINLESS_GET_CONSTREF_DECL(BiasGAMSettings, settings);
   BINLESS_GET_REF_DECL(Summary, summary);
-  BINLESS_GET_REF_DECL(BiasParams, params);
+  BINLESS_GET_REF_DECL(GAMParams, params);
   
 private:
   Eigen::VectorXd get_beta() const { return params_.get_beta(); }

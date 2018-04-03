@@ -76,25 +76,6 @@ private:
   Eigen::VectorXd nobs_;
 };
 
-struct BiasMeanParams {
-  BiasMeanParams(const BiasMeanSettings& settings) : estimate_(Eigen::VectorXd::Zero(settings.get_nbins())), mean_(0) {}
-  
-  BiasMeanParams(const Rcpp::List& state) { set_state(state); }
-  Rcpp::List get_state() const {
-    return Rcpp::List::create(_["estimate"]=get_estimate(), _["mean"]=get_mean());
-  }
-  void set_state(const Rcpp::List& state) {
-    set_estimate(Rcpp::as<Eigen::VectorXd>(state["estimate"]));
-    set_mean(Rcpp::as<double>(state["mean"]));
-  }
-  
-  BINLESS_FORBID_COPY(BiasMeanParams);
-  
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, estimate);
-  BINLESS_GET_SET_DECL(double, double, mean);
-};
-
-
 class BiasMeanImpl {
 public:
   template<typename FastData>
@@ -108,7 +89,7 @@ public:
   
   BINLESS_GET_CONSTREF_DECL(BiasMeanSettings, settings);
   BINLESS_GET_REF_DECL(Summary, summary);
-  BINLESS_GET_REF_DECL(BiasMeanParams, params);
+  BINLESS_GET_REF_DECL(MeanParams, params);
   
 private:
   void set_estimate(const Eigen::VectorXd& estimate) { params_.set_estimate(estimate); }
