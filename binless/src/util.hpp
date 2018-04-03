@@ -10,6 +10,17 @@
 
 #define SQUARE(x) ((x)*(x))
 
+#define BINLESS_GET_SET_DECL(Type, CType, Name)                \
+public:                                                        \
+Type get_##Name() const {                                      \
+  return Name##_;                                              \
+};                                                             \
+void set_##Name(CType value) {                                 \
+  Name##_ = value;                                             \
+}                                                              \
+private:                                                       \
+  Type Name##_;
+
 std::vector<double> soft_threshold(const std::vector<double>& beta,
                                    double eCprime, double lam1);
 

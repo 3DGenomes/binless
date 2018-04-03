@@ -41,8 +41,8 @@ void DecayEstimator::set_poisson_lsq_summary(const std::vector<double>& log_expe
   Rcpp::Rcout << (Eigen::MatrixXd(log_decay.rows(),5) << settings_.get_log_distance().array().exp().matrix(),
                   log_decay, weight, sum_obs, sum_exp).finished();*/
   //report back
-  summary_.kappahat = log_decay;
-  summary_.weight = weight;
+  summary_.set_kappahat(log_decay);
+  summary_.set_weight(weight);
 }
 
 void DecayEstimator::update_summary(const ResidualsPair& z) {
@@ -58,14 +58,14 @@ void DecayEstimator::update_summary(const ResidualsPair& z) {
   Rcpp::Rcout << "distance kappahat weight\n";
   Rcpp::Rcout << (Eigen::MatrixXd(kappahat.rows(),3) << settings_.get_log_distance().array().exp().matrix(), kappahat,
                   weight_sum).finished();*/
-  summary_.kappahat = kappahat;
-  summary_.weight = weight_sum;
+  summary_.set_kappahat(kappahat);
+  summary_.set_weight(weight_sum);
 }
 
 void DecayEstimator::update_params() {
   //extract data
-  const Eigen::VectorXd y(summary_.kappahat);
-  const Eigen::VectorXd Sm1 = summary_.weight.array().sqrt().matrix();
+  const Eigen::VectorXd y(summary_.get_kappahat());
+  const Eigen::VectorXd Sm1 = summary_.get_weight().array().sqrt().matrix();
   
   gam_.optimize(y,Sm1,settings_.get_max_iter(),settings_.get_tol_val());
   //Rcpp::Rcout << "gam converged: " << gam.has_converged() << "\n";

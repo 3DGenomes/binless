@@ -70,14 +70,15 @@ private:
 };
 
 struct BiasMeanSummary {
-  Eigen::VectorXd etahat, weight;
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, etahat);
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
 };
 
 struct BiasMeanParams {
-  BiasMeanParams(const BiasMeanSettings& settings) : estimate(Eigen::VectorXd::Zero(settings.get_nbins())), mean(0) {}
+  BiasMeanParams(const BiasMeanSettings& settings) : estimate_(Eigen::VectorXd::Zero(settings.get_nbins())), mean_(0) {}
   
-  Eigen::VectorXd estimate;
-  double mean;
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, estimate);
+  BINLESS_GET_SET_DECL(double, double, mean);
 };
 
 class BiasMeanEstimator {
@@ -93,11 +94,11 @@ public:
   Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return settings_.get_binner()*vec; }
   
   //set log bias
-  void set_estimate(const Eigen::VectorXd& log_bias) { params_.estimate = log_bias; }
+  void set_estimate(const Eigen::VectorXd& log_bias) { params_.set_estimate(log_bias); }
   
   //get log bias along binned distances
   Eigen::VectorXd get_binned_estimate() const {
-    return params_.estimate - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.mean);
+    return params_.get_estimate() - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.get_mean());
   }
   
   //get approximate log bias (bi + bj) along distances in original data (same approx as during fitting)
@@ -115,7 +116,7 @@ public:
 private:
   //compute average log bias (weighted by nobs) in order to center it
   void center_estimate() {
-    params_.mean = settings_.get_nobs().dot(params_.estimate)/settings_.get_nobs().sum();
+    params_.set_mean(settings_.get_nobs().dot(params_.get_estimate())/settings_.get_nobs().sum());
   }
   
   const BiasMeanSettings settings_; // parameters for performing the binning, constant

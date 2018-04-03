@@ -108,14 +108,16 @@ private:
 };
 
 struct BiasSummary {
-  Eigen::VectorXd etahat, weight;
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, etahat);
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
 };
 
 struct BiasParams {
-  BiasParams(const BiasGAMSettings& settings) : beta(Eigen::VectorXd::Zero(settings.get_Krow())), lambda(-1), mean(0) {}
-  
-  Eigen::VectorXd beta;
-  double lambda, mean;
+  BiasParams(const BiasGAMSettings& settings) : beta_(Eigen::VectorXd::Zero(settings.get_Krow())), lambda_(-1), mean_(0) {}
+
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, beta);
+  BINLESS_GET_SET_DECL(double, double, lambda);
+  BINLESS_GET_SET_DECL(double, double, mean);
 };
 
 class BiasGAMEstimator {
@@ -132,12 +134,12 @@ public:
   //compute group sums of a vector of the size of the input data into the bins formed for the bias calculation
   Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return settings_.get_binner()*vec; }
   
-  Eigen::VectorXd get_beta() const { return params_.beta; }
-  void set_beta(const Eigen::VectorXd& beta) { params_.beta = beta; }
+  Eigen::VectorXd get_beta() const { return params_.get_beta(); }
+  void set_beta(const Eigen::VectorXd& beta) { params_.set_beta(beta); }
   
   //get log bias along binned distances
   Eigen::VectorXd get_binned_estimate() const {
-    return settings_.get_X() * params_.beta - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.mean);
+    return settings_.get_X() * params_.get_beta() - Eigen::VectorXd::Constant(settings_.get_nbins(), params_.get_mean());
   }
   
   //get approximate log bias (bi + bj) along distances in original data (same approx as during fitting)
@@ -145,8 +147,8 @@ public:
     return settings_.get_binner().transpose()*get_binned_estimate();
   }
   
-  double get_lambda() const { return params_.lambda; }
-  void set_lambda(double lambda) { params_.lambda = lambda; }
+  double get_lambda() const { return params_.get_lambda(); }
+  void set_lambda(double lambda) { params_.set_lambda(lambda); }
 
   //initial guess of IRLS weights using poisson model
   void set_poisson_lsq_summary(const std::vector<double>& log_expected, const FastSignalData& data, double pseudocount=0.01);
@@ -158,7 +160,7 @@ public:
 private:
   //compute average log bias (weighted by nobs) in order to center it
   void center_estimate() {
-    params_.mean = settings_.get_nobs().dot(settings_.get_X() * params_.beta)/settings_.get_nobs().sum();
+    params_.set_mean(settings_.get_nobs().dot(settings_.get_X() * params_.get_beta())/settings_.get_nobs().sum());
   }
   
   const BiasGAMSettings settings_; // parameters for performing the binning, constant

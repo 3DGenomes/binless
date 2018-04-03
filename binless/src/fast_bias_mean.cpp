@@ -40,8 +40,8 @@ void BiasMeanEstimator::set_poisson_lsq_summary(const std::vector<double>& log_e
   Rcpp::Rcout << (Eigen::MatrixXd(log_bias.rows(),5) << settings_.get_log_distance().array().exp().matrix(),
                   log_bias, weight, sum_obs, sum_exp).finished();*/
   //report back
-  summary_.etahat = log_bias;
-  summary_.weight = weight;
+  summary_.set_etahat(log_bias);
+  summary_.set_weight(weight);
 }
 
 void BiasMeanEstimator::update_summary(const ResidualsPair& z) {
@@ -57,14 +57,14 @@ void BiasMeanEstimator::update_summary(const ResidualsPair& z) {
   Rcpp::Rcout << "distance etahat weight\n";
   Rcpp::Rcout << (Eigen::MatrixXd(etahat.rows(),3) << settings_.get_log_distance().array().exp().matrix(), etahat,
                   weight_sum).finished();*/
-  summary_.etahat = etahat;
-  summary_.weight = weight_sum;
+  summary_.set_etahat(etahat);
+  summary_.set_weight(weight_sum);
 }
 
 void BiasMeanEstimator::update_params() {
   //center log_bias (no smoothing)
-  double avg = settings_.get_nobs().dot(summary_.etahat)/settings_.get_nobs().sum();
-  Eigen::VectorXd log_biases = (summary_.etahat.array() - avg).matrix();
+  double avg = settings_.get_nobs().dot(summary_.get_etahat())/settings_.get_nobs().sum();
+  Eigen::VectorXd log_biases = (summary_.get_etahat().array() - avg).matrix();
   //cap estimates at 3SD from the mean
   double stdev = std::sqrt(log_biases.squaredNorm()/log_biases.rows());
   log_biases = log_biases.array().min(3*stdev).max(-3*stdev).matrix();
