@@ -15,7 +15,6 @@ using namespace Rcpp;
 #include "FixedSparsity.hpp"
 #include "EstimatedSparsity.hpp"
 
-#include "util.hpp" //SQUARE
 #include "graph_helpers.hpp" //get_patch_numbers
 
 List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,

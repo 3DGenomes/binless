@@ -6,6 +6,7 @@ using namespace Rcpp;
 #include <vector>
 #include "FastData.hpp"
 #include "util.hpp" //bin_data_evenly
+#include "macros.hpp"
 #include "spline.hpp"
 
 namespace binless {
