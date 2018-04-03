@@ -13,8 +13,6 @@ using namespace Rcpp;
 namespace binless {
 namespace fast {
 
-struct ResidualsPair { std::vector<double> residuals,weights; };
-
 //residuals: normal with log-link, 0 drops data
 template<typename FastData>
 ResidualsPair get_residuals(const NormalDistribution& dist, const FastData& data, const BiasEstimator& bias, const DecayEstimator& dec);

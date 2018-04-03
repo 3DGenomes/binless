@@ -6,8 +6,8 @@ using namespace Rcpp;
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
-#include "fast_bias_Mean.hpp"
-#include "fast_residuals.hpp"
+#include "fast_bias_mean.hpp"
+#include "fast_residuals_pair.hpp"
 #include "spline.hpp"
 #include "fast_expected.hpp"
 

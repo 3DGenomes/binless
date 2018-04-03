@@ -7,7 +7,7 @@ using namespace Rcpp;
 #include <Eigen/Sparse>
 
 #include "fast_bias.hpp"
-#include "fast_residuals.hpp"
+#include "fast_residuals_pair.hpp"
 #include "spline.hpp"
 #include "gam.hpp"
 #include "fast_expected.hpp"
