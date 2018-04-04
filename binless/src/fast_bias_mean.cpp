@@ -14,10 +14,10 @@ using namespace Rcpp;
 namespace binless {
 namespace fast {
 
-void BiasMeanImpl::update_params() {
+void BiasMeanFitterImpl::update_params(const Eigen::VectorXd& phihat, const Eigen::VectorXd& weight) {
   //center log_bias (no smoothing)
-  double avg = settings_.get_nobs().dot(summary_.get_phihat())/settings_.get_nobs().sum();
-  Eigen::VectorXd log_biases = (summary_.get_phihat().array() - avg).matrix();
+  double avg = get_settings().get_nobs().dot(phihat)/get_settings().get_nobs().sum();
+  Eigen::VectorXd log_biases = (phihat.array() - avg).matrix();
   //cap estimates at 3SD from the mean
   double stdev = std::sqrt(log_biases.squaredNorm()/log_biases.rows());
   log_biases = log_biases.array().min(3*stdev).max(-3*stdev).matrix();

@@ -76,29 +76,40 @@ private:
   Eigen::VectorXd nobs_;
 };
 
-class BiasMeanImpl {
+class BiasMeanSummarizerImpl {
 public:
   template<typename FastData>
-  BiasMeanImpl(const FastData& data, const BiasMeanConfig& conf) : 
-    settings_(data, conf), summary_(), params_(settings_) {}
+  BiasMeanSummarizerImpl(const FastData& data, const BiasMeanConfig& conf) : 
+    settings_(data, conf), summary_() {}
   
-  void update_params();
+  BINLESS_GET_CONSTREF_DECL(BiasMeanSettings, settings);
+  BINLESS_GET_REF_DECL(Summary, summary);
+};
+
+class BiasMeanFitterImpl {
+public:
+  template<typename FastData>
+  BiasMeanFitterImpl(const FastData& data, const BiasMeanConfig& conf) : 
+    settings_(data, conf), params_(settings_) {}
+  
+  //update beta and lambda given phihat and weight
+  void update_params(const Eigen::VectorXd& phihat, const Eigen::VectorXd& weight);
   
   //get X*beta
-  Eigen::VectorXd get_estimate() const { return params_.get_estimate(); }
+  Eigen::VectorXd get_estimate() const { return get_params().get_estimate(); }
   
   BINLESS_GET_CONSTREF_DECL(BiasMeanSettings, settings);
   BINLESS_GET_REF_DECL(Summary, summary);
   BINLESS_GET_REF_DECL(MeanParams, params);
   
 private:
-  void set_estimate(const Eigen::VectorXd& estimate) { params_.set_estimate(estimate); }
+  void set_estimate(const Eigen::VectorXd& estimate) { get_params().set_estimate(estimate); }
   
 };
 
 typedef BiasMeanConfig BiasConfig;
 typedef BiasMeanSettings BiasSettings;
-typedef Estimator<BiasMeanImpl> BiasEstimator;
+typedef Estimator<BiasMeanSummarizerImpl,BiasMeanFitterImpl> BiasEstimator;
 
 }
 }

@@ -11,10 +11,10 @@ using namespace Rcpp;
 namespace binless {
 namespace fast {
 
-void DecayImpl::update_params() {
+void DecayGAMFitterImpl::update_params(const Eigen::VectorXd& phihat, const Eigen::VectorXd& weight) {
   //extract data
-  const Eigen::VectorXd y(summary_.get_phihat());
-  const Eigen::VectorXd Sm1 = summary_.get_weight().array().sqrt().matrix();
+  const Eigen::VectorXd y(phihat);
+  const Eigen::VectorXd Sm1 = weight.array().sqrt().matrix();
   gam_.optimize(y,Sm1,settings_.get_max_iter(), settings_.get_tol_val());
   //Rcpp::Rcout << "gam converged: " << gam.has_converged() << "\n";
   set_lambda(gam_.get_lambda());

@@ -114,28 +114,39 @@ private:
   Eigen::SparseMatrix<double> X_,D_,Ceq_; // design, difference and constraint matrices
 };
 
-class BiasGAMImpl {
+class BiasGAMSummarizerImpl {
 public:
   template<typename FastData>
-  BiasGAMImpl(const FastData& data, const BiasGAMConfig& conf) : 
-    settings_(data, conf), summary_(), params_(settings_), gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
+  BiasGAMSummarizerImpl(const FastData& data, const BiasGAMConfig& conf) : 
+    settings_(data, conf), summary_() {}
+  
+  BINLESS_GET_CONSTREF_DECL(BiasGAMSettings, settings);
+  BINLESS_GET_REF_DECL(Summary, summary);
+};
+
+class BiasGAMFitterImpl {
+public:
+  template<typename FastData>
+  BiasGAMFitterImpl(const FastData& data, const BiasGAMConfig& conf) : 
+    settings_(data, conf), params_(settings_), gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
   { gam_.set_equality_constraints(settings_.get_Ceq()); }
   
-  void update_params();
+  //update beta and lambda given phihat and weight
+  void update_params(const Eigen::VectorXd& phihat, const Eigen::VectorXd& weight);
   
   //get X*beta
-  Eigen::VectorXd get_estimate() const { return settings_.get_X() * params_.get_beta(); }
+  Eigen::VectorXd get_estimate() const { return get_settings().get_X() * get_params().get_beta(); }
   
   BINLESS_GET_CONSTREF_DECL(BiasGAMSettings, settings);
   BINLESS_GET_REF_DECL(Summary, summary);
   BINLESS_GET_REF_DECL(GAMParams, params);
   
 private:
-  Eigen::VectorXd get_beta() const { return params_.get_beta(); }
-  void set_beta(const Eigen::VectorXd& beta) { params_.set_beta(beta); }
+  Eigen::VectorXd get_beta() const { return get_params().get_beta(); }
+  void set_beta(const Eigen::VectorXd& beta) { get_params().set_beta(beta); }
   
-  double get_lambda() const { return params_.get_lambda(); }
-  void set_lambda(double lambda) { params_.set_lambda(lambda); }
+  double get_lambda() const { return get_params().get_lambda(); }
+  void set_lambda(double lambda) { get_params().set_lambda(lambda); }
   
 private:
   GeneralizedAdditiveModel<AnalyticalGAMLibrary> gam_; //used to fit parameters
@@ -143,7 +154,7 @@ private:
 
 //typedef BiasGAMConfig BiasConfig;
 //typedef BiasGAMSettings BiasSettings;
-//typedef Estimator<BiasGAMImpl> BiasEstimator;
+//typedef Estimator<BiasGAMSummarizerImpl,BiasGAMFitterImpl> BiasEstimator;
 
 }
 }

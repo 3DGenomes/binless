@@ -66,46 +66,78 @@ struct MeanParams {
 
 
 // Estimator is a policy class that takes data and some configuration info and performs a complete IRLS step on it
-template<class EstimatorImpl>
-class Estimator : private EstimatorImpl {
+template<class SummarizerImpl>
+class Summarizer : public SummarizerImpl {
 public:
   template<typename FastData, typename Config>
-  Estimator(const FastData& data, const Config& conf) : EstimatorImpl(data,conf) {}
+  Summarizer(const FastData& data, const Config& conf) : SummarizerImpl(data,conf) {}
   
   //compute group sums of a vector of the size of the input data into the bins formed for the decay calculation
-  Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return EstimatorImpl::get_settings().get_binner()*vec; }
-  
-  //get log decay along binned distances
-  Eigen::VectorXd get_binned_estimate() const {
-    return EstimatorImpl::get_estimate() - Eigen::VectorXd::Constant(EstimatorImpl::get_settings().get_nbins(), EstimatorImpl::get_params().get_mean());
-  }
-  
-  //get approximate log decay along distances in original data (same approx as during fitting)
-  Eigen::VectorXd get_data_estimate() const {
-    return EstimatorImpl::get_settings().get_binner().transpose()*get_binned_estimate();
-  }
-  
-  //provide a way to store and recall the state of the estimator
-  Rcpp::List get_state() const { return EstimatorImpl::get_params().get_state(); }
-  void set_state(const Rcpp::List& state) { EstimatorImpl::get_params().set_state(state); }
+  Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return SummarizerImpl::get_settings().get_binner()*vec; }
   
   //initial guess of IRLS weights using poisson model
   void set_poisson_lsq_summary(const std::vector<double>& log_expected, const FastSignalData& data, double pseudocount=0.01);
   //incremental update of IRLS weights
-  void update_summary(const ResidualsPair& z);
-  //perform spline fit of summary data and center final estimate
-  void update_params() {
-    EstimatorImpl::update_params();
-    if (EstimatorImpl::get_settings().is_centered()) center_estimate(); 
+  void update_summary(const ResidualsPair& z, const Eigen::VectorXd& estimate);
+  
+};
+
+
+template<class FitterImpl>
+class Fitter : private FitterImpl {
+public:
+  template<typename FastData, typename Config>
+  Fitter(const FastData& data, const Config& conf) : FitterImpl(data,conf) {}
+
+  //provide a way to store and recall the state of the Fitter
+  Rcpp::List get_state() const { return FitterImpl::get_params().get_state(); }
+  void set_state(const Rcpp::List& state) { FitterImpl::get_params().set_state(state); }
+  
+  //perform fit of summary data and center final estimate
+  void update_params(const Eigen::VectorXd& phihat, const Eigen::VectorXd& weight) {
+    FitterImpl::update_params(phihat,weight);
+    if (FitterImpl::get_settings().is_centered()) center_estimate(); 
+  }
+
+  //get estimate along binned support
+  Eigen::VectorXd get_binned_estimate() const {
+    return FitterImpl::get_estimate() - Eigen::VectorXd::Constant(FitterImpl::get_settings().get_nbins(), FitterImpl::get_params().get_mean());
   }
   
 private:
   //compute average of estimate in order to center it
   void center_estimate() {
-    EstimatorImpl::get_params().set_mean(EstimatorImpl::get_settings().get_nobs().dot(EstimatorImpl::get_estimate())
-                                           /EstimatorImpl::get_settings().get_nobs().sum());
+    FitterImpl::get_params().set_mean(FitterImpl::get_settings().get_nobs().dot(FitterImpl::get_estimate())
+                                           /FitterImpl::get_settings().get_nobs().sum());
+  }
+};
+
+template<class SummarizerImpl, class FitterImpl>
+class Estimator : public Summarizer<SummarizerImpl>, public Fitter<FitterImpl> {
+public:
+  
+  typedef Summarizer<SummarizerImpl> summarizer_t;
+  typedef Fitter<FitterImpl> fitter_t;
+  
+  template<typename FastData, typename Config>
+  Estimator(const FastData& data, const Config& conf) : summarizer_t(data,conf), fitter_t(data,conf) {}
+  
+  void update_summary(const ResidualsPair& z) {
+    Eigen::VectorXd estimate = fitter_t::get_binned_estimate();
+    summarizer_t::update_summary(z,estimate);
   }
   
+  void update_params() {
+    Eigen::VectorXd phihat = summarizer_t::get_summary().get_phihat();
+    Eigen::VectorXd weight = summarizer_t::get_summary().get_weight();
+    fitter_t::update_params(phihat,weight);
+  }
+
+  //get approximate estimate along support in original data (same approx as during fitting)
+  Eigen::VectorXd get_data_estimate() const {
+    return summarizer_t::get_settings().get_binner().transpose()*fitter_t::get_binned_estimate();
+  }
+
 };
 
 #include "fast_estimator.ipp"

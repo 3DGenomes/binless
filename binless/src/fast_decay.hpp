@@ -93,34 +93,46 @@ private:
   Eigen::SparseMatrix<double> X_,D_,Cin_; // design, difference and constraint matrices
 };
 
-class DecayImpl {
+class DecaySummarizerImpl {
 public:
   template<typename FastData>
-  DecayImpl(const FastData& data, const DecayConfig& conf) : 
-    settings_(data, conf), summary_(), params_(settings_), gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
-     { gam_.set_inequality_constraints(settings_.get_Cin()); }
+  DecaySummarizerImpl(const FastData& data, const DecayConfig& conf) : 
+    settings_(data, conf), summary_() {}
   
-  void update_params();
+  BINLESS_GET_CONSTREF_DECL(DecaySettings, settings);
+  BINLESS_GET_REF_DECL(Summary, summary);
+  
+};
+
+class DecayGAMFitterImpl {
+public:
+  template<typename FastData>
+  DecayGAMFitterImpl(const FastData& data, const DecayConfig& conf) : 
+    settings_(data, conf), params_(settings_), gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
+  { gam_.set_inequality_constraints(get_settings().get_Cin()); }
+  
+  //update beta and lambda given phihat and weight
+  void update_params(const Eigen::VectorXd& phihat, const Eigen::VectorXd& weight);
   
   //get X*beta
-  Eigen::VectorXd get_estimate() const { return settings_.get_X() * params_.get_beta(); }
+  Eigen::VectorXd get_estimate() const { return get_settings().get_X() * get_params().get_beta(); }
   
   BINLESS_GET_CONSTREF_DECL(DecaySettings, settings);
   BINLESS_GET_REF_DECL(Summary, summary);
   BINLESS_GET_REF_DECL(GAMParams, params);
   
 private:
-  Eigen::VectorXd get_beta() const { return params_.get_beta(); }
-  void set_beta(const Eigen::VectorXd& beta) { params_.set_beta(beta); }
+  Eigen::VectorXd get_beta() const { return get_params().get_beta(); }
+  void set_beta(const Eigen::VectorXd& beta) { get_params().set_beta(beta); }
   
-  double get_lambda() const { return params_.get_lambda(); }
-  void set_lambda(double lambda) { params_.set_lambda(lambda); }
+  double get_lambda() const { return get_params().get_lambda(); }
+  void set_lambda(double lambda) { get_params().set_lambda(lambda); }
   
 private:
   GeneralizedAdditiveModel<QuadProgGAMLibrary> gam_; //used to fit parameters
 };
 
-typedef Estimator<DecayImpl> DecayEstimator;
+typedef Estimator<DecaySummarizerImpl,DecayGAMFitterImpl> DecayEstimator;
 
 }
 }
