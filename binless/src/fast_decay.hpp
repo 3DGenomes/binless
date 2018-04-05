@@ -6,11 +6,10 @@ using namespace Rcpp;
 #include <vector>
 #include "FastData.hpp"
 #include "util.hpp" //bin_data_evenly
-#include "macros.hpp"
-#include "spline.hpp"
-#include "gam.hpp"
+#include "macros.hpp" //BINLESS_*
+#include "spline.hpp" //generate_spline_base
 #include "QuadProgGAMLibrary.hpp"
-#include "fast_estimator.hpp"
+#include "fast_estimator.hpp" //Estimator, Fitter, Summarizer and implementations
 
 namespace binless {
 namespace fast {
