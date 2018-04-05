@@ -134,8 +134,8 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, uns
   //
   DecayConfig dconf(tol_val, free_decay);
   DecayEstimator dec(out, dconf);
-  //unsigned constraint_every = 0;
-  //BiasConfig bconf(tol_val, constraint_every);
+  /*unsigned constraint_every = 0;
+  BiasConfig bconf(tol_val, constraint_every);*/
   BiasConfig bconf(nbins);
   BiasEstimator bias(out, bconf);
   //
@@ -234,8 +234,9 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, double alph
   DecayConfig conf(tol_val, 10000); //no need to pass free_diag as parameter because it is not used anyway
   DecayEstimator dec(out, conf);
   dec.set_state(obs["decay"]);
-  unsigned constraint_every = 0;
-  BiasConfig bconf(nbins); //bconf(tol_val, constraint_every);
+  /*unsigned constraint_every = 0;
+  BiasConfig bconf(tol_val, constraint_every);*/
+  BiasConfig bconf(nbins);
   BiasEstimator bias(out, bconf);
   //
   bias.set_state(obs["biases"]);
@@ -279,8 +280,9 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   DecayConfig conf(tol_val, 10000); //no need to pass free_diag as parameter because it is not used anyway
   DecayEstimator dec(out, conf);
   dec.set_state(obs["decay"]);
-  unsigned constraint_every = 0;
-  BiasConfig bconf(nbins); //bconf(tol_val, constraint_every);
+  /*unsigned constraint_every = 0;
+  BiasConfig bconf(tol_val, constraint_every);*/
+  BiasConfig bconf(nbins);
   BiasEstimator bias(out, bconf);
   //
   bias.set_state(obs["biases"]);

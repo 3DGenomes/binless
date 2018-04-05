@@ -7,7 +7,7 @@ using namespace Rcpp;
 #include "FastData.hpp"
 #include "fast_expected.hpp"
 #include "fast_decay.hpp"
-#include "fast_bias.hpp"
+#include "fast_bias_mean.hpp"
 #include "fast_distribution.hpp"
 
 namespace binless {

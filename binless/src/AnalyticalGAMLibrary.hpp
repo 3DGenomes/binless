@@ -21,6 +21,9 @@ public:
   // n_eq x K matrix Ceq such that the constraint is Ceq \beta = 0
   void set_equality_constraints(const Eigen::SparseMatrix<double, Eigen::RowMajor>& Ceq) { Ceq_ = Ceq; neq_ = Ceq_.rows(); }
   
+  //this call must be here, see GAMFitterImpl constructor
+  void set_inequality_constraints(const Eigen::SparseMatrix<double, Eigen::RowMajor>& Cin) { Rcpp::stop("Not implemented"); }
+  
 protected:
   void optimize(const Eigen::VectorXd& y, const Eigen::VectorXd& Sm1, unsigned max_iter, double tol_val);
   

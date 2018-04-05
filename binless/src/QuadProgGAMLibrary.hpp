@@ -16,15 +16,12 @@ public:
                      const Eigen::SparseMatrix<double>& D,
                      double sigma);
   
-  // Add n_eq equality constraints on \beta by passing a
-  // n_eq x K matrix Ceq such that the constraint is Ceq \beta = 0
-  //TODO: cannot use Quadprog++ only for equality constraints
-  //void set_equality_constraints(const Eigen::MatrixXd& Ceq) { Ceq_ = Ceq; neq_ = Ceq_.rows(); }
+  //this call must be here, see GAMFitterImpl constructor
+  void set_equality_constraints(const Eigen::SparseMatrix<double, Eigen::RowMajor>& Ceq) { Rcpp::stop("Not implemented"); }
   
   // Add n_in inequality constraints on \beta by passing a
   // n_in x K matrix Cin such that the constraint is Cin \beta >= 0
   void set_inequality_constraints(const Eigen::MatrixXd& Cin) { Cin_ = Cin; nin_ = Cin_.rows(); }
-  
   
 protected:
   void optimize(const Eigen::VectorXd& y, const Eigen::VectorXd& Sm1, unsigned max_iter, double tol_val);
