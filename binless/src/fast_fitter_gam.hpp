@@ -7,22 +7,19 @@ using namespace Rcpp;
 
 #include "macros.hpp"
 #include "gam.hpp"
+#include "Traits.hpp"
 
 namespace binless {
 namespace fast {
 
-template<typename Leg>
-struct GAMFitterTraits;
-
-template<typename Leg>
-class FitterSettings;
 
 // class that holds parameters that were output by a GAM fit
-struct GAMParams {
+template<>
+struct Params<GAM> {
   template<typename Settings>
-  GAMParams(const Settings& settings) : beta_(Eigen::VectorXd::Zero(settings.get_K())), lambda_(-1), mean_(0) {}
+  Params(const Settings& settings) : beta_(Eigen::VectorXd::Zero(settings.get_K())), lambda_(-1), mean_(0) {}
   
-  GAMParams(const Rcpp::List& state) { set_state(state); }
+  Params(const Rcpp::List& state) { set_state(state); }
   Rcpp::List get_state() const {
     return Rcpp::List::create(_["beta"]=get_beta(), _["lambda"]=get_lambda(), _["mean"]=get_mean());
   }
@@ -32,7 +29,7 @@ struct GAMParams {
     set_mean(Rcpp::as<double>(state["mean"]));
   }
   
-  BINLESS_FORBID_COPY(GAMParams);
+  BINLESS_FORBID_COPY(Params);
   
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, beta);
   BINLESS_GET_SET_DECL(double, double, lambda);
@@ -41,14 +38,14 @@ struct GAMParams {
 };
 
 template<typename Leg>
-class GAMFitterImpl {
+class FitterImpl<Leg,GAM> {
 public:
   template<typename SummarizerSettings, typename FastData, typename Config>
-  GAMFitterImpl(const SummarizerSettings& sset, const FastData& data, const Config& conf) : 
+  FitterImpl(const SummarizerSettings& sset, const FastData& data, const Config& conf) : 
     settings_(sset, data, conf), params_(settings_), gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
   {
-    if (GAMFitterTraits<Leg>::has_inequality_constraints) gam_.set_inequality_constraints(get_settings().get_Cin());
-    if (GAMFitterTraits<Leg>::has_equality_constraints) gam_.set_equality_constraints(get_settings().get_Ceq());
+    if (FitterTraits<Leg,GAM>::has_inequality_constraints) gam_.set_inequality_constraints(get_settings().get_Cin());
+    if (FitterTraits<Leg,GAM>::has_equality_constraints) gam_.set_equality_constraints(get_settings().get_Ceq());
   }
   
   //update beta and lambda given phihat and weight
@@ -66,7 +63,7 @@ public:
   Eigen::VectorXd get_estimate() const { return get_settings().get_X() * get_params().get_beta(); }
   
   BINLESS_GET_CONSTREF_DECL(FitterSettings<Leg>, settings);
-  BINLESS_GET_REF_DECL(GAMParams, params);
+  BINLESS_GET_REF_DECL(Params<GAM>, params);
   
 private:
   Eigen::VectorXd get_beta() const { return get_params().get_beta(); }
@@ -76,7 +73,7 @@ private:
   void set_lambda(double lambda) { get_params().set_lambda(lambda); }
   
 private:
-  GeneralizedAdditiveModel<typename GAMFitterTraits<Leg>::library> gam_; //used to fit parameters
+  GeneralizedAdditiveModel<typename FitterTraits<Leg,GAM>::library> gam_; //used to fit parameters
 };
 
 }

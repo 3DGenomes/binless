@@ -9,6 +9,7 @@ using namespace Rcpp;
 #include "fast_residuals_pair.hpp"
 #include "FastData.hpp"
 #include "macros.hpp"
+#include "Traits.hpp"
 
 namespace binless {
 namespace fast {
@@ -20,9 +21,6 @@ struct Summary {
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, phihat);
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
 };
-
-template<typename Leg>
-class SummarizerSettings;
 
 template<typename Leg>
 class SummarizerImpl {
@@ -37,14 +35,16 @@ public:
 };
 
 // Estimator is a policy class that takes data and some configuration info and performs a complete IRLS step on it
-template<class SummarizerImpl>
-class Summarizer : public SummarizerImpl {
+template<class Leg>
+class Summarizer : public SummarizerImpl<Leg> {
 public:
+  typedef SummarizerImpl<Leg> summarizerImpl_t;
+  
   template<typename FastData, typename Config>
-  Summarizer(const FastData& data, const Config& conf) : SummarizerImpl(data,conf) {}
+  Summarizer(const FastData& data, const Config& conf) : summarizerImpl_t(data,conf) {}
   
   //compute group sums of a vector of the size of the input data into the bins formed for the decay calculation
-  Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return SummarizerImpl::get_settings().get_binner()*vec; }
+  Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return summarizerImpl_t::get_settings().get_binner()*vec; }
   
   //initial guess of IRLS weights using poisson model
   void set_poisson_lsq_summary(const std::vector<double>& log_expected, const FastSignalData& data, double pseudocount=0.01);

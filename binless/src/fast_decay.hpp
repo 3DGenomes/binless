@@ -10,13 +10,12 @@ using namespace Rcpp;
 #include "spline.hpp" //generate_spline_base
 #include "QuadProgGAMLibrary.hpp"
 #include "fast_estimator.hpp" //Estimator, Fitter, Summarizer and implementations
+#include "Traits.hpp"
 
 namespace binless {
 namespace fast {
 
 struct ResidualsPair;
-
-struct Decay {};
 
 struct DecayConfig {
   DecayConfig(double tol_val, double free_decay) : tol_val(tol_val), free_decay(free_decay) {}
@@ -113,14 +112,14 @@ public:
 };
 
 template<>
-struct GAMFitterTraits<Decay> {
+struct FitterTraits<Decay,GAM> {
   typedef QuadProgGAMLibrary library;
   static const bool has_inequality_constraints = true;
   static const bool has_equality_constraints = false;
 };
 
 
-typedef Estimator<SummarizerImpl<Decay>,GAMFitterImpl<Decay> > DecayEstimator;
+typedef Estimator<Decay,GAM> DecayEstimator;
 
 }
 }

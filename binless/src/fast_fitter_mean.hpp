@@ -6,22 +6,18 @@ using namespace Rcpp;
 #include <Eigen/Core>
 
 #include "macros.hpp"
+#include "Traits.hpp"
 
 namespace binless {
 namespace fast {
 
-template<typename Leg>
-struct MeanFitterTraits;
-
-template<typename Leg>
-class FitterSettings;
-
 // class that holds parameters that were output by fitting the mean of some statistic
-struct MeanParams {
+template<>
+struct Params<Mean> {
   template<typename Settings>
-  MeanParams(const Settings& settings) : estimate_(Eigen::VectorXd::Zero(settings.get_nbins())), mean_(0) {}
+  Params(const Settings& settings) : estimate_(Eigen::VectorXd::Zero(settings.get_nbins())), mean_(0) {}
   
-  MeanParams(const Rcpp::List& state) { set_state(state); }
+  Params(const Rcpp::List& state) { set_state(state); }
   Rcpp::List get_state() const {
     return Rcpp::List::create(_["estimate"]=get_estimate(), _["mean"]=get_mean());
   }
@@ -30,7 +26,7 @@ struct MeanParams {
     set_mean(Rcpp::as<double>(state["mean"]));
   }
   
-  BINLESS_FORBID_COPY(MeanParams);
+  BINLESS_FORBID_COPY(Params);
   
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, estimate);
   BINLESS_GET_SET_DECL(double, double, mean);
@@ -38,10 +34,10 @@ struct MeanParams {
 
 
 template<typename Leg>
-class MeanFitterImpl {
+class FitterImpl<Leg,Mean> {
 public:
   template<typename SummarizerSettings, typename FastData, typename Config>
-  MeanFitterImpl(const SummarizerSettings& sset, const FastData& data, const Config& conf) : 
+  FitterImpl(const SummarizerSettings& sset, const FastData& data, const Config& conf) : 
     settings_(sset, data, conf), params_(settings_) {}
   
   //update beta and lambda given phihat and weight
@@ -60,7 +56,7 @@ public:
   Eigen::VectorXd get_estimate() const { return get_params().get_estimate(); }
   
   BINLESS_GET_CONSTREF_DECL(FitterSettings<Leg>, settings);
-  BINLESS_GET_REF_DECL(MeanParams, params);
+  BINLESS_GET_REF_DECL(Params<Mean>, params);
   
 private:
   void set_estimate(const Eigen::VectorXd& estimate) { get_params().set_estimate(estimate); }

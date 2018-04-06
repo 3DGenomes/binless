@@ -15,12 +15,12 @@ using namespace Rcpp;
 namespace binless {
 namespace fast {
 
-template<typename SummarizerImpl, typename FitterImpl>
-class Estimator : public Summarizer<SummarizerImpl>, public Fitter<FitterImpl> {
+template<typename Leg, typename Method>
+class Estimator : public Summarizer<Leg>, public Fitter<Leg,Method> {
 public:
   
-  typedef Summarizer<SummarizerImpl> summarizer_t;
-  typedef Fitter<FitterImpl> fitter_t;
+  typedef Summarizer<Leg> summarizer_t;
+  typedef Fitter<Leg,Method> fitter_t;
   
   template<typename FastData, typename Config>
   Estimator(const FastData& data, const Config& conf) : summarizer_t(data,conf), fitter_t(summarizer_t::get_settings(),data,conf) {}

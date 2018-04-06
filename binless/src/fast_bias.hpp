@@ -11,13 +11,12 @@ using namespace Rcpp;
 #include "gam.hpp"
 #include "AnalyticalGAMLibrary.hpp"
 #include "fast_estimator.hpp"
+#include "Traits.hpp"
 
 namespace binless {
 namespace fast {
 
 struct ResidualsPair;
-
-struct BiasGAM {};
 
 struct BiasGAMConfig {
   BiasGAMConfig(double tol_val, double constraint_every) : tol_val(tol_val), constraint_every(constraint_every) {}
@@ -137,14 +136,14 @@ public:
 };
 
 template<>
-struct GAMFitterTraits<BiasGAM> {
+struct FitterTraits<BiasGAM,GAM> {
   typedef AnalyticalGAMLibrary library;
   static const bool has_inequality_constraints = false;
   static const bool has_equality_constraints = true;
 };
 
 //typedef BiasGAMConfig BiasConfig;
-//typedef Estimator<SummarizerImpl<BiasGAM>,GAMFitterImpl<BiasGAM> > BiasEstimator;
+//typedef Estimator<BiasGAM,GAM> BiasEstimator;
 
 }
 }

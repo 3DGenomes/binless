@@ -9,13 +9,12 @@ using namespace Rcpp;
 #include "macros.hpp"
 #include "spline.hpp"
 #include "fast_estimator.hpp"
+#include "Traits.hpp"
 
 namespace binless {
 namespace fast {
 
 struct ResidualsPair;
-
-struct BiasMean {};
 
 struct BiasMeanConfig {
   BiasMeanConfig(unsigned nbins) : nbins(nbins) {}
@@ -93,10 +92,10 @@ public:
 };
 
 template<>
-struct MeanFitterTraits<BiasMean> {};
+struct FitterTraits<BiasMean,Mean> {};
 
 typedef BiasMeanConfig BiasConfig;
-typedef Estimator<SummarizerImpl<BiasMean>,MeanFitterImpl<BiasMean> > BiasEstimator;
+typedef Estimator<BiasMean,Mean> BiasEstimator;
 
 }
 }
