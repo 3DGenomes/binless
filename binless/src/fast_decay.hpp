@@ -17,8 +17,9 @@ namespace fast {
 
 struct ResidualsPair;
 
-struct DecayConfig {
-  DecayConfig(double tol_val, double free_decay) : tol_val(tol_val), free_decay(free_decay) {}
+template<>
+struct Config<Decay,GAM> {
+  Config(double tol_val, double free_decay) : tol_val(tol_val), free_decay(free_decay) {}
   
   //parameters for decay calculation
   unsigned K=50;
@@ -33,11 +34,11 @@ struct DecayConfig {
 };
 
 template<>
-class SummarizerSettings<Decay> {
+class SummarizerSettings<Decay,GAM> {
   
 public:
   template<typename FastData>
-  SummarizerSettings(const FastData& data, const DecayConfig& conf) {
+  SummarizerSettings(const FastData& data, const Config<Decay,GAM>& conf) {
     //log_distance and bounds
     auto distance_std = data.get_distance();
     const Eigen::Map<const Eigen::VectorXd> distance_data(distance_std.data(),distance_std.size());
@@ -74,11 +75,11 @@ private:
 };
 
 template<>
-class FitterSettings<Decay> {
+class FitterSettings<Decay,GAM> {
   
 public:
   template<typename FastData>
-  FitterSettings(const SummarizerSettings<Decay>& settings, const FastData& data, const DecayConfig& conf) :
+  FitterSettings(const SummarizerSettings<Decay,GAM>& settings, const FastData& data, const Config<Decay,GAM>& conf) :
       max_iter_(conf.max_iter), tol_val_(conf.tol_val), sigma_(conf.sigma), K_(conf.K), nbins_(settings.get_nbins()), nobs_(settings.get_nobs()) {
     auto log_distance = settings.get_support();
     auto log_dmin = settings.get_support_min();
@@ -119,6 +120,7 @@ struct FitterTraits<Decay,GAM> {
 };
 
 
+typedef Config<Decay,GAM> DecayConfig;
 typedef Estimator<Decay,GAM> DecayEstimator;
 
 }

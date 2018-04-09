@@ -18,8 +18,9 @@ namespace fast {
 
 struct ResidualsPair;
 
-struct BiasGAMConfig {
-  BiasGAMConfig(double tol_val, double constraint_every) : tol_val(tol_val), constraint_every(constraint_every) {}
+template<>
+struct Config<Bias,GAM> {
+  Config(double tol_val, double constraint_every) : tol_val(tol_val), constraint_every(constraint_every) {}
   
   //parameters for bias calculation
   double bf_per_kb=5;
@@ -34,11 +35,11 @@ struct BiasGAMConfig {
 };
 
 template<>
-class SummarizerSettings<BiasGAM> {
+class SummarizerSettings<Bias,GAM> {
   
 public:
   template<typename FastData>
-  SummarizerSettings(const FastData& data, const BiasGAMConfig& conf) {
+  SummarizerSettings(const FastData& data, const Config<Bias,GAM>& conf) {
     //log_distance and bounds
     auto pos1_std = data.get_pos1();
     auto pos2_std = data.get_pos2();
@@ -90,7 +91,7 @@ private:
 };
 
 template<>
-class FitterSettings<BiasGAM> {
+class FitterSettings<Bias,GAM> {
   
 public:
   template<typename FastData>
@@ -129,21 +130,21 @@ public:
   
   BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, X);
   BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, D);
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, Cin);
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, Ceq); //not used
+  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, Cin); //not used
+  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, Ceq);
   
   BINLESS_FORBID_COPY(FitterSettings);
 };
 
 template<>
-struct FitterTraits<BiasGAM,GAM> {
+struct FitterTraits<Bias,GAM> {
   typedef AnalyticalGAMLibrary library;
   static const bool has_inequality_constraints = false;
   static const bool has_equality_constraints = true;
 };
 
-//typedef BiasGAMConfig BiasConfig;
-//typedef Estimator<BiasGAM,GAM> BiasEstimator;
+//typedef Config<Bias,GAM> BiasConfig;
+//typedef Estimator<Bias,GAM> BiasEstimator;
 
 }
 }

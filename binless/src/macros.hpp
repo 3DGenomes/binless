@@ -3,6 +3,9 @@
 
 #define SQUARE(x) ((x)*(x))
 
+//useful when passing arguments with multiple template arguments to macros
+#define COMMA() ,
+
 //define a private variable and a public getter / setter pair
 //CType is the type of the variable as passed in the setter (e.g. const Type&)
 #define BINLESS_GET_SET_DECL(Type, CType, Name)                  \

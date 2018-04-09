@@ -1,6 +1,6 @@
 //here, each estimate is is log ( sum_i observed / sum_i expected ) with i representing a summary bin
-template<class Leg>
-void Summarizer<Leg>::set_poisson_lsq_summary(const std::vector<double>& log_expected_std, const FastSignalData& data, double pseudocount) {
+template<class Leg, typename Method>
+void Summarizer<Leg,Method>::set_poisson_lsq_summary(const std::vector<double>& log_expected_std, const FastSignalData& data, double pseudocount) {
   //compute observed data
   auto observed_std = data.get_observed();
   auto nobs_std = data.get_nobs();
@@ -30,8 +30,8 @@ void Summarizer<Leg>::set_poisson_lsq_summary(const std::vector<double>& log_exp
   Rcpp::Rcout << summarizerImpl_t::get_summary().get_phihat().rows() << "\n";
 }
 
-template<class Leg>
-void Summarizer<Leg>::update_summary(const ResidualsPair& z, const Eigen::VectorXd& estimate) {
+template<class Leg, typename Method>
+void Summarizer<Leg,Method>::update_summary(const ResidualsPair& z, const Eigen::VectorXd& estimate) {
   //compute weight
   const Eigen::Map<const Eigen::VectorXd> weights(z.weights.data(),z.weights.size());
   Eigen::VectorXd weight_sum = summarize(weights);

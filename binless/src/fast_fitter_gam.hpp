@@ -62,7 +62,7 @@ public:
   //get X*beta
   Eigen::VectorXd get_estimate() const { return get_settings().get_X() * get_params().get_beta(); }
   
-  BINLESS_GET_CONSTREF_DECL(FitterSettings<Leg>, settings);
+  BINLESS_GET_CONSTREF_DECL(FitterSettings<Leg COMMA() GAM>, settings);
   BINLESS_GET_REF_DECL(Params<GAM>, params);
   
 private:

@@ -16,17 +16,18 @@ namespace fast {
 
 struct ResidualsPair;
 
-struct BiasMeanConfig {
-  BiasMeanConfig(unsigned nbins) : nbins(nbins) {}
+template<>
+struct Config<Bias,Mean> {
+  Config(unsigned nbins) : nbins(nbins) {}
   unsigned nbins;
 };
 
 template<>
-class SummarizerSettings<BiasMean> {
+class SummarizerSettings<Bias,Mean> {
   
 public:
   template<typename FastData>
-  SummarizerSettings(const FastData& data, const BiasMeanConfig& conf) {
+  SummarizerSettings(const FastData& data, const Config<Bias,Mean>& conf) {
     //log_distance and bounds
     auto pos1_std = data.get_pos1();
     auto pos2_std = data.get_pos2();
@@ -76,11 +77,11 @@ private:
 };
 
 template<>
-class FitterSettings<BiasMean> {
+class FitterSettings<Bias,Mean> {
   
 public:
   template<typename FastData>
-  FitterSettings(const SummarizerSettings<BiasMean>& settings, const FastData&, const BiasMeanConfig&) :
+  FitterSettings(const SummarizerSettings<Bias,Mean>& settings, const FastData&, const Config<Bias,Mean>&) :
     nbins_(settings.get_nbins()), nobs_(settings.get_nobs()) {}
     
   //this estimate is never centered after fitting (internal centering)
@@ -92,10 +93,10 @@ public:
 };
 
 template<>
-struct FitterTraits<BiasMean,Mean> {};
+struct FitterTraits<Bias,Mean> {};
 
-typedef BiasMeanConfig BiasConfig;
-typedef Estimator<BiasMean,Mean> BiasEstimator;
+typedef Config<Bias,Mean> BiasConfig;
+typedef Estimator<Bias,Mean> BiasEstimator;
 
 }
 }

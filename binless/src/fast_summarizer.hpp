@@ -22,23 +22,23 @@ struct Summary {
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
 };
 
-template<typename Leg>
+template<typename Leg, typename Method>
 class SummarizerImpl {
 public:
-  template<typename FastData, typename Config>
-  SummarizerImpl(const FastData& data, const Config& conf) : 
+  template<typename FastData>
+  SummarizerImpl(const FastData& data, const Config<Leg,Method>& conf) : 
     settings_(data, conf), summary_() {}
   
-  BINLESS_GET_CONSTREF_DECL(SummarizerSettings<Leg>, settings);
+  BINLESS_GET_CONSTREF_DECL(SummarizerSettings<Leg COMMA() Method>, settings);
   BINLESS_GET_REF_DECL(Summary, summary);
   
 };
 
 // Estimator is a policy class that takes data and some configuration info and performs a complete IRLS step on it
-template<class Leg>
-class Summarizer : public SummarizerImpl<Leg> {
+template<class Leg, typename Method>
+class Summarizer : public SummarizerImpl<Leg,Method> {
 public:
-  typedef SummarizerImpl<Leg> summarizerImpl_t;
+  typedef SummarizerImpl<Leg,Method> summarizerImpl_t;
   
   template<typename FastData, typename Config>
   Summarizer(const FastData& data, const Config& conf) : summarizerImpl_t(data,conf) {}
