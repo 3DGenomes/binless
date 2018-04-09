@@ -43,8 +43,8 @@ public:
     auto distance_std = data.get_distance();
     const Eigen::Map<const Eigen::VectorXd> distance_data(distance_std.data(),distance_std.size());
     Eigen::VectorXd log_distance_data = distance_data.array().log();
-    log_dmin_ = log_distance_data.minCoeff();
-    log_dmax_ = log_distance_data.maxCoeff();
+    support_min_ = log_distance_data.minCoeff();
+    support_max_ = log_distance_data.maxCoeff();
     //binner matrix
     binner_ = bin_data_evenly(log_distance_data, conf.K*conf.bins_per_bf, true); //true to drop unused bins
     nbins_ = binner_.rows();
@@ -54,12 +54,12 @@ public:
     for (unsigned i=0; i<nobs_data.rows(); ++i) nobs_data(i) = nobs_std[i]; // cast to double
     nobs_ = binner_ * nobs_data;
     //compute mean log distance
-    log_distance_ = ((binner_ * (log_distance_data.array() * nobs_data.array()).matrix()).array() / nobs_.array()).matrix();
+    support_ = ((binner_ * (log_distance_data.array() * nobs_data.array()).matrix()).array() / nobs_.array()).matrix();
   }
   
-  Eigen::VectorXd get_support() const { return log_distance_; }
-  double get_support_min() const { return log_dmin_; }
-  double get_support_max() const { return log_dmax_; }
+  Eigen::VectorXd get_support() const { return support_; }
+  double get_support_min() const { return support_min_; }
+  double get_support_max() const { return support_max_; }
   Eigen::SparseMatrix<double> get_binner() const { return binner_; }
   unsigned get_nbins() const { return nbins_; }
   Eigen::VectorXd get_nobs() const { return nobs_; }
@@ -67,8 +67,8 @@ public:
   BINLESS_FORBID_COPY(SummarizerSettings);
   
 private:
-  Eigen::VectorXd log_distance_;
-  double log_dmin_, log_dmax_;
+  Eigen::VectorXd support_;
+  double support_min_, support_max_;
   Eigen::SparseMatrix<double> binner_; // Nbins x Ndata binary matrix
   unsigned nbins_;
   Eigen::VectorXd nobs_;
