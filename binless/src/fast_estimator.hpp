@@ -22,8 +22,8 @@ public:
   typedef Summarizer<Leg,Method> summarizer_t;
   typedef Fitter<Leg,Method> fitter_t;
   
-  template<typename FastData, typename Config>
-  Estimator(const FastData& data, const Config& conf) : summarizer_t(data,conf), fitter_t(summarizer_t::get_settings(),data,conf) {}
+  template<typename FastData>
+  Estimator(const FastData& data, const Config<Leg,Method>& conf) : summarizer_t(data,conf), fitter_t(summarizer_t::get_settings(),conf) {}
   
   void update_summary(const ResidualsPair& z) {
     Eigen::VectorXd estimate = fitter_t::get_binned_estimate();

@@ -94,8 +94,7 @@ template<>
 class FitterSettings<Bias,GAM> {
   
 public:
-  template<typename FastData>
-  FitterSettings(const SummarizerSettings<BiasGAM>& settings, const FastData& data, const BiasGAMConfig& conf) :
+  FitterSettings(const SummarizerSettings<BiasGAM>& settings, const BiasGAMConfig& conf) :
       max_iter_(conf.max_iter), tol_val_(conf.tol_val), sigma_(conf.sigma),
       K_(conf.bf_per_kb*(settings.get_support_max()-settings.get_support_min())/1000.),
       nbins_(settings.get_nbins()), nobs_(settings.get_nobs())  {

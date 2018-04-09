@@ -78,8 +78,7 @@ template<>
 class FitterSettings<Decay,GAM> {
   
 public:
-  template<typename FastData>
-  FitterSettings(const SummarizerSettings<Decay,GAM>& settings, const FastData& data, const Config<Decay,GAM>& conf) :
+  FitterSettings(const SummarizerSettings<Decay,GAM>& settings, const Config<Decay,GAM>& conf) :
       max_iter_(conf.max_iter), tol_val_(conf.tol_val), sigma_(conf.sigma), K_(conf.K), nbins_(settings.get_nbins()), nobs_(settings.get_nobs()) {
     auto log_distance = settings.get_support();
     auto log_dmin = settings.get_support_min();

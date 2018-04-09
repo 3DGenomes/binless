@@ -80,8 +80,7 @@ template<>
 class FitterSettings<Bias,Mean> {
   
 public:
-  template<typename FastData>
-  FitterSettings(const SummarizerSettings<Bias,Mean>& settings, const FastData&, const Config<Bias,Mean>&) :
+  FitterSettings(const SummarizerSettings<Bias,Mean>& settings, const Config<Bias,Mean>&) :
     nbins_(settings.get_nbins()), nobs_(settings.get_nobs()) {}
     
   //this estimate is never centered after fitting (internal centering)

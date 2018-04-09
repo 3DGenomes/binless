@@ -40,9 +40,8 @@ struct Params<GAM> {
 template<typename Leg>
 class FitterImpl<Leg,GAM> {
 public:
-  template<typename SummarizerSettings, typename FastData, typename Config>
-  FitterImpl(const SummarizerSettings& sset, const FastData& data, const Config& conf) : 
-    settings_(sset, data, conf), params_(settings_), gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
+  FitterImpl(const SummarizerSettings<Leg,GAM>& sset, const Config<Leg,GAM>& conf) : 
+    settings_(sset, conf), params_(settings_), gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
   {
     if (FitterTraits<Leg,GAM>::has_inequality_constraints) gam_.set_inequality_constraints(get_settings().get_Cin());
     if (FitterTraits<Leg,GAM>::has_equality_constraints) gam_.set_equality_constraints(get_settings().get_Ceq());
