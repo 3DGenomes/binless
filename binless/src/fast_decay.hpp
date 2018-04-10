@@ -34,51 +34,35 @@ struct Config<Decay,GAM> {
 };
 
 template<>
-class SummarizerSettings<Decay,GAM> {
+class SummarizerSettingsImpl<Decay,GAM> : public SummarizerSettings {
   
 public:
   template<typename FastData>
-  SummarizerSettings(const FastData& data, const Config<Decay,GAM>& conf) {
+  SummarizerSettingsImpl(const FastData& data, const Config<Decay,GAM>& conf) {
     //log_distance and bounds
     auto distance_std = data.get_distance();
     const Eigen::Map<const Eigen::VectorXd> distance_data(distance_std.data(),distance_std.size());
     Eigen::VectorXd log_distance_data = distance_data.array().log();
-    support_min_ = log_distance_data.minCoeff();
-    support_max_ = log_distance_data.maxCoeff();
+    set_support_min(log_distance_data.minCoeff());
+    set_support_max(log_distance_data.maxCoeff());
     //binner matrix
-    binner_ = bin_data_evenly(log_distance_data, conf.K*conf.bins_per_bf, true); //true to drop unused bins
-    nbins_ = binner_.rows();
+    set_binner(bin_data_evenly(log_distance_data, conf.K*conf.bins_per_bf, true)); //true to drop unused bins
+    set_nbins(get_binner().rows());
     //nobs
     auto nobs_std = data.get_nobs();
     Eigen::VectorXd nobs_data = Eigen::VectorXd::Zero(nobs_std.size());
     for (unsigned i=0; i<nobs_data.rows(); ++i) nobs_data(i) = nobs_std[i]; // cast to double
-    nobs_ = binner_ * nobs_data;
+    set_nobs(get_binner() * nobs_data);
     //compute mean log distance
-    support_ = ((binner_ * (log_distance_data.array() * nobs_data.array()).matrix()).array() / nobs_.array()).matrix();
+    set_support( ((get_binner() * (log_distance_data.array() * nobs_data.array()).matrix()).array() / get_nobs().array()).matrix() );
   }
-  
-  Eigen::VectorXd get_support() const { return support_; }
-  double get_support_min() const { return support_min_; }
-  double get_support_max() const { return support_max_; }
-  Eigen::SparseMatrix<double> get_binner() const { return binner_; }
-  unsigned get_nbins() const { return nbins_; }
-  Eigen::VectorXd get_nobs() const { return nobs_; }
-  
-  BINLESS_FORBID_COPY(SummarizerSettings);
-  
-private:
-  Eigen::VectorXd support_;
-  double support_min_, support_max_;
-  Eigen::SparseMatrix<double> binner_; // Nbins x Ndata binary matrix
-  unsigned nbins_;
-  Eigen::VectorXd nobs_;
 };
 
 template<>
 class FitterSettings<Decay,GAM> {
   
 public:
-  FitterSettings(const SummarizerSettings<Decay,GAM>& settings, const Config<Decay,GAM>& conf) :
+  FitterSettings(const SummarizerSettings& settings, const Config<Decay,GAM>& conf) :
       max_iter_(conf.max_iter), tol_val_(conf.tol_val), sigma_(conf.sigma), K_(conf.K), nbins_(settings.get_nbins()), nobs_(settings.get_nobs()) {
     auto log_distance = settings.get_support();
     auto log_dmin = settings.get_support_min();

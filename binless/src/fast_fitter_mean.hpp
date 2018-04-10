@@ -36,7 +36,7 @@ struct Params<Mean> {
 template<typename Leg>
 class FitterImpl<Leg,Mean> {
 public:
-  FitterImpl(const SummarizerSettings<Leg,Mean>& sset, const Config<Leg,Mean>& conf) : 
+  FitterImpl(const SummarizerSettings& sset, const Config<Leg,Mean>& conf) : 
     settings_(sset, conf), params_(settings_) {}
   
   //update beta and lambda given phihat and weight

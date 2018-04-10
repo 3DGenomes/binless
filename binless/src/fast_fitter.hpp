@@ -16,7 +16,7 @@ class Fitter : private FitterImpl<Leg,Method> {
 public:
   typedef FitterImpl<Leg,Method> fitterImpl_t;
   
-  Fitter(const SummarizerSettings<Leg,Method>& settings, const Config<Leg,Method>& conf) : fitterImpl_t(settings,conf) {}
+  Fitter(const SummarizerSettings& settings, const Config<Leg,Method>& conf) : fitterImpl_t(settings,conf) {}
 
   //provide a way to store and recall the state of the Fitter
   Rcpp::List get_state() const { return fitterImpl_t::get_params().get_state(); }

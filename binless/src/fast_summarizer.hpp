@@ -22,14 +22,30 @@ struct Summary {
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
 };
 
+// class that holds the data used to map the inputs to the summaries
+// cannot be built directly, as it is meant to be constructed by each
+// domain-specific child
+class SummarizerSettings {
+  
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, support);
+  BINLESS_GET_SET_DECL(double, double, support_min);
+  BINLESS_GET_SET_DECL(double, double, support_max);
+  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, binner);
+  BINLESS_GET_SET_DECL(unsigned, unsigned, nbins);
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, nobs);
+  
+protected:
+  SummarizerSettings() {}
+};
+
 template<typename Leg, typename Method>
 class SummarizerImpl {
 public:
   template<typename FastData>
   SummarizerImpl(const FastData& data, const Config<Leg,Method>& conf) : 
-    settings_(data, conf), summary_() {}
+    settings_(SummarizerSettingsImpl<Leg,Method>(data, conf)), summary_() {}
   
-  BINLESS_GET_CONSTREF_DECL(SummarizerSettings<Leg COMMA() Method>, settings);
+  BINLESS_GET_CONSTREF_DECL(SummarizerSettings, settings); //store type that is agnostic to Leg and Method
   BINLESS_GET_REF_DECL(Summary, summary);
   
 };

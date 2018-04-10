@@ -47,8 +47,10 @@ struct FitterTraits;
 template<typename Leg, typename Method>
 struct FitterImpl;
 
-template<typename Leg, typename Method>
 class SummarizerSettings;
+
+template<typename Leg, typename Method>
+class SummarizerSettingsImpl;
 
 template<typename Leg, typename Method>
 class FitterSettings;

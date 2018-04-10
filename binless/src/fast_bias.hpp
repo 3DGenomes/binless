@@ -35,11 +35,11 @@ struct Config<Bias,GAM> {
 };
 
 template<>
-class SummarizerSettings<Bias,GAM> {
+class SummarizerSettingsImpl<Bias,GAM> : public SummarizerSettings {
   
 public:
   template<typename FastData>
-  SummarizerSettings(const FastData& data, const Config<Bias,GAM>& conf) {
+  SummarizerSettingsImpl(const FastData& data, const Config<Bias,GAM>& conf) {
     //log_distance and bounds
     auto pos1_std = data.get_pos1();
     auto pos2_std = data.get_pos2();
@@ -47,8 +47,8 @@ public:
     const Eigen::Map<const Eigen::Matrix<unsigned,Eigen::Dynamic,1> > pos2_data(pos2_std.data(),pos2_std.size());
     Eigen::VectorXd pos_data(pos1_data.rows()+pos2_data.rows());
     pos_data << pos1_data.cast<double>(), pos2_data.cast<double>();
-    support_min_ = pos_data.minCoeff();
-    support_max_ = pos_data.maxCoeff();
+    set_support_min( pos_data.minCoeff() );
+    set_support_max( pos_data.maxCoeff() );
     //binner matrix
     const unsigned K = conf.bf_per_kb*(get_support_max()-get_support_min())/1000.;
     const unsigned Nbins = K * conf.bins_per_bf;
@@ -56,40 +56,24 @@ public:
     const bool drop = true; //drop unused bins
     auto binner1 = bin_data(pos1_data.cast<double>(), design, drop);
     auto binner2 = bin_data(pos2_data.cast<double>(), design, drop);
-    binner_ = (  binner1 + binner2 );
-    nbins_ = binner_.rows();
+    set_binner( (  binner1 + binner2 ) );
+    set_nbins( get_binner().rows() );
     //nobs
     auto nobs_std = data.get_nobs();
     Eigen::VectorXd nobs_data = Eigen::VectorXd::Zero(nobs_std.size());
     for (unsigned i=0; i<nobs_data.rows(); ++i) nobs_data(i) = nobs_std[i]; // cast to double
-    nobs_ = binner_ * nobs_data / 2.; // each obs is used twice in the binner matrix
+    set_nobs( get_binner() * nobs_data / 2. ); // each obs is used twice in the binner matrix
     //compute mean position (currently, positions dont change within a bin but that might evolve)
-    support_ =   ((  binner1*(pos1_data.cast<double>().array()*nobs_data.array()).matrix()
-                     + binner2*(pos1_data.cast<double>().array()*nobs_data.array()).matrix() ).array() / (2*nobs_).array()).matrix();
+    set_support(   ((  binner1*(pos1_data.cast<double>().array()*nobs_data.array()).matrix()
+                     + binner2*(pos1_data.cast<double>().array()*nobs_data.array()).matrix() ).array() / (2*get_nobs()).array()).matrix() );
   }
-  
-  Eigen::VectorXd get_support() const { return support_; }
-  double get_support_min() const { return support_min_; }
-  double get_support_max() const { return support_max_; }
-  Eigen::SparseMatrix<double> get_binner() const { return binner_; }
-  unsigned get_nbins() const { return nbins_; }
-  Eigen::VectorXd get_nobs() const { return nobs_; }
-  
-  BINLESS_FORBID_COPY(SummarizerSettings);
-  
-private:
-  Eigen::VectorXd support_;
-  double support_min_, support_max_;
-  Eigen::SparseMatrix<double> binner_; // Nbins x Ndata binary matrix
-  unsigned nbins_;
-  Eigen::VectorXd nobs_;
 };
 
 template<>
 class FitterSettings<Bias,GAM> {
   
 public:
-  FitterSettings(const SummarizerSettings<Bias,GAM>& settings, const Config<Bias,GAM>& conf) :
+  FitterSettings(const SummarizerSettings& settings, const Config<Bias,GAM>& conf) :
       max_iter_(conf.max_iter), tol_val_(conf.tol_val), sigma_(conf.sigma),
       K_(conf.bf_per_kb*(settings.get_support_max()-settings.get_support_min())/1000.),
       nbins_(settings.get_nbins()), nobs_(settings.get_nobs())  {
