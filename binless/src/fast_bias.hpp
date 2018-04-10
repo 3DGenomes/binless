@@ -96,9 +96,6 @@ public:
     }
   }
   
-  //this estimate is always centered after fitting
-  bool is_centered() const { return true; }
-  
   BINLESS_GET_CONSTREF_DECL(unsigned, max_iter);
   BINLESS_GET_CONSTREF_DECL(double, tol_val);
   BINLESS_GET_CONSTREF_DECL(double, sigma);
@@ -119,6 +116,8 @@ struct FitterTraits<Bias,GAM> {
   typedef AnalyticalGAMLibrary library;
   static const bool has_inequality_constraints = false;
   static const bool has_equality_constraints = true;
+  //this estimate is always centered after fitting
+  static const bool is_centered = true;
 };
 
 //typedef Config<Bias,GAM> BiasConfig;

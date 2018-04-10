@@ -22,10 +22,10 @@ public:
   Rcpp::List get_state() const { return fitterImpl_t::get_params().get_state(); }
   void set_state(const Rcpp::List& state) { fitterImpl_t::get_params().set_state(state); }
   
-  //perform fit of summary data and center final estimate
+  //perform fit of summary data
   void update_params(const Eigen::VectorXd& phihat, const Eigen::VectorXd& weight) {
     fitterImpl_t::update_params(phihat,weight);
-    if (fitterImpl_t::get_settings().is_centered()) center_estimate(); 
+    if (FitterTraits<Leg,Method>::is_centered) center_estimate(); 
   }
 
   //get estimate along binned support

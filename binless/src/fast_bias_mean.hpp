@@ -62,16 +62,16 @@ public:
   FitterSettings(const SummarizerSettings& settings, const Config<Bias,Mean>&) :
     nbins_(settings.get_nbins()), nobs_(settings.get_nobs()) {}
     
-  //this estimate is never centered after fitting (internal centering)
-  bool is_centered() const { return false; }
-  
   BINLESS_GET_CONSTREF_DECL(unsigned, nbins);
   BINLESS_GET_CONSTREF_DECL(Eigen::VectorXd, nobs);
   BINLESS_FORBID_COPY(FitterSettings);
 };
 
 template<>
-struct FitterTraits<Bias,Mean> {};
+struct FitterTraits<Bias,Mean> {
+  //this estimate is never centered after fitting (internal centering)
+  static const bool is_centered = false;
+};
 
 typedef Config<Bias,Mean> BiasConfig;
 typedef Estimator<Bias,Mean> BiasEstimator;

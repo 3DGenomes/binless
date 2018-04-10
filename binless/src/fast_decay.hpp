@@ -77,9 +77,6 @@ public:
     Cin_ = decreasing_constraint(conf.K, free_first);
   }
   
-  //this estimate is always centered after fitting
-  bool is_centered() const { return true; }
-  
   BINLESS_GET_CONSTREF_DECL(unsigned, max_iter);
   BINLESS_GET_CONSTREF_DECL(double, tol_val);
   BINLESS_GET_CONSTREF_DECL(double, sigma);
@@ -100,6 +97,8 @@ struct FitterTraits<Decay,GAM> {
   typedef QuadProgGAMLibrary library;
   static const bool has_inequality_constraints = true;
   static const bool has_equality_constraints = false;
+  //this estimate is always centered after fitting
+  static const bool is_centered = true;
 };
 
 
