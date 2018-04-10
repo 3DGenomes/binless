@@ -37,11 +37,35 @@ struct Params<GAM> {
   
 };
 
+// class that holds the data used to fit summaries and generate corresponding params
+// cannot be built directly, as it is meant to be constructed by each
+// domain-specific child
+template<>
+class FitterSettings<GAM> {
+  
+  BINLESS_GET_CONSTREF_DECL(unsigned, max_iter);
+  BINLESS_GET_CONSTREF_DECL(double, tol_val);
+  BINLESS_GET_CONSTREF_DECL(double, sigma);
+  BINLESS_GET_CONSTREF_DECL(double, K);
+  BINLESS_GET_CONSTREF_DECL(unsigned, nbins);
+  BINLESS_GET_CONSTREF_DECL(Eigen::VectorXd, nobs);
+  
+  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, X);
+  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, D);
+  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, Cin);
+  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, Ceq);
+  
+  
+protected:
+  FitterSettings(unsigned max_iter, double tol_val, double sigma, unsigned K, unsigned nbins, const Eigen::VectorXd& nobs) :
+    max_iter_(max_iter), tol_val_(tol_val), sigma_(sigma), K_(K), nbins_(nbins), nobs_(nobs) {}
+};
+
 template<typename Leg>
 class FitterImpl<Leg,GAM> {
 public:
   FitterImpl(const SummarizerSettings& sset, const Config<Leg,GAM>& conf) : 
-    settings_(sset, conf), params_(settings_), gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
+    settings_(FitterSettingsImpl<Leg,GAM>(sset, conf)), params_(settings_), gam_(settings_.get_X(), settings_.get_D(), settings_.get_sigma())
   {
     if (FitterTraits<Leg,GAM>::has_inequality_constraints) gam_.set_inequality_constraints(get_settings().get_Cin());
     if (FitterTraits<Leg,GAM>::has_equality_constraints) gam_.set_equality_constraints(get_settings().get_Ceq());
@@ -61,7 +85,7 @@ public:
   //get X*beta
   Eigen::VectorXd get_estimate() const { return get_settings().get_X() * get_params().get_beta(); }
   
-  BINLESS_GET_CONSTREF_DECL(FitterSettings<Leg COMMA() GAM>, settings);
+  BINLESS_GET_CONSTREF_DECL(FitterSettings<GAM>, settings);
   BINLESS_GET_REF_DECL(Params<GAM>, params);
   
 private:

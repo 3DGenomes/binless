@@ -59,37 +59,25 @@ public:
 };
 
 template<>
-class FitterSettings<Decay,GAM> {
+class FitterSettingsImpl<Decay,GAM> : public FitterSettings<GAM> {
   
 public:
-  FitterSettings(const SummarizerSettings& settings, const Config<Decay,GAM>& conf) :
-      max_iter_(conf.max_iter), tol_val_(conf.tol_val), sigma_(conf.sigma), K_(conf.K), nbins_(settings.get_nbins()), nobs_(settings.get_nobs()) {
+  FitterSettingsImpl(const SummarizerSettings& settings, const Config<Decay,GAM>& conf) :
+      FitterSettings<GAM>(conf.max_iter, conf.tol_val, conf.sigma, conf.K, settings.get_nbins(), settings.get_nobs()) {
     auto log_distance = settings.get_support();
     auto log_dmin = settings.get_support_min();
     auto log_dmax = settings.get_support_max();
     //
-    X_ = generate_spline_base(log_distance, log_dmin, log_dmax, get_K());
+    set_X( generate_spline_base(log_distance, log_dmin, log_dmax, get_K()) );
     //D: build difference matrix
-    D_ = second_order_difference_matrix(get_K());
+    set_D( second_order_difference_matrix(get_K()) );
     //C: build constraint matrix to forbid increase
     unsigned free_first = get_K() * (std::log(conf.free_decay)-log_dmin)/(log_dmax-log_dmin);
     //Rcpp::Rcout << "Free decay in " << free_first << " out of " << conf_.K << " basis functions\n";
-    Cin_ = decreasing_constraint(conf.K, free_first);
+    set_Cin( decreasing_constraint(get_K(), free_first) );
   }
   
-  BINLESS_GET_CONSTREF_DECL(unsigned, max_iter);
-  BINLESS_GET_CONSTREF_DECL(double, tol_val);
-  BINLESS_GET_CONSTREF_DECL(double, sigma);
-  BINLESS_GET_CONSTREF_DECL(double, K);
-  BINLESS_GET_CONSTREF_DECL(unsigned, nbins);
-  BINLESS_GET_CONSTREF_DECL(Eigen::VectorXd, nobs);
-  
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, X);
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, D);
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, Cin);
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, Ceq); //not used
-  
-  BINLESS_FORBID_COPY(FitterSettings);
+  BINLESS_FORBID_COPY(FitterSettingsImpl);
 };
 
 template<>

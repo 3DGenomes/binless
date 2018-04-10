@@ -32,12 +32,24 @@ struct Params<Mean> {
   BINLESS_GET_SET_DECL(double, double, mean);
 };
 
+// class that holds the data used to fit summaries and generate corresponding params
+// cannot be built directly, as it is meant to be constructed by each
+// domain-specific child
+template<>
+class FitterSettings<Mean> {
+  
+  BINLESS_GET_CONSTREF_DECL(unsigned, nbins);
+  BINLESS_GET_CONSTREF_DECL(Eigen::VectorXd, nobs);
+  
+protected:
+  FitterSettings(unsigned nbins, const Eigen::VectorXd& nobs) : nbins_(nbins), nobs_(nobs) {}
+};
 
 template<typename Leg>
 class FitterImpl<Leg,Mean> {
 public:
   FitterImpl(const SummarizerSettings& sset, const Config<Leg,Mean>& conf) : 
-    settings_(sset, conf), params_(settings_) {}
+    settings_(FitterSettingsImpl<Leg,Mean>(sset, conf)), params_(settings_) {}
   
   //update beta and lambda given phihat and weight
   void update_params(const Eigen::VectorXd& phihat, const Eigen::VectorXd& weight) {
@@ -54,7 +66,7 @@ public:
   //get X*beta
   Eigen::VectorXd get_estimate() const { return get_params().get_estimate(); }
   
-  BINLESS_GET_CONSTREF_DECL(FitterSettings<Leg COMMA() Mean>, settings);
+  BINLESS_GET_CONSTREF_DECL(FitterSettings<Mean>, settings);
   BINLESS_GET_REF_DECL(Params<Mean>, params);
   
 private:

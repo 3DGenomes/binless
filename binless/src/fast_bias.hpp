@@ -70,45 +70,33 @@ public:
 };
 
 template<>
-class FitterSettings<Bias,GAM> {
+class FitterSettingsImpl<Bias,GAM> : public FitterSettings<GAM> {
   
 public:
-  FitterSettings(const SummarizerSettings& settings, const Config<Bias,GAM>& conf) :
-      max_iter_(conf.max_iter), tol_val_(conf.tol_val), sigma_(conf.sigma),
-      K_(conf.bf_per_kb*(settings.get_support_max()-settings.get_support_min())/1000.),
-      nbins_(settings.get_nbins()), nobs_(settings.get_nobs())  {
+  FitterSettingsImpl(const SummarizerSettings& settings, const Config<Bias,GAM>& conf) :
+      FitterSettings<GAM>(conf.max_iter, conf.tol_val, conf.sigma,
+                          conf.bf_per_kb*(settings.get_support_max()-settings.get_support_min())/1000., // K
+                          settings.get_nbins(), settings.get_nobs()) {
     auto position = settings.get_support();
     auto pos_min = settings.get_support_min();
     auto pos_max = settings.get_support_max();
     //X: design matrix
-    X_ = generate_spline_base(position, pos_min, pos_max, get_K());
+    set_X( generate_spline_base(position, pos_min, pos_max, get_K()) );
     //D: build difference matrix
-    D_ = second_order_difference_matrix(get_K());
+    set_D( second_order_difference_matrix(get_K()) );
     //C: build constraint matrix to center
     if (conf.constraint_every > 0) {
       unsigned constraint_number = (pos_max-pos_min)/conf.constraint_every;
       Rcpp::Rcout << "Using " << constraint_number << "=" << (pos_max-pos_min) << "/" << conf.constraint_every << " constraints to model bias\n";
       const auto design2 = make_even_bins(pos_min, pos_max, constraint_number);
       const bool drop = true;
-      Ceq_ = bin_data(position, design2, drop);
+      set_Ceq( bin_data(position, design2, drop) );
     } else {
-      Ceq_ = Eigen::SparseMatrix<double, Eigen::RowMajor>(0,K_);
+      set_Ceq( Eigen::SparseMatrix<double, Eigen::RowMajor>(0,get_K()) );
     }
   }
   
-  BINLESS_GET_CONSTREF_DECL(unsigned, max_iter);
-  BINLESS_GET_CONSTREF_DECL(double, tol_val);
-  BINLESS_GET_CONSTREF_DECL(double, sigma);
-  BINLESS_GET_CONSTREF_DECL(double, K);
-  BINLESS_GET_CONSTREF_DECL(unsigned, nbins);
-  BINLESS_GET_CONSTREF_DECL(Eigen::VectorXd, nobs);
-  
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, X);
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, D);
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, Cin); //not used
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, Ceq);
-  
-  BINLESS_FORBID_COPY(FitterSettings);
+  BINLESS_FORBID_COPY(FitterSettingsImpl);
 };
 
 template<>

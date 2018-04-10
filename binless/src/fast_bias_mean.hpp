@@ -56,15 +56,13 @@ public:
 };
 
 template<>
-class FitterSettings<Bias,Mean> {
+class FitterSettingsImpl<Bias,Mean> : public FitterSettings<Mean> {
   
 public:
-  FitterSettings(const SummarizerSettings& settings, const Config<Bias,Mean>&) :
-    nbins_(settings.get_nbins()), nobs_(settings.get_nobs()) {}
+  FitterSettingsImpl(const SummarizerSettings& settings, const Config<Bias,Mean>&) :
+    FitterSettings<Mean>(settings.get_nbins(), settings.get_nobs()) {}
     
-  BINLESS_GET_CONSTREF_DECL(unsigned, nbins);
-  BINLESS_GET_CONSTREF_DECL(Eigen::VectorXd, nobs);
-  BINLESS_FORBID_COPY(FitterSettings);
+  BINLESS_FORBID_COPY(FitterSettingsImpl);
 };
 
 template<>

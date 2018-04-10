@@ -52,8 +52,11 @@ class SummarizerSettings;
 template<typename Leg, typename Method>
 class SummarizerSettingsImpl;
 
-template<typename Leg, typename Method>
+template<typename Method>
 class FitterSettings;
+
+template<typename Leg, typename Method>
+class FitterSettingsImpl;
 
 template<typename Method>
 class Params;
