@@ -25,7 +25,6 @@ public:
   //perform fit of summary data
   void update_params(const Eigen::VectorXd& phihat, const Eigen::VectorXd& weight) {
     fitterImpl_t::update_params(phihat,weight);
-    if (FitterTraits<Leg,Method>::is_centered) center_estimate(); 
   }
 
   //get estimate along binned support
@@ -33,12 +32,6 @@ public:
     return fitterImpl_t::get_estimate() - Eigen::VectorXd::Constant(fitterImpl_t::get_settings().get_nbins(), fitterImpl_t::get_params().get_mean());
   }
   
-private:
-  //compute average of estimate in order to center it
-  void center_estimate() {
-    fitterImpl_t::get_params().set_mean(fitterImpl_t::get_settings().get_nobs().dot(fitterImpl_t::get_estimate())
-                                           /fitterImpl_t::get_settings().get_nobs().sum());
-  }
 };
 
 }

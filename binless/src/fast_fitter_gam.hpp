@@ -80,6 +80,8 @@ public:
     //Rcpp::Rcout << "gam converged: " << gam.has_converged() << "\n";
     set_lambda(gam_.get_lambda());
     set_beta(gam_.get_beta());
+    //this estimate is always centered
+    center_estimate(); 
   }
   
   //get X*beta
@@ -94,6 +96,12 @@ private:
   
   double get_lambda() const { return get_params().get_lambda(); }
   void set_lambda(double lambda) { get_params().set_lambda(lambda); }
+  
+  //compute average of estimate in order to center it
+  void center_estimate() {
+    get_params().set_mean(get_settings().get_nobs().dot(get_estimate())
+                          /get_settings().get_nobs().sum());
+  }
   
 private:
   GeneralizedAdditiveModel<typename FitterTraits<Leg,GAM>::library> gam_; //used to fit parameters

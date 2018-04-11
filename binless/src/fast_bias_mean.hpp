@@ -64,10 +64,7 @@ public:
 };
 
 template<>
-struct FitterTraits<Bias,Mean> {
-  //this estimate is never centered after fitting (internal centering)
-  static const bool is_centered = false;
-};
+struct FitterTraits<Bias,Mean> {};
 
 typedef Config<Bias,Mean> BiasConfig;
 typedef Estimator<Bias,Mean> BiasEstimator;

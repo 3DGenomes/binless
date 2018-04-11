@@ -83,8 +83,6 @@ struct FitterTraits<Decay,GAM> {
   typedef QuadProgGAMLibrary library;
   static const bool has_inequality_constraints = true;
   static const bool has_equality_constraints = false;
-  //this estimate is always centered after fitting
-  static const bool is_centered = true;
 };
 
 

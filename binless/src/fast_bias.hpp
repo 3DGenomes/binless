@@ -102,8 +102,6 @@ struct FitterTraits<Bias,GAM> {
   typedef AnalyticalGAMLibrary library;
   static const bool has_inequality_constraints = false;
   static const bool has_equality_constraints = true;
-  //this estimate is always centered after fitting
-  static const bool is_centered = true;
 };
 
 //typedef Config<Bias,GAM> BiasConfig;
