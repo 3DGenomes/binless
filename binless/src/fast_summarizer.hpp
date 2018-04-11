@@ -51,12 +51,15 @@ public:
 };
 
 // Estimator is a policy class that takes data and some configuration info and performs a complete IRLS step on it
-class Summarizer : public SummarizerImpl {
+class Summarizer : private SummarizerImpl {
 public:
   typedef SummarizerImpl summarizerImpl_t;
   
   template<typename FastData, typename Conf>
   Summarizer(const FastData& data, const Conf& conf) : summarizerImpl_t(data,conf) {}
+  
+  using SummarizerImpl::get_settings;
+  using SummarizerImpl::get_summary;
   
   //compute group sums of a vector of the size of the input data into the bins formed for the decay calculation
   Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return summarizerImpl_t::get_settings().get_binner()*vec; }
