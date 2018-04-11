@@ -95,8 +95,6 @@ public:
       set_Ceq( Eigen::SparseMatrix<double, Eigen::RowMajor>(0,get_K()) );
     }
   }
-  
-  BINLESS_FORBID_COPY(FitterSettingsImpl);
 };
 
 template<>

@@ -76,8 +76,6 @@ public:
     //Rcpp::Rcout << "Free decay in " << free_first << " out of " << conf_.K << " basis functions\n";
     set_Cin( decreasing_constraint(get_K(), free_first) );
   }
-  
-  BINLESS_FORBID_COPY(FitterSettingsImpl);
 };
 
 template<>

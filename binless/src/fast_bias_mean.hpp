@@ -61,8 +61,6 @@ class FitterSettingsImpl<Bias,Mean> : public FitterSettings<Mean> {
 public:
   FitterSettingsImpl(const SummarizerSettings& settings, const Config<Bias,Mean>&) :
     FitterSettings<Mean>(settings.get_nbins(), settings.get_nobs()) {}
-    
-  BINLESS_FORBID_COPY(FitterSettingsImpl);
 };
 
 template<>
