@@ -39,12 +39,6 @@ struct Mean {};
 /// TRAITS declarations
 
 template<typename Leg, typename Method>
-struct ConfigBase {
-  typedef Leg leg_t;
-  typedef Method method_t;
-};
-
-template<typename Leg, typename Method>
 struct Config;
 
 template<typename Leg, typename Method>
