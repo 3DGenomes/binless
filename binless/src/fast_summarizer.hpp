@@ -38,12 +38,12 @@ protected:
   SummarizerSettings() {}
 };
 
-template<typename Leg, typename Method>
 class SummarizerImpl {
 public:
-  template<typename FastData>
-  SummarizerImpl(const FastData& data, const Config<Leg,Method>& conf) : 
-    settings_(SummarizerSettingsImpl<Leg,Method>(data, conf)), summary_() {}
+  template<typename FastData, typename Conf>
+  SummarizerImpl(const FastData& data, const Conf& conf) : 
+    settings_(SummarizerSettingsImpl<typename Conf::leg_t, typename Conf::method_t>(data, conf)), //init with derived but store common base members
+    summary_() {}
   
   BINLESS_GET_CONSTREF_DECL(SummarizerSettings, settings); //store type that is agnostic to Leg and Method
   BINLESS_GET_REF_DECL(Summary, summary);
@@ -51,13 +51,12 @@ public:
 };
 
 // Estimator is a policy class that takes data and some configuration info and performs a complete IRLS step on it
-template<class Leg, typename Method>
-class Summarizer : public SummarizerImpl<Leg,Method> {
+class Summarizer : public SummarizerImpl {
 public:
-  typedef SummarizerImpl<Leg,Method> summarizerImpl_t;
+  typedef SummarizerImpl summarizerImpl_t;
   
-  template<typename FastData, typename Config>
-  Summarizer(const FastData& data, const Config& conf) : summarizerImpl_t(data,conf) {}
+  template<typename FastData, typename Conf>
+  Summarizer(const FastData& data, const Conf& conf) : summarizerImpl_t(data,conf) {}
   
   //compute group sums of a vector of the size of the input data into the bins formed for the decay calculation
   Eigen::VectorXd summarize(const Eigen::VectorXd& vec) const { return summarizerImpl_t::get_settings().get_binner()*vec; }
@@ -68,8 +67,6 @@ public:
   void update_summary(const ResidualsPair& z, const Eigen::VectorXd& estimate);
   
 };
-
-#include "fast_summarizer.ipp"
 
 }
 }

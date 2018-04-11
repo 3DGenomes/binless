@@ -19,7 +19,7 @@ namespace fast {
 struct ResidualsPair;
 
 template<>
-struct Config<Bias,GAM> {
+struct Config<Bias,GAM> : public ConfigBase<Bias,GAM> {
   Config(double tol_val, double constraint_every) : tol_val(tol_val), constraint_every(constraint_every) {}
   
   //parameters for bias calculation

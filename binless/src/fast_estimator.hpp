@@ -16,10 +16,10 @@ namespace binless {
 namespace fast {
 
 template<typename Leg, typename Method>
-class Estimator : public Summarizer<Leg,Method>, public Fitter<Leg,Method> {
+class Estimator : public Summarizer, public Fitter<Leg,Method> {
 public:
   
-  typedef Summarizer<Leg,Method> summarizer_t;
+  typedef Summarizer summarizer_t;
   typedef Fitter<Leg,Method> fitter_t;
   
   template<typename FastData>

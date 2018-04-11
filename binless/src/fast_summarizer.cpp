@@ -1,6 +1,11 @@
+#include "fast_summarizer.hpp"
+
+
+namespace binless {
+namespace fast {
+
 //here, each estimate is is log ( sum_i observed / sum_i expected ) with i representing a summary bin
-template<class Leg, typename Method>
-void Summarizer<Leg,Method>::set_poisson_lsq_summary(const std::vector<double>& log_expected_std, const FastSignalData& data, double pseudocount) {
+void Summarizer::set_poisson_lsq_summary(const std::vector<double>& log_expected_std, const FastSignalData& data, double pseudocount) {
   //compute observed data
   auto observed_std = data.get_observed();
   auto nobs_std = data.get_nobs();
@@ -30,8 +35,7 @@ void Summarizer<Leg,Method>::set_poisson_lsq_summary(const std::vector<double>& 
   Rcpp::Rcout << summarizerImpl_t::get_summary().get_phihat().rows() << "\n";
 }
 
-template<class Leg, typename Method>
-void Summarizer<Leg,Method>::update_summary(const ResidualsPair& z, const Eigen::VectorXd& estimate) {
+void Summarizer::update_summary(const ResidualsPair& z, const Eigen::VectorXd& estimate) {
   //compute weight
   const Eigen::Map<const Eigen::VectorXd> weights(z.weights.data(),z.weights.size());
   Eigen::VectorXd weight_sum = summarize(weights);
@@ -46,3 +50,7 @@ void Summarizer<Leg,Method>::update_summary(const ResidualsPair& z, const Eigen:
   summarizerImpl_t::get_summary().set_phihat(phihat);
   summarizerImpl_t::get_summary().set_weight(weight_sum);
 }
+
+}
+}
+

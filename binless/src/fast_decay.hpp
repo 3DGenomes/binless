@@ -18,7 +18,7 @@ namespace fast {
 struct ResidualsPair;
 
 template<>
-struct Config<Decay,GAM> {
+struct Config<Decay,GAM> : public ConfigBase<Decay,GAM> {
   Config(double tol_val, double free_decay) : tol_val(tol_val), free_decay(free_decay) {}
   
   //parameters for decay calculation

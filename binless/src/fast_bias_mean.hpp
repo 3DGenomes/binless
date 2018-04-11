@@ -17,7 +17,7 @@ namespace fast {
 struct ResidualsPair;
 
 template<>
-struct Config<Bias,Mean> {
+struct Config<Bias,Mean> : public ConfigBase<Bias,Mean> {
   Config(unsigned nbins) : nbins(nbins) {}
   unsigned nbins;
 };
