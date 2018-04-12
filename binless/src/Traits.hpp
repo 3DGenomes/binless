@@ -30,6 +30,7 @@ namespace fast {
 //Leg
 struct Decay {};
 struct Bias {};
+struct Exposure {};
 
 //Method
 struct GAM {};
@@ -40,6 +41,9 @@ struct Mean {};
 
 template<typename Leg, typename Method>
 struct Config;
+
+template<typename Leg, typename Method>
+struct SummarizerTraits;
 
 template<typename Leg, typename Method>
 struct FitterTraits;

@@ -83,6 +83,8 @@ struct FitterTraits<Decay,GAM> {
   typedef QuadProgGAMLibrary library;
   static const bool has_inequality_constraints = true;
   static const bool has_equality_constraints = false;
+  //print debug info
+  static const bool debug = false;
 };
 
 

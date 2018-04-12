@@ -14,9 +14,6 @@ void Summarizer<Leg,Method>::set_poisson_lsq_summary(const std::vector<double>& 
   Eigen::VectorXd sum_exp = summarize((log_expected.array().exp()*nobs.array()).matrix());
   //compute estimate
   Eigen::VectorXd estimate = (pseudocount + sum_obs.array()/sum_exp.array()).log().matrix();
-  //center estimate
-  double avg = summarizerImpl_t::get_settings().get_nobs().dot(estimate)/summarizerImpl_t::get_settings().get_nobs().sum();
-  estimate = (estimate.array() - avg).matrix();
   //compute weight
   Eigen::VectorXd weight = (estimate.array().exp()*summarizerImpl_t::get_settings().get_nobs().array()).matrix();
   /*Rcpp::Rcout << "BEFORE\n";
@@ -26,8 +23,12 @@ void Summarizer<Leg,Method>::set_poisson_lsq_summary(const std::vector<double>& 
   //report back
   summarizerImpl_t::get_summary().set_phihat(estimate);
   summarizerImpl_t::get_summary().set_weight(weight);
-  Rcpp::Rcout <<"set_poisson_lsq_summary for decay " << estimate.rows() << " " << weight.rows() << "\n";
-  Rcpp::Rcout << summarizerImpl_t::get_summary().get_phihat().rows() << "\n";
+  if (SummarizerTraits<Leg,Method>::debug) {
+    Rcpp::Rcout <<"set_poisson_lsq_summary: sum_obs " << sum_obs.transpose() << "\n";
+    Rcpp::Rcout <<"set_poisson_lsq_summary: sum_exp " << sum_exp.transpose() << "\n";
+    Rcpp::Rcout <<"set_poisson_lsq_summary: estimate " << estimate.transpose() << "\n";
+    Rcpp::Rcout <<"set_poisson_lsq_summary: weight " << weight.transpose() << "\n";
+  }
 }
 
 template<class Leg, typename Method>

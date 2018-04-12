@@ -53,15 +53,28 @@ public:
   
   //update beta and lambda given phihat and weight
   void update_params(const Eigen::VectorXd& phihat, const Eigen::VectorXd& weight) {
-    //center log_bias (no smoothing)
-    double avg = get_settings().get_nobs().dot(phihat)/get_settings().get_nobs().sum();
-    Eigen::VectorXd log_biases = (phihat.array() - avg).matrix();
-    //cap estimates at 3SD from the mean
-    double stdev = std::sqrt(log_biases.squaredNorm()/log_biases.rows());
-    log_biases = log_biases.array().min(3*stdev).max(-3*stdev).matrix();
+    //the mean is actually already calculated: phihat
+    Eigen::VectorXd estimate = phihat;
     
+    //center estimate based on number of observations in data
+    if (FitterTraits<Leg,Mean>::center) {
+      double avg = get_settings().get_nobs().dot(estimate)/get_settings().get_nobs().sum();
+      estimate = (estimate.array() - avg).matrix();
+    }
+    //cap estimates at 3SD from the mean
+    if (FitterTraits<Leg,Mean>::cap) {
+      double stdev = std::sqrt(estimate.squaredNorm()/estimate.rows());
+      estimate = estimate.array().min(3*stdev).max(-3*stdev).matrix();
+    }
+    
+    //print debug info
+    if (FitterTraits<Leg,Mean>::debug) {
+      Rcpp::Rcout << "phihat: " << phihat.transpose() << "\n";
+      Rcpp::Rcout << "weight: " << weight.transpose() << "\n";
+      Rcpp::Rcout << "estimate: " << estimate.transpose() << "\n";
+    }
     //this estimate is never centered after fitting (internal centering)
-    set_estimate(log_biases);
+    set_estimate(estimate);
   }
   
   //get X*beta

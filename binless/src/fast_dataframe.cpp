@@ -4,13 +4,14 @@
 namespace binless {
 namespace fast {
 
-Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const BiasEstimator& bias, const DecayEstimator& dec, double tol_val) {
+Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const ExposureEstimator& expo, const BiasEstimator& bias, const DecayEstimator& dec, double tol_val) {
   //bias, decay, signal with decay and exposures, and log_background matrix (w/ offset)
   std::vector<double> biasmat,decaymat,signal,binless,background;
   biasmat.reserve(data.get_N());
   binless.reserve(data.get_N());
-  std::vector<unsigned> dname(data.get_name()), nobs(data.get_nobs());
-  std::vector<double> log_signal(data.get_log_signal()), exposures(data.get_exposures());
+  std::vector<unsigned> nobs(data.get_nobs());
+  std::vector<double> log_signal(data.get_log_signal());
+  Eigen::VectorXd exposures = expo.get_data_estimate();
   Eigen::VectorXd log_biases = bias.get_data_estimate();
   Eigen::VectorXd log_decay = dec.get_data_estimate();
   for (unsigned i=0; i<data.get_N(); ++i) {
@@ -20,8 +21,7 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const BiasEstimat
     decaymat.push_back(std::exp(ldec));
     double lsig = log_signal[i];
     signal.push_back(std::exp(lsig));
-    unsigned name = dname[i]-1;
-    double exposure = exposures[name];
+    double exposure = exposures(i);
     binless.push_back(std::exp(ldec + lsig));
     background.push_back(nobs[i]*std::exp(bipbj + ldec + exposure));
   }

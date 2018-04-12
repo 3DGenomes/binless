@@ -1,12 +1,12 @@
 
 
 template<typename FastData>
-ResidualsPair get_residuals(const NormalDistribution& dist, const FastData& data, const BiasEstimator& bias, const DecayEstimator& dec) {
+ResidualsPair get_residuals(const NormalDistribution& dist, const FastData& data, const ExposureEstimator& expo, const BiasEstimator& bias, const DecayEstimator& dec) {
     std::vector<double> residuals;
     std::vector<double> weights;
     residuals.reserve(data.get_N());
     weights.reserve(data.get_N());
-    auto log_expected = get_log_expected(data, bias, dec);
+    auto log_expected = get_log_expected(data, expo, bias, dec);
     auto observed = data.get_observed();
     auto nobs = data.get_nobs();
     for (unsigned i=0; i<data.get_N(); ++i) {
@@ -22,12 +22,12 @@ ResidualsPair get_residuals(const NormalDistribution& dist, const FastData& data
 }
 
 template<typename FastData>
-ResidualsPair get_residuals(const PoissonDistribution& dist, const FastData& data, const BiasEstimator& bias, const DecayEstimator& dec) {
+ResidualsPair get_residuals(const PoissonDistribution& dist, const FastData& data, const ExposureEstimator& expo, const BiasEstimator& bias, const DecayEstimator& dec) {
     std::vector<double> residuals;
     std::vector<double> weights;
     residuals.reserve(data.get_N());
     weights.reserve(data.get_N());
-    auto log_expected = get_log_expected(data, bias, dec);
+    auto log_expected = get_log_expected(data, expo, bias, dec);
     auto observed = data.get_observed();
     auto nobs = data.get_nobs();
     for (unsigned i=0; i<data.get_N(); ++i) {
@@ -40,12 +40,12 @@ ResidualsPair get_residuals(const PoissonDistribution& dist, const FastData& dat
 
 //residuals: negative binomial with log-link
 template<typename FastData>
-ResidualsPair get_residuals(const NegativeBinomialDistribution& dist, const FastData& data, const BiasEstimator& bias, const DecayEstimator& dec) {
+ResidualsPair get_residuals(const NegativeBinomialDistribution& dist, const FastData& data, const ExposureEstimator& expo, const BiasEstimator& bias, const DecayEstimator& dec) {
   std::vector<double> residuals;
   std::vector<double> weights;
   residuals.reserve(data.get_N());
   weights.reserve(data.get_N());
-  auto log_expected = get_log_expected(data, bias, dec);
+  auto log_expected = get_log_expected(data, expo, bias, dec);
   auto observed = data.get_observed();
   auto nobs = data.get_nobs();
   for (unsigned i=0; i<data.get_N(); ++i) {
