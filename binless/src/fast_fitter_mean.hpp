@@ -56,9 +56,12 @@ public:
     //center log_bias (no smoothing)
     double avg = get_settings().get_nobs().dot(phihat)/get_settings().get_nobs().sum();
     Eigen::VectorXd log_biases = (phihat.array() - avg).matrix();
-    //cap estimates at 3SD from the mean
-    double stdev = std::sqrt(log_biases.squaredNorm()/log_biases.rows());
-    log_biases = log_biases.array().min(3*stdev).max(-3*stdev).matrix();
+    
+    if (FitterTraits<Leg,Mean>::cap) {
+      //cap estimates at 3SD from the mean
+      double stdev = std::sqrt(log_biases.squaredNorm()/log_biases.rows());
+      log_biases = log_biases.array().min(3*stdev).max(-3*stdev).matrix();
+    }
     
     Rcpp::Rcout << "mean_fit: " << log_biases.transpose() << "\n";
     //this estimate is never centered after fitting (internal centering)

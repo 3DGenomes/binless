@@ -64,7 +64,10 @@ public:
 };
 
 template<>
-struct FitterTraits<Bias,Mean> {};
+struct FitterTraits<Bias,Mean> {
+  //cap the data at 3SD
+  static const bool cap = true;
+};
 
 typedef Config<Bias,Mean> BiasConfig;
 typedef Estimator<Bias,Mean> BiasEstimator;
