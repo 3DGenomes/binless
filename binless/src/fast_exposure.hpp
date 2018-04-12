@@ -24,7 +24,7 @@ struct Config<Exposure,Mean> {};
 template<>
 struct SummarizerTraits<Exposure,Mean> {
   //print debug info
-  static const bool debug = true;
+  static const bool debug = false;
 };
 
 template<>
@@ -67,7 +67,7 @@ struct FitterTraits<Exposure,Mean> {
   //do not cap the data, use exact means
   static const bool cap = false;
   //print debug info
-  static const bool debug = true;
+  static const bool debug = false;
 };
 
 typedef Config<Exposure,Mean> ExposureConfig;
