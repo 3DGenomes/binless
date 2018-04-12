@@ -62,6 +62,8 @@ public:
 
 template<>
 struct FitterTraits<Exposure,Mean> {
+  //do not center the estimate!
+  static const bool center = false;
   //do not cap the data, use exact means
   static const bool cap = false;
   //print debug info

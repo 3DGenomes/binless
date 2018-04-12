@@ -65,6 +65,8 @@ public:
 
 template<>
 struct FitterTraits<Bias,Mean> {
+  //center the estimate
+  static const bool center = true;
   //cap the data at 3SD
   static const bool cap = true;
   //print debug info
