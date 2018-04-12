@@ -14,9 +14,6 @@ void Summarizer<Leg,Method>::set_poisson_lsq_summary(const std::vector<double>& 
   Eigen::VectorXd sum_exp = summarize((log_expected.array().exp()*nobs.array()).matrix());
   //compute estimate
   Eigen::VectorXd estimate = (pseudocount + sum_obs.array()/sum_exp.array()).log().matrix();
-  //center estimate
-  double avg = summarizerImpl_t::get_settings().get_nobs().dot(estimate)/summarizerImpl_t::get_settings().get_nobs().sum();
-  estimate = (estimate.array() - avg).matrix();
   //compute weight
   Eigen::VectorXd weight = (estimate.array().exp()*summarizerImpl_t::get_settings().get_nobs().array()).matrix();
   /*Rcpp::Rcout << "BEFORE\n";
