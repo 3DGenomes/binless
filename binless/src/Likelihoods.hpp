@@ -5,7 +5,7 @@
 
 #include "BinnedData.hpp"
 #include "Traits.hpp"
-#include "util.hpp"
+#include "macros.hpp"
 #include "Settings.hpp"
 
 //Likelihood takes the data and unthresholded beta estimate, and returns

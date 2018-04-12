@@ -4,7 +4,7 @@
 #include <Rcpp.h>
 #include <utility> //pair
 
-#include "util.hpp" //SQUARE
+#include "macros.hpp" //SQUARE
 #include "Traits.hpp"
 
 //ScoreAssembler receives a chi square and the degrees of freedom

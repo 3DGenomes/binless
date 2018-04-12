@@ -7,13 +7,11 @@ using namespace Rcpp;
 #include "FastData.hpp"
 #include "fast_expected.hpp"
 #include "fast_decay.hpp"
-#include "fast_bias.hpp"
+#include "fast_bias_mean.hpp"
 #include "fast_distribution.hpp"
 
 namespace binless {
 namespace fast {
-
-struct ResidualsPair { std::vector<double> residuals,weights; };
 
 //residuals: normal with log-link, 0 drops data
 template<typename FastData>

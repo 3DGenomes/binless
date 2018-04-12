@@ -44,7 +44,7 @@ plot_binless_matrix(a, upper="nobs", lower="nobs")
 #fitted background
 plot_binless_matrix(a, upper="background", lower="background")
 #fitted biases
-ggplot(data.table(bin=1:nlevels(mat[,bin1]),log_biases=out$log_biases))+geom_point(aes(bin,log_biases))
+ggplot(data.table(bin=1:nlevels(mat[,bin1]),log_biases=out$biases$estimate))+geom_point(aes(bin,log_biases))
 #biases matrix
 plot_binless_matrix(a, upper="biasmat", lower="biasmat")
 #fitted decay

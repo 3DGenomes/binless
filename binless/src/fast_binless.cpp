@@ -134,8 +134,8 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, uns
   //
   DecayConfig dconf(tol_val, free_decay);
   DecayEstimator dec(out, dconf);
-  //unsigned constraint_every = 0;
-  //BiasConfig bconf(tol_val, constraint_every);
+  /*unsigned constraint_every = 0;
+  BiasConfig bconf(tol_val, constraint_every);*/
   BiasConfig bconf(nbins);
   BiasEstimator bias(out, bconf);
   //
@@ -160,11 +160,13 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, uns
     std::vector<double> old_expected;
     //compute biases
     z = get_residuals(nb_dist, out, bias, dec);
-    bias.step_irls(z);
+    bias.update_summary(z);
+    bias.update_params();
     //compute decay
     if (step <= bg_steps) old_expected = get_log_expected(out, bias, dec);
     z = get_residuals(nb_dist, out, bias, dec);
-    dec.step_irls(z);
+    dec.update_summary(z);
+    dec.update_params();
     if (step <= bg_steps) expected = get_log_expected(out, bias, dec);
     //compute signal
     if (step > bg_steps) {
@@ -207,8 +209,8 @@ List binless(const DataFrame obs, unsigned nbins, double lam2, double alpha, uns
   }
   Rcpp::Rcout << "done\n";
   //finalize and return
-  return Rcpp::List::create(_["mat"]=get_as_dataframe(out, bias, dec, tol_val), _["log_biases"]=bias.get_binned_estimate(),
-                            _["beta_diag"]=dec.get_beta(), _["exposures"]=out.get_exposures(),
+  return Rcpp::List::create(_["mat"]=get_as_dataframe(out, bias, dec, tol_val), _["biases"]=bias.get_state(),
+                            _["decay"]=dec.get_state(), _["exposures"]=out.get_exposures(),
                             _["log_signal"]=out.get_log_signal(),
                             //_["diagnostics"]=diagnostics,
                             _["nbins"]=nbins);
@@ -231,13 +233,13 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, double alph
   //
   DecayConfig conf(tol_val, 10000); //no need to pass free_diag as parameter because it is not used anyway
   DecayEstimator dec(out, conf);
-  auto beta_diag = Rcpp::as<Eigen::VectorXd >(obs["beta_diag"]);
-  dec.set_beta(beta_diag);
-  unsigned constraint_every = 0;
-  BiasConfig bconf(nbins); //bconf(tol_val, constraint_every);
+  dec.set_state(obs["decay"]);
+  /*unsigned constraint_every = 0;
+  BiasConfig bconf(tol_val, constraint_every);*/
+  BiasConfig bconf(nbins);
   BiasEstimator bias(out, bconf);
   //
-  bias.set_estimate(Rcpp::as<Eigen::VectorXd>(obs["log_biases"]));
+  bias.set_state(obs["biases"]);
   auto exposures = Rcpp::as<std::vector<double> >(obs["exposures"]);
   out.set_exposures(exposures);
   const double converge = tol_val/20.;
@@ -277,13 +279,13 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   //
   DecayConfig conf(tol_val, 10000); //no need to pass free_diag as parameter because it is not used anyway
   DecayEstimator dec(out, conf);
-  auto beta_diag = Rcpp::as<Eigen::VectorXd >(obs["beta_diag"]);
-  dec.set_beta(beta_diag);
-  unsigned constraint_every = 0;
-  BiasConfig bconf(nbins); //bconf(tol_val, constraint_every);
+  dec.set_state(obs["decay"]);
+  /*unsigned constraint_every = 0;
+  BiasConfig bconf(tol_val, constraint_every);*/
+  BiasConfig bconf(nbins);
   BiasEstimator bias(out, bconf);
   //
-  bias.set_estimate(Rcpp::as<Eigen::VectorXd>(obs["log_biases"]));
+  bias.set_state(obs["biases"]);
   auto exposures = Rcpp::as<std::vector<double> >(obs["exposures"]);
   out.set_exposures(exposures);
   const double converge = tol_val/20.;
