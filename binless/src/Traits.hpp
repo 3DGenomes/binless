@@ -30,6 +30,7 @@ namespace fast {
 //Leg
 struct Decay {};
 struct Bias {};
+struct Exposure {};
 
 //Method
 struct GAM {};

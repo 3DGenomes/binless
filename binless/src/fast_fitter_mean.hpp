@@ -60,6 +60,7 @@ public:
     double stdev = std::sqrt(log_biases.squaredNorm()/log_biases.rows());
     log_biases = log_biases.array().min(3*stdev).max(-3*stdev).matrix();
     
+    Rcpp::Rcout << "mean_fit: " << log_biases.transpose() << "\n";
     //this estimate is never centered after fitting (internal centering)
     set_estimate(log_biases);
   }
