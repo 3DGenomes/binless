@@ -67,6 +67,8 @@ template<>
 struct FitterTraits<Bias,Mean> {
   //cap the data at 3SD
   static const bool cap = true;
+  //print debug info
+  static const bool debug = false;
 };
 
 typedef Config<Bias,Mean> BiasConfig;

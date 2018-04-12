@@ -19,6 +19,14 @@ struct ResidualsPair;
 template<>
 struct Config<Exposure,Mean> {};
 
+
+//enable debug
+template<>
+struct SummarizerTraits<Exposure,Mean> {
+  //print debug info
+  static const bool debug = true;
+};
+
 template<>
 class SummarizerSettingsImpl<Exposure,Mean> : public SummarizerSettings {
   

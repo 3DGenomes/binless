@@ -43,6 +43,9 @@ template<typename Leg, typename Method>
 struct Config;
 
 template<typename Leg, typename Method>
+struct SummarizerTraits;
+
+template<typename Leg, typename Method>
 struct FitterTraits;
 
 template<typename Leg, typename Method>

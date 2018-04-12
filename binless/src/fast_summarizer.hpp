@@ -22,6 +22,13 @@ struct Summary {
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
 };
 
+template<typename Leg, typename Method>
+struct SummarizerTraits {
+  //this flag should be always false, but should be overridden in a specific template specialization if needed
+  static const bool debug = false;
+};
+
+
 // class that holds the data used to map the inputs to the summaries
 // cannot be built directly, as it is meant to be constructed by each
 // domain-specific child

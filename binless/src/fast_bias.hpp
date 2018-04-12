@@ -102,6 +102,8 @@ struct FitterTraits<Bias,GAM> {
   typedef AnalyticalGAMLibrary library;
   static const bool has_inequality_constraints = false;
   static const bool has_equality_constraints = true;
+  //print debug info
+  static const bool debug = false;
 };
 
 //typedef Config<Bias,GAM> BiasConfig;
