@@ -126,10 +126,10 @@ gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose
                                              data=data, iter=cs@settings$iter, verbose=verbose, init=init,
                                              init_alpha=1e-9))
   #restrict tolerance if needed
-  precision = max(abs(c(op$par[c("eRJ","eDE","alpha")],recursive=T) - c(cs@par[c("eRJ","eDE","alpha")],recursive=T)))
+  precision = max(abs(c(op$par["alpha"],recursive=T) - c(cs@par["alpha"],recursive=T)))
   cs@par$tol_disp = min(cs@par$tol_disp, max(cs@settings$tol, precision/10))
   #update parameters
-  cs@par=modifyList(cs@par, op$par[c("eRJ","eDE","alpha")])
+  cs@par=modifyList(cs@par, op$par["alpha"])
   #cs@par$eC=cs@par$eC+op$par$eC_sup
   #
   #compute log-posterior
