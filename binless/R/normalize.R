@@ -93,7 +93,7 @@ fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.
     cs@settings$dbins=10**seq(log10(cs@settings$dmin-1),log10(cs@settings$dmax+1)+stepsz,stepsz)
     #initial guess
     if (verbose==T) cat("No initial guess provided\n")
-    decay=CJ(name=cs@experiments[,name],dist=head(cs@settings$dbins,n=length(cs@settings$dbins)-1)*10**(stepsz/2))
+    decay=CJ(group=cs@design[,uniqueN(decay)],dist=head(cs@settings$dbins,n=length(cs@settings$dbins)-1)*10**(stepsz/2))
     decay[,dbin:=cut(dist, cs@settings$dbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
     decay[,c("dist","log_decay"):=list(NULL,0)]
     cs@par=list(eC=array(0,cs@experiments[,.N]), eRJ=array(0,cs@experiments[,.N]), eDE=array(0,cs@experiments[,.N]), alpha=init.dispersion,

@@ -31,12 +31,12 @@ gauss_common_muhat_mean = function(cs, zeros, sbins) {
   bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
   cpos=merge(bsub[,.(id1=id,log_iota,log_rho)],cpos,by="id1",all.x=F,all.y=T)
   cpos=merge(bsub[,.(id2=id,log_iota,log_rho)],cpos,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-  cpos=merge(cbind(cs@design[,.(name)],eC=init$eC), cpos, by="name",all.x=F,all.y=T)
+  cpos=merge(cbind(cs@design[,.(name,decay.grp=decay,genomic.grp=genomic)],eC=init$eC), cpos, by="name",all.x=F,all.y=T)
   cpos[,c("bin1","bin2","dbin"):=
          list(cut(pos1, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
               cut(pos2, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
               cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
-  cpos=merge(cpos,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
+  cpos=init$decay[,.(decay.grp=group,dbin,log_decay)][cpos,,on=c("decay.grp","dbin")]
   cpos[,log_mu.base:=eC + log_decay]
   cpos[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_iota1+log_rho2,
                                                            log_mu.base+log_rho1 +log_rho2,
@@ -60,7 +60,8 @@ gauss_common_muhat_mean = function(cs, zeros, sbins) {
              cpos[contact.up>0,   .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact L", dir="rev",
                                     count=contact.up,    lmu.nosig=lmu.up,    nobs=1, eC, log_decay, log_bias=log_iota2)])
   ### zero counts (twice, in both directions)
-  czero = init$decay[zeros,.(name,dbin,bin1,bin2,cat,dir,id1,pos1,nobs=nzero,log_decay),on=c("name","dbin")]
+  czero = cs@design[,.(name,decay.grp=decay,genomic.grp=genomic)][zeros]
+  czero = init$decay[,.(decay.grp=group,dbin,log_decay)][czero,.(name,dbin,bin1,bin2,cat,dir,id1,pos1,nobs=nzero,log_decay),on=c("decay.grp","dbin")]
   setkeyv(czero,key(zeros))
   stopifnot(czero[is.na(log_decay),.N]==0)
   setnames(bsub,"id","id1")

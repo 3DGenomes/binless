@@ -49,12 +49,12 @@ compute_means = function(cs, counts) {
   bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
   cpos=merge(bsub[,.(id1=id,log_iota,log_rho)],cpos,by="id1",all.x=F,all.y=T)
   cpos=merge(bsub[,.(id2=id,log_iota,log_rho)],cpos,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-  cpos=merge(cbind(cs@design[,.(name)],eC=init$eC), cpos, by="name",all.x=F,all.y=T)
+  cpos=merge(cbind(cs@design[,.(name,decay.grp=decay,genomic.grp=genomic)],eC=init$eC), cpos, by="name",all.x=F,all.y=T)
   cpos[,c("bin1","bin2","dbin"):=
          list(cut(pos1, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
               cut(pos2, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
               cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
-  cpos=merge(cpos,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
+  cpos=init$decay[,.(decay.grp=group,dbin,log_decay)][cpos,,on=c("decay.grp","dbin")]
   #compute signal
   if (cs@par$signal[,.N]>0 && length(cs@settings$sbins)>2) {
     signal = binless:::get_signal_matrix(cs, resolution = cs@settings$base.res, groups=cs@experiments[,.(name,groupname=name)])
