@@ -53,14 +53,14 @@ ggplot(biases[,.(step,value=value-shift(value)),by=c("name","pos","variable")])+
 
 #decay vs step (x log scale)
 decays=rbindlist(cs@diagnostics$params[leg=="decay",decay],idcol = "step", use=T)
-ggplot(decays[,.(distance,log_decay=kappa-mean(kappa),std,khat=kappahat-mean(kappa)),by=c("name","step")])+
-  geom_line(aes(distance,log_decay,group=name))+geom_point(aes(distance,khat,colour=name),alpha=0.1)+
-  geom_errorbar(aes(distance,ymin=khat-std,ymax=khat+std,colour=name),alpha=0.1)+facet_wrap(~step)+scale_x_log10()
+ggplot(decays[,.(distance,log_decay,std,kappahat),by=c("name","step")])+
+  geom_line(aes(distance,log_decay,group=name))+geom_point(aes(distance,kappahat,colour=name),alpha=0.1)+
+  geom_errorbar(aes(distance,ymin=kappahat-std,ymax=kappahat+std,colour=name),alpha=0.1)+facet_wrap(~step)+scale_x_log10()
 
 #decay vs step (x linear scale)
-ggplot(decays[,.(distance,log_decay=kappa-mean(kappa),std,khat=kappahat-mean(kappa)),by=c("name","step")])+
-  geom_line(aes(distance,log_decay,colour=name))+geom_point(aes(distance,khat,colour=name),alpha=0.1)+
-  geom_errorbar(aes(distance,ymin=khat-std,ymax=khat+std,colour=name))+facet_wrap(~step)
+ggplot(decays[,.(distance,log_decay,std,kappahat),by=c("name","step")])+
+  geom_line(aes(distance,log_decay,group=name))+geom_point(aes(distance,kappahat,colour=name),alpha=0.1)+
+  geom_errorbar(aes(distance,ymin=kappahat-std,ymax=kappahat+std,colour=name),alpha=0.1)+facet_wrap(~step)
 
 #fit last decay to polymer model
 decay=cs@par$decay[name==name[1],.(ldist=log(distance),ldec=log_decay,distance,decay=exp(log_decay))]
