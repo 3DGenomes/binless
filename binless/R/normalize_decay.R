@@ -31,7 +31,7 @@ gauss_decay_muhat_mean = function(cs, cts.common) {
 #' 
 gauss_decay_optimize = function(csd, Kdiag, original_lambda_diag,
                                 verbose=T, max_perf_iteration=1000, convergence_epsilon=1e-9) {
-  decay_out = list(log_decay = c(), value = 0, lambda_diag = c())
+  decay_out = list(value = 0, lambda_diag = c())
   for(uXD in csd[,unique(group)]) {
     if (verbose==T) cat("  group",uXD,"\n")
     cutsites = csd[group==uXD,distance]
@@ -89,7 +89,6 @@ gauss_decay_optimize = function(csd, Kdiag, original_lambda_diag,
     avg.val = weighted.mean(log_decay,nobs_vec)
     log_decay = log_decay - rep(avg.val,length(log_decay))
     
-    decay_out$log_decay = c(decay_out$log_decay,log_decay)
     decay_out$lambda_diag = c(decay_out$lambda_diag,lambda_diag)
     
   }
@@ -110,7 +109,7 @@ gauss_decay = function(cs, cts.common, verbose=T) {
                                       verbose=verbose, max_perf_iteration=cs@settings$iter,
                                       convergence_epsilon = cs@par$tol_decay)
   #restrict tolerance if needed
-  precision = max(abs(op$log_decay - cs@par$log_decay))
+  precision = max(abs(op$decay[,log_decay] - cs@par$decay[,log_decay]))
   cs@par$tol_decay = min(cs@par$tol_decay, max(cs@settings$tol,precision/10))
   #update par slot
   cs@par=modifyList(cs@par, op)
