@@ -5,10 +5,10 @@ NULL
 #' @keywords internal
 #' 
 initial_guess_genomic = function(cs, cts.common, pseudocount=1e-2) {
-  iotas=cts.common[cat=="contact L",log((pseudocount+weighted.mean(count,nobs))/(weighted.mean(exp(lmu.nosig),nobs))),keyby=c("name","id1")]
+  iotas=cts.common[cat=="contact L",log(pseudocount+weighted.mean(count,nobs)/weighted.mean(exp(lmu.nosig),nobs)),keyby=c("name","id1")]
   iotas[,V1:=V1-mean(V1),by=name]
   cs@par$log_iota=as.array(iotas[,V1])
-  rhos=cts.common[cat=="contact R",log((pseudocount+weighted.mean(count,nobs))/(weighted.mean(exp(lmu.nosig),nobs))),keyby=c("name","id1")]
+  rhos=cts.common[cat=="contact R",log(pseudocount+weighted.mean(count,nobs)/weighted.mean(exp(lmu.nosig),nobs)),keyby=c("name","id1")]
   rhos[,V1:=V1-mean(V1),by=name]
   cs@par$log_rho=as.array(rhos[,V1])
   return(cs)

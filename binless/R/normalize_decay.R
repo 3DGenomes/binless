@@ -5,7 +5,7 @@ NULL
 #' @keywords internal
 #' 
 initial_guess_decay = function(cs, cts.common, pseudocount=1e-2) {
-  decay=cts.common[,.(log_decay=log((pseudocount+weighted.mean(count,nobs))/(weighted.mean(exp(lmu.nosig),nobs))),
+  decay=cts.common[,.(log_decay=log(pseudocount+weighted.mean(count,nobs)/weighted.mean(exp(lmu.nosig),nobs)),
                       nobs=sum(nobs)),keyby=c("name","dbin")]
   decay[,log_decay:=log_decay-weighted.mean(log_decay,nobs),by=name]
   decay[,nobs:=NULL]
