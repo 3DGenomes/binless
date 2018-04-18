@@ -83,17 +83,17 @@ gauss_decay_optimize = function(csd, Kdiag, original_lambda_diag,
     }
     if (verbose==T) cat("   step",maxiter-1,": lambda_diag",lambda_diag,"\n")
     
-    log_decay = X%*%beta
+    log_decay = as.array(X%*%beta)
     decay_out$value = decay_out$value + sum(dnorm(kappa_hat, mean = as.array(log_decay), sd = as.array(sdl), log = TRUE))
     
     avg.val = weighted.mean(log_decay,nobs_vec)
     log_decay = log_decay - rep(avg.val,length(log_decay))
     
+    csd[group==uXD,log_decay:=log_decay]
     decay_out$lambda_diag = c(decay_out$lambda_diag,lambda_diag)
     
   }
   #make decay data table, reused at next call
-  csd[,log_decay:=decay_out$log_decay]
   decay_out$decay=csd
   return(decay_out)
 }
