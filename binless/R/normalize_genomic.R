@@ -17,7 +17,7 @@ initial_guess_genomic = function(cs, cts.common, pseudocount=1e-2) {
     both[,.(cat="dangling R",group,pos=pos1,eta=log_rho)],
     both[,.(cat="rejoined",group,pos=pos1,eta=(log_iota+log_rho)/2)],
     both[,.(cat="contact L",group,pos=pos1,eta=log_iota)],
-    both[,.(cat="contact R",group,pos=pos1,eta=log_iota)]
+    both[,.(cat="contact R",group,pos=pos1,eta=log_rho)]
   )
   setkey(biases,group,cat,pos)
   cs@par$biases=biases
@@ -43,10 +43,10 @@ gauss_genomic_muhat_mean = function(cs, cts.common) {
   bts[,c("etahat","var"):=list(count/mu-1+eta,var=1/mu+1/init$alpha)]
   bts[,c("eta","mu","count","expo"):=NULL]
   #counts
-  cts = cs@design[,.(name,group=genomic)][cts.common][,.(group,cat,pos=pos1,etahat=z+log_bias,var,nobs)]
+  cts = cs@design[,.(name,group=genomic)][cts.common][,.(group,cat,pos=pos1,etahat=z+log_bias,var=var*2,nobs)] #adjust var for counts are stored twice
   biasmat = rbind(bts,cts)
   biasmat[,cat:=ordered(cat,levels=c("rejoined","dangling L", "dangling R", "contact L", "contact R"))] #important to match design matrix X
-  biasmat = biasmat[,.(etahat=weighted.mean(etahat, nobs/var), std=1/sqrt(sum(nobs/(2*var))), nobs=sum(nobs)),
+  biasmat = biasmat[,.(etahat=weighted.mean(etahat, nobs/var), std=1/sqrt(sum(nobs/var)), nobs=sum(nobs)),
                    keyby=c("group","cat","pos")]
   stopifnot(biasmat[,!any(is.na(cat))])
   stopifnot(all(biasmat[,.SD[,.N],by=pos]$V1==5))
