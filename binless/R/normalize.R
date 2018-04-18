@@ -96,9 +96,11 @@ fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.
     decay=CJ(group=cs@design[,uniqueN(decay)],dist=head(cs@settings$dbins,n=length(cs@settings$dbins)-1)*10**(stepsz/2))
     decay[,dbin:=cut(dist, cs@settings$dbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
     decay[,c("dist","log_decay"):=list(NULL,0)]
+    cats=c("rejoined","dangling L","dangling R","contact L","contact R")
+    biasmat = CJ(group=cs@design[,uniqueN(genomic)],cat=ordered(cats,levels=cats), pos=cs@biases[,sort(unique(pos))])
+    biasmat[,eta:=0]
     cs@par=list(eC=array(0,cs@experiments[,.N]), eRJ=array(0,cs@experiments[,.N]), eDE=array(0,cs@experiments[,.N]), alpha=init.dispersion,
-                log_iota=array(0,cs@biases[,.N]), log_rho=array(0,cs@biases[,.N]),
-                decay=decay, log_decay=0, tol_genomic=.1, tol_decay=.1, tol_disp=.1, tol_signal=1)
+                biases=biasmat, decay=decay, tol_genomic=.1, tol_decay=.1, tol_disp=.1, tol_signal=1)
     #prepare signal matrix
     if (fit.signal==T) {
       if(verbose==T) cat("Preparing for signal estimation\n")
@@ -139,8 +141,6 @@ fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.
 update_diagnostics = function(cs, step, leg, runtime) {
   params=data.table(step=step,leg=leg,value=cs@par$value,runtime=runtime)
   tmp=as.data.table(lapply(cs@par,list))
-  #remove entries that are too heavy and redundant
-  if ("biases" %in% names(tmp)) tmp[,biases:=NULL]
   #merge with previous
   params=cbind(params,tmp)
   if (is.data.table(cs@diagnostics$params)) params=rbind(cs@diagnostics$params,params,fill=T)
@@ -194,7 +194,7 @@ get_all_values = function(cs, param, trans) {
 #' Check whether a normalization has converged
 #' @export
 #' 
-has_converged = function(cs) {
+has_converged = function(cs, part) {
   #return FALSE if legs have changed, and require at least 2 steps
   params=cs@diagnostics$params
   laststep=params[,step[.N]]
@@ -202,19 +202,20 @@ has_converged = function(cs) {
   if (!setequal(params[step==laststep,.(leg)],params[step==laststep-1,.(leg)])) return(FALSE)
   #check all legs present in the last step
   #check if all quantities directly involved in building the expected matrix have converged
-  rel.precision=function(name,fn=identity){merge(params[step==laststep,.(leg,get(name))],
+  rel.precision.bias=function(fn=identity){dt = merge(params[step==laststep&leg=="bias",biases[[1]]], params[step==laststep-1&leg=="bias",biases[[1]]], by=c("group","cat","pos"))
+                                                 dt[, max( abs(fn(eta.x)-fn(eta.y)) ) / ( max(fn(eta.x))-min(fn(eta.y)) ) ]}
+  rel.precision.decay=function(fn=identity){dt = merge(params[step==laststep&leg=="decay",decay[[1]]], params[step==laststep-1&leg=="decay",decay[[1]]], by=c("group","dbin"))
+                                                 dt[, max( abs(fn(log_decay.x)-fn(log_decay.y)) ) / ( max(fn(log_decay.x))-min(fn(log_decay.y)) ) ]}
+  rel.precision.signal=function(name,fn=identity){merge(params[step==laststep,.(leg,get(name))],
                                                  params[step==laststep-1,.(leg,get(name))],by="leg")[
                                                    leg==leg[.N], max( abs(fn(V2.x[[1]])-fn(V2.y[[1]])) ) / ( max(fn(V2.x[[1]]))-min(fn(V2.x[[1]])) ) ]}
-  conv.log_iota = rel.precision("log_iota")
-  conv.log_rho = rel.precision("log_rho")
-  conv.log_decay = rel.precision("log_decay")
-  conv.signal = max(rel.precision("beta.phi"))
-  #cat(" conv.log_iota ", conv.log_iota,
-  #    " conv.log_rho ", conv.log_rho, " conv.log_decay ", conv.log_decay, " conv.phi ", conv.phi, "\n")
-  cat(" relative precision for this iteration: iota ", conv.log_iota,
-      " rho ", conv.log_rho, " decay ", conv.log_decay, " signal ", conv.signal, "\n")
-  conv.param = all(c(conv.log_iota,conv.log_rho,
-                     conv.log_decay,conv.signal)<cs@settings$tol, na.rm=T)
+  conv.log_biases = rel.precision.bias()
+  conv.log_decay = 0
+  if (part == "background") conv.log_decay = rel.precision.decay()
+  conv.signal = NA
+  if (part == "signal") conv.signal = rel.precision.signal("beta.phi")
+  cat(" relative precision for this iteration: biases ", conv.log_biases, " decay ", conv.log_decay, " signal ", conv.signal, "\n")
+  conv.param = all(c(conv.log_biases,conv.log_decay,conv.signal)<cs@settings$tol, na.rm=T)
   return(conv.param)
 }
 
@@ -337,11 +338,13 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
     #
     #check for convergence
-    if (has_converged(cs)) {
-      if (fit.signal == T && i <= cs@settings$bg.steps) {
+    if (fit.signal == T && i <= cs@settings$bg.steps) {
+      if (has_converged(cs, "background")) {
         cat("Background has converged, fitting signal\n")
         cs@settings$bg.steps = i #compute signal at next step
-      } else {
+      }
+    } else {
+      if (has_converged(cs, "signal")) {
         if (verbose==T) {
           cat("Normalization has converged\n")
         }
