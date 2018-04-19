@@ -43,10 +43,12 @@ ggplot(signals[name==unique(name)[1],.(step,value=beta-shift(beta)),by=c("name",
 ggplot(signals[bin1==min(bin1)])+geom_line(aes(bin2,phi,group=name))+geom_point(aes(bin2,phihat),alpha=0.1)+facet_grid(step~name)+ylim(-2.5,10)
 
 #biases vs step
-biases=merge(rbindlist(lapply(cs@diagnostics$params[leg=="bias",log_iota],function(x){cs@biases[,.(name,pos,log_iota=x)]}),use=T,id="step"),
-             rbindlist(lapply(cs@diagnostics$params[leg=="bias",log_rho],function(x){cs@biases[,.(name,pos,log_rho=x)]}),use=T,id="step"))[name==name[1]]
-biases=melt(biases,id=c("step","name","pos"))
-ggplot(biases)+geom_line(aes(pos,value,colour=variable))+facet_grid(step~variable)
+biases.ori=merge(rbindlist(lapply(cs.ori@diagnostics$params[leg=="bias",log_iota],function(x){cs@biases[,.(name,pos,log_iota=x)]}),use=T,id="step"),
+             rbindlist(lapply(cs.ori@diagnostics$params[leg=="bias",log_rho],function(x){cs@biases[,.(name,pos,log_rho=x)]}),use=T,id="step"))[name==name[1]]
+biases.new=rbindlist(cs.new@diagnostics$params[leg=="bias",biases],use=T,id="step")[group==group[1]&cat%in%c("contact L","contact R")]
+biases.new=merge(biases.new[cat=="contact L",.(step,pos,log_iota=eta)],biases.new[cat=="contact R",.(step,group,pos,log_rho=eta)],by=c("step","pos"))
+biases=melt(rbindlist(list(new=biases.new[,.(step,pos,log_iota,log_rho)],ori=biases.ori[,.(step,pos,log_iota,log_rho)]),use=T,idcol="origin"),id=c("origin","step","pos"))
+ggplot(biases)+geom_line(aes(pos,value,colour=origin))+facet_grid(step~variable)
 
 #biases differential
 ggplot(biases[,.(step,value=value-shift(value)),by=c("name","pos","variable")])+geom_line(aes(pos,value,colour=variable))+facet_grid(step~variable)
