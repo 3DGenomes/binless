@@ -86,7 +86,7 @@ gauss_genomic_optimize = function(biasmat, design, Krow, sbins,
       lambda_rho = 1 
     }
     etas = biasmat[group==uXB,etahat]
-    sds = biasmat[group==uXB,std]
+    sds = biasmat[group==uXB,1/std]
     
     S_m2 = Diagonal(x=sds^2)
     tmp_X_S_m2_X = crossprod(Diagonal(x=sds)%*%X)
