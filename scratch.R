@@ -1,0 +1,207 @@
+gauss_genomic_optimize_ori = function(bts, cts, biases, design, Krow, sbins,
+                                  original_lambda_iota, original_lambda_rho, verbose=T,
+                                  max_perf_iteration=1000, convergence_epsilon=1e-5, constrain=F) {
+  XB = as.array(design[,genomic])
+  
+  #run optimization
+  Totalbbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
+  TotalDsets = design[,.N]
+  
+  genomic_out = list(log_iota = c(), log_rho = c(), lambda_iota = c(), lambda_rho = c(), value = 0)
+  
+  for(uXB in unique(XB)) {
+    if (verbose==T) cat("  group",uXB,"\n")
+    Dsets = 0
+    bbegin = c()
+    for (d in 1:TotalDsets) {
+      if(XB[d] == uXB) {
+        bbegin = c(bbegin,Totalbbegin[d],Totalbbegin[d+1])
+        Dsets = Dsets + 1
+      }
+    }
+    SD = bbegin[2]-bbegin[1]
+    cutsites = biases[,pos][bbegin[1]:(bbegin[2]-1)]
+    Bsp = generate_spline_base(cutsites, min(cutsites), max(cutsites), Krow)
+    X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
+    if (constrain == T) {
+      sbinned=biases[bbegin[1]:(bbegin[2]-1), cut(pos, sbins, ordered_result=T,
+                                                  right=F, include.lowest=T,dig.lab=12)]
+      centering=Matrix(model.matrix(~ 0+sbinned))
+      stopifnot(dim(centering)==c(SD,length(sbins)-1))
+    } else {
+      centering=Matrix(rep(1,SD),ncol=1)
+    }
+    W=cbind(rbind(Matrix(0,nrow=3*SD,ncol=ncol(centering)),centering,Matrix(0,nrow=SD,ncol=ncol(centering))),
+            rbind(Matrix(0,nrow=4*SD,ncol=ncol(centering)),centering))
+    diags = list(rep(1,Krow), rep(-2,Krow))
+    D1 = bandSparse(Krow-2, Krow, k=0:2, diagonals=c(diags, diags[1]))
+    if (!is.null(original_lambda_iota) && !is.null(original_lambda_rho)) {
+      lambda_iota = original_lambda_iota[uXB]
+      lambda_rho = original_lambda_rho[uXB]
+    } else {
+      lambda_iota = 1 
+      lambda_rho = 1 
+    }
+    eta_hat_RJ=bts[cat=="rejoined",etahat][bbegin[1]:(bbegin[2]-1)]
+    sd_RJ=bts[cat=="rejoined",std][bbegin[1]:(bbegin[2]-1)]
+    eta_hat_DL=bts[cat=="dangling L",etahat][bbegin[1]:(bbegin[2]-1)]
+    sd_DL=bts[cat=="dangling L",std][bbegin[1]:(bbegin[2]-1)]
+    eta_hat_DR=bts[cat=="dangling R",etahat][bbegin[1]:(bbegin[2]-1)]
+    sd_DR=bts[cat=="dangling R",std][bbegin[1]:(bbegin[2]-1)]
+    eta_hat_L=cts[cat=="contact L",etahat][bbegin[1]:(bbegin[2]-1)]
+    sd_L=cts[cat=="contact L",std][bbegin[1]:(bbegin[2]-1)]
+    eta_hat_R=cts[cat=="contact R",etahat][bbegin[1]:(bbegin[2]-1)]
+    sd_R=cts[cat=="contact R",std][bbegin[1]:(bbegin[2]-1)]
+    
+    if (Dsets > 1) {
+      for (d in 2:Dsets) {
+        ncutsites = biases[,pos][bbegin[(2*d-1)]:(bbegin[2*d]-1)]
+        nBsp  = generate_spline_base(ncutsites, min(ncutsites), max(ncutsites), Krow)
+        cutsites = c(cutsites,ncutsites)
+        nX = rbind(cbind(nBsp/2,nBsp/2),bdiag(nBsp,nBsp),bdiag(nBsp,nBsp))
+        SDd = bbegin[2*d]-bbegin[(2*d-1)]
+        X = rbind(X,nX)
+        Bsp = bdiag(Bsp,nBsp)
+        W = rbind(W,Matrix(0,nrow=5*SDd,ncol=2*ncol(centering)))
+        eta_hat_RJ=c(eta_hat_RJ,bts[cat=="rejoined",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        sd_RJ=c(sd_RJ,bts[cat=="rejoined",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        eta_hat_DL=c(eta_hat_DL,bts[cat=="dangling L",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        sd_DL=c(sd_DL,bts[cat=="dangling L",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        eta_hat_DR=c(eta_hat_DR,bts[cat=="dangling R",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        sd_DR=c(sd_DR,bts[cat=="dangling R",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        eta_hat_L=c(eta_hat_L,cts[cat=="contact L",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        sd_L=c(sd_L,cts[cat=="contact L",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        eta_hat_R=c(eta_hat_R,cts[cat=="contact R",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        sd_R=c(sd_R,cts[cat=="contact R",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
+        SD = SD + SDd
+      }
+    } 
+    
+    SD = bbegin[2]-bbegin[1]
+    etas = c(eta_hat_RJ[1:SD],eta_hat_DL[1:SD],eta_hat_DR[1:SD],eta_hat_L[1:SD],eta_hat_R[1:SD])
+    sds = c((1/(sd_RJ[1:SD])),(1/(sd_DL[1:SD])),(1/(sd_DR[1:SD])),(1/(sd_L[1:SD])),(1/(sd_R[1:SD])))
+    if (Dsets > 1) {
+      for (d in 2:Dsets) {
+        SDd = bbegin[2*d]-bbegin[(2*d-1)]
+        etas = c(etas,eta_hat_RJ[(SD+1):(SD+SDd)],eta_hat_DL[(SD+1):(SD+SDd)],eta_hat_DR[(SD+1):(SD+SDd)],eta_hat_L[(SD+1):(SD+SDd)],eta_hat_R[(SD+1):(SD+SDd)])
+        sds = c(sds,(1/(sd_RJ[(SD+1):(SD+SDd)])),(1/(sd_DL[(SD+1):(SD+SDd)])),(1/(sd_DR[(SD+1):(SD+SDd)])),(1/(sd_L[(SD+1):(SD+SDd)])),(1/(sd_R[(SD+1):(SD+SDd)])))
+        SD = SD + SDd
+      }
+    }
+    
+    S_m2 = Diagonal(x=sds^2)
+    tmp_X_S_m2_X = crossprod(Diagonal(x=sds)%*%X)
+    tmp_Xt_W = crossprod(X,W)
+    
+    epsilon = Inf
+    maxiter = 0
+    beta = Matrix(1,2*Krow)
+    while(epsilon > convergence_epsilon && maxiter < max_perf_iteration) {
+      D = bdiag(lambda_iota*D1,lambda_rho*D1)
+      DtD = crossprod(D)
+      if (maxiter==0) {
+        cholA = Cholesky(tmp_X_S_m2_X + Krow^2*DtD + Diagonal(dim(DtD)[1])/(2*1**2), LDL=F, super=NA,Imult=1e-20) 
+        stopifnot(!isLDL(cholA)) #do LLt cholesky so we can use crossprod for Gamma_v
+      } else {
+        cholA = update(cholA,tmp_X_S_m2_X + Krow^2*DtD + Diagonal(dim(DtD)[1])/(2*1**2))
+      }
+      tmp_Lm1XtW = solve(cholA,solve(cholA,tmp_Xt_W,system="P"),system="L") 
+      if (maxiter==0) {
+        cholWtXAm1XtW = Cholesky(crossprod(tmp_Lm1XtW), super=NA, Imult=1e-20)
+      } else {
+        cholWtXAm1XtW = update(cholWtXAm1XtW, t(tmp_Lm1XtW), mult=1e-20) #update providing M in A=MMt
+      }
+      #
+      tmp_Xt_Sm2_etas = crossprod(X,S_m2%*%etas) #Kx1
+      beta1 = solve(cholA, tmp_Xt_Sm2_etas)
+      beta2 = tmp_Lm1XtW %*% solve(cholWtXAm1XtW, crossprod(tmp_Xt_W,beta1))
+      beta2 = solve(cholA,solve(cholA,beta2,system="DLt"),system="Pt") 
+      beta_y = beta1-beta2
+      
+      nbeta = beta_y
+      epsilon = max(abs(beta-nbeta))
+      beta = nbeta
+      beta_iota = beta[1:Krow]
+      beta_rho = beta[(Krow+1):(2*Krow)]
+      
+      lambda_iota = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_iota)+1e8)
+      lambda_iota = sqrt(as.numeric(lambda_iota))
+      lambda_rho = (Krow - 2)/((Krow**2)*crossprod(D1%*%beta_rho)+1e8)
+      lambda_rho = sqrt(as.numeric(lambda_rho))
+      
+      maxiter = maxiter+1
+    }
+    if (verbose==T) cat("   step",maxiter-1,"lambda_iota",lambda_iota,"\n")
+    
+    log_mean = X%*%beta
+    SD = bbegin[2]-bbegin[1]
+    log_iota = Bsp[1:SD,1:Krow]%*%beta_iota
+    log_rho = Bsp[1:SD,1:Krow]%*%beta_rho
+    
+    SD = 5*SD
+    if (Dsets > 1) {
+      for (d in 2:Dsets) {
+        SDd = bbegin[2*d]-bbegin[(2*d-1)]
+        
+        nlog_iota = Bsp[(SD/5+1):(SD/5+SDd),((d-1)*Krow+1):(d*Krow)]%*%beta_iota
+        nlog_rho = Bsp[(SD/5+1):(SD/5+SDd),((d-1)*Krow+1):(d*Krow)]%*%beta_rho
+        
+        log_iota = c(as.array(log_iota),as.array(nlog_iota))
+        log_rho = c(as.array(log_rho),as.array(nlog_rho))
+        
+        SD = SD + 5*SDd
+      }
+    }
+    
+    avg.iota = mean(log_iota)
+    log_iota = log_iota - rep(avg.iota,length(log_iota))
+    
+    avg.rho = mean(log_rho)
+    log_rho = log_rho - rep(avg.rho,length(log_rho))
+    
+    genomic_out$lambda_iota = c(genomic_out$lambda_iota,lambda_iota)
+    genomic_out$lambda_rho = c(genomic_out$lambda_rho,lambda_rho)
+    genomic_out$log_iota = c(genomic_out$log_iota,as.array(log_iota))
+    genomic_out$log_rho = c(genomic_out$log_rho,as.array(log_rho))
+    
+    genomic_out$value = genomic_out$value+sum(dnorm(etas, mean = as.array(log_mean), sd = as.array(sds), log = TRUE))
+  }
+  
+  #make nice output table
+  bout=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=genomic_out$log_iota)],
+             bts[cat=="dangling R",.(cat, name, id, pos, etahat, std, eta=genomic_out$log_rho)],
+             bts[cat=="rejoined",.(cat, name, id, pos, etahat, std, eta=(genomic_out$log_iota+genomic_out$log_rho)/2)])
+  cout=rbind(cts[cat=="contact L",.(cat, name, id, pos, etahat, std, eta=genomic_out$log_iota)],
+             cts[cat=="contact R",.(cat, name, id, pos, etahat, std, eta=genomic_out$log_rho)])
+  bout=rbind(bout,cout)
+  setkey(bout, id, name, cat)
+  genomic_out$biases=bout
+  return(genomic_out)
+}
+
+cts.common = binless:::gauss_common_muhat_mean(cs.new.0, cs.new.0@zeros, cs.new.0@settings$sbins)
+biasmat = binless:::gauss_genomic_muhat_mean(cs.new.0, cts.common)
+a = gauss_genomic_muhat_mean_ori(cs.ori.0, cts.common)
+biasmat.ori=rbindlist(a)
+biasmats=rbindlist(list(ori=biasmat.ori[,.(pos,cat,etahat,std)],new=biasmat[,.(pos,cat,etahat,std)]),use=T,id="origin")
+dcast(biasmats,pos+cat~origin,value.var = "etahat")[,summary(new-ori)]
+dcast(biasmats,pos+cat~origin,value.var = "std")[,summary(new-ori)]
+
+op.new = binless:::gauss_genomic_optimize(biasmat, cs.new.0@design, cs.new.0@settings$Krow, cs.new.0@settings$sbins,
+                                      cs.new.0@par$lambda_iota, cs.new.0@par$lambda_rho, verbose=T,
+                                      max_perf_iteration=cs.new.0@settings$iter,
+                                      convergence_epsilon=cs.new.0@par$tol_genomic,
+                                      constrain=T)
+
+generate_spline_base = binless:::generate_spline_base
+op.ori = gauss_genomic_optimize_ori(a$bts, a$cts, cs.ori.0@biases, cs.ori.0@design, cs.ori.0@settings$Krow, cs.ori.0@settings$sbins,
+                                          cs.ori.0@par$lambda_iota, cs.ori.0@par$lambda_rho, verbose=T,
+                                          max_perf_iteration=cs.ori.0@settings$iter,
+                                          convergence_epsilon=cs.ori.0@par$tol_genomic,
+                                          constrain=T)
+
+biasmats=rbindlist(list(ori=op.ori$biases[,.(pos,cat,etahat,std,eta)],new=op.new$biases[,.(pos,cat,etahat,std,eta)]),use=T,id="origin")
+dcast(biasmats,pos+cat~origin,value.var = "etahat")[,summary(new-ori)]
+dcast(biasmats,pos+cat~origin,value.var = "std")[,summary(new-ori)]
+dcast(biasmats,pos+cat~origin,value.var = "eta")[,summary(new-ori)]
+ggplot(biasmats)+geom_line(aes(pos,eta,colour=origin))+facet_wrap(~cat)
