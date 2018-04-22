@@ -46,7 +46,7 @@ compute_means = function(cs, counts) {
   init=cs@par
   bsub=merge(init$biases[cat == "contact L",.(genomic.grp=group,pos,log_iota=eta)],
              init$biases[cat == "contact R",.(genomic.grp=group,pos,log_rho=eta)], by=c("genomic.grp","pos"))
-  cpos=merge(cbind(cs@design[,.(name,decay.grp=decay,genomic.grp=genomic)],eC=init$eC), cs@counts, by="name",all.x=F,all.y=T)
+  cpos=merge(cbind(cs@design[,.(name,decay.grp=decay,genomic.grp=genomic)],eC=init$eC), counts, by="name",all.x=F,all.y=T)
   setnames(bsub,c("genomic.grp","pos1","log_iota1","log_rho1"))
   cpos = merge(cpos, bsub, all.x=T, all.y=F, by=c("genomic.grp","pos1"))
   setnames(bsub,c("genomic.grp","pos2","log_iota2","log_rho2"))
