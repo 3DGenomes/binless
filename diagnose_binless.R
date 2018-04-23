@@ -54,11 +54,15 @@ ggplot(biases)+geom_line(aes(pos,value,colour=origin))+facet_grid(step~variable)
 ggplot(biases[,.(step,value=value-shift(value)),by=c("name","pos","variable")])+geom_line(aes(pos,value,colour=variable))+facet_grid(step~variable)
 
 #decay vs step (x log scale)
-decays=rbindlist(cs@diagnostics$params[leg=="decay",decay],idcol = "step", use=T)
-decays[,group:=factor(group)]
-ggplot(decays[,.(distance,log_decay,std,kappahat),by=c("group","step")])+
-  geom_line(aes(distance,log_decay,group=group))+geom_point(aes(distance,kappahat,colour=group),alpha=0.1)+
-  geom_errorbar(aes(distance,ymin=kappahat-std,ymax=kappahat+std,colour=group),alpha=0.1)+facet_wrap(~step)+scale_x_log10()
+decays.ori=rbindlist(cs.ori@diagnostics$params[leg=="decay",decay],idcol = "step", use=T)
+decays.ori[,group:=factor(unclass(name))]
+decays.ori[,name:=NULL]
+decays.new=rbindlist(cs.new@diagnostics$params[leg=="decay",decay],idcol = "step", use=T)
+decays.new[,group:=factor(group)]
+decays=rbindlist(list(ori=decays.ori,new=decays.new),use=T,id="origin")
+ggplot(decays[,.(origin,distance,log_decay,std,kappahat),by=c("group","step")])+
+  geom_line(aes(distance,log_decay,group=origin,colour=origin))+geom_point(aes(distance,kappahat,colour=origin),alpha=0.1)+
+  geom_errorbar(aes(distance,ymin=kappahat-std,ymax=kappahat+std,colour=origin),alpha=0.1)+facet_grid(group~step)+scale_x_log10()
 
 #decay vs step (x linear scale)
 ggplot(decays[,.(distance,log_decay,std,kappahat),by=c("group","step")])+
