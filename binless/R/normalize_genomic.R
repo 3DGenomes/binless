@@ -61,7 +61,7 @@ gauss_genomic_optimize = function(biasmat, design, Krow, sbins,
   genomic_out = list(lambda_iota = c(), lambda_rho = c(), value = 0, genomic_beta = data.table(), biases = data.table())
   
   for(uXB in unique(XB)) {
-    if (verbose==T) cat("  group",uXB,"\n")
+    if (verbose==T) cat("  group",uXB,": ")
     cutsites = biasmat[group==uXB&cat==cat[1],pos]
     Bsp = generate_spline_base(cutsites, min(cutsites), max(cutsites), Krow)
     X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp)) #because the biasmat is properly sorted and all 5 cats per pos are there
@@ -130,7 +130,7 @@ gauss_genomic_optimize = function(biasmat, design, Krow, sbins,
       
       maxiter = maxiter+1
     }
-    if (verbose==T) cat("   step",maxiter-1,"lambda_iota",lambda_iota,"\n")
+    if (verbose==T) cat(maxiter-1,"steps lambda_iota",lambda_iota,"lambda_rho",lambda_rho,"\n")
     
     beta_iota = beta[1:Krow]
     beta_rho = beta[(Krow+1):(2*Krow)]

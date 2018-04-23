@@ -34,7 +34,7 @@ gauss_decay_optimize = function(csd, Kdiag, original_lambda_diag,
   all_log_decay = c()
   decay_out = list(value = 0, lambda_diag = c())
   for(uXD in csd[,unique(group)]) {
-    if (verbose==T) cat("  group",uXD,"\n")
+    if (verbose==T) cat("  group",uXD,": ")
     cutsites = csd[group==uXD,distance]
     lcs = log(cutsites)
     X = as.matrix(binless:::generate_spline_base(lcs,min(lcs),max(lcs), Kdiag))
@@ -82,7 +82,7 @@ gauss_decay_optimize = function(csd, Kdiag, original_lambda_diag,
       #cat("step ",maxiter," epsilon ",epsilon," lambda_diag ", lambda_diag,"\n")
       maxiter = maxiter+1
     }
-    if (verbose==T) cat("   step",maxiter-1,": lambda_diag",lambda_diag,"\n")
+    if (verbose==T) cat(maxiter-1,"steps lambda_diag",lambda_diag,"\n")
     
     log_decay = as.array(X%*%beta)
     decay_out$value = decay_out$value + sum(dnorm(kappa_hat, mean = as.array(log_decay), sd = as.array(sdl), log = TRUE))
