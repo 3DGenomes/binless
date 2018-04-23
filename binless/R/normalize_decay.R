@@ -31,12 +31,13 @@ gauss_decay_muhat_mean = function(cs, cts.common) {
 #' 
 gauss_decay_optimize = function(csd, Kdiag, original_lambda_diag,
                                 verbose=T, max_perf_iteration=1000, convergence_epsilon=1e-9) {
+  all_log_decay = c()
   decay_out = list(value = 0, lambda_diag = c())
   for(uXD in csd[,unique(group)]) {
     if (verbose==T) cat("  group",uXD,"\n")
     cutsites = csd[group==uXD,distance]
     lcs = log(cutsites)
-    X = as.matrix(generate_spline_base(lcs,min(lcs),max(lcs), Kdiag))
+    X = as.matrix(binless:::generate_spline_base(lcs,min(lcs),max(lcs), Kdiag))
     nobs_vec=csd[group==uXD,nobs]
     diags = list(rep(1,Kdiag), rep(-2,Kdiag))
     D = bandSparse(Kdiag-2, Kdiag, k=0:2, diagonals=c(diags, diags[1]))
@@ -89,11 +90,12 @@ gauss_decay_optimize = function(csd, Kdiag, original_lambda_diag,
     avg.val = weighted.mean(log_decay,nobs_vec)
     log_decay = log_decay - rep(avg.val,length(log_decay))
     
-    csd[group==uXD,log_decay:=log_decay]
+    all_log_decay = c(all_log_decay,log_decay)
     decay_out$lambda_diag = c(decay_out$lambda_diag,lambda_diag)
     
   }
   #make decay data table, reused at next call
+  csd[,log_decay:=all_log_decay]
   decay_out$decay=csd
   return(decay_out)
 }
