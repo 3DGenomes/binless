@@ -10,7 +10,7 @@ library(igraph)
 #This script is to group all commands related to diagnosing a run that does not converge
 
 #check convergence and see precision
-binless:::has_converged(cs)
+binless:::has_converged(cs, "signal")
 
 #runtime: total and vs step
 cs@diagnostics$params[,sum(runtime)/3600]

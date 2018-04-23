@@ -91,7 +91,7 @@ gauss_decay_optimize = function(csd, Kdiag, original_lambda_diag,
     log_decay = log_decay - rep(avg.val,length(log_decay))
     
     all_log_decay = c(all_log_decay,log_decay)
-    decay_out$lambda_diag = c(decay_out$lambda_diag,lambda_diag)
+    decay_out$lambda_diag = as.array(c(decay_out$lambda_diag,lambda_diag))
     
   }
   #make decay data table, reused at next call

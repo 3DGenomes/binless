@@ -149,8 +149,8 @@ gauss_genomic_optimize = function(biasmat, design, Krow, sbins,
     genomic_out$biases = rbind(genomic_out$biases,
                                biasmat[group==uXB,.(group,cat,pos,etahat,std,eta=c((log_iota+log_rho)/2,log_iota,log_rho,log_iota,log_rho),nobs)])
     
-    genomic_out$lambda_iota = c(genomic_out$lambda_iota,lambda_iota)
-    genomic_out$lambda_rho = c(genomic_out$lambda_rho,lambda_rho)
+    genomic_out$lambda_iota = as.array(c(genomic_out$lambda_iota,lambda_iota))
+    genomic_out$lambda_rho = as.array(c(genomic_out$lambda_rho,lambda_rho))
     
     genomic_out$value = genomic_out$value+sum(dnorm(etas, mean = as.array(X %*% beta), sd = as.array(sds), log = TRUE))
   }
