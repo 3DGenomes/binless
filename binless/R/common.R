@@ -64,11 +64,10 @@ gauss_common_muhat_mean = function(cs, zeros, sbins) {
                                     count=contact.up,    lmu.nosig=lmu.up,    nobs=1, eC, log_decay, log_bias=log_iota2)])
   ### zero counts (twice, in both directions)
   czero = cs@design[,.(name,decay.grp=decay,genomic.grp=genomic)][zeros]
-  czero = init$decay[,.(decay.grp=group,dbin,log_decay)][czero,.(name,dbin,bin1,bin2,cat,dir,id1,pos1,nobs=nzero,log_decay),on=c("decay.grp","dbin")]
-  setkeyv(czero,key(zeros))
+  czero = init$decay[,.(decay.grp=group,dbin,log_decay)][czero,.(genomic.grp,name,dbin,bin1,bin2,cat,dir,id1,pos1,nobs=nzero,log_decay),on=c("decay.grp","dbin")]
   stopifnot(czero[is.na(log_decay),.N]==0)
   setnames(bsub,"pos","pos1")
-  czero = bsub[czero,on="pos1"]
+  czero = bsub[czero,on=c("genomic.grp","pos1")]
   czero[,log_bias:=ifelse(cat=="contact L", log_iota, log_rho)]
   czero[,c("log_iota","log_rho"):=NULL]
   czero = cbind(cs@design[,.(name)],eC=init$eC)[czero,on="name"]

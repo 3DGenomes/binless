@@ -49,7 +49,7 @@ gauss_genomic_muhat_mean = function(cs, cts.common) {
   biasmat = biasmat[,.(etahat=weighted.mean(etahat, nobs/var), std=1/sqrt(sum(nobs/var)), nobs=sum(nobs)),
                    keyby=c("group","cat","pos")]
   stopifnot(biasmat[,!any(is.na(cat))])
-  stopifnot(all(biasmat[,.SD[,.N],by=pos]$V1==5))
+  stopifnot(all(biasmat[,.SD[,.N%%5],by=pos]$V1==0))
   return(biasmat)
 }
 
