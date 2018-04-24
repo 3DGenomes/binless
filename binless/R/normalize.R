@@ -156,7 +156,7 @@ update_diagnostics = function(cs, step, leg, runtime) {
 #' @examples
 get_all_values = function(cs, param, trans) {
   #get value in tmp as vector of lists, remove NULL lists
-  legs=c("expo","bias","decay","signal","disp")
+  legs=c("expo","disp","bias","decay","signal")
   if (!(param %in% names(cs@diagnostics$param))) return(data.table())
   values=cs@diagnostics$params[,.(step,leg=ordered(leg,legs),tmp=get(param))][!sapply(tmp,is.null)]
   values[,step:=step+((unclass(leg)-1)%%10)/10]
@@ -312,6 +312,10 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     a=system.time(cs <- binless:::gauss_exposures(cs, cts.common, verbose=verbose))
     cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="expo", runtime=a[1]+a[4])
     #
+    #fit dispersion
+    a=system.time(cs <- binless:::gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight, verbose=verbose))
+    cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
+    #
     #fit iota and rho
     constrain.bias = fit.signal==T && i <= cs@settings$bg.steps+1
     a=system.time(cs <- binless:::gauss_genomic(cs, cts.common, verbose=verbose, constrain=constrain.bias))
@@ -332,10 +336,6 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
       a=system.time(cs <- binless:::gauss_decay(cs, cts.common, verbose=verbose))
       cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
     }
-    #
-    #fit dispersion
-    a=system.time(cs <- binless:::gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight, verbose=verbose))
-    cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
     #
     #check for convergence
     if (fit.signal == T && i <= cs@settings$bg.steps) {
