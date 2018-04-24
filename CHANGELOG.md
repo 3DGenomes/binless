@@ -19,6 +19,8 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
   - using binwise averages (breaks backwards compatibility)
   - using negative binomial with fixed dispersion
 - require `pos1` and `pos2` columns in fast binless input
+- fits in optimized binless are performed by group and are more efficient
+  memorywise
 
 ### Fixed
 - sigma parameter was ignored in `GeneralizedAdditiveModel`
