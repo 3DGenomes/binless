@@ -26,17 +26,20 @@ gauss_common_muhat_mean = function(cs, zeros, sbins) {
   init=cs@par
   ### positive counts (twice, in both directions)
   #compute means
-  cpos=copy(cs@counts)
-  bsub=cs@biases[,.(id)]
-  bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
-  cpos=merge(bsub[,.(id1=id,log_iota,log_rho)],cpos,by="id1",all.x=F,all.y=T)
-  cpos=merge(bsub[,.(id2=id,log_iota,log_rho)],cpos,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-  cpos=merge(cbind(cs@design[,.(name)],eC=init$eC), cpos, by="name",all.x=F,all.y=T)
+  bsub=merge(init$biases[cat == "contact L",.(genomic.grp=group,pos,log_iota=eta)],
+             init$biases[cat == "contact R",.(genomic.grp=group,pos,log_rho=eta)], by=c("genomic.grp","pos"))
+  cpos=merge(cbind(cs@design[,.(name,decay.grp=decay,genomic.grp=genomic)],eC=init$eC), cs@counts, by="name",all.x=F,all.y=T)
+  setnames(bsub,c("genomic.grp","pos1","log_iota1","log_rho1"))
+  cpos = merge(cpos, bsub, all.x=T, all.y=F, by=c("genomic.grp","pos1"))
+  setnames(bsub,c("genomic.grp","pos2","log_iota2","log_rho2"))
+  cpos = merge(cpos, bsub, all.x=T, all.y=F, by=c("genomic.grp","pos2"))
+  setnames(bsub,c("genomic.grp","pos","log_iota","log_rho"))
+  cpos[,genomic.grp:=NULL]
   cpos[,c("bin1","bin2","dbin"):=
          list(cut(pos1, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
               cut(pos2, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
               cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
-  cpos=merge(cpos,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
+  cpos=init$decay[,.(decay.grp=group,dbin,log_decay)][cpos,,on=c("decay.grp","dbin")]
   cpos[,log_mu.base:=eC + log_decay]
   cpos[,c("lmu.far","lmu.down","lmu.close","lmu.up"):=list(log_mu.base+log_iota1+log_rho2,
                                                            log_mu.base+log_rho1 +log_rho2,
@@ -60,16 +63,17 @@ gauss_common_muhat_mean = function(cs, zeros, sbins) {
              cpos[contact.up>0,   .(name, id1=id2, pos1=pos2, bin1=bin2, bin2=bin1, dbin, cat="contact L", dir="rev",
                                     count=contact.up,    lmu.nosig=lmu.up,    nobs=1, eC, log_decay, log_bias=log_iota2)])
   ### zero counts (twice, in both directions)
-  czero = init$decay[zeros,.(name,dbin,bin1,bin2,cat,dir,id1,pos1,nobs=nzero,log_decay),on=c("name","dbin")]
-  setkeyv(czero,key(zeros))
+  czero = cs@design[,.(name,decay.grp=decay,genomic.grp=genomic)][zeros]
+  czero = init$decay[,.(decay.grp=group,dbin,log_decay)][czero,.(genomic.grp,name,dbin,bin1,bin2,cat,dir,id1,pos1,nobs=nzero,log_decay),on=c("decay.grp","dbin")]
   stopifnot(czero[is.na(log_decay),.N]==0)
-  setnames(bsub,"id","id1")
-  czero = bsub[czero,on="id1"]
+  setnames(bsub,"pos","pos1")
+  czero = bsub[czero,on=c("genomic.grp","pos1")]
   czero[,log_bias:=ifelse(cat=="contact L", log_iota, log_rho)]
   czero[,c("log_iota","log_rho"):=NULL]
   czero = cbind(cs@design[,.(name)],eC=init$eC)[czero,on="name"]
   czero[,lmu.nosig:=eC + log_decay + log_bias] #we don't average over j
   czero[,count:=0]
+  czero[,genomic.grp:=NULL]
   cts=rbind(cpos,czero)
   setkeyv(cts,key(zeros))
   ### add signal

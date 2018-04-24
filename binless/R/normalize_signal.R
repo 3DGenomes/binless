@@ -125,7 +125,10 @@ gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.
   cs@par$lambda2=as.array(params[,lambda2])
   cs@par$value = params[,sum(BIC)]
   if (verbose==T) {
-    cat("  fit: lambda1",cs@par$lambda1[1],"lambda2",cs@par$lambda2[1],"\n")
+    cat("  fit\n")
+    for (i in 1:cs@experiments[,.N]) {
+      cat("   ", as.character(cs@experiments[i,name]), ": lambda1",cs@par$lambda1[i],"lambda2",cs@par$lambda2[i],"\n")
+    }
     cat("  BIC = ",cs@par$value, "\n")
   }
   return(cs)

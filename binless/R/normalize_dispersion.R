@@ -44,17 +44,18 @@ subsample_counts = function(cs, ncounts, dset=NA) {
 compute_means = function(cs, counts) {
   #compute background
   init=cs@par
-  cpos=copy(counts)
-  bsub=cs@biases[,.(id)]
-  bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
-  cpos=merge(bsub[,.(id1=id,log_iota,log_rho)],cpos,by="id1",all.x=F,all.y=T)
-  cpos=merge(bsub[,.(id2=id,log_iota,log_rho)],cpos,by="id2",all.x=F,all.y=T, suffixes=c("2","1"))
-  cpos=merge(cbind(cs@design[,.(name)],eC=init$eC), cpos, by="name",all.x=F,all.y=T)
+  bsub=merge(init$biases[cat == "contact L",.(genomic.grp=group,pos,log_iota=eta)],
+             init$biases[cat == "contact R",.(genomic.grp=group,pos,log_rho=eta)], by=c("genomic.grp","pos"))
+  cpos=merge(cbind(cs@design[,.(name,decay.grp=decay,genomic.grp=genomic)],eC=init$eC), counts, by="name",all.x=F,all.y=T)
+  setnames(bsub,c("genomic.grp","pos1","log_iota1","log_rho1"))
+  cpos = merge(cpos, bsub, all.x=T, all.y=F, by=c("genomic.grp","pos1"))
+  setnames(bsub,c("genomic.grp","pos2","log_iota2","log_rho2"))
+  cpos = merge(cpos, bsub, all.x=T, all.y=F, by=c("genomic.grp","pos2"))
   cpos[,c("bin1","bin2","dbin"):=
          list(cut(pos1, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
               cut(pos2, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
               cut(distance,cs@settings$dbins,ordered_result=T,right=F,include.lowest=T,dig.lab=12))]
-  cpos=merge(cpos,init$decay[,.(name,dbin,log_decay)],by=c("name","dbin"))
+  cpos=init$decay[,.(decay.grp=group,dbin,log_decay)][cpos,,on=c("decay.grp","dbin")]
   #compute signal
   if (cs@par$signal[,.N]>0 && length(cs@settings$sbins)>2) {
     signal = binless:::get_signal_matrix(cs, resolution = cs@settings$base.res, groups=cs@experiments[,.(name,groupname=name)])
@@ -97,7 +98,11 @@ gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose
   if (verbose==T) cat(" Dispersion\n")
   #predict all means and put into table
   counts = binless:::compute_means(cs,counts)
-  stopifnot(cs@biases[,.N]==length(cs@par$log_iota))
+  log_biases = dcast(cs@par$biases[cat%in%c("contact L","contact R"),.(group,pos,cat,eta)],group+pos~cat,value.var = "eta")
+  setnames(log_biases,c("group","pos","log_iota","log_rho"))
+  log_biases = merge(log_biases,cs@design[,.(name,group=genomic)],by=c("group"), allow.cartesian = T)
+  log_biases = merge(log_biases,cs@biases,by=c("name","pos"),all.x=F,all.y=T)
+  stopifnot(cs@biases[,.N]==log_biases[,.N])
   #
   #fit dispersion and exposures
   if (verbose==T) cat("  predict\n")
@@ -112,12 +117,12 @@ gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose
                counts_close=counts[,contact.close], counts_far=counts[,contact.far],
                counts_up=counts[,contact.up], counts_down=counts[,contact.down],
                weight=as.array(weight[,wt]),
-               log_iota=cs@par$log_iota, log_rho=cs@par$log_rho,
+               log_iota=log_biases[,log_iota], log_rho=log_biases[,log_rho],
                log_mean_cclose=counts[,lmu.close], log_mean_cfar=counts[,lmu.far],
                log_mean_cup=counts[,lmu.up], log_mean_cdown=counts[,lmu.down])
   init=list(eC_sup=as.array(counts[,log(mean(contact.close/exp(lmu.close))),by=name][,V1]),
-            eRJ=as.array(cs@biases[,.(name,frac=rejoined/exp((cs@par$log_iota+cs@par$log_rho)/2))][,log(mean(frac)),by=name][,V1]),
-            eDE=as.array(cs@biases[,.(name,frac=(dangling.L/exp(cs@par$log_iota)+dangling.R/exp(cs@par$log_rho))/2)][
+            eRJ=as.array(log_biases[,.(name,frac=rejoined/exp((log_iota+log_rho)/2))][,log(mean(frac)),by=name][,V1]),
+            eDE=as.array(log_biases[,.(name,frac=(dangling.L/exp(log_iota)+dangling.R/exp(log_rho))/2)][
               ,log(mean(frac)),by=name][,V1]))
   init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],lmu.close]))
   init$alpha=max(0.001,1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu))
