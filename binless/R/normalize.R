@@ -74,7 +74,7 @@ get_nzeros = function(cs, sbins, ncores=1) {
 #' @keywords internal
 #' 
 fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
-                       bg.steps=5, iter=100, fit.signal=T, verbose=T, ncounts=100000, init.dispersion=1,
+                       bg.steps=5, iter=100, fit.signal=T, verbose=T, init.dispersion=1,
                        tol=1e-1, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
     #fresh start
     cs@par=list() #in case we have a weird object
@@ -269,8 +269,7 @@ get_residuals = function(cts.common, viewpoint) {
 #' @examples
 #' 
 normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
-                     ngibbs = 15, bg.steps=5, iter=100, fit.signal=T,
-                     verbose=T, ncounts=100000, init.dispersion=1,
+                     ngibbs = 15, bg.steps=5, iter=100, fit.signal=T, verbose=T, init.dispersion=1, 
                      tol=1e-1, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
@@ -283,7 +282,7 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     #fresh start
     cs = fresh_start(cs, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, base.res = base.res,
                      bg.steps = bg.steps, iter = iter, fit.signal = fit.signal,
-                     verbose = verbose, ncounts = ncounts, init.dispersion = init.dispersion,
+                     verbose = verbose, init.dispersion = init.dispersion,
                      tol = tol, ncores = ncores, fix.lambda1 = fix.lambda1, fix.lambda1.at = fix.lambda1.at,
                      fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
     laststep=0
@@ -293,9 +292,6 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     cs@groups=list()
   }
   #
-  if(verbose==T) cat("Subsampling counts for dispersion\n")
-  subcounts = binless:::subsample_counts(cs, ncounts)
-  subcounts.weight = merge(cs@zeros[,.(nc=sum(ncross)/4),by=name],subcounts[,.(ns=.N),keyby=name],by="name")[,.(name,wt=nc/ns)]
   #gibbs sampling
   if (ngibbs==0) return(cs)
   for (i in (laststep + 1:ngibbs)) {
@@ -313,7 +309,7 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="expo", runtime=a[1]+a[4])
     #
     #fit dispersion
-    a=system.time(cs <- binless:::gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight, verbose=verbose))
+    a=system.time(cs <- binless:::gauss_dispersion(cs, cts.common, verbose=verbose))
     cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
     #
     #fit iota and rho

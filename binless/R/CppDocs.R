@@ -27,7 +27,7 @@ NULL
 #' 
 #' Once normalized with \code{\link{fast_binless}}, differences with respect to a reference can be computed.
 #'
-#' @ref unsigned integer corresponding to the index (starting at 1) of the dataset to use as reference
+#' @param ref unsigned integer corresponding to the index (starting at 1) of the dataset to use as reference
 #' @inheritParams fast_binless
 #' 
 #' @export

@@ -4,7 +4,7 @@
 \alias{has_converged}
 \title{Check whether a normalization has converged}
 \usage{
-has_converged(cs)
+has_converged(cs, part)
 }
 \description{
 Check whether a normalization has converged

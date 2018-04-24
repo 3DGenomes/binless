@@ -31,17 +31,9 @@ initial_guess_genomic = function(cs, cts.common, pseudocount=1e-2) {
 #' 
 gauss_genomic_muhat_mean = function(cs, cts.common) {
   #biases
-  init=cs@par
-  bsub=copy(cs@biases)
-  bsub=merge(cbind(cs@design[,.(name,group=genomic)],eRJ=init$eRJ,eDE=init$eDE), bsub, by="name",all.x=F,all.y=T)
-  bts=rbind(bsub[,.(group,cat="rejoined",pos, count=rejoined,expo=eRJ,nobs=1)],
-            bsub[,.(group,cat="dangling L",pos, count=dangling.L,expo=eDE,nobs=1)],
-            bsub[,.(group,cat="dangling R",pos, count=dangling.R,expo=eDE,nobs=1)])
-  setkey(bts,group,cat,pos)
-  bts = bts[init$biases[cat%in%c("rejoined","dangling L","dangling R"),.(group,cat,pos,eta)]]
-  bts[,mu:=exp(expo+eta)]
+  bts = binless:::gauss_common_muhat_mean_biases(cs)
   bts[,c("etahat","var"):=list(count/mu-1+eta,var=1/mu+1/init$alpha)]
-  bts[,c("eta","mu","count","expo"):=NULL]
+  bts[,c("eta","mu","count"):=NULL]
   #counts
   cts = cs@design[,.(name,group=genomic)][cts.common][,.(group,cat,pos=pos1,etahat=z+log_bias,var=var*2,nobs)] #adjust var for counts are stored twice
   biasmat = rbind(bts,cts)

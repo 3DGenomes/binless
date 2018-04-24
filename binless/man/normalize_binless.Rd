@@ -6,9 +6,9 @@
 \usage{
 normalize_binless(cs, restart = F, bf_per_kb = 50, bf_per_decade = 10,
   bins_per_bf = 10, base.res = 5000, ngibbs = 15, bg.steps = 5,
-  iter = 100, fit.signal = T, verbose = T, ncounts = 1e+05,
-  init.dispersion = 1, tol = 0.1, ncores = 1, fix.lambda1 = F,
-  fix.lambda1.at = NA, fix.lambda2 = F, fix.lambda2.at = NA)
+  iter = 100, fit.signal = T, verbose = T, init.dispersion = 1,
+  tol = 0.1, ncores = 1, fix.lambda1 = F, fix.lambda1.at = NA,
+  fix.lambda2 = F, fix.lambda2.at = NA)
 }
 \arguments{
 \item{cs}{CSnorm object as returned by \code{\link{merge_cs_norm_datasets}}}
