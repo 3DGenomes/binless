@@ -88,6 +88,23 @@ gauss_common_muhat_mean = function(cs, zeros, sbins) {
   return(cts)
 }
 
+#' Compute predicted means for dangling and rejoined
+#' @keywords internal
+#' 
+gauss_common_muhat_mean_biases = function(cs) {
+    #biases
+    init=cs@par
+    bsub=copy(cs@biases)
+    bsub=merge(cbind(cs@design[,.(name,group=genomic)],eRJ=init$eRJ,eDE=init$eDE), bsub, by="name",all.x=F,all.y=T)
+    bts=rbind(bsub[,.(group,cat="rejoined",pos, count=rejoined,expo=eRJ,nobs=1)],
+              bsub[,.(group,cat="dangling L",pos, count=dangling.L,expo=eDE,nobs=1)],
+              bsub[,.(group,cat="dangling R",pos, count=dangling.R,expo=eDE,nobs=1)])
+    setkey(bts,group,cat,pos)
+    bts = bts[init$biases[cat%in%c("rejoined","dangling L","dangling R"),.(group,cat,pos,eta)]]
+    bts[,mu:=exp(expo+eta)]
+    return(bts[,.(group,cat,pos,count,mu,nobs,eta)])
+}
+
 #' Add begin and end for a binned matrix
 #'
 #' @keywords internal

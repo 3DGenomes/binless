@@ -1,44 +1,6 @@
 #' @include binless.R
 NULL
 
-#' Get the first ncounts/d of each of d datasets, including zeros 
-#' 
-#' count is always a bit smaller because we censor those that are <dmin without adding more counts
-#' 
-#' @keywords internal
-#' 
-subsample_counts = function(cs, ncounts, dset=NA) {
-  ncounts_per_dset=as.integer(ncounts/cs@design[,.N])
-  if (is.na(dset)) {
-    cts = foreach (d=cs@design[,name],.combine=rbind) %do% subsample_counts(cs,ncounts_per_dset,dset=d)
-  } else {
-    #get name and id of counts
-    nbiases = cs@biases[name==dset, .N]
-    ncounts = min(nbiases*(nbiases-1)/2,ncounts)
-    ids=c(cs@biases[name==dset,.(minid=min(id),maxid=max(id))])
-    cts=data.table(name=dset,id1=ids$minid,id2=(ids$minid+1):ids$maxid)
-    while(cts[,.N]<ncounts)
-      cts=rbind(cts,data.table(name=dset,id1=cts[.N,id1+1],id2=cts[.N,id1+2]:ids$maxid))
-    cts=cts[1:ncounts]
-    #merge positions and compute distances
-    cts = merge(cts,cs@biases[,.(name,id,pos)],by.x=c("name","id1"),by.y=c("name","id"))
-    cts = merge(cts,cs@biases[,.(name,id,pos)],by.x=c("name","id2"),by.y=c("name","id"),suffixes=c("1","2"))
-    cts[,distance:=abs(pos2-pos1)]
-    if (cs@settings$circularize>0) cts[,distance:=pmin(distance, cs@settings$circularize+1-distance)] 
-    cts = cts[distance>=cs@settings$dmin]
-    #merge counts
-    setkey(cts, id1, id2, name)
-    cts = merge(cts, cs@counts[,.(name,id1,id2,contact.close,contact.down,contact.far,contact.up)], all.x=T)
-    cts[is.na(contact.close),contact.close:=0]
-    cts[is.na(contact.down),contact.down:=0]
-    cts[is.na(contact.far),contact.far:=0]
-    cts[is.na(contact.up),contact.up:=0]
-    if (cts[,uniqueN(c(contact.close,contact.far,contact.up,contact.down))]<2)
-      stop("dataset too sparse, please increase ncounts")
-    return(cts)
-  }
-}
-
 #' Compute means for a given counts matrix
 #' @keywords internal
 compute_means = function(cs, counts) {
@@ -94,56 +56,25 @@ optimize_stan_model = function(model, data, iter, verbose, init, ...) {
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
 #' 
-gauss_dispersion = function(cs, counts, weight=cs@design[,.(name,wt=1)], verbose=T) {
+gauss_dispersion = function(cs, cts.common, verbose=T) {
   if (verbose==T) cat(" Dispersion\n")
   #predict all means and put into table
-  counts = binless:::compute_means(cs,counts)
-  log_biases = dcast(cs@par$biases[cat%in%c("contact L","contact R"),.(group,pos,cat,eta)],group+pos~cat,value.var = "eta")
-  setnames(log_biases,c("group","pos","log_iota","log_rho"))
-  log_biases = merge(log_biases,cs@design[,.(name,group=genomic)],by=c("group"), allow.cartesian = T)
-  log_biases = merge(log_biases,cs@biases,by=c("name","pos"),all.x=F,all.y=T)
-  stopifnot(cs@biases[,.N]==log_biases[,.N])
-  #
-  #fit dispersion and exposures
-  if (verbose==T) cat("  predict\n")
-  bbegin=c(1,cs@biases[,.(name,row=.I)][name!=shift(name),row],cs@biases[,.N+1])
-  cbegin=c(1,counts[,.(name,row=.I)][name!=shift(name),row],counts[,.N+1])
-  data = list( Dsets=cs@design[,.N], Biases=cs@design[,uniqueN(genomic)], Decays=cs@design[,uniqueN(decay)],
-               XB=as.array(cs@design[,genomic]), XD=as.array(cs@design[,decay]),
-               SD=cs@biases[,.N], bbegin=bbegin,
-               cutsitesD=cs@biases[,pos], rejoined=cs@biases[,rejoined],
-               danglingL=cs@biases[,dangling.L], danglingR=cs@biases[,dangling.R],
-               N=counts[,.N], cbegin=cbegin,
-               counts_close=counts[,contact.close], counts_far=counts[,contact.far],
-               counts_up=counts[,contact.up], counts_down=counts[,contact.down],
-               weight=as.array(weight[,wt]),
-               log_iota=log_biases[,log_iota], log_rho=log_biases[,log_rho],
-               log_mean_cclose=counts[,lmu.close], log_mean_cfar=counts[,lmu.far],
-               log_mean_cup=counts[,lmu.up], log_mean_cdown=counts[,lmu.down])
-  init=list(eC_sup=as.array(counts[,log(mean(contact.close/exp(lmu.close))),by=name][,V1]),
-            eRJ=as.array(log_biases[,.(name,frac=rejoined/exp((log_iota+log_rho)/2))][,log(mean(frac)),by=name][,V1]),
-            eDE=as.array(log_biases[,.(name,frac=(dangling.L/exp(log_iota)+dangling.R/exp(log_rho))/2)][
-              ,log(mean(frac)),by=name][,V1]))
-  init$mu=mean(exp(init$eC_sup[1]+counts[name==name[1],lmu.close]))
-  init$alpha=max(0.001,1/(var(counts[name==name[1],contact.close]/init$mu)-1/init$mu))
-  init$mu=NULL
-  out=capture.output(op<-optimize_stan_model(model=binless:::stanmodels$gauss_dispersion, tol_param=cs@par$tol_disp,
-                                             data=data, iter=cs@settings$iter, verbose=verbose, init=init,
-                                             init_alpha=1e-9))
+  bts = binless:::gauss_common_muhat_mean_biases(cs)[,.(cat,count,mu,nobs)]
+  cts = cts.common[,.(cat,count,mu,nobs=nobs/2)]
+  data = rbind(bts,cts)
+  alpha = MASS::theta.ml(data[,count], data[,mu], data[,sum(nobs)], data[,nobs], limit=10, eps=cs@par$tol_disp)
   #restrict tolerance if needed
-  precision = max(abs(c(op$par["alpha"],recursive=T) - c(cs@par["alpha"],recursive=T)))
+  precision = max(abs(alpha - cs@par$alpha))
   cs@par$tol_disp = min(cs@par$tol_disp, max(cs@settings$tol, precision/10))
   #update parameters
-  cs@par=modifyList(cs@par, op$par["alpha"])
-  #cs@par$eC=cs@par$eC+op$par$eC_sup
+  cs@par$alpha = alpha
   #
   #compute log-posterior
   Krow=cs@settings$Krow
   Kdiag=cs@settings$Kdiag
-  cs@par$value = op$value + (Krow-2)/2*sum(log(cs@par$lambda_iota/exp(1))+log(cs@par$lambda_rho/exp(1))) +
-    (Kdiag-2)/2*sum(log(cs@par$lambda_diag/exp(1)))
+  cs@par$value = sum(data[,nobs]*(dnbinom(x=data[,count], size=alpha, mu=data[,mu],log=T)))
   if (verbose==T) {
-    cat("  fit: dispersion",cs@par$alpha,"\n")
+    cat("  fit: alpha",cs@par$alpha,"\n")
     cat("  log-likelihood = ",cs@par$value,"\n")
   }
   return(cs)
