@@ -4,7 +4,7 @@
 \alias{gauss_decay_optimize}
 \title{Optimize decay parameters}
 \usage{
-gauss_decay_optimize(csd, design, Kdiag, original_lambda_diag, verbose = T,
+gauss_decay_optimize(csd, Kdiag, original_lambda_diag, verbose = T,
   max_perf_iteration = 1000, convergence_epsilon = 1e-09)
 }
 \description{
