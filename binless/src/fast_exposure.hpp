@@ -48,7 +48,6 @@ public:
     set_nobs(get_binner() * nobs_data);
     //compute mean log distance
     set_support( ((get_binner() * (name_data.cast<double>().array() * nobs_data.array()).matrix()).array() / get_nobs().array()).matrix() );
-    Rcpp::Rcout << "support: " << get_support().transpose() << "\n";
   }
 };
 
