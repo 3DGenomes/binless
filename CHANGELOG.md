@@ -9,6 +9,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - First part of decay in fast binless is not forced to decrease. Use `free_diag`
  argument to decide (default 10kb)
 - patchno column to fast binless output
+- allow to pass a vector of lambda2 values to fast binless
 
 ### Changed
 - Exposures are now fit separately

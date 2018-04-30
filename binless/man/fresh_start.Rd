@@ -6,8 +6,8 @@
 \usage{
 fresh_start(cs, bf_per_kb = 50, bf_per_decade = 10, bins_per_bf = 10,
   base.res = 5000, bg.steps = 5, iter = 100, fit.signal = T,
-  verbose = T, init.dispersion = 1, tol = 0.1, ncores = 1,
-  fix.lambda1 = F, fix.lambda1.at = NA, fix.lambda2 = F,
+  verbose = T, init.dispersion = 1, min.lambda2 = 2.5, tol = 0.1,
+  ncores = 1, fix.lambda1 = F, fix.lambda1.at = NA, fix.lambda2 = F,
   fix.lambda2.at = NA)
 }
 \description{

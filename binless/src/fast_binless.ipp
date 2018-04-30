@@ -1,7 +1,7 @@
 
 template<typename Lasso>
 SignalTriplet step_signal(const FastSignalData& data, const ResidualsPair& z,
-                          std::vector<Lasso>& flos, double lam2, unsigned group) {
+                          std::vector<Lasso>& flos, const Eigen::ArrayXd& lam2, unsigned group) {
     //build signal matrix
     auto dlog_signal = data.get_log_signal();
     std::vector<double> phihat,weights;
@@ -28,7 +28,7 @@ SignalTriplet step_signal(const FastSignalData& data, const ResidualsPair& z,
         std::vector<double> y(phihat.cbegin() + dset*data.get_ncells(), phihat.cbegin() + (dset+1)*data.get_ncells());
         std::vector<double> wt(weights.cbegin() + dset*data.get_ncells(), weights.cbegin() + (dset+1)*data.get_ncells());
         std::vector<unsigned> no(nobs.cbegin() + dset*data.get_ncells(), nobs.cbegin() + (dset+1)*data.get_ncells());
-        flos[dset].optimize(y, wt, lam2);
+        flos[dset].optimize(y, wt, lam2[dset]);
         //compute weighted average
         std::vector<double> beta = flos[dset].get();
         double avg=0;
@@ -50,7 +50,7 @@ SignalTriplet step_signal(const FastSignalData& data, const ResidualsPair& z,
 
 template<typename Lasso>
 DifferenceQuadruplet step_difference(const FastDifferenceData& data, const ResidualsPair& z,
-                                     std::vector<Lasso>& flos, double lam2, unsigned ref) {
+                                     std::vector<Lasso>& flos, const Eigen::ArrayXd& lam2, unsigned ref) {
     //build difference matrices
     auto dsignal = data.get_log_signal();
     auto dphi_ref = data.get_phi_ref();
@@ -83,7 +83,7 @@ DifferenceQuadruplet step_difference(const FastDifferenceData& data, const Resid
             std::vector<double> y(deltahat.cbegin() + dset*data.get_ncells(), deltahat.cbegin() + (dset+1)*data.get_ncells());
             std::vector<double> wt(weights.cbegin() + dset*data.get_ncells(), weights.cbegin() + (dset+1)*data.get_ncells());
             unsigned idx = dset - (ref_seen ? 1 : 0);
-            flos[idx].optimize(y, wt, lam2);
+            flos[idx].optimize(y, wt, lam2[idx]);
             std::vector<double> ldelta = flos[idx].get();
             delta.insert(delta.end(), ldelta.begin(), ldelta.end());
         }

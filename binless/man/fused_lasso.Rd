@@ -6,8 +6,8 @@
 'value'}
 \usage{
 fused_lasso(csig, positive, fixed, constrained, verbose = T,
-  fix.lambda1 = F, fix.lambda1.at = 0.1, fix.lambda2 = F,
-  fix.lambda2.at = NA)
+  min.lambda2 = 2.5, fix.lambda1 = F, fix.lambda1.at = 0.1,
+  fix.lambda2 = F, fix.lambda2.at = NA)
 }
 \arguments{
 \item{csig}{the CSbsig or CSbdiff object to optimize}
@@ -20,9 +20,15 @@ positive?}
 \item{constrained}{boolean. Constrain lambda1 so that any diagonal that contains
 only one big patch be forced to have 'value'=0 ?}
 
-\item{verbose}{boolean (default TRUE).
+\item{verbose}{boolean (default TRUE).}
 
-finds optimal lambda1, lambda2 and eC using BIC.}
+\item{min.lambda2}{The minimum value of lambda2 when scanning for its optimum. Might
+move a bit because of the CV+kSD criterion}
+
+\item{fix.lambda1, fix.lambda1.at, fix.lambda2, fix.lambda2.at}{Default FALSE. if TRUE, sets lambda1
+(resp. lambda2) to the provided value instead of optimizing it
+ 
+ finds optimal lambda1, lambda2 and eC using BIC.}
 }
 \description{
 run fused lasso on one dataset contained in matg, fusing 'valuehat' into

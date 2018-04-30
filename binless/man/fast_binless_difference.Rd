@@ -3,6 +3,12 @@
 \name{fast_binless_difference}
 \alias{fast_binless_difference}
 \title{Fast binless difference calculation}
+\arguments{
+\item{ref}{unsigned integer corresponding to the index (starting at 1) of the dataset to use as reference}
+
+\item{lam2}{numeric positive value for the fusion penalty, or a vector of
+the same size as the number of datasets minus one.}
+}
 \description{
 Once normalized with \code{\link{fast_binless}}, differences with respect to a reference can be computed.
 }

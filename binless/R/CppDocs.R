@@ -14,7 +14,8 @@
 #'  and similarly for the bin columns bin1 and bin2. observed is the number of reads that fall
 #'  at that coordinate. The provided matrices must be dense, i.e. report zero counts.
 #' @param nbins unsigned integer referring to the number of bins in the provided matrix.
-#' @param lam2 numeric positive value for the fusion penalty.
+#' @param lam2 numeric positive value for the fusion penalty, or a vector of
+#' the same size as the number of datasets.
 #' @param nouter unsigned The maximum number of iterations that should be performed (default 20)
 #' @param tol_val double tolerance on the values for convergence and the fused lasso (default 1e-1)
 #' @param bg_steps unsigned the maximum number of initial steps where no signal is fitted
@@ -28,6 +29,8 @@ NULL
 #' Once normalized with \code{\link{fast_binless}}, differences with respect to a reference can be computed.
 #'
 #' @param ref unsigned integer corresponding to the index (starting at 1) of the dataset to use as reference
+#' @param lam2 numeric positive value for the fusion penalty, or a vector of
+#' the same size as the number of datasets minus one.
 #' @inheritParams fast_binless
 #' 
 #' @export

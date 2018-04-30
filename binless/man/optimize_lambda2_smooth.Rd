@@ -5,7 +5,7 @@
 \title{cross-validate lambda2 assuming it is smooth}
 \usage{
 optimize_lambda2_smooth(csig, n.SD = 1, constrained = T, positive = T,
-  fixed = F, fix.lambda1 = F, fix.lambda1.at = NA)
+  fixed = F, min.lambda2 = 2.5, fix.lambda1 = F, fix.lambda1.at = NA)
 }
 \description{
 cross-validate lambda2 assuming it is smooth

@@ -6,9 +6,9 @@
 \usage{
 normalize_binless(cs, restart = F, bf_per_kb = 50, bf_per_decade = 10,
   bins_per_bf = 10, base.res = 5000, ngibbs = 15, bg.steps = 5,
-  iter = 100, fit.signal = T, verbose = T, init.dispersion = 1,
-  tol = 0.1, ncores = 1, fix.lambda1 = F, fix.lambda1.at = NA,
-  fix.lambda2 = F, fix.lambda2.at = NA)
+  iter = 100, verbose = T, init.dispersion = 1, min.lambda2 = 2.5,
+  tol = 0.1, ncores = 1, fit.signal = T, fix.lambda1 = F,
+  fix.lambda1.at = NA, fix.lambda2 = F, fix.lambda2.at = NA)
 }
 \arguments{
 \item{cs}{CSnorm object as returned by \code{\link{merge_cs_norm_datasets}}}
@@ -25,30 +25,38 @@ should suffice.}
 functions into. Must be sufficiently small so that the diagonal decay is 
 approximately constant in that bin.}
 
-\item{ngibbs}{positive integer. Number of gibbs sampling iterations.}
+\item{base.res}{base resolution to use for the fused lasso}
+
+\item{ngibbs}{positive integer. Maximum number of iterations.}
+
+\item{bg.steps}{The first steps are for fitting the background. Do at most bg.steps.}
 
 \item{iter}{positive integer. Maximum number of optimization steps for each leg.}
-
-\item{fit.signal}{boolean. Set to FALSE only for diagnostics.}
 
 \item{verbose}{Display progress if TRUE}
 
 \item{init.dispersion}{positive numeric. Value of the dispersion to use initially.}
 
-\item{tol}{positive numeric (default 1e-2). Convergence tolerance on relative changes in the computed biases.}
+\item{min.lambda2}{The minimum value which lambda2 is allowed to take when searching its optimum. Too small values
+can cause computational instability.}
+
+\item{tol}{positive numeric (default 1e-1). Convergence tolerance on relative changes in the computed biases.}
 
 \item{ncores}{positive integer (default 1). Number of cores to use.}
+
+\item{fit.signal}{boolean. Set to FALSE only for diagnostics.}
 
 \item{fix.lambda1}{whether to set lambda1 to a given value, or to estimate it}
 
 \item{fix.lambda1.at}{if fix.lambda1==T, the approximate value where it is meant to be fixed. Might move a bit because
 of the positivity and degeneracy constraints.}
 
+\item{fix.lambda2}{whether to set lambda2 to a given value, or to estimate it}
+
+\item{fix.lambda2.at}{if fix.lambda2==T, the approximate value where it is meant to be fixed.}
+
 \item{init}{boolean (default is FALSE). Whether to continue an existing
 normalization or to start anew (default).}
-
-\item{lambdas}{positive numeric. Length scales to try out as initial
-condition.}
 }
 \value{
 A csnorm object

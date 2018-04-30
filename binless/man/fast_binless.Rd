@@ -12,7 +12,8 @@ at that coordinate. The provided matrices must be dense, i.e. report zero counts
 
 \item{nbins}{unsigned integer referring to the number of bins in the provided matrix.}
 
-\item{lam2}{numeric positive value for the fusion penalty.}
+\item{lam2}{numeric positive value for the fusion penalty, or a vector of
+the same size as the number of datasets.}
 
 \item{nouter}{unsigned The maximum number of iterations that should be performed (default 20)}
 

@@ -114,6 +114,9 @@ List binless(const DataFrame obs, unsigned nbins, const NumericVector lam2, doub
   double current_tol_val = 1.;
   std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
                                                              FusedLassoGaussianEstimator<GFLLibrary>(nbins, current_tol_val/20.));
+  const Eigen::ArrayXd lambda2_vals = (lam2.size() == out.get_ndatasets())
+                                     ? Rcpp::as<Eigen::ArrayXd>(lam2)
+                                     : Eigen::ArrayXd::Constant(out.get_ndatasets(),lam2[0]);
   //std::vector<DataFrame> diagnostics;
   ResidualsPair z;
   for (unsigned step=1; step <= ngibbs; ++step) {
@@ -134,7 +137,7 @@ List binless(const DataFrame obs, unsigned nbins, const NumericVector lam2, doub
     if (step > bg_steps) {
       old_expected = get_log_expected(out, expo, bias, dec);
       z = get_residuals(nb_dist, out, expo, bias, dec);
-      auto signal = step_signal(out, z, flos, lam2);
+      auto signal = step_signal(out, z, flos, lambda2_vals);
       out.set_log_signal(signal.beta);
       out.set_signal_phihat(signal.phihat);
       out.set_signal_weights(signal.weights);
@@ -215,7 +218,7 @@ Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, double alph
     Rcpp::Rcout << "lambda2= " << lam2[i] << "\n";
     out.set_log_signal(signal_ori); //fills-in phi_ref and delta
     ResidualsPair z = get_residuals(nb_dist, out, expo, bias, dec);
-    auto signal = step_signal(out, z, flos, lam2[i], group);
+    auto signal = step_signal(out, z, flos, Eigen::ArrayXd::Constant(1,lam2[i]), group);
     out.set_log_signal(signal.beta);
     out.set_signal_phihat(signal.phihat);
     out.set_signal_weights(signal.weights);
@@ -255,10 +258,13 @@ Rcpp::DataFrame binless_difference(const List obs, const NumericVector lam2, uns
   const double converge = tol_val/20.;
   std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets() - 1,
                                                              FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge));
+  const Eigen::ArrayXd lambda2_vals = (lam2.size() == out.get_ndatasets() - 1)
+    ? Rcpp::as<Eigen::ArrayXd>(lam2)
+      : Eigen::ArrayXd::Constant(out.get_ndatasets() - 1, lam2[0]);
   //compute differences
   Rcpp::Rcout << "compute\n";
   ResidualsPair z = get_residuals(nb_dist, out, expo, bias, dec);
-  auto diff = step_difference(out, z, flos, lam2, ref);
+  auto diff = step_difference(out, z, flos, lambda2_vals, ref);
   out.set_log_difference(diff.delta);
   out.set_deltahat(diff.deltahat);
   out.set_difference_weights(diff.weights);
