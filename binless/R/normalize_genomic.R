@@ -32,7 +32,7 @@ initial_guess_genomic = function(cs, cts.common, pseudocount=1e-2) {
 gauss_genomic_muhat_mean = function(cs, cts.common) {
   #biases
   bts = binless:::gauss_common_muhat_mean_biases(cs)
-  bts[,c("etahat","var"):=list(count/mu-1+eta,var=1/mu+1/init$alpha)]
+  bts[,c("etahat","var"):=list(count/mu-1+eta,var=1/mu+1/cs@par$alpha)]
   bts[,c("eta","mu","count"):=NULL]
   #counts
   cts = cs@design[,.(name,group=genomic)][cts.common][,.(group,cat,pos=pos1,etahat=z+log_bias,var=var*2,nobs)] #adjust var for counts are stored twice
