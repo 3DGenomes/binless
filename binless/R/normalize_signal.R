@@ -76,8 +76,8 @@ compress_cts = function(cs, cts) {
 #' fit signal using sparse fused lasso
 #' @keywords internal
 #' 
-gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.lambda1.at=NA,
-                        fix.lambda2=F, fix.lambda2.at=NA) {
+gauss_signal = function(cs, cts.common, verbose=T, ncores=1, min.lambda2=2.5,
+                        fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
   if (verbose==T) cat(" Signal\n")
   #cts.common = binless:::gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
   cts = binless:::gauss_signal_muhat_mean(cs, cts.common)
@@ -101,6 +101,7 @@ gauss_signal = function(cs, cts.common, verbose=T, ncores=1, fix.lambda1=F, fix.
   params = foreach(csig=csigs, .combine=rbind, .export=c("verbose","fix.lambda1","fix.lambda1.at",
                                                          "fix.lambda2","fix.lambda2.at")) %dopar% {
                                                            binless:::fused_lasso(csig, positive=T, fixed=F, constrained=F, verbose=verbose,
+                                                                                 min.lambda2=min.lambda2,
                                                                                  fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                                                                                  fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
                                                          }

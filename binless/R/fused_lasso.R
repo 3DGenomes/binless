@@ -137,7 +137,7 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
 
 #' cross-validate lambda2 assuming it is smooth
 #' @keywords internal
-optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fix.lambda1=F, fix.lambda1.at=NA) {
+optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, min.lambda2=2.5, fix.lambda1=F, fix.lambda1.at=NA) {
   obj = function(x) {
     ret = binless:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
     ret$l2vals = rbind(csig@state$l2vals,data.table(lambda2=10^(x),BIC=ret$BIC,BIC.sd=ret$BIC.sd,converged=ret$converged))
@@ -147,7 +147,7 @@ optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixe
     return(csig@state$BIC)
   }
   #first, find rough minimum between 2.5 and 100 by gridding
-  minlambda=2.5
+  minlambda=min.lambda2
   maxlambda=100
   npoints=10
   lvals=10^seq(log10(minlambda),log10(maxlambda),length.out=npoints)
@@ -216,15 +216,19 @@ evaluate_at_lambda2 = function(csig, lambda2, constrained=T, positive=T, fixed=F
 #' @param constrained boolean. Constrain lambda1 so that any diagonal that contains
 #'   only one big patch be forced to have 'value'=0 ?
 #' @param verbose boolean (default TRUE).
+#' @param min.lambda2 The minimum value of lambda2 when scanning for its optimum. Might
+#'  move a bit because of the CV+kSD criterion
+#' @param fix.lambda1,fix.lambda1.at,fix.lambda2,fix.lambda2.at Default FALSE. if TRUE, sets lambda1
+#'  (resp. lambda2) to the provided value instead of optimizing it
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-fused_lasso = function(csig, positive, fixed, constrained, verbose=T, fix.lambda1=F, fix.lambda1.at=0.1, fix.lambda2=F, fix.lambda2.at=NA) {
+fused_lasso = function(csig, positive, fixed, constrained, verbose=T, min.lambda2=2.5, fix.lambda1=F, fix.lambda1.at=0.1, fix.lambda2=F, fix.lambda2.at=NA) {
   if (fix.lambda2==F) {
     n.SD=ifelse(fixed==T,1,0)
     #first we optimize lambda2 without constraints nor soft-thresholding (setting eCprime=0)
     csig = binless:::optimize_lambda2_smooth(csig, n.SD=n.SD, constrained=F, positive=F, fixed=T,
-                                             fix.lambda1=T, fix.lambda1.at=0)
+                                             min.lambda2=min.lambda2, fix.lambda1=T, fix.lambda1.at=0)
     #now for that optimum, report the best lambda1 (if optimized) and eCprime
     csig = binless:::evaluate_at_lambda2(csig, csig@par$lambda2, constrained=constrained, positive=positive, fixed=fixed,
                                          fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)

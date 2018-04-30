@@ -74,7 +74,7 @@ get_nzeros = function(cs, sbins, ncores=1) {
 #' @keywords internal
 #' 
 fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
-                       bg.steps=5, iter=100, fit.signal=T, verbose=T, init.dispersion=1,
+                       bg.steps=5, iter=100, fit.signal=T, verbose=T, init.dispersion=1, min.lambda2=2.5,
                        tol=1e-1, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
     #fresh start
     cs@par=list() #in case we have a weird object
@@ -84,7 +84,7 @@ fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.
     if (fit.signal==F) base.res = cs@biases[,max(pos)-min(pos)]+2
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
-                         bg.steps=bg.steps, iter=iter, init.dispersion=init.dispersion, tol=tol,
+                         bg.steps=bg.steps, iter=iter, init.dispersion=init.dispersion, tol=tol, min.lambda2=min.lambda2,
                          fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                          fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
@@ -250,18 +250,22 @@ get_residuals = function(cts.common, viewpoint) {
 #' @param bins_per_bf positive integer. Number of distance bins to split basis 
 #'   functions into. Must be sufficiently small so that the diagonal decay is 
 #'   approximately constant in that bin.
-#' @param lambdas positive numeric. Length scales to try out as initial
-#'   condition.
-#' @param ngibbs positive integer. Number of gibbs sampling iterations.
+#' @param base.res base resolution to use for the fused lasso
+#' @param ngibbs positive integer. Maximum number of iterations.
+#' @param bg.steps The first steps are for fitting the background. Do at most bg.steps.
 #' @param iter positive integer. Maximum number of optimization steps for each leg.
-#' @param fit.signal boolean. Set to FALSE only for diagnostics.
 #' @param verbose Display progress if TRUE
 #' @param init.dispersion positive numeric. Value of the dispersion to use initially.
-#' @param tol positive numeric (default 1e-2). Convergence tolerance on relative changes in the computed biases.
+#' @param min.lambda2 The minimum value which lambda2 is allowed to take when searching its optimum. Too small values
+#'  can cause computational instability.
+#' @param tol positive numeric (default 1e-1). Convergence tolerance on relative changes in the computed biases.
 #' @param ncores positive integer (default 1). Number of cores to use.
+#' @param fit.signal boolean. Set to FALSE only for diagnostics.
 #' @param fix.lambda1 whether to set lambda1 to a given value, or to estimate it
 #' @param fix.lambda1.at if fix.lambda1==T, the approximate value where it is meant to be fixed. Might move a bit because
 #'   of the positivity and degeneracy constraints.
+#' @param fix.lambda2 whether to set lambda2 to a given value, or to estimate it
+#' @param fix.lambda2.at if fix.lambda2==T, the approximate value where it is meant to be fixed.
 #'   
 #' @return A csnorm object
 #' @export
@@ -269,8 +273,8 @@ get_residuals = function(cts.common, viewpoint) {
 #' @examples
 #' 
 normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
-                     ngibbs = 15, bg.steps=5, iter=100, fit.signal=T, verbose=T, init.dispersion=1, 
-                     tol=1e-1, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
+                     ngibbs = 15, bg.steps=5, iter=100, verbose=T, init.dispersion=1, min.lambda2=2.5,
+                     tol=1e-1, ncores=1,  fit.signal=T, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -282,7 +286,7 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     #fresh start
     cs = fresh_start(cs, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, base.res = base.res,
                      bg.steps = bg.steps, iter = iter, fit.signal = fit.signal,
-                     verbose = verbose, init.dispersion = init.dispersion,
+                     verbose = verbose, init.dispersion = init.dispersion, min.lambda2=min.lambda2,
                      tol = tol, ncores = ncores, fix.lambda1 = fix.lambda1, fix.lambda1.at = fix.lambda1.at,
                      fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
     laststep=0
@@ -322,6 +326,7 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
       cts.common = binless:::gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
       #fit signal using sparse fused lasso
       a=system.time(cs <- binless:::gauss_signal(cs, cts.common, verbose=verbose, ncores=ncores,
+                                                       min.lambda2=cs@settings$min.lambda2,
                                                        fix.lambda1=cs@settings$fix.lambda1,
                                                        fix.lambda1.at=cs@settings$fix.lambda1.at,
                                                        fix.lambda2=cs@settings$fix.lambda2,
