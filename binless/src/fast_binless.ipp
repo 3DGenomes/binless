@@ -73,15 +73,18 @@ DifferenceQuadruplet step_difference(const FastDifferenceData& data, const Resid
     //compute difference on each dataset
     std::vector<double> delta;
     delta.reserve(data.get_N());
+    bool ref_seen = false;
     for (unsigned dset=0; dset<data.get_ndatasets(); ++dset) {
         if (dset==ref-1) { //subtract 1 for R factor vs c++ indices
             delta.resize(delta.size()+data.get_ncells(), 0);
+            ref_seen = true;
         } else {
             //run fused lasso
             std::vector<double> y(deltahat.cbegin() + dset*data.get_ncells(), deltahat.cbegin() + (dset+1)*data.get_ncells());
             std::vector<double> wt(weights.cbegin() + dset*data.get_ncells(), weights.cbegin() + (dset+1)*data.get_ncells());
-            flos[dset].optimize(y, wt, lam2);
-            std::vector<double> ldelta = flos[dset].get();
+            unsigned idx = dset - (ref_seen ? 1 : 0);
+            flos[idx].optimize(y, wt, lam2);
+            std::vector<double> ldelta = flos[idx].get();
             delta.insert(delta.end(), ldelta.begin(), ldelta.end());
         }
     }

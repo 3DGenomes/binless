@@ -253,7 +253,7 @@ Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, do
   bias.set_state(obs["biases"]);
   //
   const double converge = tol_val/20.;
-  std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
+  std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets() - 1,
                                                              FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge));
   //compute differences
   Rcpp::Rcout << "compute\n";

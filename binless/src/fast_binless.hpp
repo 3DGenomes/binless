@@ -31,7 +31,7 @@ Rcpp::List binless(const DataFrame obs, unsigned nbins, double lam2, double alph
 Rcpp::List binless_eval_cv(const List obs, const NumericVector lam2, double alpha=1., unsigned group=0, double tol_val=1e-1);
 
 Rcpp::DataFrame binless_difference(const List obs, double lam2, unsigned ref, double alpha=1., double tol_val=1e-1);
-
+ 
 #include "fast_binless.ipp"
 
 }
