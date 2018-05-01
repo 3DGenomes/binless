@@ -139,12 +139,8 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
 #' @keywords internal
 optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, min.lambda2=2.5, fix.lambda1=F, fix.lambda1.at=NA) {
   obj = function(x) {
-    #cat("lambda2=",10^(x)," beta[0]=",init.guess$beta[1],"\n")
     ret = binless:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
     ret$l2vals = rbind(csig@state$l2vals,data.table(lambda2=10^(x),BIC=ret$BIC,BIC.sd=ret$BIC.sd,converged=ret$converged))
-    settings=csig@settings
-    settings$last.beta=ret$beta
-    csig@settings <<- settings
     csig@state <<- ret
     #cat("optimize_lambda2: eval at lambda2= ",csig@state$lambda2, " lambda1= ",csig@state$lambda1,
     #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " BIC.sd= ", csig@state$BIC.sd, " dof= ",csig@state$dof,"\n")
@@ -154,7 +150,7 @@ optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixe
   minlambda=min.lambda2
   maxlambda=100
   npoints=10
-  lvals=rev(10^seq(log10(minlambda),log10(maxlambda),length.out=npoints))
+  lvals=10^seq(log10(minlambda),log10(maxlambda),length.out=npoints)
   op = foreach (lam=lvals,.combine=rbind) %do% obj(log10(lam))
   op = copy(csig@state$l2vals)
   setkey(op,lambda2)
