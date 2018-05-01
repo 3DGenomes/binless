@@ -137,7 +137,7 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
 
 #' cross-validate lambda2 assuming it is smooth
 #' @keywords internal
-optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, min.lambda2=2.5, fix.lambda1=F, fix.lambda1.at=NA) {
+optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, min.lambda2=1, fix.lambda1=F, fix.lambda1.at=NA) {
   obj = function(x) {
     ret = binless:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
     ret$l2vals = rbind(csig@state$l2vals,data.table(lambda2=10^(x),BIC=ret$BIC,BIC.sd=ret$BIC.sd,converged=ret$converged))
@@ -146,7 +146,7 @@ optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixe
     #    " eCprime= ",csig@state$eCprime," BIC= ",csig@state$BIC, " BIC.sd= ", csig@state$BIC.sd, " dof= ",csig@state$dof,"\n")
     return(csig@state$BIC)
   }
-  #first, find rough minimum between 2.5 and 100 by gridding
+  #first, find rough minimum by gridding
   minlambda=min.lambda2
   maxlambda=100
   npoints=10
@@ -223,7 +223,7 @@ evaluate_at_lambda2 = function(csig, lambda2, constrained=T, positive=T, fixed=F
 #'   
 #'   finds optimal lambda1, lambda2 and eC using BIC.
 #' @keywords internal
-fused_lasso = function(csig, positive, fixed, constrained, verbose=T, min.lambda2=2.5, fix.lambda1=F, fix.lambda1.at=0.1, fix.lambda2=F, fix.lambda2.at=NA) {
+fused_lasso = function(csig, positive, fixed, constrained, verbose=T, min.lambda2=1, fix.lambda1=F, fix.lambda1.at=0.1, fix.lambda2=F, fix.lambda2.at=NA) {
   if (fix.lambda2==F) {
     n.SD=ifelse(fixed==T,1,0)
     #first we optimize lambda2 without constraints nor soft-thresholding (setting eCprime=0)

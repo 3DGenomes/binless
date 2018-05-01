@@ -74,7 +74,7 @@ get_nzeros = function(cs, sbins, ncores=1) {
 #' @keywords internal
 #' 
 fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
-                       bg.steps=5, iter=100, fit.signal=T, verbose=T, init.dispersion=1, min.lambda2=2.5,
+                       bg.steps=5, iter=100, fit.signal=T, verbose=T, init.dispersion=1, min.lambda2=1,
                        tol=1e-1, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
     #fresh start
     cs@par=list() #in case we have a weird object
@@ -273,7 +273,7 @@ get_residuals = function(cts.common, viewpoint) {
 #' @examples
 #' 
 normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
-                     ngibbs = 15, bg.steps=5, iter=100, verbose=T, init.dispersion=1, min.lambda2=2.5,
+                     ngibbs = 15, bg.steps=5, iter=100, verbose=T, init.dispersion=1, min.lambda2=1,
                      tol=1e-1, ncores=1,  fit.signal=T, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
