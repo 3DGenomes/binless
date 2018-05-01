@@ -22,7 +22,6 @@ void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::compute() {
     std::vector<double> y = Rcpp::as<std::vector<double> >(binned_.get_betahat());
     std::vector<double> w = Rcpp::as<std::vector<double> >(binned_.get_weight());
     const int ngroups=2;
-    auto state = gauss_.get_state();
     for (int g=0; g<ngroups; ++g) {
         //prepare data and weights for group g and copy initial values
         std::vector<double> y_cv(y), w_cv(w);
@@ -32,11 +31,16 @@ void ScorePreparator<CVkSD<kSD>,GaussianEstimator>::compute() {
                 w_cv[i]=0;
             }
         }
+        //cold start, important when lambda2 is very small since it would reuse the correct value for beta, i.e. phihat (beta = phihat when lam2 -> 0)
+        gauss_.reset();
         //compute fused lasso
-        gauss_.set_state(state);
         gauss_.optimize(y_cv, w_cv, lambda2_);
         std::vector<double> values = gauss_.get();
         betas_.push_back(values);
+        
+        /*const Rcpp::IntegerVector bin1(binned_.get_bin1()), bin2(binned_.get_bin2());
+        Rcpp::Rcout << "lam2 g bin1 bin2 y w beta y_ori w_ori\n";
+        for (unsigned i=0; i< N_; ++i) Rcpp::Rcout << lambda2_ << " " << g << " " << bin1[i] << " " << bin2[i] << " " << y_cv[i] << " " << w_cv[i] << " " << values[i] << " " << y[i] << " " << w[i] << "\n";*/
         
         //store fused solution at group positions back in beta_cv
         for (int i=0; i<N_; ++i) if (cvgroup_[i]==g) beta_cv_[i] = values[i];

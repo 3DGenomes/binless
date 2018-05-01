@@ -29,6 +29,8 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - output matrix properly returns factor labels for name, bin1 and bin2 in fast binless
 - bug causing weights to be twice too small
 - centering bug on first iteration of fast binless
+- bug in the BIC calculation of optimized binless, causing lambda2 estimates to
+  be too low
 
 ## [0.11.0]
 ### Changed
