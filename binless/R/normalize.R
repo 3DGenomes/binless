@@ -261,11 +261,12 @@ get_residuals = function(cts.common, viewpoint) {
 #' @param tol positive numeric (default 1e-1). Convergence tolerance on relative changes in the computed biases.
 #' @param ncores positive integer (default 1). Number of cores to use.
 #' @param fit.signal boolean. Set to FALSE only for diagnostics.
-#' @param fix.lambda1 whether to set lambda1 to a given value, or to estimate it
+#' @param fix.lambda1 whether to set lambda1 to a given value, or to estimate it. Default is estimate.
 #' @param fix.lambda1.at if fix.lambda1==T, the approximate value where it is meant to be fixed. Might move a bit because
-#'   of the positivity and degeneracy constraints.
-#' @param fix.lambda2 whether to set lambda2 to a given value, or to estimate it
-#' @param fix.lambda2.at if fix.lambda2==T, the approximate value where it is meant to be fixed.
+#'   of the positivity and degeneracy constraints. Make sure this value is positive if lambda1 is fixed.
+#' @param fix.lambda2 whether to set lambda2 to a given value, or to estimate it. Default is fixed.
+#' @param fix.lambda2.at if fix.lambda2==T, the approximate value where it is meant to be fixed. Make sure this value
+#'  is positive if lambda2 is fixed.
 #'   
 #' @return A csnorm object
 #' @export
@@ -274,7 +275,7 @@ get_residuals = function(cts.common, viewpoint) {
 #' 
 normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
                      ngibbs = 15, bg.steps=5, iter=100, verbose=T, init.dispersion=1, min.lambda2=1,
-                     tol=1e-1, ncores=1,  fit.signal=T, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
+                     tol=1e-1, ncores=1,  fit.signal=T, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=T, fix.lambda2.at=min.lambda2) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
