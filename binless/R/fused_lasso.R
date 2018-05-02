@@ -137,7 +137,7 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
 
 #' cross-validate lambda2 assuming it is smooth
 #' @keywords internal
-optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, min.lambda2=1, fix.lambda1=F, fix.lambda1.at=NA) {
+optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, min.lambda2=.1, fix.lambda1=F, fix.lambda1.at=NA) {
   obj = function(x) {
     #cat("lambda2=",10^(x)," beta[0]=",init.guess$beta[1],"\n")
     ret = binless:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
