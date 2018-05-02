@@ -274,7 +274,7 @@ get_residuals = function(cts.common, viewpoint) {
 #' @examples
 #' 
 normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
-                     ngibbs = 15, bg.steps=5, iter=100, verbose=T, init.dispersion=1, min.lambda2=1,
+                     ngibbs = 25, bg.steps=5, iter=100, verbose=T, init.dispersion=1, min.lambda2=1,
                      tol=1e-1, ncores=1,  fit.signal=T, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=T, fix.lambda2.at=min.lambda2) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
