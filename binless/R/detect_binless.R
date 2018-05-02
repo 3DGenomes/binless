@@ -48,14 +48,14 @@ prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val, nper
 #'  move a bit because of the CV+kSD criterion
 #' @param fix.lambda1,fix.lambda1.at,fix.lambda2,fix.lambda2.at Default FALSE. if TRUE, sets lambda1
 #'  (resp. lambda2) to the provided value instead of optimizing it
-#' @param nperf number of IRLS iterations (default 50)
+#' @param nperf number of IRLS iterations (default 100)
 #'   
 #' @return 
 #' @export
 #' 
 #' @examples
 detect_binless_interactions = function(cs, resolution=cs@settings$base.res, group="all", ncores=1, tol.val=cs@settings$tol, verbose=T,
-                                       min.lambda2=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA, nperf=50){
+                                       min.lambda2=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA, nperf=100){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
@@ -113,7 +113,7 @@ detect_binless_interactions = function(cs, resolution=cs@settings$base.res, grou
 #' 
 #' @examples
 detect_binless_differences = function(cs, ref, resolution=cs@settings$base.res, group="all", ncores=1, tol.val=cs@settings$tol, verbose=T,
-                                      min.lambda2=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA, nperf=50){
+                                      min.lambda2=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA, nperf=100){
   if (verbose==T) cat("Binless difference detection with resolution=",resolution,
                       " group=", group," and ref=",as.character(ref),"\n")
   ### get CSgroup object
