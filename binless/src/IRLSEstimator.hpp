@@ -52,7 +52,8 @@ public:
             << " after " << gauss_.get_ninner() << " steps " << " phi[0]= " << beta[0] << "\n";*/
         } while (counter_ < nouter && (!has_converged_) );
         /*Rcpp::Rcout << " Perf iteration: end with lam2= " << lambda2 << " alpha= "
-                      << gauss_.get_alpha() << " phi[0]= " << beta[0] << "\n";*/
+                    << gauss_.get_alpha() << " phi[0]= " << beta[0] << " cv= " << has_converged_
+                    << " nsteps=" << counter_ << " / " << nouter << "\n";*/
         Timer::start_timer("weight");
         wt_.set_beta(beta); //store last beta without updating weights (but might update phi_ref if applicable)
         Timer::print_times();
