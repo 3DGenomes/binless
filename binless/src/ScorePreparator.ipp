@@ -58,7 +58,8 @@ void ScorePreparator<BIC,GaussianEstimator>::compute(const Rcpp::NumericVector& 
     std::vector<double> y = Rcpp::as<std::vector<double> >(binned_.get_betahat());
     std::vector<double> w = Rcpp::as<std::vector<double> >(binned_.get_weight());
     //compute fused lasso
-    gauss_.optimize(y, beta_init_v, w, lambda2);
+    gauss_.reset();
+    gauss_.optimize(y, w, lambda2);
     beta_ = gauss_.get();
 }
 

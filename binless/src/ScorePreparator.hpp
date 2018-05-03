@@ -58,7 +58,7 @@ public:
         compute(binned.get_beta(), lambda2);
     }
     
-    Rcpp::IntegerVector get_assembler_var() const { return binned_.get_nobs(); }
+    Rcpp::NumericVector get_assembler_var() const { return binned_.get_nobs(); }
     
     Rcpp::NumericVector get_likelihood_var() const { return Rcpp::wrap(beta_); }
    
