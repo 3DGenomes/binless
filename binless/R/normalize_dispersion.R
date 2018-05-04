@@ -1,20 +1,53 @@
 #' @include binless.R
 NULL
 
+
+#' This function is adapted from MASS::theta.ml (GPL-3)
+#' It allows to specify the initial value of theta, and removes superfluous checks
+#' @keywords internal
+#' 
+theta.ml = function (y, mu, weights, init.theta, limit = 25, eps = .Machine$double.eps^0.25, trace = FALSE) 
+{
+  score <- function(n, th, mu, y, w)
+    sum(w * (digamma(th + y) - digamma(th) + log(th) + 1 - log(th + mu) - (y + th)/(mu + th)))
+  info <- function(n, th, mu, y, w)
+    sum(w * (-trigamma(th + y) + trigamma(th) - 1/th + 2/(mu + th) - (y + th)/(mu + th)^2))
+  n = sum(weights)
+  #t0 <- init.theta
+  t0 <- n/sum(weights * (y/mu - 1)^2)
+  it <- 0
+  del <- 1
+  if (trace) 
+    message(sprintf("theta.ml: iter %d 'theta = %f'", it, 
+                    signif(t0)), domain = NA)
+  while ((it <- it + 1) < limit && abs(del) > eps) {
+    t0 <- abs(t0)
+    del <- score(n, t0, mu, y, weights)/(i <- info(n, t0, 
+                                                   mu, y, weights))
+    t0 <- t0 + del
+    if (trace) 
+      message("theta.ml: iter", it, " theta =", signif(t0))
+  }
+  t0
+}
+
 #' Single-cpu simplified fitting for exposures and dispersion
 #' @keywords internal
 #' 
-gauss_dispersion = function(cs, cts.common, verbose=T, alpha.min=0.01) {
+gauss_dispersion = function(cs, cts.common, verbose=T, alpha.min=0.01, ncores=1) {
   if (verbose==T) cat(" Dispersion\n")
   #predict all means and put into table
-  bts = binless:::gauss_common_muhat_mean_biases(cs)[,.(cat,count,mu,nobs)]
-  cts = cts.common[,.(cat,count,mu,nobs=nobs/2)]
+  bts = binless:::gauss_common_muhat_mean_biases(cs)[,.(cat,pos,count,mu,nobs)]
+  cts = cts.common[,.(cat,pos=pos1,count,mu,nobs=nobs/2)]
   data = rbind(bts,cts)
-  alpha = MASS::theta.ml(data[,count], data[,mu], data[,sum(nobs)], data[,nobs], limit=10, eps=cs@par$tol_disp)
-  alpha = max(alpha,alpha.min)
-  #restrict tolerance if needed
-  precision = max(abs(alpha - cs@par$alpha))
-  cs@par$tol_disp = min(cs@par$tol_disp, max(cs@settings$tol, precision/10))
+  data[,bin:=cut(pos, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
+  registerDoParallel(cores=ncores)
+  alphas = foreach (b=data[,levels(bin)],.combine=rbind) %dopar% {
+    alpha=binless:::theta.ml(data[bin==b,count], data[bin==b,mu], data[bin==b,nobs], cs@par$alpha)
+    data.table(bin=b,alpha=alpha)
+  }
+  stopImplicitCluster()
+  alpha = max(alphas[,median(alpha)],alpha.min)
   #update parameters
   cs@par$alpha = alpha
   #
