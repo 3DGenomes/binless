@@ -22,7 +22,8 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - require `pos1` and `pos2` columns in fast binless input
 - fits in optimized binless are performed by group and are more efficient
   memorywise
-- drop stan dependency and fit dispersion with MASS instead
+- drop stan dependency and fit dispersion manually on each row, taking the
+  median value
 
 ### Fixed
 - sigma parameter was ignored in `GeneralizedAdditiveModel`

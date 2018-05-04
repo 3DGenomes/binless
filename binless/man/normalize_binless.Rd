@@ -5,10 +5,10 @@
 \title{Binless normalization}
 \usage{
 normalize_binless(cs, restart = F, bf_per_kb = 50, bf_per_decade = 10,
-  bins_per_bf = 10, base.res = 5000, ngibbs = 15, bg.steps = 5,
-  iter = 100, verbose = T, init.dispersion = 1, min.lambda2 = 2.5,
+  bins_per_bf = 10, base.res = 5000, ngibbs = 25, bg.steps = 5,
+  iter = 100, verbose = T, init.dispersion = 0.1, min.lambda2 = 0.1,
   tol = 0.1, ncores = 1, fit.signal = T, fix.lambda1 = F,
-  fix.lambda1.at = NA, fix.lambda2 = F, fix.lambda2.at = NA)
+  fix.lambda1.at = NA, fix.lambda2 = T, fix.lambda2.at = 2.5)
 }
 \arguments{
 \item{cs}{CSnorm object as returned by \code{\link{merge_cs_norm_datasets}}}
@@ -46,14 +46,15 @@ can cause computational instability.}
 
 \item{fit.signal}{boolean. Set to FALSE only for diagnostics.}
 
-\item{fix.lambda1}{whether to set lambda1 to a given value, or to estimate it}
+\item{fix.lambda1}{whether to set lambda1 to a given value, or to estimate it. Default is estimate.}
 
 \item{fix.lambda1.at}{if fix.lambda1==T, the approximate value where it is meant to be fixed. Might move a bit because
-of the positivity and degeneracy constraints.}
+of the positivity and degeneracy constraints. Make sure this value is positive if lambda1 is fixed.}
 
-\item{fix.lambda2}{whether to set lambda2 to a given value, or to estimate it}
+\item{fix.lambda2}{whether to set lambda2 to a given value, or to estimate it. Default is fixed.}
 
-\item{fix.lambda2.at}{if fix.lambda2==T, the approximate value where it is meant to be fixed.}
+\item{fix.lambda2.at}{if fix.lambda2==T, the approximate value where it is meant to be fixed. Make sure this value
+is positive if lambda2 is fixed.}
 
 \item{init}{boolean (default is FALSE). Whether to continue an existing
 normalization or to start anew (default).}

@@ -6,7 +6,7 @@
 \usage{
 detect_binless_differences(cs, ref, resolution = cs@settings$base.res,
   group = "all", ncores = 1, tol.val = cs@settings$tol, verbose = T,
-  min.lambda2 = 2.5, fix.lambda1 = F, fix.lambda1.at = NA,
+  min.lambda2 = 0.1, fix.lambda1 = F, fix.lambda1.at = NA,
   fix.lambda2 = F, fix.lambda2.at = NA, nperf = 50)
 }
 \arguments{

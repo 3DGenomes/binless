@@ -6,7 +6,7 @@
 'value'}
 \usage{
 fused_lasso(csig, positive, fixed, constrained, verbose = T,
-  min.lambda2 = 2.5, fix.lambda1 = F, fix.lambda1.at = 0.1,
+  min.lambda2 = 1, fix.lambda1 = F, fix.lambda1.at = 0.1,
   fix.lambda2 = F, fix.lambda2.at = NA)
 }
 \arguments{

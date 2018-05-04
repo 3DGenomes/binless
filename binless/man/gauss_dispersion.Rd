@@ -4,7 +4,8 @@
 \alias{gauss_dispersion}
 \title{Single-cpu simplified fitting for exposures and dispersion}
 \usage{
-gauss_dispersion(cs, cts.common, verbose = T)
+gauss_dispersion(cs, cts.common, verbose = T, alpha.min = 0.01,
+  ncores = 1)
 }
 \description{
 Single-cpu simplified fitting for exposures and dispersion
