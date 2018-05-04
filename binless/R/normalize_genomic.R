@@ -19,6 +19,8 @@ initial_guess_genomic = function(cs, cts.common, pseudocount=1e-2) {
     both[,.(cat="contact L",group,pos=pos1,eta=log_iota)],
     both[,.(cat="contact R",group,pos=pos1,eta=log_rho)]
   )
+  cats=c("rejoined","dangling L","dangling R","contact L","contact R")
+  biases[,cat:=ordered(cat,levels=cats)]
   setkey(biases,group,cat,pos)
   cs@par$biases=biases
   return(cs)

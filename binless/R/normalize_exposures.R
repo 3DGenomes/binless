@@ -25,6 +25,7 @@ gauss_exposures = function(cs, cts.common, verbose=T) {
   bts=rbind(bsub[,.(group,name,cat="rejoined",pos, count=rejoined,expo=eRJ,nobs=1)],
             bsub[,.(group,name,cat="dangling L",pos, count=dangling.L,expo=eDE,nobs=1)],
             bsub[,.(group,name,cat="dangling R",pos, count=dangling.R,expo=eDE,nobs=1)])
+  bts[,cat:=ordered(cat,levels=levels(init$biases[,cat]))]
   setkey(bts,group,cat,pos)
   bts = bts[init$biases[cat%in%c("rejoined","dangling L","dangling R"),.(group,cat,pos,eta)]]
   bts[,mu:=exp(expo+eta)]

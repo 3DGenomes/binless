@@ -99,8 +99,9 @@ gauss_common_muhat_mean_biases = function(cs) {
     bts=rbind(bsub[,.(group,cat="rejoined",pos, count=rejoined,expo=eRJ,nobs=1)],
               bsub[,.(group,cat="dangling L",pos, count=dangling.L,expo=eDE,nobs=1)],
               bsub[,.(group,cat="dangling R",pos, count=dangling.R,expo=eDE,nobs=1)])
+    bts[,cat:=ordered(cat,levels=levels(init$biases[,cat]))]
     setkey(bts,group,cat,pos)
-    bts = bts[init$biases[cat%in%c("rejoined","dangling L","dangling R"),.(group,cat,pos,eta)]]
+    bts = bts[init$biases[cat%in%c("rejoined","dangling L","dangling R"),.(group,cat,pos,eta)],,on=c("group","cat","pos")]
     bts[,mu:=exp(expo+eta)]
     return(bts[,.(group,cat,pos,count,mu,nobs,eta)])
 }
