@@ -74,7 +74,7 @@ get_nzeros = function(cs, sbins, ncores=1) {
 #' @keywords internal
 #' 
 fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
-                       bg.steps=5, iter=100, fit.signal=T, verbose=T, init.dispersion=1, min.lambda2=.1,
+                       bg.steps=5, iter=100, fit.signal=T, verbose=T, init.dispersion=.1, min.lambda2=.1,
                        tol=1e-1, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
     #fresh start
     cs@par=list() #in case we have a weird object
@@ -100,7 +100,7 @@ fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.
     biasmat = CJ(group=cs@design[,unique(genomic)],cat=ordered(cats,levels=cats), pos=cs@biases[,sort(unique(pos))])
     biasmat[,eta:=0]
     cs@par=list(eC=array(0,cs@experiments[,.N]), eRJ=array(0,cs@experiments[,.N]), eDE=array(0,cs@experiments[,.N]), alpha=init.dispersion,
-                biases=biasmat, decay=decay, tol_genomic=.1, tol_decay=.1, tol_disp=.1, tol_signal=1)
+                biases=biasmat, decay=decay, tol_genomic=.1, tol_decay=.1, tol_signal=1)
     #prepare signal matrix
     if (fit.signal==T) {
       if(verbose==T) cat("Preparing for signal estimation\n")
@@ -274,8 +274,8 @@ get_residuals = function(cts.common, viewpoint) {
 #' @examples
 #' 
 normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
-                     ngibbs = 25, bg.steps=5, iter=100, verbose=T, init.dispersion=1, min.lambda2=.1,
-                     tol=1e-1, ncores=1,  fit.signal=T, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=T, fix.lambda2.at=1) {
+                     ngibbs = 25, bg.steps=5, iter=100, verbose=T, init.dispersion=.1, min.lambda2=.1,
+                     tol=1e-1, ncores=1,  fit.signal=T, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=T, fix.lambda2.at=2.5) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -314,7 +314,7 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="expo", runtime=a[1]+a[4])
     #
     #fit dispersion
-    a=system.time(cs <- binless:::gauss_dispersion(cs, cts.common, verbose=verbose))
+    a=system.time(cs <- binless:::gauss_dispersion(cs, cts.common, verbose=verbose, ncores=ncores))
     cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
     #
     #fit iota and rho
