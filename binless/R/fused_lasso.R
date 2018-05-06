@@ -154,8 +154,8 @@ optimize_lambda2_smooth = function(csig, constrained=T, positive=T, fixed=F, min
   #first, find rough minimum by gridding
   minlambda=min.lambda2
   maxlambda=100
-  npoints=100
-  lvals=c(10^seq(log10(minlambda),log10(maxlambda),length.out=npoints-1),100)
+  npoints=10
+  lvals=10^seq(log10(minlambda),log10(maxlambda),length.out=npoints)
   op = foreach (lam=lvals,.combine=rbind) %do% obj(log10(lam))
   op = copy(csig@state$l2vals)
   setkey(op,lambda2)
