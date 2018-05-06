@@ -137,7 +137,7 @@ optimize_lambda2 = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, fi
 
 #' cross-validate lambda2 assuming it is smooth
 #' @keywords internal
-optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixed=F, min.lambda2=.1, fix.lambda1=F, fix.lambda1.at=NA) {
+optimize_lambda2_smooth = function(csig, constrained=T, positive=T, fixed=F, min.lambda2=.1, fix.lambda1=F, fix.lambda1.at=NA) {
   obj = function(x) {
     #cat("lambda2=",10^(x)," beta[0]=",init.guess$beta[1],"\n")
     ret = binless:::gfl_BIC(csig, lambda2=10^(x), constrained=constrained, positive=positive, fixed=fixed, fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at)
@@ -153,8 +153,8 @@ optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixe
   }
   #first, find rough minimum by gridding
   minlambda=min.lambda2
-  maxlambda=10
-  npoints=10
+  maxlambda=100
+  npoints=100
   lvals=c(10^seq(log10(minlambda),log10(maxlambda),length.out=npoints-1),100)
   op = foreach (lam=lvals,.combine=rbind) %do% obj(log10(lam))
   op = copy(csig@state$l2vals)
@@ -173,24 +173,6 @@ optimize_lambda2_smooth = function(csig, n.SD=1, constrained=T, positive=T, fixe
   #optimize there
   op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
   lambda2=10^op$minimum
-  if (n.SD>0) {
-    #finally, find minimum + SD
-    optBIC=csig@state$BIC+n.SD*csig@state$BIC.sd
-    minlambda=lambda2
-    setkey(csig@state$l2vals,lambda2)
-    maxlambda=csig@state$l2vals[lambda2>minlambda&BIC>optBIC,lambda2[1]]
-    if (length(maxlambda)==0 || is.na(maxlambda)) maxlambda=100
-    obj2 = function(x) {
-      a=obj(x)
-      return(a+2*abs(optBIC-a))
-    }
-    if (minlambda==maxlambda) {
-      lambda2=minlambda
-    } else {
-      op<-optimize(obj2, c(log10(minlambda),log10(maxlambda)), tol=0.1)
-      lambda2=10^op$minimum
-    }
-  }
   #finish
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
   if (lambda2==minlambda) cat("   Warning: lambda2 hit lower boundary.\n")
@@ -230,9 +212,8 @@ evaluate_at_lambda2 = function(csig, lambda2, constrained=T, positive=T, fixed=F
 #' @keywords internal
 fused_lasso = function(csig, positive, fixed, constrained, verbose=T, min.lambda2=1, fix.lambda1=F, fix.lambda1.at=0.1, fix.lambda2=F, fix.lambda2.at=NA) {
   if (fix.lambda2==F) {
-    n.SD=ifelse(fixed==T,1,0)
     #first we optimize lambda2 without constraints nor soft-thresholding (setting eCprime=0)
-    csig = binless:::optimize_lambda2_smooth(csig, n.SD=n.SD, constrained=F, positive=F, fixed=T,
+    csig = binless:::optimize_lambda2_smooth(csig, constrained=F, positive=F, fixed=T,
                                              min.lambda2=min.lambda2, fix.lambda1=T, fix.lambda1.at=0)
     #now for that optimum, report the best lambda1 (if optimized) and eCprime
     csig = binless:::evaluate_at_lambda2(csig, csig@par$lambda2, constrained=constrained, positive=positive, fixed=fixed,

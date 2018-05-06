@@ -65,18 +65,18 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     NumericVector opt;
     if (lambda1_fixed) {
         if (constrained) {
-            auto est = make_FixedSparsity<CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
+            auto est = make_FixedSparsity<BIC, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
             opt = est.optimize();
         } else {
-            auto est = make_FixedSparsity<CVkSD<1>, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
+            auto est = make_FixedSparsity<BIC, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
             opt = est.optimize();
         }
     } else {
         if (constrained) {
-          auto est = make_EstimatedSparsity<CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
+          auto est = make_EstimatedSparsity<BIC, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
           opt = est.optimize();
         } else {
-          auto est = make_EstimatedSparsity<CVkSD<1>, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
+          auto est = make_EstimatedSparsity<BIC, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
           opt = est.optimize();
         }
     }
