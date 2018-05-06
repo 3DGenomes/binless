@@ -24,14 +24,15 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
   memorywise
 - drop stan dependency and fit dispersion manually on each row, taking the
   median value
+- Switch to BIC to estimate lambda2
 
 ### Fixed
 - sigma parameter was ignored in `GeneralizedAdditiveModel`
 - output matrix properly returns factor labels for name, bin1 and bin2 in fast binless
 - bug causing weights to be twice too small
 - centering bug on first iteration of fast binless
-- bug in the BIC calculation of optimized binless, causing lambda2 estimates to
-  be too low
+- bugs in the BIC calculation of optimized binless, causing lambda2 estimates to
+  be too low and unstable
 
 ## [0.11.0]
 ### Changed

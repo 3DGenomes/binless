@@ -45,7 +45,7 @@ Graph build_patch_graph(int nbins, double tol_val, const IntegerVector& bin1,
 IntegerVector get_patch_numbers(int nbins, double tol_val, const IntegerVector& bin1,
                                 const IntegerVector& bin2, const NumericVector& value) {
     //build graph with edges only between vertices with equal values
-    Graph fG = build_patch_graph(nbins, tol_val/20., bin1, bin2, value); //use a factor 20 given the factor 20 for the fused lasso computation
+    Graph fG = build_patch_graph(nbins, tol_val, bin1, bin2, value); //assume the lasso has been computed at precision greater than tol_val
     //deduce connected components
     std::vector<int> component(boost::num_vertices(fG));
     int num = boost::connected_components(fG, &component[0]);
