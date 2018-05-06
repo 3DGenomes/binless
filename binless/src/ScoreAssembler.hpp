@@ -50,6 +50,7 @@ public:
     value_t assemble(const Rcpp::NumericVector& chisq, double dof) const {
         const double BIC = sum(chisq)+ lsnc_*dof;
         const double BIC_sd = -1;
+        /*Rcpp::Rcout << "BIC: score= " << BIC << " chisq= " << sum(chisq) << " lsnc= " << lsnc_ << " dof= " << dof << std::endl;*/
         return value_t(BIC,BIC_sd);
     }
     
