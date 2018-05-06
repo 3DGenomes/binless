@@ -154,14 +154,14 @@ optimize_lambda2_smooth = function(csig, constrained=T, positive=T, fixed=F, min
   #first, find rough minimum by gridding
   minlambda=min.lambda2
   maxlambda=100
-  npoints=10
+  npoints=25
   lvals=10^seq(log10(minlambda),log10(maxlambda),length.out=npoints)
   op = foreach (lam=lvals,.combine=rbind) %do% obj(log10(lam))
   op = copy(csig@state$l2vals)
   setkey(op,lambda2)
   #ggplot(op)+geom_point(aes(lambda2,BIC,colour=converged))+geom_errorbar(aes(lambda2,ymin=BIC-BIC.sd,ymax=BIC+BIC.sd,colour=converged))+scale_x_log10()+scale_y_log10()
   #fail if too few runs have converged
-  if (csig@settings$nperf>1 && op[1:5,sum(converged)<4]) stop("Fused lasso fails to converge, increase nperf!")
+  if (csig@settings$nperf>1 && op[1:15,sum(converged)<4]) stop("Fused lasso fails to converge, increase nperf!")
   #now find the lowest minimum and extract flanking values
   l2min=op[BIC==min(BIC),min(lambda2)]
   minlambda=op[lambda2<=l2min][.N-1,lambda2]
@@ -171,7 +171,7 @@ optimize_lambda2_smooth = function(csig, constrained=T, positive=T, fixed=F, min
   #cat("minlambda ",minlambda," maxlambda ",maxlambda,"\n")
   stopifnot(maxlambda>minlambda)
   #optimize there
-  op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.1)
+  op<-optimize(obj, c(log10(minlambda),log10(maxlambda)), tol=0.05)
   lambda2=10^op$minimum
   #finish
   if (lambda2==maxlambda) cat("   Warning: lambda2 hit upper boundary.\n")
