@@ -16,9 +16,11 @@
 #' @param nbins unsigned integer referring to the number of bins in the provided matrix.
 #' @param lam2 numeric positive value for the fusion penalty, or a vector of
 #' the same size as the number of datasets.
-#' @param nouter unsigned The maximum number of iterations that should be performed (default 20)
-#' @param tol_val double tolerance on the values for convergence and the fused lasso (default 1e-1)
-#' @param bg_steps unsigned the maximum number of initial steps where no signal is fitted
+#' @param alpha the dispersion of the negative binomial
+#' @param nouter unsigned The maximum number of iterations that should be performed (default 25)
+#' @param tol_val double tolerance on the values for convergence and the fused lasso (default 2e-1)
+#' @param bg_steps unsigned the maximum number of initial steps where no signal is fitted (default 5)
+#' @param free_decay the distance in bases up to which the decay is not forced to decrease (default 10000)
 #' 
 #' @export
 #' @name fast_binless 

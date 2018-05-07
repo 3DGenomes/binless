@@ -15,11 +15,15 @@ at that coordinate. The provided matrices must be dense, i.e. report zero counts
 \item{lam2}{numeric positive value for the fusion penalty, or a vector of
 the same size as the number of datasets.}
 
-\item{nouter}{unsigned The maximum number of iterations that should be performed (default 20)}
+\item{alpha}{the dispersion of the negative binomial}
 
-\item{tol_val}{double tolerance on the values for convergence and the fused lasso (default 1e-1)}
+\item{nouter}{unsigned The maximum number of iterations that should be performed (default 25)}
 
-\item{bg_steps}{unsigned the maximum number of initial steps where no signal is fitted}
+\item{tol_val}{double tolerance on the values for convergence and the fused lasso (default 2e-1)}
+
+\item{bg_steps}{unsigned the maximum number of initial steps where no signal is fitted (default 5)}
+
+\item{free_decay}{the distance in bases up to which the decay is not forced to decrease (default 10000)}
 }
 \description{
 This function computes a fast approximation to the binless normalization of a given dataset

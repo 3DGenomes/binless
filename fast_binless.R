@@ -14,7 +14,7 @@ library(binless)
 #You can also extract it from the CSnorm object built during preprocessing
 #load("example/rao_HiCall_FOXP1ext_csnorm.RData")
 mat=binless:::bin_data(cs,resolution=5000)
-#write.table(mat,file = "example/rao_HiCall_FOXP1ext_2.3M_mat_5kb.dat", quote = T, row.names = F)
+#write.table(mat,file = "example/rao_HiCall_SEMA3Cext_1.5M_mat_5kb.dat", quote = T, row.names = F)
 
 
 #The fast binless algorithm computes a binless normalization without estimating
@@ -24,13 +24,10 @@ mat=binless:::bin_data(cs,resolution=5000)
 #Play with lam2 to see its effect. This is the parameter that is optimized in the
 #full-blown binless, along with another threshold (lambda1, set to zero here),
 #which determines the significance of a given signal/difference contribution
-nouter=25
-lam2=5
-alpha=10
-tol_val=2e-1
-bg_steps=5
-free_decay=10000
-out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, alpha, nouter, tol_val, bg_steps, free_decay)
+#pass one value for all, or a value for each dataset
+lam2=c(2.53,2.84)
+alpha=0.44
+out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, alpha)
 
 
 #Here follow the plots of the observed and fitted quantities (be sure to check out signal and binless plots)
@@ -68,10 +65,9 @@ plot_binless_matrix(a, upper="binless", lower="observed")
 
 #now we compute differences between the two datasets
 ref=mat[,name[1]]
-lam2=5
+lam2=3.38
 alpha=1
-tol_val=2e-1
-diff=as.data.table(binless:::fast_binless_difference(out, lam2, ref, alpha, tol_val))
+diff=as.data.table(binless:::fast_binless_difference(out, lam2, ref, alpha))
 
 #log(observed)
 plot_binless_matrix(diff, upper="observed", lower="observed")
