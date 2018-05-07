@@ -25,6 +25,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - drop stan dependency and fit dispersion manually on each row, taking the
   median value
 - Switch to BIC to estimate lambda2
+- reorder arguments in fast_binless
 
 ### Fixed
 - sigma parameter was ignored in `GeneralizedAdditiveModel`

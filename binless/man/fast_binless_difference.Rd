@@ -3,6 +3,9 @@
 \name{fast_binless_difference}
 \alias{fast_binless_difference}
 \title{Fast binless difference calculation}
+\usage{
+fast_binless_difference(out, ref, alpha, lam2, tol_val = 2e-1)
+}
 \arguments{
 \item{ref}{unsigned integer corresponding to the index (starting at 1) of the dataset to use as reference}
 

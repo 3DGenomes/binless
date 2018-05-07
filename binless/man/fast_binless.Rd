@@ -3,6 +3,10 @@
 \name{fast_binless}
 \alias{fast_binless}
 \title{Fast binless signal calculation}
+\usage{
+fast_binless(obs, nbins, alpha, lam2, nouter = 25, tol_val = 2e-1,
+ bg_steps = 5, free_decay = 10000)
+}
 \arguments{
 \item{obs}{DataFrame containing at least 4 named columns: name, bin1, bin2 and observed.
 The first three must be convertible to integer vectors (like factors) and must range from
@@ -12,10 +16,10 @@ at that coordinate. The provided matrices must be dense, i.e. report zero counts
 
 \item{nbins}{unsigned integer referring to the number of bins in the provided matrix.}
 
+\item{alpha}{the dispersion of the negative binomial}
+
 \item{lam2}{numeric positive value for the fusion penalty, or a vector of
 the same size as the number of datasets.}
-
-\item{alpha}{the dispersion of the negative binomial}
 
 \item{nouter}{unsigned The maximum number of iterations that should be performed (default 25)}
 
@@ -29,8 +33,6 @@ the same size as the number of datasets.}
 This function computes a fast approximation to the binless normalization of a given dataset
 Most notably, it does not produce a statistically significant output, since the fusion and
 significance thresholds must be set by the user. Other differences include a pointwise estimate
-of the decay and genomic biases, one decay and one genomic bias for all datasets, and
-a Poisson model of the counts (infinite dispersion). This implies that empty rows and
-counter diagonals are not admissible and will throw an error. This fast model is meant for a quick
-overview of the data, and should not be used for high-resolution and/or statistical analyses.
+of the decay and genomic biases, and one decay and one genomic bias for all datasets. This fast 
+model is meant for a quick overview of the data.
 }
