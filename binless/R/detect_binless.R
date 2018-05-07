@@ -69,7 +69,7 @@ detect_binless_interactions = function(cs, resolution=cs@settings$base.res, grou
   csi = binless:::prepare_signal_estimation(cs, csg, resolution, tol.val, nperf)
   #
   #perform fused lasso on signal
-  if (verbose==T) cat("  Fused lasso\n")
+  if (verbose==T) cat("  Fused lasso using alpha= ", cs@par$alpha, "\n")
   groupnames=csi@cts[,unique(name)]
   csigs = foreach(g=groupnames) %do% {
     csig = new("CSbsig", mat=csi@mat[name==g], cts=csi@cts[name==g], settings=csi@settings)
@@ -127,7 +127,7 @@ detect_binless_differences = function(cs, ref, resolution=cs@settings$base.res, 
   csi = binless:::prepare_difference_estimation(cs, csg, resolution, ref, tol.val, nperf)
   #
   #perform fused lasso on signal
-  if (verbose==T) cat("  Fused lasso\n")
+  if (verbose==T) cat("  Fused lasso using alpha= ", cs@par$alpha, "\n")
   groupnames=csi@cts[,unique(name)]
   csigs = foreach (g=groupnames) %do% {
     csig = new("CSbdiff", mat=csi@mat[name==g], cts=csi@cts[name==g], cts.ref=csi@cts.ref,
