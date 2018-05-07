@@ -4,13 +4,15 @@
 \alias{fast_binless_difference}
 \title{Fast binless difference calculation}
 \usage{
-fast_binless_difference(out, ref, alpha, lam2, tol_val = 2e-1)
+fast_binless_difference(out, ref, alpha, lam2, lam1 = 0, tol_val = 2e-1)
 }
 \arguments{
 \item{ref}{unsigned integer corresponding to the index (starting at 1) of the dataset to use as reference}
 
 \item{lam2}{numeric positive value for the fusion penalty, or a vector of
 the same size as the number of datasets minus one.}
+
+\item{lam1}{numeric positive value (or vector of size n-1) for the significance threshold (default is zero)}
 }
 \description{
 Once normalized with \code{\link{fast_binless}}, differences with respect to a reference can be computed.

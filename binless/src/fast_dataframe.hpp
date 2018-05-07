@@ -14,9 +14,9 @@ using namespace Rcpp;
 namespace binless {
 namespace fast {
 
-Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const ExposureEstimator& expo, const BiasEstimator& bias, const DecayEstimator& dec, double tol_val);
+Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const ExposureEstimator& expo, const BiasEstimator& bias, const DecayEstimator& dec, const NumericVector lam1, double tol_val);
 
-Rcpp::DataFrame get_as_dataframe(const FastData<Difference>& data, double tol_val);
+Rcpp::DataFrame get_as_dataframe(const FastData<Difference>& data, const NumericVector lam1, double tol_val);
 
 }
 }

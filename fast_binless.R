@@ -27,6 +27,7 @@ mat=binless:::bin_data(cs,resolution=5000)
 #pass one value for all, or a value for each dataset
 alpha=0.44
 lam2=c(2.53,2.84)
+lam1=c(0.11,0.15)
 out=binless:::fast_binless(mat, mat[,nlevels(bin1)], alpha, lam2)
 
 
@@ -67,7 +68,8 @@ plot_binless_matrix(a, upper="binless", lower="observed")
 ref=mat[,name[1]]
 alpha=0.44
 lam2=3.38
-diff=as.data.table(binless:::fast_binless_difference(out, ref, alpha, lam2))
+lam1=0.1
+diff=as.data.table(binless:::fast_binless_difference(out, ref, alpha, lam2, lam1))
 
 #log(observed)
 plot_binless_matrix(diff, upper="observed", lower="observed")

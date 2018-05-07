@@ -10,6 +10,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
  argument to decide (default 10kb)
 - patchno column to fast binless output
 - allow to pass a vector of lambda2 values to fast binless
+- allow to pass lambda1 to get thresholdings similar to optimized binless
 
 ### Changed
 - Exposures are now fit separately

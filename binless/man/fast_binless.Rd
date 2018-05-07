@@ -4,7 +4,7 @@
 \alias{fast_binless}
 \title{Fast binless signal calculation}
 \usage{
-fast_binless(obs, nbins, alpha, lam2, nouter = 25, tol_val = 2e-1,
+fast_binless(obs, nbins, alpha, lam2, lam1 = 0, nouter = 25, tol_val = 2e-1,
  bg_steps = 5, free_decay = 10000)
 }
 \arguments{
@@ -20,6 +20,8 @@ at that coordinate. The provided matrices must be dense, i.e. report zero counts
 
 \item{lam2}{numeric positive value for the fusion penalty, or a vector of
 the same size as the number of datasets.}
+
+\item{lam1}{numeric positive value (or vector) for the significance threshold (default is zero)}
 
 \item{nouter}{unsigned The maximum number of iterations that should be performed (default 25)}
 

@@ -82,7 +82,8 @@ std::vector<double> shift_signal(const FastSignalData& data) {
   return log_signal;
 }
 
-List binless(const DataFrame obs, unsigned nbins, double alpha, const NumericVector lam2, unsigned ngibbs, double tol_val, unsigned bg_steps, unsigned free_decay) {
+List binless(const DataFrame obs, unsigned nbins, double alpha, const NumericVector lam2, const NumericVector lam1,
+             unsigned ngibbs, double tol_val, unsigned bg_steps, unsigned free_decay) {
   //initialize return values, exposures and fused lasso optimizer
   Rcpp::Rcout << "init\n";
   NegativeBinomialDistribution nb_dist;
@@ -174,14 +175,14 @@ List binless(const DataFrame obs, unsigned nbins, double alpha, const NumericVec
   }
   Rcpp::Rcout << "done\n";
   //finalize and return
-  return Rcpp::List::create(_["mat"]=get_as_dataframe(out, expo, bias, dec, tol_val), _["biases"]=bias.get_state(),
+  return Rcpp::List::create(_["mat"]=get_as_dataframe(out, expo, bias, dec, lam1, tol_val), _["biases"]=bias.get_state(),
                             _["decay"]=dec.get_state(), _["exposures"]=expo.get_state(),
                             _["log_signal"]=out.get_log_signal(),
                             //_["diagnostics"]=diagnostics,
                             _["nbins"]=nbins);
 }
 
-Rcpp::List binless_eval_cv(const List obs, double alpha, const NumericVector lam2, unsigned group, double tol_val) {
+Rcpp::List binless_eval_cv(const List obs, double alpha, const NumericVector lam2, const NumericVector lam1, unsigned group, double tol_val) {
   //setup distribution
   NegativeBinomialDistribution nb_dist;
   Sampler<NegativeBinomialDistribution> nb_sampler(nb_dist);
@@ -222,14 +223,14 @@ Rcpp::List binless_eval_cv(const List obs, double alpha, const NumericVector lam
     out.set_log_signal(signal.beta);
     out.set_signal_phihat(signal.phihat);
     out.set_signal_weights(signal.weights);
-    diagnostics.push_back(get_as_dataframe(out, expo, bias, dec, tol_val));
+    diagnostics.push_back(get_as_dataframe(out, expo, bias, dec, lam1, tol_val));
   }
   //finalize and return
   Rcpp::Rcout << "done\n";
   return Rcpp::wrap(diagnostics);
 }
 
-Rcpp::DataFrame binless_difference(const List obs, unsigned ref, double alpha, const NumericVector lam2, double tol_val) {
+Rcpp::DataFrame binless_difference(const List obs, unsigned ref, double alpha, const NumericVector lam2, const NumericVector lam1, double tol_val) {
   //setup distribution
   NegativeBinomialDistribution nb_dist;
   Sampler<NegativeBinomialDistribution> nb_sampler(nb_dist);
@@ -271,7 +272,7 @@ Rcpp::DataFrame binless_difference(const List obs, unsigned ref, double alpha, c
   out.set_phi_ref(diff.phi_ref);
   //finalize and return
   Rcpp::Rcout << "done\n";
-  return get_as_dataframe(out,tol_val);
+  return get_as_dataframe(out,lam1,tol_val);
 }
 
 }

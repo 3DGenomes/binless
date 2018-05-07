@@ -1,25 +1,31 @@
 #include "fast_dataframe.hpp"
 #include "graph_helpers.hpp"
+#include <algorithm>
 
 namespace binless {
 namespace fast {
 
-Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const ExposureEstimator& expo, const BiasEstimator& bias, const DecayEstimator& dec, double tol_val) {
+Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const ExposureEstimator& expo, const BiasEstimator& bias, const DecayEstimator& dec, const NumericVector lam1, double tol_val) {
   //bias, decay, signal with decay and exposures, and log_background matrix (w/ offset)
   std::vector<double> biasmat,decaymat,signal,binless,background;
   biasmat.reserve(data.get_N());
   binless.reserve(data.get_N());
-  std::vector<unsigned> nobs(data.get_nobs());
+  std::vector<unsigned> nobs(data.get_nobs()), name(data.get_name());
   std::vector<double> log_signal(data.get_log_signal());
   Eigen::VectorXd exposures = expo.get_data_estimate();
   Eigen::VectorXd log_biases = bias.get_data_estimate();
   Eigen::VectorXd log_decay = dec.get_data_estimate();
+  const Eigen::ArrayXd lambda1_vals = (lam1.size() == data.get_ndatasets())
+    ? Rcpp::as<Eigen::ArrayXd>(lam1)
+      : Eigen::ArrayXd::Constant(data.get_ndatasets(),lam1[0]);
   for (unsigned i=0; i<data.get_N(); ++i) {
     double bipbj = log_biases(i);
     biasmat.push_back(std::exp(bipbj));
     double ldec = log_decay(i);
     decaymat.push_back(std::exp(ldec));
+    double l1val = lambda1_vals(name[i]-1);
     double lsig = log_signal[i];
+    lsig = (lsig > 0) ? std::max(0., lsig - l1val) : std::min(0., lsig + l1val);
     signal.push_back(std::exp(lsig));
     double exposure = exposures(i);
     binless.push_back(std::exp(ldec + lsig));
@@ -56,7 +62,7 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const ExposureEst
 }
 
 
-Rcpp::DataFrame get_as_dataframe(const FastData<Difference>& data, double tol_val) {
+Rcpp::DataFrame get_as_dataframe(const FastData<Difference>& data, const NumericVector lam1, double tol_val) {
   std::vector<double> log_difference = data.get_log_difference();
   std::vector<double> difference;
   difference.reserve(log_difference.size());
