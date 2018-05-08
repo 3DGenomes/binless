@@ -48,11 +48,12 @@ gauss_dispersion = function(cs, cts.common, verbose=T, alpha.min=0.01, ncores=1)
   data=data[bin%in%bins]
   #compute dispersion on each selected row
   registerDoParallel(cores=ncores)
-  alphas = foreach (b=data[,levels(bin)],.combine=rbind) %dopar% {
+  alphas = foreach (b=data[,unique(bin)],.combine=rbind) %dopar% {
     alpha=binless:::theta.ml(data[bin==b,count], data[bin==b,mu], data[bin==b,nobs], cs@par$alpha)
     data.table(bin=b,alpha=alpha)
   }
   stopImplicitCluster()
+  #ggplot(alphas)+geom_point(aes(bin,alpha))+scale_y_log10()
   alpha = max(alphas[,median(alpha)],alpha.min)
   #update parameters
   cs@par$alpha = alpha
