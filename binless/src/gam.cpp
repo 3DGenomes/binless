@@ -9,7 +9,7 @@ Eigen::SparseMatrix<double> decreasing_constraint(unsigned K, unsigned Kfree) {
   Eigen::MatrixXi D = - Eigen::MatrixXi::Identity(K-1,K);
   D.diagonal(1).setConstant(1);
   //return only last rows
-  return - D.bottomRows(K-Kfree).sparseView().cast<double>();
+  return - D.bottomRows(K-1-Kfree).sparseView().cast<double>();
 }
 
 Eigen::SparseMatrix<double> second_order_difference_matrix(unsigned K) {
