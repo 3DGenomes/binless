@@ -48,8 +48,9 @@ gauss_dispersion = function(cs, cts.common, verbose=T, alpha.min=0.01, ncores=1)
   data=data[bin%in%bins]
   #compute dispersion on each selected row
   registerDoParallel(cores=ncores)
+  init.disp = cs@par$alpha
   alphas = foreach (b=data[,unique(bin)],.combine=rbind) %dopar% {
-    alpha=binless:::theta.ml(data[bin==b,count], data[bin==b,mu], data[bin==b,nobs], cs@par$alpha)
+    alpha=binless:::theta.ml(data[bin==b,count], data[bin==b,mu], data[bin==b,nobs], init.disp)
     data.table(bin=b,alpha=alpha)
   }
   stopImplicitCluster()
