@@ -41,6 +41,12 @@ gauss_dispersion = function(cs, cts.common, verbose=T, alpha.min=0.01, ncores=1)
   cts = cts.common[,.(cat,pos=pos1,count,mu,nobs=nobs/2)]
   data = rbind(bts,cts)
   data[,bin:=cut(pos, cs@settings$sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
+  #take subset of rows
+  bins=data[,unique(bin)]
+  nrows=min(length(bins),cs@settings$nrows.dispersion)
+  bins=bins[unique(as.integer(seq.int(1,length(bins),length.out=cs@settings$nrows.dispersion)))]
+  data=data[bin%in%bins]
+  #compute dispersion on each selected row
   registerDoParallel(cores=ncores)
   alphas = foreach (b=data[,levels(bin)],.combine=rbind) %dopar% {
     alpha=binless:::theta.ml(data[bin==b,count], data[bin==b,mu], data[bin==b,nobs], cs@par$alpha)

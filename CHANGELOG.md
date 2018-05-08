@@ -23,8 +23,8 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - require `pos1` and `pos2` columns in fast binless input
 - fits in optimized binless are performed by group and are more efficient
   memorywise
-- drop stan dependency and fit dispersion manually on each row, taking the
-  median value
+- drop stan dependency and fit dispersion manually on a subset of rows, taking
+  the median value
 - Switch to BIC to estimate lambda2
 - reorder arguments in fast_binless
 

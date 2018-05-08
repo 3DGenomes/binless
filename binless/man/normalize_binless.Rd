@@ -6,9 +6,10 @@
 \usage{
 normalize_binless(cs, restart = F, bf_per_kb = 50, bf_per_decade = 10,
   bins_per_bf = 10, base.res = 5000, ngibbs = 25, bg.steps = 5,
-  iter = 100, verbose = T, init.dispersion = 0.1, min.lambda2 = 0.1,
-  tol = 0.1, ncores = 1, fit.signal = T, fix.lambda1 = F,
-  fix.lambda1.at = NA, fix.lambda2 = T, fix.lambda2.at = 2.5)
+  iter = 100, verbose = T, init.dispersion = 0.1,
+  nrows.dispersion = 100, min.lambda2 = 0.1, tol = 0.1, ncores = 1,
+  fit.signal = T, fix.lambda1 = F, fix.lambda1.at = NA, fix.lambda2 = T,
+  fix.lambda2.at = 2.5)
 }
 \arguments{
 \item{cs}{CSnorm object as returned by \code{\link{merge_cs_norm_datasets}}}
@@ -36,6 +37,8 @@ approximately constant in that bin.}
 \item{verbose}{Display progress if TRUE}
 
 \item{init.dispersion}{positive numeric. Value of the dispersion to use initially.}
+
+\item{nrows.dispersion}{positive integer. Number of rows on which to compute the dispersion.}
 
 \item{min.lambda2}{The minimum value which lambda2 is allowed to take when searching its optimum. Too small values
 can cause computational instability.}

@@ -73,9 +73,10 @@ get_nzeros = function(cs, sbins, ncores=1) {
 #' Cleanup a CSnorm object, store settings and populate it with initial guesses of all required parameters
 #' @keywords internal
 #' 
-fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
-                       bg.steps=5, iter=100, fit.signal=T, verbose=T, init.dispersion=.1, min.lambda2=.1,
-                       tol=1e-1, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
+fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000, bg.steps=5,
+                       iter=100, fit.signal=T, verbose=T, init.dispersion=.1, nrows.dispersion = 100,
+                       min.lambda2=.1, tol=1e-1, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F,
+                       fix.lambda2.at=NA) {
     #fresh start
     cs@par=list() #in case we have a weird object
     cs@groups=list()
@@ -84,7 +85,8 @@ fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.
     if (fit.signal==F) base.res = cs@biases[,max(pos)-min(pos)]+2
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
-                         bg.steps=bg.steps, iter=iter, init.dispersion=init.dispersion, tol=tol, min.lambda2=min.lambda2,
+                         bg.steps=bg.steps, iter=iter, init.dispersion=init.dispersion, tol=tol,
+                         nrows.dispersion = nrows.dispersion, min.lambda2=min.lambda2,
                          fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                          fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
@@ -256,6 +258,7 @@ get_residuals = function(cts.common, viewpoint) {
 #' @param iter positive integer. Maximum number of optimization steps for each leg.
 #' @param verbose Display progress if TRUE
 #' @param init.dispersion positive numeric. Value of the dispersion to use initially.
+#' @param nrows.dispersion positive integer. Number of rows on which to compute the dispersion.
 #' @param min.lambda2 The minimum value which lambda2 is allowed to take when searching its optimum. Too small values
 #'  can cause computational instability.
 #' @param tol positive numeric (default 1e-1). Convergence tolerance on relative changes in the computed biases.
@@ -274,8 +277,9 @@ get_residuals = function(cts.common, viewpoint) {
 #' @examples
 #' 
 normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
-                     ngibbs = 25, bg.steps=5, iter=100, verbose=T, init.dispersion=.1, min.lambda2=.1,
-                     tol=1e-1, ncores=1,  fit.signal=T, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=T, fix.lambda2.at=2.5) {
+                     ngibbs = 25, bg.steps=5, iter=100, verbose=T, init.dispersion=.1, nrows.dispersion = 100,
+                     min.lambda2=.1, tol=1e-1, ncores=1,  fit.signal=T, fix.lambda1=F, fix.lambda1.at=NA,
+                     fix.lambda2=T, fix.lambda2.at=2.5) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -285,11 +289,11 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
   setkey(cs@counts, id1, id2, name)
   if (restart==F) {
     #fresh start
-    cs = fresh_start(cs, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, base.res = base.res,
-                     bg.steps = bg.steps, iter = iter, fit.signal = fit.signal,
-                     verbose = verbose, init.dispersion = init.dispersion, min.lambda2=min.lambda2,
-                     tol = tol, ncores = ncores, fix.lambda1 = fix.lambda1, fix.lambda1.at = fix.lambda1.at,
-                     fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
+    cs = fresh_start(cs, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf,
+                     base.res = base.res, bg.steps = bg.steps, iter = iter, fit.signal = fit.signal,
+                     verbose = verbose, init.dispersion = init.dispersion, nrows.dispersion = nrows.dispersion,
+                     min.lambda2=min.lambda2,  tol = tol, ncores = ncores, fix.lambda1 = fix.lambda1,
+                     fix.lambda1.at = fix.lambda1.at, fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
     laststep=0
   } else {
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
