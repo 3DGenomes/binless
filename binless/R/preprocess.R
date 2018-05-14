@@ -109,9 +109,9 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
     bins1=seq(b1,obj[,max(begin1)]+resolution,resolution)
     bins2=seq(b2,obj[,max(begin2)]+resolution,resolution)
     #
-    counts = obj[,.(begin1,begin2,bin1=cut2(begin1, bins1, oneval=F, onlycuts=T, digits=10),
+    counts = obj[,.(name,begin1,begin2,bin1=cut2(begin1, bins1, oneval=F, onlycuts=T, digits=10),
                   bin2=cut2(begin2, bins2, oneval=F, onlycuts=T, digits=10))
-               ][,.(observed=.N),by=c("bin1","bin2")]
+               ][,.(observed=.N,nobs=-1),by=c("name","bin1","bin2")]
   } else if (class(obj)[1] == "CSnorm") {
     if (!is.null(b1)) stop("b1 must be NULL when passing CSnorm object")
     if (!is.null(b2)) stop("b2 must be NULL when passing CSnorm object")
