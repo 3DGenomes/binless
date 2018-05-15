@@ -313,9 +313,11 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     residuals[,step:=i]
     cs@diagnostics$residuals = rbind(cs@diagnostics$residuals, residuals)
     #
-    #fit exposures
-    a=system.time(cs <- binless:::gauss_exposures(cs, cts.common, verbose=verbose))
-    cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="expo", runtime=a[1]+a[4])
+    if (!(fit.signal==T && i > cs@settings$bg.steps)) {
+      #fit exposures
+      a=system.time(cs <- binless:::gauss_exposures(cs, cts.common, verbose=verbose))
+      cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="expo", runtime=a[1]+a[4])
+    }
     #
     #fit dispersion
     a=system.time(cs <- binless:::gauss_dispersion(cs, cts.common, verbose=verbose, ncores=ncores))
