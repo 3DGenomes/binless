@@ -40,10 +40,11 @@ void Summarizer<Leg,Method>::update_summary(const ResidualsPair& z, const Eigen:
   const Eigen::Map<const Eigen::VectorXd> residuals(z.residuals.data(),z.residuals.size());
   Eigen::VectorXd phihat = summarize(residuals.array() * weights.array()).matrix();
   phihat = (phihat.array() / weight_sum.array()).matrix() + estimate;
-  /*Rcpp::Rcout << "BEFORE\n";
-  Rcpp::Rcout << "distance phihat weight\n";
-  Rcpp::Rcout << (Eigen::MatrixXd(phihat.rows(),3) << summarizerImpl_t::get_settings().get_log_distance().array().exp().matrix(), phihat,
-                  weight_sum).finished();*/
+  if (SummarizerTraits<Leg,Method>::debug) {
+    Rcpp::Rcout << "support phihat weight\n";
+    Rcpp::Rcout << (Eigen::MatrixXd(phihat.rows(),3)
+                << summarizerImpl_t::get_settings().get_support(), phihat, weight_sum).finished();
+  }
   summarizerImpl_t::get_summary().set_phihat(phihat);
   summarizerImpl_t::get_summary().set_weight(weight_sum);
 }
