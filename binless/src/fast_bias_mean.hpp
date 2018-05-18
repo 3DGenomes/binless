@@ -22,6 +22,13 @@ struct Config<Bias,Mean> {
   unsigned nbins;
 };
 
+//enable debug
+template<>
+struct SummarizerTraits<Bias,Mean> {
+  //print debug info
+  static const bool debug = false;
+};
+
 template<>
 class SummarizerSettingsImpl<Bias,Mean> : public SummarizerSettings {
   

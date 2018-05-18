@@ -34,6 +34,13 @@ struct Config<Bias,GAM> {
   
 };
 
+//enable debug
+template<>
+struct SummarizerTraits<Bias,GAM> {
+  //print debug info
+  static const bool debug = false;
+};
+
 template<>
 class SummarizerSettingsImpl<Bias,GAM> : public SummarizerSettings {
   

@@ -80,6 +80,13 @@ public:
     //Rcpp::Rcout << "gam converged: " << gam.has_converged() << "\n";
     set_lambda(gam_.get_lambda());
     set_beta(gam_.get_beta());
+    //print debug info
+    if (FitterTraits<Leg,GAM>::debug) {
+      Rcpp::Rcout << "phihat: " << phihat.transpose() << "\n";
+      Rcpp::Rcout << "weight: " << weight.transpose() << "\n";
+      Rcpp::Rcout << "beta: " << gam_.get_beta().transpose() << "\n";
+      Rcpp::Rcout << "lambda: " << gam_.get_lambda() << "\n";
+    }
     //this estimate is always centered
     center_estimate(); 
   }

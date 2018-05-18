@@ -33,6 +33,13 @@ struct Config<Decay,GAM> {
   
 };
 
+//enable debug
+template<>
+struct SummarizerTraits<Decay,GAM> {
+  //print debug info
+  static const bool debug = false;
+};
+
 template<>
 class SummarizerSettingsImpl<Decay,GAM> : public SummarizerSettings {
   
