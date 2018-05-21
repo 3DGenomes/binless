@@ -61,7 +61,10 @@ public:
     for (unsigned i=0; i<nobs_data.rows(); ++i) nobs_data(i) = nobs_std[i]; // cast to double
     set_nobs(get_binner() * nobs_data);
     //compute mean log distance
-    set_support( ((get_binner() * (log_distance_data.array() * nobs_data.array()).matrix()).array() / get_nobs().array()).matrix() );
+    //in theory, should be weighted by nobs, but that causes problems when nobs=0
+    //counter diagonals with nobs=0 cannot yet be removed because signal is not ported to new class hierarchy
+    set_support( (get_binner() * log_distance_data).cwiseQuotient(
+                        get_binner() * Eigen::VectorXd::Ones(log_distance_data.rows())) );
   }
 };
 
