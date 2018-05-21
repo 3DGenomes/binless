@@ -1,5 +1,5 @@
-#ifndef FAST_BIAS_HPP
-#define FAST_BIAS_HPP
+#ifndef FAST_BIAS_GAM_HPP
+#define FAST_BIAS_GAM_HPP
 
 #include <RcppEigen.h>
 using namespace Rcpp;
