@@ -69,9 +69,10 @@ public:
     
     //print debug info
     if (FitterTraits<Leg,Mean>::debug) {
-      Rcpp::Rcout << "phihat: " << phihat.transpose() << "\n";
-      Rcpp::Rcout << "weight: " << weight.transpose() << "\n";
-      Rcpp::Rcout << "estimate: " << estimate.transpose() << "\n";
+      Rcpp::Rcout << "\nupdate_params:\n";
+      Rcpp::Rcout << "phihat weight estimate\n";
+      Rcpp::Rcout << (Eigen::MatrixXd(estimate.rows(),3)
+                  << phihat, weight, estimate).finished();
     }
     //this estimate is never centered after fitting (internal centering)
     set_estimate(estimate);

@@ -82,10 +82,10 @@ public:
     set_beta(gam_.get_beta());
     //print debug info
     if (FitterTraits<Leg,GAM>::debug) {
-      Rcpp::Rcout << "phihat: " << phihat.transpose() << "\n";
-      Rcpp::Rcout << "weight: " << weight.transpose() << "\n";
-      Rcpp::Rcout << "beta: " << gam_.get_beta().transpose() << "\n";
-      Rcpp::Rcout << "lambda: " << gam_.get_lambda() << "\n";
+      Rcpp::Rcout << "\nupdate_params: lambda= " << gam_.get_lambda() << "\n";
+      Rcpp::Rcout << "phihat weight estimate\n";
+      Rcpp::Rcout << (Eigen::MatrixXd(phihat.rows(),3)
+                  << phihat, weight, get_estimate()).finished();
     }
     //this estimate is always centered
     center_estimate(); 
