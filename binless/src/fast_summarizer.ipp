@@ -14,6 +14,8 @@ void Summarizer<Leg,Method>::set_poisson_lsq_summary(const std::vector<double>& 
   Eigen::VectorXd sum_exp = summarize((log_expected.array().exp()*nobs.array()).matrix());
   //compute estimate
   Eigen::VectorXd estimate = (pseudocount + sum_obs.array()/sum_exp.array()).log().matrix();
+  //fix bins with sum_exp == 0 (i.e. nobs == 0)
+  for (unsigned i=0; i<sum_exp.rows(); ++i) if (sum_exp(i)==0) estimate(i) = 0;
   //compute weight
   Eigen::VectorXd weight = (estimate.array().exp()*summarizerImpl_t::get_settings().get_nobs().array()).matrix();
   //report back
@@ -36,6 +38,8 @@ void Summarizer<Leg,Method>::update_summary(const ResidualsPair& z, const Eigen:
   const Eigen::Map<const Eigen::VectorXd> residuals(z.residuals.data(),z.residuals.size());
   Eigen::VectorXd phihat = summarize(residuals.array() * weights.array()).matrix();
   phihat = (phihat.array() / weight_sum.array()).matrix() + estimate;
+  //fix bins with weight_sum == 0 (i.e. nobs == 0)
+  for (unsigned i=0; i<weight_sum.rows(); ++i) if (weight_sum(i)==0) phihat(i) = 0;
   if (SummarizerTraits<Leg,Method>::debug) {
     Rcpp::Rcout << "\nupdate_summary:\n";
     Rcpp::Rcout << "support phihat weight\n";
