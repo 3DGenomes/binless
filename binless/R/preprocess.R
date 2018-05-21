@@ -136,8 +136,9 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
                            observed=contact.close+contact.far+contact.up+contact.down)][
                              (!is.na(bin1))&(!is.na(bin2)),.(observed=sum(observed)),keyby=key(counts)]
     counts=poscounts[counts]
-    counts[is.na(observed),observed:=0]
+    counts[is.na(observed),c("observed","nobs"):=list(0,0)]
     counts[bin1==min(bin1)&bin2==max(bin2),observed:=observed+as.integer(1)] #otherwise fitted decay can be degenerate
+    if (!all(complete.cases(counts))) cat("Warning: NAs found in binned matrix. Fast binless might fail.")
   }
   #
   counts = add_bin_begin_and_end(counts)
