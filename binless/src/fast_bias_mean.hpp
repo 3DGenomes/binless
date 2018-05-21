@@ -26,7 +26,7 @@ struct Config<Bias,Mean> {
 template<>
 struct SummarizerTraits<Bias,Mean> {
   //print debug info
-  static const bool debug = false;
+  static const bool debug = true;
 };
 
 template<>
@@ -57,8 +57,9 @@ public:
     for (unsigned i=0; i<nobs_data.rows(); ++i) nobs_data(i) = nobs_std[i]; // cast to double
     set_nobs( get_binner() * nobs_data / 2. ); // each obs is used twice in the binner matrix
     //compute mean position (currently, positions dont change within a bin but that might evolve)
-    set_support(   ((  binner1*(pos1_data.cast<double>().array()*nobs_data.array()).matrix()
-                     + binner2*(pos1_data.cast<double>().array()*nobs_data.array()).matrix() ).array() / (2*get_nobs()).array()).matrix() );
+    Eigen::VectorXd support = ((  binner1*(pos1_data.cast<double>().array()*nobs_data.array()).matrix()
+                                + binner2*(pos2_data.cast<double>().array()*nobs_data.array()).matrix() ).array() / (2*get_nobs()).array()).matrix();
+    set_support(support);
   }
 };
 
@@ -77,7 +78,7 @@ struct FitterTraits<Bias,Mean> {
   //cap the data at 3SD
   static const bool cap = true;
   //print debug info
-  static const bool debug = false;
+  static const bool debug = true;
 };
 
 typedef Config<Bias,Mean> BiasConfig;
