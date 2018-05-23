@@ -1,5 +1,5 @@
-#ifndef FAST_BIAS_HPP
-#define FAST_BIAS_HPP
+#ifndef FAST_BIAS_GAM_HPP
+#define FAST_BIAS_GAM_HPP
 
 #include <RcppEigen.h>
 using namespace Rcpp;
@@ -34,6 +34,13 @@ struct Config<Bias,GAM> {
   
 };
 
+//enable debug
+template<>
+struct SummarizerTraits<Bias,GAM> {
+  //print debug info
+  static const bool debug = false;
+};
+
 template<>
 class SummarizerSettingsImpl<Bias,GAM> : public SummarizerSettings {
   
@@ -64,8 +71,14 @@ public:
     for (unsigned i=0; i<nobs_data.rows(); ++i) nobs_data(i) = nobs_std[i]; // cast to double
     set_nobs( get_binner() * nobs_data / 2. ); // each obs is used twice in the binner matrix
     //compute mean position (currently, positions dont change within a bin but that might evolve)
-    set_support(   ((  binner1*(pos1_data.cast<double>().array()*nobs_data.array()).matrix()
-                     + binner2*(pos1_data.cast<double>().array()*nobs_data.array()).matrix() ).array() / (2*get_nobs()).array()).matrix() );
+    //in theory, should be weighted by nobs, but that causes problems when nobs=0
+    //columns with nobs=0 cannot yet be removed because signal is not ported to new class hierarchy
+    Eigen::VectorXd support = (   (binner1*pos1_data.cast<double>()).cwiseQuotient(
+      binner1*Eigen::VectorXd::Ones(pos1_data.rows()))
+                                    + (binner2*pos2_data.cast<double>()).cwiseQuotient(
+                                        binner2*Eigen::VectorXd::Ones(pos2_data.rows()))
+    )/2.;
+    set_support(support);
   }
 };
 

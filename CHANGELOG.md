@@ -35,6 +35,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - centering bug on first iteration of fast binless
 - bugs in the BIC calculation of optimized binless, causing lambda2 estimates to
   be too low and unstable
+- Bug in fast binless when entire rows had nobs == 0
 
 ## [0.11.0]
 ### Changed
