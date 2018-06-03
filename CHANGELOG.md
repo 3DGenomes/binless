@@ -4,7 +4,7 @@ All notable changes to *binless* will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 for versions 0.x of binless, minor releases might break backwards compatibility.
 
-## [Unreleased]
+## [0.12.0]
 ### Added
 - First part of decay in fast binless is not forced to decrease. Use `free_diag`
  argument to decide (default 10kb)
@@ -94,7 +94,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - Initial commit
 
 
-[Unreleased]: ../../compare/v0.11.0...HEAD
+[0.12.0]: ../../compare/v0.11.0...HEAD
 [0.11.0]: ../../compare/v0.10.2...v0.11.0
 [0.10.2]: ../../compare/v0.10.1...v0.10.2
 [0.10.1]: ../../compare/v0.10.0...v0.10.1
