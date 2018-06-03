@@ -11,6 +11,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - patchno column to fast binless output
 - allow to pass a vector of lambda2 values to fast binless
 - allow to pass lambda1 to get thresholdings similar to optimized binless
+- allow to use final output of optimized binless as input to fast binless
 
 ### Changed
 - Exposures are now fit separately

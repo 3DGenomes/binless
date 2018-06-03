@@ -196,7 +196,7 @@ plot_binless_matrix = function(mat, upper="binless", lower="observed", trans="lo
   data=copy(mat)
   if (!("begin1" %in% names(data) && "begin2" %in% names(data))) {
     if (data[,is.factor(bin1)] && data[,is.factor(bin2)]) {
-      data = add_bin_begin_and_end(data)
+      data = add_bin_bounds_and_distance(data)
       bin1="begin1"
       bin2="begin2"
       just=1

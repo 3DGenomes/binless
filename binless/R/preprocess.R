@@ -141,10 +141,8 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
     if (!all(complete.cases(counts))) cat("Warning: NAs found in binned matrix. Fast binless might fail.")
   }
   #
-  counts = add_bin_begin_and_end(counts)
-  counts[,distance:=begin2-begin1+resolution/2]
-  counts[,c("pos1","pos2"):=list(as.integer((end1+begin1)/2),as.integer((end2+begin2)/2))]
-  counts=counts[,.(name,bin1,pos1,bin2,pos2,distance,observed,nobs,begin1,end1,begin2,end2)]
+  counts = add_bin_bounds_and_distance(counts)
+  counts = counts[,.(name,bin1,pos1,bin2,pos2,distance,observed,nobs,begin1,end1,begin2,end2)]
   setkeyv(counts,c("name","bin1","bin2"))
   return(counts)
 }

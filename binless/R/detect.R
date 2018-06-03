@@ -100,7 +100,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   setkey(mat,name,bin1,bin2)
   #
   if (verbose==T) cat("*** write begin/end positions\n")
-  mat = add_bin_begin_and_end(mat)
+  mat = add_bin_bounds_and_distance(mat)
   ### store matrices
   csg=new("CSgroup", mat=mat, interactions=list(), resolution=resolution, group=group,
           cts=cts, par=list(alpha=cs@par$alpha, dmin=cs@settings$dmin, nbins=length(sbins)-1, sbins=sbins),

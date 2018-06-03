@@ -106,13 +106,13 @@ gauss_common_muhat_mean_biases = function(cs) {
     return(bts[,.(group,cat,pos,count,mu,nobs,eta)])
 }
 
-#' Add begin and end for a binned matrix
+#' Add begin and end for a binned matrix, as well as middle position and average distance
 #'
 #' @keywords internal
 #' @export
 #'
 #' @examples
-add_bin_begin_and_end = function(mat) {
+add_bin_bounds_and_distance = function(mat) {
   bin1.begin=mat[,bin1]
   bin1.end=mat[,bin1]
   bin2.begin=mat[,bin2]
@@ -125,6 +125,9 @@ add_bin_begin_and_end = function(mat) {
   mat[,end1:=as.integer(as.character(bin1.end))]
   mat[,begin2:=as.integer(as.character(bin2.begin))]
   mat[,end2:=as.integer(as.character(bin2.end))]
+  resolution=mat[1,end1-begin1]
+  mat[,distance:=begin2-begin1+resolution/2]
+  mat[,c("pos1","pos2"):=list(as.integer((end1+begin1)/2),as.integer((end2+begin2)/2))]
   return(mat)
 }
 
