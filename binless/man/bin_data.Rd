@@ -14,7 +14,13 @@ bin_data(obj, resolution, b1 = NULL, b2 = NULL)
 \item{b2, e2}{(optional) if provided, give extradiagonal portion}
 }
 \value{
-a data.table representing the binned data
+a data.table representing the binned data. Will contain
+  name,bin1,bin2 (bin coordinates), observed data and mean distance between
+  these bins and nobs. If a CSnorm object is passed, will also compute the
+  number of observables in this bin (i.e. 4x the number of cut site
+  intersections). For the sake of speed, nobs is approximate along the
+  diagonal as it assumes that all intersections have observables, which is
+  not true since we discard all counts smaller than dmin.
 }
 \description{
 Bin a reads data.table into a matrix of a given resolution

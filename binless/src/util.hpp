@@ -8,8 +8,6 @@
 
 #include "BinnedData.hpp"
 
-#define SQUARE(x) ((x)*(x))
-
 std::vector<double> soft_threshold(const std::vector<double>& beta,
                                    double eCprime, double lam1);
 

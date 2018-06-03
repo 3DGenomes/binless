@@ -17,14 +17,14 @@ NULL
 predict_binned_matrices_irls = function(cts, dispersion) {
   #predict means
   cts[,c("decay","biases","mu.nosig"):=list(exp(log_decay),exp(log_bias),exp(lmu.nosig))]
-  mat=cts[,.(ncounts=sum(weight),
-             observed=sum(count*weight),
-             biasmat=weighted.mean(biases,weight),
-             decaymat=weighted.mean(decay,weight),
-             background=sum(mu.nosig*weight),
-             background.sd=sqrt(sum((mu.nosig+mu.nosig^2/dispersion)*weight)),
-             residual=sum(count*weight)/sum(mu*weight),
-             normalized=sum(count*weight)/sum(exp(lmu.nosig-log_decay)*weight))
+  mat=cts[,.(observed=sum(count*nobs),
+             nobs=sum(nobs),
+             biasmat=weighted.mean(biases,nobs),
+             decaymat=weighted.mean(decay,nobs),
+             background=sum(mu.nosig*nobs),
+             background.sd=sqrt(sum((mu.nosig+mu.nosig^2/dispersion)*nobs)),
+             residual=sum(count*nobs)/sum(mu*nobs),
+             normalized=sum(count*nobs)/sum(exp(lmu.nosig-log_decay)*nobs))
           ,keyby=c("name","bin1","bin2")]
   #fill missing data
   bl1=cts[,levels(bin1)]
@@ -32,7 +32,7 @@ predict_binned_matrices_irls = function(cts, dispersion) {
   levels(bins) <- bl1
   fullmat=CJ(name=cts[,unique(name)],bin1=bins,bin2=bins,sorted=T)[bin2>=bin1]
   mat=mat[fullmat]
-  mat[is.na(observed),c("ncounts","observed","normalized"):=list(0,0,0)]
+  mat[is.na(observed),c("nobs","observed","normalized"):=list(0,0,0)]
   mat[,diag.idx:=unclass(bin2)-unclass(bin1)]
   mat[,decaymat:=mean(decaymat,na.rm = T),by=c("name","diag.idx")]
   mat[,diag.idx:=NULL]
@@ -100,7 +100,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
   setkey(mat,name,bin1,bin2)
   #
   if (verbose==T) cat("*** write begin/end positions\n")
-  mat = add_bin_begin_and_end(mat)
+  mat = add_bin_bounds_and_distance(mat)
   ### store matrices
   csg=new("CSgroup", mat=mat, interactions=list(), resolution=resolution, group=group,
           cts=cts, par=list(alpha=cs@par$alpha, dmin=cs@settings$dmin, nbins=length(sbins)-1, sbins=sbins),

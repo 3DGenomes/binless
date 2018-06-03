@@ -26,8 +26,8 @@ public:
     Rcpp::NumericVector get_betahat() const { return betahat_; }
     void set_betahat(const Rcpp::NumericVector& betahat) { betahat_ = betahat; }
     
-    Rcpp::NumericVector get_ncounts() const { return ncounts_; }
-    void set_ncounts(const Rcpp::NumericVector& ncounts) { ncounts_ = ncounts; }
+    Rcpp::NumericVector get_nobs() const { return nobs_; }
+    void set_nobs(const Rcpp::NumericVector& nobs) { nobs_ = nobs; }
     
     Rcpp::IntegerVector get_patchno() const { return patchno_; }
     void set_patchno(const Rcpp::IntegerVector& patchno) { patchno_ = patchno; }
@@ -40,7 +40,7 @@ public:
     
 private:
     Rcpp::IntegerVector bin1_, bin2_;
-    Rcpp::NumericVector beta_, weight_, weight_nodecay_, betahat_, ncounts_;
+    Rcpp::NumericVector beta_, weight_, weight_nodecay_, betahat_, nobs_;
     Rcpp::IntegerVector patchno_, diag_idx_, diag_grp_;
 };
 

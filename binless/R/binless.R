@@ -28,14 +28,12 @@
 #' \code{\link{plot_binless_matrix}}
 #'
 #' @useDynLib binless, .registration = TRUE
-#' @import rstan
 #' @import methods
 #' @import data.table
 #' @import doParallel
 #' @import foreach
 #' @import matrixStats
 #' @import ggplot2
-#' @import MASS
 #' @import Matrix
 #' @import quadprog
 #' @importFrom scales muted

@@ -4,7 +4,7 @@
 #include <Rcpp.h>
 #include <utility> //pair
 
-#include "util.hpp" //SQUARE
+#include "macros.hpp" //SQUARE
 #include "Traits.hpp"
 
 //ScoreAssembler receives a chi square and the degrees of freedom
@@ -41,15 +41,16 @@ private:
 //BIC
 template<> class ScoreAssembler<BIC> {
 public:
-    typedef Rcpp::NumericVector var_t; //type of ncounts
+    typedef Rcpp::NumericVector var_t; //type of nobs
     typedef std::pair<double,double> value_t; //score return type
     const std::string score_name = "BIC";
     
-    ScoreAssembler(const var_t& ncounts) : lsnc_(log(Rcpp::sum(ncounts))) {}
+    ScoreAssembler(const var_t& nobs) : lsnc_(log(Rcpp::sum(nobs))) {}
     
     value_t assemble(const Rcpp::NumericVector& chisq, double dof) const {
         const double BIC = sum(chisq)+ lsnc_*dof;
         const double BIC_sd = -1;
+        /*Rcpp::Rcout << "BIC: score= " << BIC << " chisq= " << sum(chisq) << " lsnc= " << lsnc_ << " dof= " << dof << std::endl;*/
         return value_t(BIC,BIC_sd);
     }
     

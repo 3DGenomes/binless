@@ -70,24 +70,13 @@ get_nzeros = function(cs, sbins, ncores=1) {
   return(zeros)
 }
 
-#' Compute initial exposures assuming a poisson model
-#' @keywords internal
-#' 
-initial_guess_exposures = function(cs, cts.common, pseudocount=1e-2) {
-  #biases
-  cs@par$eDE=as.array(cs@biases[,log(pseudocount+mean(dangling.L+dangling.R)/2),keyby=c("name")]$V1)
-  cs@par$eRJ=as.array(cs@biases[,log(pseudocount+mean(rejoined)),keyby=c("name")]$V1)
-  cs@par$eC=array(0,cs@experiments[,.N])
-  cs@par$eC = as.array(cts.common[,log(pseudocount+weighted.mean(count,weight)),keyby=c("name")]$V1)
-  return(cs)
-}
-
 #' Cleanup a CSnorm object, store settings and populate it with initial guesses of all required parameters
 #' @keywords internal
 #' 
-fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
-                       bg.steps=5, iter=100, fit.signal=T, verbose=T, ncounts=100000, init.dispersion=1,
-                       tol=1e-1, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
+fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000, bg.steps=5,
+                       iter=100, fit.signal=T, verbose=T, init.dispersion=.1, nrows.dispersion = 100,
+                       min.lambda2=.1, tol=1e-1, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F,
+                       fix.lambda2.at=NA) {
     #fresh start
     cs@par=list() #in case we have a weird object
     cs@groups=list()
@@ -97,6 +86,7 @@ fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.
     cs@settings = c(cs@settings[c("circularize","dmin","dmax","qmin","dfuse")],
                     list(bf_per_kb=bf_per_kb, bf_per_decade=bf_per_decade, bins_per_bf=bins_per_bf, base.res=base.res,
                          bg.steps=bg.steps, iter=iter, init.dispersion=init.dispersion, tol=tol,
+                         nrows.dispersion = nrows.dispersion, min.lambda2=min.lambda2,
                          fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                          fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at))
     cs@settings$Kdiag=round((log10(cs@settings$dmax)-log10(cs@settings$dmin))*cs@settings$bf_per_decade)
@@ -105,12 +95,14 @@ fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.
     cs@settings$dbins=10**seq(log10(cs@settings$dmin-1),log10(cs@settings$dmax+1)+stepsz,stepsz)
     #initial guess
     if (verbose==T) cat("No initial guess provided\n")
-    decay=CJ(name=cs@experiments[,name],dist=head(cs@settings$dbins,n=length(cs@settings$dbins)-1)*10**(stepsz/2))
+    decay=CJ(group=cs@design[,unique(decay)],dist=head(cs@settings$dbins,n=length(cs@settings$dbins)-1)*10**(stepsz/2))
     decay[,dbin:=cut(dist, cs@settings$dbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)]
     decay[,c("dist","log_decay"):=list(NULL,0)]
+    cats=c("rejoined","dangling L","dangling R","contact L","contact R")
+    biasmat = CJ(group=cs@design[,unique(genomic)],cat=ordered(cats,levels=cats), pos=cs@biases[,sort(unique(pos))])
+    biasmat[,eta:=0]
     cs@par=list(eC=array(0,cs@experiments[,.N]), eRJ=array(0,cs@experiments[,.N]), eDE=array(0,cs@experiments[,.N]), alpha=init.dispersion,
-                log_iota=array(0,cs@biases[,.N]), log_rho=array(0,cs@biases[,.N]),
-                decay=decay, log_decay=0, tol_genomic=.1, tol_decay=.1, tol_disp=.1, tol_signal=1)
+                biases=biasmat, decay=decay, tol_genomic=.1, tol_decay=.1, tol_signal=1)
     #prepare signal matrix
     if (fit.signal==T) {
       if(verbose==T) cat("Preparing for signal estimation\n")
@@ -151,8 +143,6 @@ fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.
 update_diagnostics = function(cs, step, leg, runtime) {
   params=data.table(step=step,leg=leg,value=cs@par$value,runtime=runtime)
   tmp=as.data.table(lapply(cs@par,list))
-  #remove entries that are too heavy and redundant
-  if ("biases" %in% names(tmp)) tmp[,biases:=NULL]
   #merge with previous
   params=cbind(params,tmp)
   if (is.data.table(cs@diagnostics$params)) params=rbind(cs@diagnostics$params,params,fill=T)
@@ -168,10 +158,10 @@ update_diagnostics = function(cs, step, leg, runtime) {
 #' @examples
 get_all_values = function(cs, param, trans) {
   #get value in tmp as vector of lists, remove NULL lists
-  legs=c("bias","decay","signal","disp")
+  legs=c("expo","disp","bias","decay","signal")
   if (!(param %in% names(cs@diagnostics$param))) return(data.table())
   values=cs@diagnostics$params[,.(step,leg=ordered(leg,legs),tmp=get(param))][!sapply(tmp,is.null)]
-  values[,step:=step+((unclass(leg)-1)%%8)/8]
+  values[,step:=step+((unclass(leg)-1)%%10)/10]
   #melt it
   melted=as.data.table(values[,melt(tmp)])
   if ("Var1" %in% names(melted)) {
@@ -206,7 +196,7 @@ get_all_values = function(cs, param, trans) {
 #' Check whether a normalization has converged
 #' @export
 #' 
-has_converged = function(cs) {
+has_converged = function(cs, part) {
   #return FALSE if legs have changed, and require at least 2 steps
   params=cs@diagnostics$params
   laststep=params[,step[.N]]
@@ -214,19 +204,20 @@ has_converged = function(cs) {
   if (!setequal(params[step==laststep,.(leg)],params[step==laststep-1,.(leg)])) return(FALSE)
   #check all legs present in the last step
   #check if all quantities directly involved in building the expected matrix have converged
-  rel.precision=function(name,fn=identity){merge(params[step==laststep,.(leg,get(name))],
+  rel.precision.bias=function(fn=identity){dt = merge(params[step==laststep&leg=="bias",biases[[1]]], params[step==laststep-1&leg=="bias",biases[[1]]], by=c("group","cat","pos"))
+                                                 dt[, max( abs(fn(eta.x)-fn(eta.y)) ) / ( max(fn(eta.x))-min(fn(eta.y)) ) ]}
+  rel.precision.decay=function(fn=identity){dt = merge(params[step==laststep&leg=="decay",decay[[1]]], params[step==laststep-1&leg=="decay",decay[[1]]], by=c("group","dbin"))
+                                                 dt[, max( abs(fn(log_decay.x)-fn(log_decay.y)) ) / ( max(fn(log_decay.x))-min(fn(log_decay.y)) ) ]}
+  rel.precision.signal=function(name,fn=identity){merge(params[step==laststep,.(leg,get(name))],
                                                  params[step==laststep-1,.(leg,get(name))],by="leg")[
                                                    leg==leg[.N], max( abs(fn(V2.x[[1]])-fn(V2.y[[1]])) ) / ( max(fn(V2.x[[1]]))-min(fn(V2.x[[1]])) ) ]}
-  conv.log_iota = rel.precision("log_iota")
-  conv.log_rho = rel.precision("log_rho")
-  conv.log_decay = rel.precision("log_decay")
-  conv.signal = max(rel.precision("beta.phi"))
-  #cat(" conv.log_iota ", conv.log_iota,
-  #    " conv.log_rho ", conv.log_rho, " conv.log_decay ", conv.log_decay, " conv.phi ", conv.phi, "\n")
-  cat(" relative precision for this iteration: iota ", conv.log_iota,
-      " rho ", conv.log_rho, " decay ", conv.log_decay, " signal ", conv.signal, "\n")
-  conv.param = all(c(conv.log_iota,conv.log_rho,
-                     conv.log_decay,conv.signal)<cs@settings$tol, na.rm=T)
+  conv.log_biases = rel.precision.bias()
+  conv.log_decay = 0
+  if (part == "background") conv.log_decay = rel.precision.decay()
+  conv.signal = NA
+  if (part == "signal") conv.signal = rel.precision.signal("beta.phi")
+  cat(" relative precision for this iteration: biases ", conv.log_biases, " decay ", conv.log_decay, " signal ", conv.signal, "\n")
+  conv.param = all(c(conv.log_biases,conv.log_decay,conv.signal)<cs@settings$tol, na.rm=T)
   return(conv.param)
 }
 
@@ -235,15 +226,15 @@ has_converged = function(cs) {
 #' @keywords internal
 #' 
 get_residuals = function(cts.common, viewpoint) {
-  a=cts.common[bin1==viewpoint,.(signal=sum(exp(phi)*weight),
-                               decay=sum(exp(log_decay)*weight),
-                               bias=sum(exp(log_bias)*weight),
-                               mean=sum(exp(lmu.nosig+phi)*weight),
-                               ncounts=sum(weight),
-                               count=sum(count*weight)),
+  a=cts.common[bin1==viewpoint,.(signal=sum(exp(phi)*nobs),
+                               decay=sum(exp(log_decay)*nobs),
+                               bias=sum(exp(log_bias)*nobs),
+                               mean=sum(exp(lmu.nosig+phi)*nobs),
+                               nobs=sum(nobs),
+                               count=sum(count*nobs)),
              keyby=c("name","bin2")]
   setnames(a,"bin2","bin")
-  a[bin==viewpoint,c("signal","decay","bias","mean","ncounts","count"):=list(signal/2,decay/2,bias/2,mean/2,ncounts/2,count/2)]
+  a[bin==viewpoint,c("signal","decay","bias","mean","nobs","count"):=list(signal/2,decay/2,bias/2,mean/2,nobs/2,count/2)]
   return(a)
 }
 
@@ -261,18 +252,24 @@ get_residuals = function(cts.common, viewpoint) {
 #' @param bins_per_bf positive integer. Number of distance bins to split basis 
 #'   functions into. Must be sufficiently small so that the diagonal decay is 
 #'   approximately constant in that bin.
-#' @param lambdas positive numeric. Length scales to try out as initial
-#'   condition.
-#' @param ngibbs positive integer. Number of gibbs sampling iterations.
+#' @param base.res base resolution to use for the fused lasso
+#' @param ngibbs positive integer. Maximum number of iterations.
+#' @param bg.steps The first steps are for fitting the background. Do at most bg.steps.
 #' @param iter positive integer. Maximum number of optimization steps for each leg.
-#' @param fit.signal boolean. Set to FALSE only for diagnostics.
 #' @param verbose Display progress if TRUE
 #' @param init.dispersion positive numeric. Value of the dispersion to use initially.
-#' @param tol positive numeric (default 1e-2). Convergence tolerance on relative changes in the computed biases.
+#' @param nrows.dispersion positive integer. Number of rows on which to compute the dispersion.
+#' @param min.lambda2 The minimum value which lambda2 is allowed to take when searching its optimum. Too small values
+#'  can cause computational instability.
+#' @param tol positive numeric (default 1e-1). Convergence tolerance on relative changes in the computed biases.
 #' @param ncores positive integer (default 1). Number of cores to use.
-#' @param fix.lambda1 whether to set lambda1 to a given value, or to estimate it
+#' @param fit.signal boolean. Set to FALSE only for diagnostics.
+#' @param fix.lambda1 whether to set lambda1 to a given value, or to estimate it. Default is estimate.
 #' @param fix.lambda1.at if fix.lambda1==T, the approximate value where it is meant to be fixed. Might move a bit because
-#'   of the positivity and degeneracy constraints.
+#'   of the positivity and degeneracy constraints. Make sure this value is positive if lambda1 is fixed.
+#' @param fix.lambda2 whether to set lambda2 to a given value, or to estimate it. Default is fixed.
+#' @param fix.lambda2.at if fix.lambda2==T, the approximate value where it is meant to be fixed. Make sure this value
+#'  is positive if lambda2 is fixed.
 #'   
 #' @return A csnorm object
 #' @export
@@ -280,9 +277,9 @@ get_residuals = function(cts.common, viewpoint) {
 #' @examples
 #' 
 normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
-                     ngibbs = 15, bg.steps=5, iter=100, fit.signal=T,
-                     verbose=T, ncounts=100000, init.dispersion=1,
-                     tol=1e-1, ncores=1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA) {
+                     ngibbs = 25, bg.steps=5, iter=100, verbose=T, init.dispersion=.1, nrows.dispersion = 100,
+                     min.lambda2=.1, tol=1e-1, ncores=1,  fit.signal=T, fix.lambda1=F, fix.lambda1.at=NA,
+                     fix.lambda2=T, fix.lambda2.at=2.5) {
   #basic checks
   stopifnot( (cs@settings$circularize==-1 && cs@counts[,max(distance)]<=cs@biases[,max(pos)-min(pos)]) |
                (cs@settings$circularize>=0 && cs@counts[,max(distance)]<=cs@settings$circularize/2))
@@ -292,24 +289,18 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
   setkey(cs@counts, id1, id2, name)
   if (restart==F) {
     #fresh start
-    cs = fresh_start(cs, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf, base.res = base.res,
-                     bg.steps = bg.steps, iter = iter, fit.signal = fit.signal,
-                     verbose = verbose, ncounts = ncounts, init.dispersion = init.dispersion,
-                     tol = tol, ncores = ncores, fix.lambda1 = fix.lambda1, fix.lambda1.at = fix.lambda1.at,
-                     fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
+    cs = fresh_start(cs, bf_per_kb = bf_per_kb, bf_per_decade = bf_per_decade, bins_per_bf = bins_per_bf,
+                     base.res = base.res, bg.steps = bg.steps, iter = iter, fit.signal = fit.signal,
+                     verbose = verbose, init.dispersion = init.dispersion, nrows.dispersion = nrows.dispersion,
+                     min.lambda2=min.lambda2,  tol = tol, ncores = ncores, fix.lambda1 = fix.lambda1,
+                     fix.lambda1.at = fix.lambda1.at, fix.lambda2 = fix.lambda2, fix.lambda2.at = fix.lambda2.at)
     laststep=0
-    #update eC everywhere in the first step
-    update.eC=T
   } else {
     if (verbose==T) cat("Continuing already started normalization with its original settings\n")
     laststep = cs@diagnostics$params[,max(step)]
-    update.eC = !(fit.signal==T && laststep > cs@settings$bg.steps)
     cs@groups=list()
   }
   #
-  if(verbose==T) cat("Subsampling counts for dispersion\n")
-  subcounts = binless:::subsample_counts(cs, ncounts)
-  subcounts.weight = merge(cs@zeros[,.(nc=sum(ncross)/4),by=name],subcounts[,.(ns=.N),keyby=name],by="name")[,.(name,wt=nc/ns)]
   #gibbs sampling
   if (ngibbs==0) return(cs)
   for (i in (laststep + 1:ngibbs)) {
@@ -318,20 +309,31 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
     #compute residuals once for this round
     if(verbose==T) cat(" Residuals\n")
     cts.common = binless:::gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
-    residuals = get_residuals(cts.common, viewpoint = cts.common[,min(bin1)])
+    residuals = binless:::get_residuals(cts.common, viewpoint = cts.common[,min(bin1)])
     residuals[,step:=i]
     cs@diagnostics$residuals = rbind(cs@diagnostics$residuals, residuals)
+    #
+    if (!(fit.signal==T && i > cs@settings$bg.steps)) {
+      #fit exposures
+      a=system.time(cs <- binless:::gauss_exposures(cs, cts.common, verbose=verbose))
+      cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="expo", runtime=a[1]+a[4])
+    }
+    #
+    #fit dispersion
+    a=system.time(cs <- binless:::gauss_dispersion(cs, cts.common, verbose=verbose, ncores=ncores))
+    cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
+    #
     #fit iota and rho
     constrain.bias = fit.signal==T && i <= cs@settings$bg.steps+1
-    a=system.time(cs <- binless:::gauss_genomic(cs, cts.common, update.eC=update.eC, verbose=verbose, constrain=constrain.bias))
+    a=system.time(cs <- binless:::gauss_genomic(cs, cts.common, verbose=verbose, constrain=constrain.bias))
     cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="bias", runtime=a[1]+a[4])
     #
     if (fit.signal==T && i > cs@settings$bg.steps) {
       if(verbose==T) cat(" Residuals\n")
       cts.common = binless:::gauss_common_muhat_mean(cs, cs@zeros, cs@settings$sbins)
       #fit signal using sparse fused lasso
-      update.eC=F
       a=system.time(cs <- binless:::gauss_signal(cs, cts.common, verbose=verbose, ncores=ncores,
+                                                       min.lambda2=cs@settings$min.lambda2,
                                                        fix.lambda1=cs@settings$fix.lambda1,
                                                        fix.lambda1.at=cs@settings$fix.lambda1.at,
                                                        fix.lambda2=cs@settings$fix.lambda2,
@@ -339,20 +341,18 @@ normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins
       cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="signal", runtime=a[1]+a[4])
     } else {
       #fit diagonal decay
-      a=system.time(cs <- binless:::gauss_decay(cs, cts.common, update.eC=update.eC, verbose=verbose))
+      a=system.time(cs <- binless:::gauss_decay(cs, cts.common, verbose=verbose))
       cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="decay", runtime=a[1]+a[4])
     }
     #
-    #fit dispersion
-    a=system.time(cs <- binless:::gauss_dispersion(cs, counts=subcounts, weight=subcounts.weight, verbose=verbose))
-    cs@diagnostics$params = binless:::update_diagnostics(cs, step=i, leg="disp", runtime=a[1]+a[4])
-    #
     #check for convergence
-    if (has_converged(cs)) {
-      if (fit.signal == T && i <= cs@settings$bg.steps) {
+    if (fit.signal == T && i <= cs@settings$bg.steps) {
+      if (has_converged(cs, "background")) {
         cat("Background has converged, fitting signal\n")
         cs@settings$bg.steps = i #compute signal at next step
-      } else {
+      }
+    } else {
+      if (has_converged(cs, "signal")) {
         if (verbose==T) {
           cat("Normalization has converged\n")
         }

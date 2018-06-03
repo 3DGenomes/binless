@@ -6,9 +6,9 @@
 \usage{
 fresh_start(cs, bf_per_kb = 50, bf_per_decade = 10, bins_per_bf = 10,
   base.res = 5000, bg.steps = 5, iter = 100, fit.signal = T,
-  verbose = T, ncounts = 1e+05, init.dispersion = 1, tol = 0.1,
-  ncores = 1, fix.lambda1 = F, fix.lambda1.at = NA, fix.lambda2 = F,
-  fix.lambda2.at = NA)
+  verbose = T, init.dispersion = 0.1, nrows.dispersion = 100,
+  min.lambda2 = 0.1, tol = 0.1, ncores = 1, fix.lambda1 = F,
+  fix.lambda1.at = NA, fix.lambda2 = F, fix.lambda2.at = NA)
 }
 \description{
 Cleanup a CSnorm object, store settings and populate it with initial guesses of all required parameters

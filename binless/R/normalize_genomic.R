@@ -5,12 +5,24 @@ NULL
 #' @keywords internal
 #' 
 initial_guess_genomic = function(cs, cts.common, pseudocount=1e-2) {
-  iotas=cts.common[cat=="contact L",log((pseudocount+weighted.mean(count,weight))/(weighted.mean(exp(lmu.nosig),weight))),keyby=c("name","id1")]
-  iotas[,V1:=V1-mean(V1),by=name]
-  cs@par$log_iota=as.array(iotas[,V1])
-  rhos=cts.common[cat=="contact R",log((pseudocount+weighted.mean(count,weight))/(weighted.mean(exp(lmu.nosig),weight))),keyby=c("name","id1")]
-  rhos[,V1:=V1-mean(V1),by=name]
-  cs@par$log_rho=as.array(rhos[,V1])
+  design=cs@design[,.(name,group=genomic)]
+  iotas=cts.common[design][cat=="contact L",.(log_iota=log(pseudocount+weighted.mean(count,nobs)/weighted.mean(exp(lmu.nosig),nobs))),keyby=c("group","pos1")]
+  iotas[,log_iota:=log_iota-mean(log_iota),by=group]
+  rhos=cts.common[design][cat=="contact R",.(log_rho=log(pseudocount+weighted.mean(count,nobs)/weighted.mean(exp(lmu.nosig),nobs))),keyby=c("group","pos1")]
+  rhos[,log_rho:=log_rho-mean(log_rho),by=group]
+  both = merge(iotas,rhos,all=T,by=c("group","pos1"))
+  #
+  biases = rbind(
+    both[,.(cat="dangling L",group,pos=pos1,eta=log_iota)],
+    both[,.(cat="dangling R",group,pos=pos1,eta=log_rho)],
+    both[,.(cat="rejoined",group,pos=pos1,eta=(log_iota+log_rho)/2)],
+    both[,.(cat="contact L",group,pos=pos1,eta=log_iota)],
+    both[,.(cat="contact R",group,pos=pos1,eta=log_rho)]
+  )
+  cats=c("rejoined","dangling L","dangling R","contact L","contact R")
+  biases[,cat:=ordered(cat,levels=cats)]
+  setkey(biases,group,cat,pos)
+  cs@par$biases=biases
   return(cs)
 }
 
@@ -21,64 +33,40 @@ initial_guess_genomic = function(cs, cts.common, pseudocount=1e-2) {
 #' 
 gauss_genomic_muhat_mean = function(cs, cts.common) {
   #biases
-  init=cs@par
-  bsub=copy(cs@biases)
-  bsub[,c("log_iota","log_rho"):=list(init$log_iota,init$log_rho)]
-  bsub=merge(cbind(cs@design[,.(name)],eRJ=init$eRJ,eDE=init$eDE), bsub, by="name",all.x=F,all.y=T)
-  bsub[,c("lmu.DL","lmu.DR","lmu.RJ"):=list(eDE+log_iota,eDE+log_rho,eRJ+(log_iota+log_rho)/2)]
-  bts=rbind(bsub[,.(name,id,pos,cat="dangling L", etahat=dangling.L/exp(lmu.DL)-1+lmu.DL,
-                    std=sqrt(1/exp(lmu.DL)+1/init$alpha))],
-            bsub[,.(name,id,pos,cat="dangling R", etahat=dangling.R/exp(lmu.DR)-1+lmu.DR,
-                    std=sqrt(1/exp(lmu.DR)+1/init$alpha))],
-            bsub[,.(name,id,pos,cat="rejoined", etahat=rejoined/exp(lmu.RJ)-1+lmu.RJ,
-                    std=sqrt(1/exp(lmu.RJ)+1/init$alpha))])
-  setkey(bts,id,name,cat)
-  stopifnot(bts[,.N]==3*cs@biases[,.N])
+  bts = binless:::gauss_common_muhat_mean_biases(cs)
+  bts[,c("etahat","var"):=list(count/mu-1+eta,var=1/mu+1/cs@par$alpha)]
+  bts[,c("eta","mu","count"):=NULL]
   #counts
-  cts.common[,etaij:=eC+log_bias]
-  cts = cts.common[,.(etahat=weighted.mean(z+etaij, weight/var), std=1/sqrt(sum(weight/(2*var)))),
-                   keyby=c("id1","name","cat")]
-  cts = merge(cs@biases[,.(name,id,pos)],cts,by.x=c("name","id"),by.y=c("name","id1"))
-  setkey(cts, id, name, cat)
-  return(list(bts=bts,cts=cts))
+  cts = cs@design[,.(name,group=genomic)][cts.common][,.(group,cat,pos=pos1,etahat=z+log_bias,var=var*2,nobs)] #adjust var for counts are stored twice
+  biasmat = rbind(bts,cts)
+  biasmat[,cat:=ordered(cat,levels=c("rejoined","dangling L", "dangling R", "contact L", "contact R"))] #important to match design matrix X
+  biasmat = biasmat[,.(etahat=weighted.mean(etahat, nobs/var), std=1/sqrt(sum(nobs/var)), nobs=sum(nobs)),
+                   keyby=c("group","cat","pos")]
+  stopifnot(biasmat[,!any(is.na(cat))])
+  stopifnot(all(biasmat[,.SD[,.N%%5],by=pos]$V1==0))
+  return(biasmat)
 }
 
-gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
+gauss_genomic_optimize = function(biasmat, design, Krow, sbins,
                                   original_lambda_iota, original_lambda_rho, verbose=T,
                                   max_perf_iteration=1000, convergence_epsilon=1e-5, constrain=F) {
   XB = as.array(design[,genomic])
   
-  #run optimization
-  Totalbbegin=c(1,biases[,.(name,row=.I)][name!=shift(name),row],biases[,.N+1])
-  TotalDsets = design[,.N]
-  
-  genomic_out = list(beta_iota_diff = matrix(0, nrow = TotalDsets, ncol = Krow-2), beta_rho_diff = matrix(0, nrow = TotalDsets, ncol = Krow-2),
-                     beta_iota = c(), beta_rho = c(), log_iota = c(), log_rho = c(),
-                     log_mean_RJ = c(), log_mean_DL = c(), log_mean_DR = c(), log_mean_cleft  = c(), log_mean_cright = c(),
-                     eC = c(), eDE = c(), eRJ = c(), lambda_iota = c(), lambda_rho = c(),
-                     value = 0)
+  genomic_out = list(lambda_iota = c(), lambda_rho = c(), value = 0, genomic_beta = data.table(), biases = data.table())
   
   for(uXB in unique(XB)) {
-    if (verbose==T) cat("  group",uXB,"\n")
-    Dsets = 0
-    bbegin = c()
-    for (d in 1:TotalDsets) {
-      if(XB[d] == uXB) {
-        bbegin = c(bbegin,Totalbbegin[d],Totalbbegin[d+1])
-        Dsets = Dsets + 1
-      }
-    }
-    SD = bbegin[2]-bbegin[1]
-    cutsites = biases[,pos][bbegin[1]:(bbegin[2]-1)]
+    if (verbose==T) cat("  group",uXB,": ")
+    cutsites = biasmat[group==uXB&cat==cat[1],pos]
     Bsp = generate_spline_base(cutsites, min(cutsites), max(cutsites), Krow)
-    X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp))
+    X = rbind(cbind(Bsp/2,Bsp/2),bdiag(Bsp,Bsp),bdiag(Bsp,Bsp)) #because the biasmat is properly sorted and all 5 cats per pos are there
+    SD=length(cutsites)
     if (constrain == T) {
-      sbinned=biases[bbegin[1]:(bbegin[2]-1), cut(pos, sbins, ordered_result=T,
-                                                  right=F, include.lowest=T,dig.lab=12)]
+      sbinned=cut(cutsites, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)
       centering=Matrix(model.matrix(~ 0+sbinned))
       stopifnot(dim(centering)==c(SD,length(sbins)-1))
     } else {
-      centering=Matrix(rep(1,SD),ncol=1)
+      centering=Matrix(biasmat[group==uXB,.(nobs=sum(nobs)),keyby=pos]$nobs,ncol=1)
+      centering=centering/mean(centering)
     }
     W=cbind(rbind(Matrix(0,nrow=3*SD,ncol=ncol(centering)),centering,Matrix(0,nrow=SD,ncol=ncol(centering))),
             rbind(Matrix(0,nrow=4*SD,ncol=ncol(centering)),centering))
@@ -91,55 +79,8 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       lambda_iota = 1 
       lambda_rho = 1 
     }
-    U_e = cbind(c(rep.int(1,SD),rep.int(0,4*SD)),c(rep.int(0,SD),rep.int(1,2*SD),rep.int(0,2*SD)),c(rep.int(0,3*SD),rep.int(1,2*SD)))
-    eta_hat_RJ=bts[cat=="rejoined",etahat][bbegin[1]:(bbegin[2]-1)]
-    sd_RJ=bts[cat=="rejoined",std][bbegin[1]:(bbegin[2]-1)]
-    eta_hat_DL=bts[cat=="dangling L",etahat][bbegin[1]:(bbegin[2]-1)]
-    sd_DL=bts[cat=="dangling L",std][bbegin[1]:(bbegin[2]-1)]
-    eta_hat_DR=bts[cat=="dangling R",etahat][bbegin[1]:(bbegin[2]-1)]
-    sd_DR=bts[cat=="dangling R",std][bbegin[1]:(bbegin[2]-1)]
-    eta_hat_L=cts[cat=="contact L",etahat][bbegin[1]:(bbegin[2]-1)]
-    sd_L=cts[cat=="contact L",std][bbegin[1]:(bbegin[2]-1)]
-    eta_hat_R=cts[cat=="contact R",etahat][bbegin[1]:(bbegin[2]-1)]
-    sd_R=cts[cat=="contact R",std][bbegin[1]:(bbegin[2]-1)]
-    
-    if (Dsets > 1) {
-      for (d in 2:Dsets) {
-        ncutsites = biases[,pos][bbegin[(2*d-1)]:(bbegin[2*d]-1)]
-        nBsp  = generate_spline_base(ncutsites, min(ncutsites), max(ncutsites), Krow)
-        cutsites = c(cutsites,ncutsites)
-        nX = rbind(cbind(nBsp/2,nBsp/2),bdiag(nBsp,nBsp),bdiag(nBsp,nBsp))
-        SDd = bbegin[2*d]-bbegin[(2*d-1)]
-        X = rbind(X,nX)
-        Bsp = bdiag(Bsp,nBsp)
-        W = rbind(W,Matrix(0,nrow=5*SDd,ncol=2*ncol(centering)))
-        nU_e = cbind(c(rep.int(1,SDd),rep.int(0,4*SDd)),c(rep.int(0,SDd),rep.int(1,2*SDd),rep.int(0,2*SDd)),c(rep.int(0,3*SDd),rep.int(1,2*SDd)))
-        U_e = bdiag(U_e,nU_e) 
-        eta_hat_RJ=c(eta_hat_RJ,bts[cat=="rejoined",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
-        sd_RJ=c(sd_RJ,bts[cat=="rejoined",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
-        eta_hat_DL=c(eta_hat_DL,bts[cat=="dangling L",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
-        sd_DL=c(sd_DL,bts[cat=="dangling L",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
-        eta_hat_DR=c(eta_hat_DR,bts[cat=="dangling R",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
-        sd_DR=c(sd_DR,bts[cat=="dangling R",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
-        eta_hat_L=c(eta_hat_L,cts[cat=="contact L",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
-        sd_L=c(sd_L,cts[cat=="contact L",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
-        eta_hat_R=c(eta_hat_R,cts[cat=="contact R",etahat][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
-        sd_R=c(sd_R,cts[cat=="contact R",std][bbegin[(2*d-1)]:(bbegin[2*d]-1)])
-        SD = SD + SDd
-      }
-    } 
-    
-    SD = bbegin[2]-bbegin[1]
-    etas = c(eta_hat_RJ[1:SD],eta_hat_DL[1:SD],eta_hat_DR[1:SD],eta_hat_L[1:SD],eta_hat_R[1:SD])
-    sds = c((1/(sd_RJ[1:SD])),(1/(sd_DL[1:SD])),(1/(sd_DR[1:SD])),(1/(sd_L[1:SD])),(1/(sd_R[1:SD])))
-    if (Dsets > 1) {
-      for (d in 2:Dsets) {
-        SDd = bbegin[2*d]-bbegin[(2*d-1)]
-        etas = c(etas,eta_hat_RJ[(SD+1):(SD+SDd)],eta_hat_DL[(SD+1):(SD+SDd)],eta_hat_DR[(SD+1):(SD+SDd)],eta_hat_L[(SD+1):(SD+SDd)],eta_hat_R[(SD+1):(SD+SDd)])
-        sds = c(sds,(1/(sd_RJ[(SD+1):(SD+SDd)])),(1/(sd_DL[(SD+1):(SD+SDd)])),(1/(sd_DR[(SD+1):(SD+SDd)])),(1/(sd_L[(SD+1):(SD+SDd)])),(1/(sd_R[(SD+1):(SD+SDd)])))
-        SD = SD + SDd
-      }
-    }
+    etas = biasmat[group==uXB,etahat]
+    sds = biasmat[group==uXB,1/std]
     
     S_m2 = Diagonal(x=sds^2)
     tmp_X_S_m2_X = crossprod(Diagonal(x=sds)%*%X)
@@ -169,16 +110,8 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       beta2 = tmp_Lm1XtW %*% solve(cholWtXAm1XtW, crossprod(tmp_Xt_W,beta1))
       beta2 = solve(cholA,solve(cholA,beta2,system="DLt"),system="Pt") 
       beta_y = beta1-beta2
-      #
-      tmp_Xt_Sm2_U = crossprod(X,S_m2%*%U_e)
-      beta1 = solve(cholA, tmp_Xt_Sm2_U)
-      beta2 = tmp_Lm1XtW %*% solve(cholWtXAm1XtW, crossprod(tmp_Xt_W,beta1))
-      beta2 = solve(cholA,solve(cholA,beta2,system="DLt"),system="Pt") 
-      beta_U = beta1-beta2
-      #    
-      e=solve(t(U_e)%*%S_m2%*%(U_e-X%*%beta_U),t(U_e)%*%S_m2%*%(etas-X%*%beta_y))
       
-      nbeta = beta_y - beta_U%*%e
+      nbeta = beta_y
       epsilon = max(abs(beta-nbeta))
       beta = nbeta
       beta_iota = beta[1:Krow]
@@ -191,85 +124,31 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
       
       maxiter = maxiter+1
     }
-    if (verbose==T) cat("   step",maxiter-1,"lambda_iota",lambda_iota,"\n")
+    if (verbose==T) cat(maxiter-1,"steps lambda_iota",lambda_iota,"lambda_rho",lambda_rho,"\n")
     
-    eRJ = array(0,dim=c(Dsets))
-    eDE = array(0,dim=c(Dsets))
-    eC = array(0,dim=c(Dsets))
-    for (d in 1:Dsets) {
-      eRJ[d] = e[(3*(d-1)+1)]
-      eDE[d] = e[(3*(d-1)+2)]
-      eC[d] = e[(3*(d-1)+3)]
-    }
+    beta_iota = beta[1:Krow]
+    beta_rho = beta[(Krow+1):(2*Krow)]
+    genomic_out$genomic_beta = rbind(genomic_out$genomic_beta,
+                                     data.table(group=uXB, bf=1:Krow, beta_iota=beta_iota, beta_rho=beta_rho))
     
-    log_mean = U_e %*% e + X%*%beta
-    SD = bbegin[2]-bbegin[1]
-    log_iota = Bsp[1:SD,1:Krow]%*%beta_iota
-    log_rho = Bsp[1:SD,1:Krow]%*%beta_rho
+    log_iota = as.array(Bsp%*%beta_iota)
+    log_rho = as.array(Bsp%*%beta_rho)
     
-    log_mean_RJ = log_mean[1:SD]
-    log_mean_DL = log_mean[(SD+1):(2*SD)]
-    log_mean_DR = log_mean[(2*SD+1):(3*SD)]
-    log_mean_cleft  = log_mean[(3*SD+1):(4*SD)]
-    log_mean_cright = log_mean[(4*SD+1):(5*SD)]
-    SD = 5*SD
-    if (Dsets > 1) {
-      for (d in 2:Dsets) {
-        SDd = bbegin[2*d]-bbegin[(2*d-1)]
-        
-        nlog_iota = Bsp[(SD/5+1):(SD/5+SDd),((d-1)*Krow+1):(d*Krow)]%*%beta_iota
-        nlog_rho = Bsp[(SD/5+1):(SD/5+SDd),((d-1)*Krow+1):(d*Krow)]%*%beta_rho
-        
-        log_iota = c(as.array(log_iota),as.array(nlog_iota))
-        log_rho = c(as.array(log_rho),as.array(nlog_rho))
-        
-        log_mean_RJ = c(log_mean_RJ,log_mean[(SD+1):(SD+SDd)])
-        log_mean_DL = c(log_mean_DL,log_mean[(SD+(SDd+1)):(SD+(2*SDd))])
-        log_mean_DR = c(log_mean_DR,log_mean[(SD+(2*SDd+1)):(SD+(3*SDd))])
-        log_mean_cleft  = c(log_mean_cleft,log_mean[(SD+(3*SDd+1)):(SD+(4*SDd))])
-        log_mean_cright = c(log_mean_cright,log_mean[(SD+(4*SDd+1)):(SD+(5*SDd))])
-        
-        SD = SD + 5*SDd
-      }
-    }
+    avg.iota = mean(log_iota)
+    log_iota = log_iota - rep(avg.iota,length(log_iota))
     
-    genomic_out$beta_iota = c(genomic_out$beta_iota,as.array(beta_iota))
-    genomic_out$beta_rho = c(genomic_out$beta_rho,as.array(beta_rho))
-    for (d2 in 1:TotalDsets) {
-      if(XB[d2] == uXB) {
-        genomic_out$beta_iota_diff[d2,] = as.array(D1%*%beta_iota)
-        genomic_out$beta_rho_diff[d2,] = as.array(D1%*%beta_rho)
-      }
-    }
-    genomic_out$lambda_iota = c(genomic_out$lambda_iota,lambda_iota)
-    genomic_out$lambda_rho = c(genomic_out$lambda_rho,lambda_rho)
-    genomic_out$log_iota = c(genomic_out$log_iota,as.array(log_iota))
-    genomic_out$log_rho = c(genomic_out$log_rho,as.array(log_rho))
-    genomic_out$log_mean_RJ = c(genomic_out$log_mean_RJ,as.array(log_mean_RJ))
-    genomic_out$log_mean_DL = c(genomic_out$log_mean_DL,as.array(log_mean_DL))
-    genomic_out$log_mean_DR = c(genomic_out$log_mean_DR,as.array(log_mean_DR))
-    genomic_out$log_mean_cleft  = c(genomic_out$log_mean_cleft,as.array(log_mean_cleft))
-    genomic_out$log_mean_cright = c(genomic_out$log_mean_cright,as.array(log_mean_cright))
-    genomic_out$eC = as.array(c(genomic_out$eC,eC))
-    genomic_out$eRJ = as.array(c(genomic_out$eRJ,eRJ))
-    genomic_out$eDE = as.array(c(genomic_out$eDE,eDE))
-    genomic_out$beta_iota_diff = as.matrix(genomic_out$beta_iota_diff)
-    genomic_out$beta_rho_diff = as.matrix(genomic_out$beta_rho_diff)
+    avg.rho = mean(log_rho)
+    log_rho = log_rho - rep(avg.rho,length(log_rho))
     
-    genomic_out$value = genomic_out$value+sum(dnorm(etas, mean = as.array(log_mean), sd = as.array(sds), log = TRUE))
+    genomic_out$biases = rbind(genomic_out$biases,
+                               biasmat[group==uXB,.(group,cat,pos,etahat,std,eta=c((log_iota+log_rho)/2,log_iota,log_rho,log_iota,log_rho),nobs)])
+    
+    genomic_out$lambda_iota = as.array(c(genomic_out$lambda_iota,lambda_iota))
+    genomic_out$lambda_rho = as.array(c(genomic_out$lambda_rho,lambda_rho))
+    
+    genomic_out$value = genomic_out$value+sum(dnorm(etas, mean = as.array(X %*% beta), sd = as.array(sds), log = TRUE))
   }
   
-  #make nice output table
-  bout=rbind(bts[cat=="dangling L",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_DL))],
-             bts[cat=="dangling R",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_DR))],
-             bts[cat=="rejoined",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_RJ))])
-  cout=rbind(cts[cat=="contact L",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_cleft))],
-             cts[cat=="contact R",.(cat, name, id, pos, etahat, std, eta=as.array(genomic_out$log_mean_cright))])
-  bout=rbind(bout,cout)
-  setkey(bout, id, name, cat)
-  genomic_out$biases=bout
-  genomic_out[c("beta_iota_diff","beta_rho_diff","log_mean_RJ",
-                "log_mean_DL","log_mean_DR","log_mean_cleft","log_mean_cright")]=NULL
   return(genomic_out)
 }
 
@@ -278,24 +157,19 @@ gauss_genomic_optimize = function(bts, cts, biases, design, Krow, sbins,
 #'   dispersion, otherwise it's a list with parameters to compute the mean from
 #' @keywords internal
 #'   
-gauss_genomic = function(cs, cts.common, verbose=T, update.eC=T, constrain=F) {
+gauss_genomic = function(cs, cts.common, verbose=T, constrain=F) {
   if (verbose==T) cat(" Genomic\n")
-  a = binless:::gauss_genomic_muhat_mean(cs, cts.common)
+  biasmat = binless:::gauss_genomic_muhat_mean(cs, cts.common)
   #run optimization
-  op = binless:::gauss_genomic_optimize(a$bts, a$cts, cs@biases, cs@design, cs@settings$Krow, cs@settings$sbins,
+  op = binless:::gauss_genomic_optimize(biasmat, cs@design, cs@settings$Krow, cs@settings$sbins,
                                         cs@par$lambda_iota, cs@par$lambda_rho, verbose=verbose,
                                         max_perf_iteration=cs@settings$iter,
                                         convergence_epsilon=cs@par$tol_genomic,
                                         constrain=constrain)
   #restrict tolerance if needed
-  precision = max(max(abs(op$log_iota - cs@par$log_iota)), max(abs(op$log_rho - cs@par$log_rho)))
+  precision = max(abs(op$biases[,eta] - cs@par$biases[,eta]))
   cs@par$tol_genomic = min(cs@par$tol_genomic, max(cs@settings$tol, precision/10))
   #update par slot
-  if (update.eC==F) {
-    op$eC=NULL
-  }
-  op$eRJ=NULL
-  op$eDE=NULL
   cs@par=modifyList(cs@par, op)
   if (verbose==T) cat("  log-likelihood = ",cs@par$value, "\n")
   return(cs)
@@ -312,14 +186,16 @@ gauss_genomic = function(cs, cts.common, verbose=T, update.eC=T, constrain=F) {
 #'
 #' @examples
 generate_genomic_biases = function(cs, points_per_kb=10) {
+  beta_iota = cs@par$genomic_beta[,beta_iota]
+  beta_rho = cs@par$genomic_beta[,beta_rho]
   cutsites = cs@biases[, seq(min(pos), max(pos), by = 1000/points_per_kb)]
   Krow = cs@settings$Krow
   Bsp = binless:::generate_spline_base(cutsites, Krow)
-  Dsets = cs@experiments[,.N]
-  X = bdiag(lapply(1:Dsets,function(x){Bsp}))
-  stopifnot(ncol(X) == length(cs@par$beta_iota), ncol(X) == length(cs@par$beta_rho))
-  dt = data.table(name=rep(cs@experiments[,name],each=length(cutsites)), pos=rep(cutsites,Dsets),
-                  log_iota = (X %*% cs@par$beta_iota)[,1], log_rho = (X %*% cs@par$beta_rho)[,1])
+  Ngroups = cs@design[,uniqueN(genomic)]
+  X = bdiag(lapply(1:cs@design[,uniqueN(genomic)],function(x){Bsp}))
+  stopifnot(ncol(X) == length(beta_iota), ncol(X) == length(beta_rho))
+  dt = data.table(group=rep(1:Ngroups,each=length(cutsites)), pos=rep(cutsites,Ngroups),
+                  log_iota = (X %*% beta_iota)[,1], log_rho = (X %*% beta_rho)[,1])
   return(dt)
 }
 

@@ -15,9 +15,9 @@ read_and_prepare(infile, outprefix, condition, replicate, enzyme = "HindIII",
 
 \item{outprefix}{character. Prefix to output intermediate files.}
 
-\item{condition}{character. WT, KO etc.}
+\item{condition}{character. WT, KO, cell type etc.}
 
-\item{replicate}{character. Replicate number}
+\item{replicate}{character. Replicate ID.}
 
 \item{enzyme}{character. HindIII, DpnII etc.}
 

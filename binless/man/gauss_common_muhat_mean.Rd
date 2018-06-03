@@ -18,8 +18,8 @@ data.table containing the following columns
 - lmu.nosig: the log(mean) of the background model (exposure+bias+decay)
 - phi: the log(signal)
 - mu: the mean, including signal
-- weight: how many observations in this signal/distance/direction/category bin have this count.
- Note that sum(weight) is twice the total number of observable counts (per dataset).
+- nobs: how many observations in this signal/distance/direction/category bin have this count.
+ Note that sum(nobs) is twice the total number of observable counts (per dataset).
 - eC, log_decay, log_bias: exposure, log(decay) and log(bias) of this dataset. The bias is either iota or rho depending on cat.
 - z: count/mu-1
 - var: 1/mu+1/dispersion

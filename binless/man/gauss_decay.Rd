@@ -4,7 +4,7 @@
 \alias{gauss_decay}
 \title{Single-cpu simplified fitting for iota and rho}
 \usage{
-gauss_decay(cs, cts.common, verbose = T, update.eC = T)
+gauss_decay(cs, cts.common, verbose = T)
 }
 \description{
 Single-cpu simplified fitting for iota and rho

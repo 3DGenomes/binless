@@ -12,8 +12,6 @@ sub=args[1]
 ncores=1
 base.res=5000
 
-setwd("/home/yannick/simulations/cs_norm")
-
 fit=T
 restart=F
 bin=T

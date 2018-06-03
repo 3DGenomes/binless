@@ -15,7 +15,6 @@ using namespace Rcpp;
 #include "FixedSparsity.hpp"
 #include "EstimatedSparsity.hpp"
 
-#include "util.hpp" //SQUARE
 #include "graph_helpers.hpp" //get_patch_numbers
 
 List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
@@ -66,18 +65,18 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     NumericVector opt;
     if (lambda1_fixed) {
         if (constrained) {
-            auto est = make_FixedSparsity<CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
+            auto est = make_FixedSparsity<BIC, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
             opt = est.optimize();
         } else {
-            auto est = make_FixedSparsity<CVkSD<1>, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
+            auto est = make_FixedSparsity<BIC, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo, lambda1_fix_value);
             opt = est.optimize();
         }
     } else {
         if (constrained) {
-          auto est = make_EstimatedSparsity<CVkSD<1>, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
+          auto est = make_EstimatedSparsity<BIC, ZeroOffset, AnySign, ForbidDegeneracy>(nbins, tol_val, binned, lam2, flo);
           opt = est.optimize();
         } else {
-          auto est = make_EstimatedSparsity<CVkSD<1>, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
+          auto est = make_EstimatedSparsity<BIC, ZeroOffset, AnySign, AllowDegeneracy>(nbins, tol_val, binned, lam2, flo);
           opt = est.optimize();
         }
     }
@@ -102,7 +101,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
                             _["phihat.var"]=1/binned.get_weight(),
                             _["phihat.ref"]=binned.get_phihat_ref(),
                             _["phihat.var.ref"]=1/binned.get_weight_ref(),
-                            _["ncounts"]=binned.get_ncounts(),
+                            _["nobs"]=binned.get_nobs(),
                             _["deltahat"]=binned.get_deltahat(),
                             _["weight"]=binned.get_weight(),
                             _["diag.idx"]=binned.get_diag_idx(),

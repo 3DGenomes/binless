@@ -4,8 +4,9 @@
 \alias{gauss_signal}
 \title{fit signal using sparse fused lasso}
 \usage{
-gauss_signal(cs, cts.common, verbose = T, ncores = 1, fix.lambda1 = F,
-  fix.lambda1.at = NA, fix.lambda2 = F, fix.lambda2.at = NA)
+gauss_signal(cs, cts.common, verbose = T, ncores = 1, min.lambda2 = 0.1,
+  fix.lambda1 = F, fix.lambda1.at = NA, fix.lambda2 = F,
+  fix.lambda2.at = NA)
 }
 \description{
 fit signal using sparse fused lasso

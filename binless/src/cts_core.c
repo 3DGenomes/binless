@@ -3,7 +3,7 @@
 #include "cts_core.h"
 
 void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
-        double* lmu_nosig, double* weight, double* log_decay, int nbins, double dispersion,
+        double* lmu_nosig, double* nobs, double* log_decay, int nbins, double dispersion,
         double* phi, double* phihat, double* phihat_var, double* phihat_var_nodecay,
         double* ncounts, int* bin1, int* bin2)
 {
@@ -21,12 +21,12 @@ void cts_to_signal_mat_core(int N, int* cts_bin1, int* cts_bin2, double* count,
     double z = count[i]/mu-1;
     double var = 1/mu + 1/dispersion;
     double var_nodecay = 1/mu_nodecay + 1/dispersion;
-    double w2v = weight[i]/(2*var);
-    double w2v_nodecay = weight[i]/(2*var_nodecay);
-    ncounts[pos] += weight[i];
-    phihat_var[pos] += w2v;
-    phihat_var_nodecay[pos] += w2v_nodecay;
-    phihat[pos] += (z+phi[pos])*w2v;
+    double wt = nobs[i]/var;
+    double wt_nodecay = nobs[i]/var_nodecay;
+    ncounts[pos] += nobs[i];
+    phihat_var[pos] += wt;
+    phihat_var_nodecay[pos] += wt_nodecay;
+    phihat[pos] += (z+phi[pos])*wt;
   }
   
   //finish mat

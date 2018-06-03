@@ -14,7 +14,7 @@ library(binless)
 #You can also extract it from the CSnorm object built during preprocessing
 #load("example/rao_HiCall_FOXP1ext_csnorm.RData")
 mat=binless:::bin_data(cs,resolution=5000)
-#write.table(mat,file = "example/rao_HiCall_FOXP1ext_2.3M_mat_5kb.dat", quote = T, row.names = F)
+#write.table(mat,file = "example/rao_HiCall_SEMA3Cext_1.5M_mat_5kb.dat", quote = T, row.names = F)
 
 
 #The fast binless algorithm computes a binless normalization without estimating
@@ -24,11 +24,11 @@ mat=binless:::bin_data(cs,resolution=5000)
 #Play with lam2 to see its effect. This is the parameter that is optimized in the
 #full-blown binless, along with another threshold (lambda1, set to zero here),
 #which determines the significance of a given signal/difference contribution
-nouter=25
-lam2=5
-tol_val=2e-1
-bg_steps=5
-out=binless:::fast_binless(mat, mat[,nlevels(bin1)], lam2, nouter, tol_val, bg_steps)
+#pass one value for all, or a value for each dataset
+alpha=0.44
+lam2=c(2.53,2.84)
+lam1=c(0.11,0.15)
+out=binless:::fast_binless(mat, mat[,nlevels(bin1)], alpha, lam2)
 
 
 #Here follow the plots of the observed and fitted quantities (be sure to check out signal and binless plots)
@@ -37,38 +37,45 @@ a=as.data.table(out$mat)
 #observed matrix (input data)
 plot_binless_matrix(a, upper="observed", lower="observed")
 #ggsave(filename="example/rao_HiCall_FOXP1ext_2.3M_fast_binless_observed.pdf", width=18,height=8)
+#number of observables (input data)
+plot_binless_matrix(a, upper="nobs", lower="nobs")
 #fitted background
-plot_binless_matrix(a, upper="log_background", lower="log_background", trans="identity")
+plot_binless_matrix(a, upper="background", lower="background")
 #fitted biases
-ggplot(data.table(bin=1:nlevels(mat[,bin1]),log_biases=out$log_biases))+geom_point(aes(bin,log_biases,colour="cpp"))
+ggplot(data.table(bin=1:nlevels(mat[,bin1]),log_biases=out$biases$estimate))+geom_point(aes(bin,log_biases))
 #biases matrix
-plot_binless_matrix(a, upper="log_biases", lower="log_biases", trans="identity")
+plot_binless_matrix(a, upper="biasmat", lower="biasmat")
 #fitted decay
-ggplot(unique(a[,.(distance,log_decay)]))+geom_line(aes(distance,log_decay))+scale_x_log10()
+ggplot(unique(a[,.(distance,decaymat)]))+geom_line(aes(distance,decaymat))+scale_x_log10()+scale_y_log10()
 #decay matrix
-plot_binless_matrix(a, upper="log_decay", lower="log_decay", trans="identity")
+plot_binless_matrix(a, upper="decaymat", lower="decaymat")
 #signal matrix ( = what is different from the background)
-plot_binless_matrix(a, upper="log_signal", lower="log_signal", trans="identity")
+plot_binless_signal_matrix(a)
 #weights ( = 1/variance )
-plot_binless_matrix(a, upper="weights", lower="weights")
+plot_binless_matrix(a, upper="weight", lower="weight")
+#patch number
+plot_binless_matrix(a, upper="patchno", lower="patchno", trans="identity")
 #binless matrix ( = signal + decay)
-plot_binless_matrix(a, upper="log_binless", lower="log_binless", trans="identity")
+plot_binless_matrix(a, upper="binless", lower="binless")
 #binless and observed
-plot_binless_matrix(a, upper="log_binless", lower="log(observed)", trans="identity")
+plot_binless_matrix(a, upper="binless", lower="observed")
 #ggsave(filename="example/rao_HiCall_FOXP1ext_2.3M_fast_binless.pdf", width=18,height=8)
 
 
 ### Difference detection
 
 #now we compute differences between the two datasets
-ref=1
-lam2=5
-tol_val=2e-1
-diff=as.data.table(binless:::fast_binless_difference(out, lam2, ref, tol_val))
+ref=mat[,name[1]]
+alpha=0.44
+lam2=3.38
+lam1=0.1
+diff=as.data.table(binless:::fast_binless_difference(out, ref, alpha, lam2, lam1))
 
 #log(observed)
 plot_binless_matrix(diff, upper="observed", lower="observed")
 #log difference of all datasets wrt ref
-plot_binless_matrix(diff[name!=ref], upper="log_difference/log(2)", lower="log_difference/log(2)", trans="identity", label="log2 FC", limits = c(-3,3))
+plot_binless_difference_matrix(diff[as.character(name)!=as.character(ref)])
 #ggsave(filename="example/rao_HiCall_FOXP1ext_2.3M_fast_binless_difference.pdf", width=10,height=8)
+#patch number
+plot_binless_matrix(diff[as.character(name)!=as.character(ref)], upper="patchno", lower="patchno", trans="identity")
 

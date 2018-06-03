@@ -1,3 +1,0 @@
-/* 
-    LICENSE IS LGPLv3
-*/

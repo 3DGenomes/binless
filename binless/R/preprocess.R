@@ -21,9 +21,9 @@ read_tsv = function(fname, nrows=-1L, skip=0L, locus=NULL) {
                                  &begin1>=as.integer(locus[2])&begin2>=as.integer(locus[2])
                                  &begin1<=as.integer(locus[3])&begin2<=as.integer(locus[3])]
   #only one chromosome for now
-  stopifnot(data[,nlevels(factor(chr1))]==1)
-  stopifnot(data[,nlevels(factor(chr2))]==1)
-  stopifnot(data[,chr1[1]==chr2[1]])
+  if(data[,nlevels(factor(chr1))]!=1 || data[,nlevels(factor(chr2))]!=1)
+      stop("Input data contains interchromosomal reads, aborting.
+           Please only provide data for one chromosome at a time.")
   data[,chr1:=NULL]
   data[,chr2:=NULL]
   #
@@ -86,12 +86,18 @@ get_raw_reads = function(data, b1, e1, b2=NULL, e2=NULL) {
 }
 
 #' Bin a reads data.table into a matrix of a given resolution
-#' 
+#'
 #' @param obj a CSnorm object, or a data.table containing data to be binned
 #' @param resolution the target resolution
-#' @param b2,e2 (optional) if provided, give extradiagonal portion 
+#' @param b2,e2 (optional) if provided, give extradiagonal portion
 #'
-#' @return a data.table representing the binned data
+#' @return a data.table representing the binned data. Will contain
+#'   name,bin1,bin2 (bin coordinates), observed data and mean distance between
+#'   these bins and nobs. If a CSnorm object is passed, will also compute the
+#'   number of observables in this bin (i.e. 4x the number of cut site
+#'   intersections). For the sake of speed, nobs is approximate along the
+#'   diagonal as it assumes that all intersections have observables, which is
+#'   not true since we discard all counts smaller than dmin.
 #' @export
 #'
 #' @examples
@@ -103,27 +109,41 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
     bins1=seq(b1,obj[,max(begin1)]+resolution,resolution)
     bins2=seq(b2,obj[,max(begin2)]+resolution,resolution)
     #
-    counts = obj[,.(begin1,begin2,bin1=cut2(begin1, bins1, oneval=F, onlycuts=T, digits=10),
+    counts = obj[,.(name,begin1,begin2,bin1=cut2(begin1, bins1, oneval=F, onlycuts=T, digits=10),
                   bin2=cut2(begin2, bins2, oneval=F, onlycuts=T, digits=10))
-               ][,.(observed=.N),by=c("bin1","bin2")]
+               ][,.(observed=.N,nobs=-1),by=c("name","bin1","bin2")]
   } else if (class(obj)[1] == "CSnorm") {
     if (!is.null(b1)) stop("b1 must be NULL when passing CSnorm object")
     if (!is.null(b2)) stop("b2 must be NULL when passing CSnorm object")
     bin_borders=cs@biases[,seq(min(pos)-1,max(pos)+1,resolution)] #we discard the last incomplete bin
     bins=cut(head(bin_borders,n=length(bin_borders)-1)+resolution/2, bin_borders,
              ordered_result=T, right=F, include.lowest=T,dig.lab=12)
+    #build empty counts matrix
     counts=CJ(name=cs@experiments[,name],bin1=bins,bin2=bins)[bin2>=bin1]
+    #add number of observables
+    ncounts=cs@biases[,.(name,bin=cut(pos, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12))][
+      !is.na(bin),.(nobs=.N),keyby=c("name","bin")]
+    setnames(ncounts,c("bin","nobs"),c("bin1","nobs1"))
+    counts=ncounts[counts,,on=c("name","bin1")]
+    setnames(ncounts,c("bin1","nobs1"),c("bin2","nobs2"))
+    counts=ncounts[counts,,on=c("name","bin2")]
+    counts=counts[,.(name,bin1,bin2,nobs=as.integer(4*nobs1*nobs2))]
+    counts[bin1==bin2,nobs:=as.integer(nobs/2)]
+    setkeyv(counts,c("name","bin1","bin2"))
+    #count reads and fill matrix
     poscounts=cs@counts[,.(name,bin1=cut(pos1, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                                 bin2=cut(pos2, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                            observed=contact.close+contact.far+contact.up+contact.down)][
                              (!is.na(bin1))&(!is.na(bin2)),.(observed=sum(observed)),keyby=key(counts)]
     counts=poscounts[counts]
-    counts[is.na(observed),observed:=0]
+    counts[is.na(observed),c("observed","nobs"):=list(0,0)]
     counts[bin1==min(bin1)&bin2==max(bin2),observed:=observed+as.integer(1)] #otherwise fitted decay can be degenerate
+    if (!all(complete.cases(counts))) cat("Warning: NAs found in binned matrix. Fast binless might fail.")
   }
   #
-  counts = add_bin_begin_and_end(counts)
-  counts[,distance:=begin2-begin1+resolution/2]
+  counts = add_bin_bounds_and_distance(counts)
+  counts = counts[,.(name,bin1,pos1,bin2,pos2,distance,observed,nobs,begin1,end1,begin2,end2)]
+  setkeyv(counts,c("name","bin1","bin2"))
   return(counts)
 }
 
@@ -421,8 +441,8 @@ examine_dataset = function(infile, window=15, maxlen=1000, skip.fbm=T, read.len=
 #' 
 #' @param infile character. Path to TadBit .tsv file
 #' @param outprefix character. Prefix to output intermediate files.
-#' @param condition character. WT, KO etc.
-#' @param replicate character. Replicate number
+#' @param condition character. WT, KO, cell type etc.
+#' @param replicate character. Replicate ID.
 #' @param name character. A name for the experiment. By default, it is
 #'   condition, enzyme and replicate
 #' @param enzyme character. HindIII, DpnII etc.

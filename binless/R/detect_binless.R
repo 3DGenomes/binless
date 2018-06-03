@@ -15,7 +15,7 @@ prepare_signal_estimation = function(cs, csg, resolution, tol.val, nperf) {
                 dispersion = csg@par$alpha,
                 tol.val = tol.val,
                 nperf = nperf)
-  cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,weight,log_decay)]
+  cts=csg@cts[,.(name,bin1,bin2,count,lmu.nosig,nobs,log_decay)]
   csi=new("CSbsig", mat=mat, cts=cts, settings=settings)
   return(csi)
 }
@@ -29,8 +29,8 @@ prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val, nper
     merge(csi@mat[name==n],csi@mat[name==ref,.(bin1,bin2,phi1=phi)],all=T,by=c("bin1","bin2"))
   mat[,c("phi.ref","delta"):=list(phi1,(phi-phi1)/2)]
   mat[,c("phi","phi1"):=NULL]
-  cts=csg@cts[name!=ref,.(name,bin1,bin2,count,lmu.nosig,weight,log_decay)]
-  cts.ref=csg@cts[name==ref,.(name,bin1,bin2,count,lmu.nosig,weight,log_decay)]
+  cts=csg@cts[name!=ref,.(name,bin1,bin2,count,lmu.nosig,nobs,log_decay)]
+  cts.ref=csg@cts[name==ref,.(name,bin1,bin2,count,lmu.nosig,nobs,log_decay)]
   csi=new("CSbdiff", mat=mat, cts=cts, cts.ref=cts.ref,
           ref=as.character(ref), settings=csi@settings)
   return(csi)
@@ -44,6 +44,8 @@ prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val, nper
 #' @param ncores How many cores to parallelize on (default: the one used during normalization)
 #' @param verbose Whether to be verbose (default) or not
 #' @param tol.val Tolerance on computed quantities
+#' @param min.lambda2 The minimum value of lambda2 when scanning for its optimum. Might
+#'  move a bit because of the CV+kSD criterion
 #' @param fix.lambda1,fix.lambda1.at,fix.lambda2,fix.lambda2.at Default FALSE. if TRUE, sets lambda1
 #'  (resp. lambda2) to the provided value instead of optimizing it
 #' @param nperf number of IRLS iterations (default 50)
@@ -53,7 +55,7 @@ prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val, nper
 #' 
 #' @examples
 detect_binless_interactions = function(cs, resolution=cs@settings$base.res, group="all", ncores=1, tol.val=cs@settings$tol, verbose=T,
-                                       fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA, nperf=50){
+                                       min.lambda2=.1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA, nperf=50){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
   ### get CSgroup object
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
@@ -67,7 +69,7 @@ detect_binless_interactions = function(cs, resolution=cs@settings$base.res, grou
   csi = binless:::prepare_signal_estimation(cs, csg, resolution, tol.val, nperf)
   #
   #perform fused lasso on signal
-  if (verbose==T) cat("  Fused lasso\n")
+  if (verbose==T) cat("  Fused lasso using alpha= ", cs@par$alpha, "\n")
   groupnames=csi@cts[,unique(name)]
   csigs = foreach(g=groupnames) %do% {
     csig = new("CSbsig", mat=csi@mat[name==g], cts=csi@cts[name==g], settings=csi@settings)
@@ -78,6 +80,7 @@ detect_binless_interactions = function(cs, resolution=cs@settings$base.res, grou
   registerDoParallel(cores=min(ncores,length(groupnames)))
   params = foreach(csig=csigs, .combine=rbind) %dopar% {
     binless:::fused_lasso(csig, positive=T, fixed=T, constrained=F, verbose=verbose,
+                                min.lambda2=min.lambda2,
                                 fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                                 fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }
@@ -91,7 +94,7 @@ detect_binless_interactions = function(cs, resolution=cs@settings$base.res, grou
   ### store interaction
   #store back
   csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],eCprime=params[,eCprime],name=params[,name])
-  mat[,ncounts:=NULL]
+  mat[,nobs:=NULL]
   csi@mat=mat
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg
@@ -110,7 +113,7 @@ detect_binless_interactions = function(cs, resolution=cs@settings$base.res, grou
 #' 
 #' @examples
 detect_binless_differences = function(cs, ref, resolution=cs@settings$base.res, group="all", ncores=1, tol.val=cs@settings$tol, verbose=T,
-                                      fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA, nperf=50){
+                                      min.lambda2=.1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA, nperf=50){
   if (verbose==T) cat("Binless difference detection with resolution=",resolution,
                       " group=", group," and ref=",as.character(ref),"\n")
   ### get CSgroup object
@@ -124,7 +127,7 @@ detect_binless_differences = function(cs, ref, resolution=cs@settings$base.res, 
   csi = binless:::prepare_difference_estimation(cs, csg, resolution, ref, tol.val, nperf)
   #
   #perform fused lasso on signal
-  if (verbose==T) cat("  Fused lasso\n")
+  if (verbose==T) cat("  Fused lasso using alpha= ", cs@par$alpha, "\n")
   groupnames=csi@cts[,unique(name)]
   csigs = foreach (g=groupnames) %do% {
     csig = new("CSbdiff", mat=csi@mat[name==g], cts=csi@cts[name==g], cts.ref=csi@cts.ref,
@@ -137,6 +140,7 @@ detect_binless_differences = function(cs, ref, resolution=cs@settings$base.res, 
   registerDoParallel(cores=min(ncores,length(groupnames)))
   params = foreach(csig=csigs, .combine=rbind) %do% {
     binless:::fused_lasso(csig, positive=F, fixed=T, constrained=F, verbose=verbose,
+                                min.lambda2=min.lambda2,
                                 fix.lambda1=fix.lambda1, fix.lambda1.at=fix.lambda1.at,
                                 fix.lambda2=fix.lambda2, fix.lambda2.at=fix.lambda2.at)
   }
@@ -149,7 +153,7 @@ detect_binless_differences = function(cs, ref, resolution=cs@settings$base.res, 
   mat = rbindlist(params[,mat])
   #store back
   csi@par=list(lambda1=params[,lambda1],lambda2=params[,lambda2],eCprime=params[,eCprime],name=params[,name])
-  mat[,ncounts:=NULL]
+  mat[,nobs:=NULL]
   csi@mat=mat
   csg@interactions=append(csg@interactions,list(csi))
   cs@groups[[idx1]]=csg

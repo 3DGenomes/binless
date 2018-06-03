@@ -6,8 +6,8 @@
 \usage{
 detect_binless_differences(cs, ref, resolution = cs@settings$base.res,
   group = "all", ncores = 1, tol.val = cs@settings$tol, verbose = T,
-  fix.lambda1 = F, fix.lambda1.at = NA, fix.lambda2 = F,
-  fix.lambda2.at = NA, nperf = 50)
+  min.lambda2 = 0.1, fix.lambda1 = F, fix.lambda1.at = NA,
+  fix.lambda2 = F, fix.lambda2.at = NA, nperf = 50)
 }
 \arguments{
 \item{cs}{a normalized CSnorm object}
@@ -23,6 +23,9 @@ detect_binless_differences(cs, ref, resolution = cs@settings$base.res,
 \item{tol.val}{Tolerance on computed quantities}
 
 \item{verbose}{Whether to be verbose (default) or not}
+
+\item{min.lambda2}{The minimum value of lambda2 when scanning for its optimum. Might
+move a bit because of the CV+kSD criterion}
 
 \item{fix.lambda1}{Default FALSE. if TRUE, sets lambda1
 (resp. lambda2) to the provided value instead of optimizing it}

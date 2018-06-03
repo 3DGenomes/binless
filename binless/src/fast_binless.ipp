@@ -1,12 +1,11 @@
 
 template<typename Lasso>
-SignalTriplet step_signal(const FastSignalData& data, const DecayEstimator& dec,
-                          std::vector<Lasso>& flos, double lam2, unsigned group) {
-    //get residuals
-    ResidualsPair z = get_poisson_residuals(data, dec);
+SignalTriplet step_signal(const FastSignalData& data, const ResidualsPair& z,
+                          std::vector<Lasso>& flos, const Eigen::ArrayXd& lam2, unsigned group) {
     //build signal matrix
     auto dlog_signal = data.get_log_signal();
     std::vector<double> phihat,weights;
+    std::vector<unsigned> nobs = data.get_nobs();
     phihat.reserve(data.get_N());
     weights.reserve(data.get_N());
     auto dbin1 = data.get_bin1();
@@ -28,10 +27,18 @@ SignalTriplet step_signal(const FastSignalData& data, const DecayEstimator& dec,
         //run fused lasso
         std::vector<double> y(phihat.cbegin() + dset*data.get_ncells(), phihat.cbegin() + (dset+1)*data.get_ncells());
         std::vector<double> wt(weights.cbegin() + dset*data.get_ncells(), weights.cbegin() + (dset+1)*data.get_ncells());
-        flos[dset].optimize(y, wt, lam2);
-        //subtract average and return
+        std::vector<unsigned> no(nobs.cbegin() + dset*data.get_ncells(), nobs.cbegin() + (dset+1)*data.get_ncells());
+        flos[dset].optimize(y, wt, lam2[dset]);
+        //compute weighted average
         std::vector<double> beta = flos[dset].get();
-        double avg = std::accumulate(beta.begin(),beta.end(),0.)/beta.size();
+        double avg=0;
+        double wsum=0;
+        for (unsigned i=0; i<data.get_ncells(); ++i) {
+          avg += beta[i]*no[i];
+          wsum += no[i];
+        }
+        avg = avg / wsum;
+        //subtract and store
         for (unsigned i=0; i<data.get_ncells(); ++i) {
             beta[i] = beta[i] - avg;
         }
@@ -42,10 +49,8 @@ SignalTriplet step_signal(const FastSignalData& data, const DecayEstimator& dec,
 
 
 template<typename Lasso>
-DifferenceQuadruplet step_difference(const FastDifferenceData& data, const DecayEstimator& dec,
-                                     std::vector<Lasso>& flos, double lam2, unsigned ref) {
-    //get residuals
-    ResidualsPair z = get_poisson_residuals(data, dec);
+DifferenceQuadruplet step_difference(const FastDifferenceData& data, const ResidualsPair& z,
+                                     std::vector<Lasso>& flos, const Eigen::ArrayXd& lam2, unsigned ref) {
     //build difference matrices
     auto dsignal = data.get_log_signal();
     auto dphi_ref = data.get_phi_ref();
@@ -68,15 +73,18 @@ DifferenceQuadruplet step_difference(const FastDifferenceData& data, const Decay
     //compute difference on each dataset
     std::vector<double> delta;
     delta.reserve(data.get_N());
+    bool ref_seen = false;
     for (unsigned dset=0; dset<data.get_ndatasets(); ++dset) {
         if (dset==ref-1) { //subtract 1 for R factor vs c++ indices
             delta.resize(delta.size()+data.get_ncells(), 0);
+            ref_seen = true;
         } else {
             //run fused lasso
             std::vector<double> y(deltahat.cbegin() + dset*data.get_ncells(), deltahat.cbegin() + (dset+1)*data.get_ncells());
             std::vector<double> wt(weights.cbegin() + dset*data.get_ncells(), weights.cbegin() + (dset+1)*data.get_ncells());
-            flos[dset].optimize(y, wt, lam2);
-            std::vector<double> ldelta = flos[dset].get();
+            unsigned idx = dset - (ref_seen ? 1 : 0);
+            flos[idx].optimize(y, wt, lam2[idx]);
+            std::vector<double> ldelta = flos[idx].get();
             delta.insert(delta.end(), ldelta.begin(), ldelta.end());
         }
     }

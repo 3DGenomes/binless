@@ -4,6 +4,40 @@ All notable changes to *binless* will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 for versions 0.x of binless, minor releases might break backwards compatibility.
 
+## [0.12.0]
+### Added
+- First part of decay in fast binless is not forced to decrease. Use `free_diag`
+ argument to decide (default 10kb)
+- patchno column to fast binless output
+- allow to pass a vector of lambda2 values to fast binless
+- allow to pass lambda1 to get thresholdings similar to optimized binless
+- allow to use final output of optimized binless as input to fast binless
+
+### Changed
+- Exposures are now fit separately
+- Use `nobs` column in fast binless
+- `ncounts` becomes `nobs` in optimized binless
+- Use same column names in fast and optimized binless outputs
+- fast binless model now mimicks that of slow binless
+  - using binwise averages (breaks backwards compatibility)
+  - using negative binomial with fixed dispersion
+- require `pos1` and `pos2` columns in fast binless input
+- fits in optimized binless are performed by group and are more efficient
+  memorywise
+- drop stan dependency and fit dispersion manually on a subset of rows, taking
+  the median value
+- Switch to BIC to estimate lambda2
+- reorder arguments in fast_binless
+
+### Fixed
+- sigma parameter was ignored in `GeneralizedAdditiveModel`
+- output matrix properly returns factor labels for name, bin1 and bin2 in fast binless
+- bug causing weights to be twice too small
+- centering bug on first iteration of fast binless
+- bugs in the BIC calculation of optimized binless, causing lambda2 estimates to
+  be too low and unstable
+- Bug in fast binless when entire rows had nobs == 0
+
 ## [0.11.0]
 ### Changed
 - spline base construction now migrated to C++ side
@@ -60,7 +94,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - Initial commit
 
 
-[Unreleased]: ../../compare/v0.11.0...HEAD
+[0.12.0]: ../../compare/v0.11.0...HEAD
 [0.11.0]: ../../compare/v0.10.2...v0.11.0
 [0.10.2]: ../../compare/v0.10.1...v0.10.2
 [0.10.1]: ../../compare/v0.10.0...v0.10.1
