@@ -6,14 +6,21 @@ Refer to the [CHANGELOG](CHANGELOG.md) for the latest changes
 
 ### Installation
 
+The easy way is to let `devtools` do the installation for you. Type the
+following in an R shell
+
+```
+install.packages("devtools")
+devtools::install_github("3DGenomes/binless")
+```
+
+Otherwise, you can install it manually as follows:
+
 * Download the latest release [here](../../releases/latest)
 * Unpack it in a clean folder on your machine, and hit `R CMD INSTALL --preclean binless`
   in a shell.
 * If it complains that some packages are not installed, you must install them in
   R using `install.packages`
-
-We plan to put this in Bioconductor to make the installation easier in the
-future.
 
 ### How does it work?
 
