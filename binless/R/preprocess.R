@@ -21,9 +21,9 @@ read_tsv = function(fname, nrows=-1L, skip=0L, locus=NULL) {
                                  &begin1>=as.integer(locus[2])&begin2>=as.integer(locus[2])
                                  &begin1<=as.integer(locus[3])&begin2<=as.integer(locus[3])]
   #only one chromosome for now
-  stopifnot(data[,nlevels(factor(chr1))]==1)
-  stopifnot(data[,nlevels(factor(chr2))]==1)
-  stopifnot(data[,chr1[1]==chr2[1]])
+  if(data[,nlevels(factor(chr1))]!=1 || data[,nlevels(factor(chr2))]!=1)
+      stop("Input data contains interchromosomal reads, aborting.
+           Please only provide data for one chromosome at a time.")
   data[,chr1:=NULL]
   data[,chr2:=NULL]
   #
