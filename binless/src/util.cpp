@@ -98,8 +98,40 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> bin_data_evenly(const Eigen::Vector
   return bin_data(data,design,drop);
 }
 
-
-
+Rcpp::DataFrame create_empty_matrix_cpp(Rcpp::IntegerVector name_ordered, Rcpp::IntegerVector bins_ordered) {
+  //extract info and create vectors
+  Rcpp::CharacterVector name_labels(name_ordered.attr("levels"));
+  Rcpp::CharacterVector bin_labels(bins_ordered.attr("levels"));
+  unsigned n_names = name_labels.size();
+  unsigned n_bins = bin_labels.size();
+  std::vector<int> name,bin1,bin2;
+  unsigned nrows = n_names * (n_bins * (n_bins+1))/2;
+  name.reserve(nrows);
+  bin1.reserve(nrows);
+  bin2.reserve(nrows);
+  //build vectors
+  for (int n=1; n <= n_names; ++n) {
+    for (int i=1; i <= n_bins; ++i) {
+      for (int j=i; j <= n_bins; ++j) {
+        name.push_back(n);
+        bin1.push_back(i);
+        bin2.push_back(j);
+      }
+    }
+  }
+  //convert to rcpp
+  Rcpp::IntegerVector rname(Rcpp::wrap(name));
+  rname.attr("levels") = name_labels;
+  rname.attr("class") = CharacterVector::create("ordered", "factor");
+  Rcpp::IntegerVector rbin1(Rcpp::wrap(bin1));
+  rbin1.attr("levels") = bin_labels;
+  rbin1.attr("class") = CharacterVector::create("ordered", "factor");
+  Rcpp::IntegerVector rbin2(Rcpp::wrap(bin2));
+  rbin2.attr("levels") = bin_labels;
+  rbin2.attr("class") = CharacterVector::create("ordered", "factor");
+  //return data frame
+  return Rcpp::DataFrame::create(_["name"]=rname, _["bin1"]=rbin1, _["bin2"]=rbin2);
+}
 
 
 

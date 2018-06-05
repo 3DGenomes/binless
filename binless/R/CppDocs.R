@@ -62,5 +62,21 @@ bin_cts_to_mat = function(cs, cts, resolution) {
 }
 
 
-
+#' Generate an empty matrix in triangular form.
+#' 
+#' arguments are taken as ordered factors
+#' returned matrix is of size n_names * n_bins * (n_bins+1) / 2
+#' n_names and n_bins are the number of levels in the name and bins factors
+#'
+#' @param name an ordered factor of names
+#' @param bins an ordered factor of bins
+#'
+#' @return
+#'
+#' @examples
+create_empty_matrix = function(name, bins) {
+  dt=binless:::create_empty_matrix_cpp(name,bins)
+  dt=setDT(dt,key=c("name","bin1","bin2"))
+  return(dt)
+}
 

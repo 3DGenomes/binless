@@ -36,6 +36,10 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> bin_data(const Eigen::VectorXd& dat
 //by default, drops unused bins (rows with only zeroes)
 Eigen::SparseMatrix<double, Eigen::RowMajor> bin_data_evenly(const Eigen::VectorXd& data, unsigned Nbins, bool drop = true);
 
+//build dense triangular view of a collection of hi-c matrices
+//arguments are taken as ordered factors whose length must correspond to the number of levels
+//returned matrix is of size n_names * n_bins * (n_bins+1) / 2
+Rcpp::DataFrame create_empty_matrix_cpp(Rcpp::IntegerVector names, Rcpp::IntegerVector bins);
 
 #endif
 
