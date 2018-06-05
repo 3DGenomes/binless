@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 for versions 0.x of binless, minor releases might break backwards compatibility.
 
 ## [Unreleased]
+### Fixed
+- fast binless can be run on matrices of up to 65535 bins. That means human
+  chromosome 1 at 3.8kb resolution
 
 ## [0.12.0]
 ### Added

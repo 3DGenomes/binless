@@ -119,7 +119,7 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
     bins=cut(head(bin_borders,n=length(bin_borders)-1)+resolution/2, bin_borders,
              ordered_result=T, right=F, include.lowest=T,dig.lab=12)
     #build empty counts matrix
-    counts=CJ(name=cs@experiments[,name],bin1=bins,bin2=bins)[bin2>=bin1]
+    counts=create_empty_matrix(name=cs@experiments[,ordered(name,name)], bins=bins)
     #add number of observables
     ncounts=cs@biases[,.(name,bin=cut(pos, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12))][
       !is.na(bin),.(nobs=.N),keyby=c("name","bin")]
