@@ -67,9 +67,10 @@ not interested in binless normalization, check out the short tutorial
 
 ### Questions? Problems?
 
-Please use the GitHub issues tracker to report anything, rather than
-sending an e-mail. You can use it to report bugs, ask questions or suggest new
-features. We are looking forward to your feedback!
+Check out the [FAQ](https://github.com/3DGenomes/binless/issues?q=label%3AFAQ)
+in the GitHub issues tracker. If you don't find anything, just file an issue by
+clicking on the "New issue" button. You can use it to report bugs, ask questions
+or suggest new features. We are looking forward to your feedback!
 
 ### Citation
 
