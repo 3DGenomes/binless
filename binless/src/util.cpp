@@ -72,8 +72,12 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> bin_data(const Eigen::VectorXd& dat
   tripletList.reserve(Ndata);
   for (unsigned i=0; i<Ndata; ++i) {
     auto it = design.map.upper_bound(data(i));
-    if (it == design.map.end()) it = design.map.lower_bound(data(i));
-    unsigned j = it->second - 1; //upper_bound returns pointer to next bin
+    unsigned j;
+    if (it == design.map.end()) {
+      j = design.map.rbegin()->second -1; //place in last bin
+    } else {
+      j = it->second - 1; //upper_bound returns pointer to next bin
+    }
     tripletList.push_back(Eigen::Triplet<double>(j,i,1.));
   }
   Eigen::SparseMatrix<double, Eigen::RowMajor> mat(design.Nbins,Ndata);
@@ -82,7 +86,10 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> bin_data(const Eigen::VectorXd& dat
     Eigen::SparseMatrix<double, Eigen::RowMajor> ret(design.Nbins,Ndata);
     unsigned Nrow=0;
     for (unsigned i=0; i<design.Nbins; ++i) {
-      if (mat.row(i).sum()>0) ret.row(Nrow++) = mat.row(i);
+      auto mrow = mat.row(i);
+      if (mrow.sum()>0) {
+        ret.row(Nrow++) = mrow;
+      }
     }
     ret.conservativeResize(Nrow,Ndata);
     ret.makeCompressed();
