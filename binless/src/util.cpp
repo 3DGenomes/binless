@@ -80,21 +80,26 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> bin_data(const Eigen::VectorXd& dat
     }
     tripletList.push_back(Eigen::Triplet<double>(j,i,1.));
   }
-  Eigen::SparseMatrix<double, Eigen::RowMajor> mat(design.Nbins,Ndata);
-  mat.setFromTriplets(tripletList.begin(), tripletList.end());
   if (drop) {
-    Eigen::SparseMatrix<double, Eigen::RowMajor> ret(design.Nbins,Ndata);
-    unsigned Nrow=0;
-    for (unsigned i=0; i<design.Nbins; ++i) {
-      auto mrow = mat.row(i);
-      if (mrow.sum()>0) {
-        ret.row(Nrow++) = mrow;
-      }
-    }
-    ret.conservativeResize(Nrow,Ndata);
+    //get which rows are empty
+    std::vector<bool> has_value(design.Nbins,false);
+    for (auto tr : tripletList) has_value[tr.row()] = true; 
+    //create map from old to new indices
+    std::map<unsigned,unsigned> row_map;
+    unsigned new_idx=0;
+    for (unsigned old_idx=0; old_idx<design.Nbins; old_idx++) if(has_value[old_idx]) row_map[old_idx]=new_idx++;
+    //make new triplet list, dropping empty rows
+    std::vector<Eigen::Triplet<double> > newTripletList;
+    newTripletList.reserve(Ndata);
+    for (auto tr : tripletList) newTripletList.push_back(Eigen::Triplet<double>(row_map[tr.row()],tr.col(),tr.value()));
+    //form new matrix and return
+    Eigen::SparseMatrix<double, Eigen::RowMajor> ret(new_idx,Ndata);
+    ret.setFromTriplets(newTripletList.begin(), newTripletList.end());
     ret.makeCompressed();
     return ret;
   } else {
+    Eigen::SparseMatrix<double, Eigen::RowMajor> mat(design.Nbins,Ndata);
+    mat.setFromTriplets(tripletList.begin(), tripletList.end());
     mat.makeCompressed();
     return mat;
   }
