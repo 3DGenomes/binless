@@ -83,7 +83,7 @@ std::vector<double> shift_signal(const FastSignalData& data) {
 }
 
 List binless(const DataFrame obs, unsigned nbins, double alpha, const NumericVector lam2, const NumericVector lam1,
-             unsigned ngibbs, double tol_val, unsigned bg_steps, unsigned free_decay) {
+             unsigned ngibbs, double tol_val, unsigned bg_steps, unsigned free_decay, bool compute_patchnos) {
   //initialize return values, exposures and fused lasso optimizer
   Rcpp::Rcout << "init\n";
   NegativeBinomialDistribution nb_dist;
@@ -175,8 +175,8 @@ List binless(const DataFrame obs, unsigned nbins, double alpha, const NumericVec
   }
   Rcpp::Rcout << "done\n";
   //finalize and return
-  return Rcpp::List::create(_["mat"]=get_as_dataframe(out, expo, bias, dec, lam1, tol_val), _["biases"]=bias.get_state(),
-                            _["decay"]=dec.get_state(), _["exposures"]=expo.get_state(),
+  return Rcpp::List::create(_["mat"]=get_as_dataframe(out, expo, bias, dec, lam1, tol_val, compute_patchnos),
+                            _["biases"]=bias.get_state(), _["decay"]=dec.get_state(), _["exposures"]=expo.get_state(),
                             _["log_signal"]=out.get_log_signal(),
                             //_["diagnostics"]=diagnostics,
                             _["nbins"]=nbins);
@@ -230,7 +230,8 @@ Rcpp::List binless_eval_cv(const List obs, double alpha, const NumericVector lam
   return Rcpp::wrap(diagnostics);
 }
 
-Rcpp::DataFrame binless_difference(const List obs, unsigned ref, double alpha, const NumericVector lam2, const NumericVector lam1, double tol_val) {
+Rcpp::DataFrame binless_difference(const List obs, unsigned ref, double alpha, const NumericVector lam2,
+                                   const NumericVector lam1, double tol_val, bool compute_patchnos) {
   //setup distribution
   NegativeBinomialDistribution nb_dist;
   Sampler<NegativeBinomialDistribution> nb_sampler(nb_dist);
@@ -272,7 +273,7 @@ Rcpp::DataFrame binless_difference(const List obs, unsigned ref, double alpha, c
   out.set_phi_ref(diff.phi_ref);
   //finalize and return
   Rcpp::Rcout << "done\n";
-  return get_as_dataframe(out,lam1,tol_val);
+  return get_as_dataframe(out,lam1,tol_val,compute_patchnos);
 }
 
 }

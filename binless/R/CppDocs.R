@@ -22,7 +22,9 @@
 #' @param nouter unsigned The maximum number of iterations that should be performed (default 25)
 #' @param tol_val double tolerance on the values for convergence and the fused lasso (default 2e-1)
 #' @param bg_steps unsigned the maximum number of initial steps where no signal is fitted (default 5)
-#' @param free_decay the distance in bases up to which the decay is not forced to decrease (default 10000)
+#' @param free_decay integer the distance in bases up to which the decay is not forced to decrease (default 10000)
+#' @param compute_patchnos boolean whether to compute the patchno column or not (TRUE by default).
+#'  On very large datasets, this is slow.
 #' 
 #' @export
 #' @name fast_binless 
