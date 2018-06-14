@@ -13,6 +13,8 @@ library(binless)
 
 #The following command returns a list that contains three plots and the data used to generate them
 #These plots are useful to determine dangling.L, dangling.R, dmin and maxlen
+#check out the FAQ if there's not enough information in the comments
+# https://github.com/3DGenomes/binless/issues?q=label%3AFAQ
 #filename is passed to fread, so you can use zcat to read compressed files directly
 #fread warning can be ignored
 #be sure to set the proper read length
@@ -47,9 +49,10 @@ foreach (dset=dsets, maxlen=maxlens) %do% {
 }         
 
 
-#here we plot the raw (unnormalized) reads. We need to load the full csdata object,
-#as only the one without the raw data is returned.
-
+#In the previous step, you generated two files, one ending in "_with_data.RData"
+#which contains a csdata object that includes the raw reads. Here, we plot them
+#using the arrow plot. When you load the file, it creates a csd object that
+#contains a csd@data data.table with the necessary info.
 load("example/rao_HiCall_GM12878_FOXP1ext_2.3M_csdata_with_data.RData")
 data=get_raw_reads(csd@data, csd@biases[,min(pos)], csd@biases[,max(pos)])
 #plot the whole 2.3M region at 10kb resolution
