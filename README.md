@@ -11,7 +11,7 @@ following in an R shell
 
 ```
 install.packages("devtools")
-devtools::install_github("3DGenomes/binless")
+devtools::install_github("3DGenomes/binless",subdir="binless")
 ```
 
 Otherwise, you can install it manually as follows:

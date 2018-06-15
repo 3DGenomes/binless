@@ -14,6 +14,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
   chromosome 1 at 3.8kb resolution
 - bug causing failed assertion during init on rare occasions in fast binless
 - considerable speedup of init phase in fast binless
+- installation link
 
 ## [0.12.0]
 ### Added
