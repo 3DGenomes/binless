@@ -1,4 +1,8 @@
-PKG_CPPFLAGS = -UNDEBUG
+USE_BOOST = 0
+PKG_CPPFLAGS = -UNDEBUG -DUSE_BOOST=$(USE_BOOST)
 CXX_STD = CXX11
-PKG_LIBS = -lgsl -lgslcblas
-
+ifeq ($(USE_BOOST), 1)
+	PKG_LIBS = -lgsl -lgslcblas -lboost_iostreams
+else
+	PKG_LIBS = -lgsl -lgslcblas
+endif

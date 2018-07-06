@@ -49,7 +49,8 @@ public:
     const bool drop = true; //drop unused bins
     auto binner1 = bin_data(pos1_data.cast<double>(), design, drop);
     auto binner2 = bin_data(pos2_data.cast<double>(), design, drop);
-    set_binner( (  binner1 + binner2 ) );
+    binner1 += binner2;
+    set_binner( (  binner1 ) );
     set_nbins( get_binner().rows() );
     //nobs
     auto nobs_std = data.get_nobs();

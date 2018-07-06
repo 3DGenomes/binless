@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include "gfl_graph_fl.h"
 
 int graph_fused_lasso (int n, double *y,
@@ -57,7 +58,8 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
 {
     int i;
     int step;
-    int nz;
+    int64_t nz;
+    int64_t bufnz;
     int ti;
     int zmi;
     int wbufsize;
@@ -83,8 +85,14 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
     nzmap           = (int *) malloc(n * sizeof(int));
     zmapbreaks      = (int *) malloc(n * sizeof(int));
     zmapoffsets     = (int *) malloc(n * sizeof(int));
-    tf_dp_buf       = (double *) malloc((nz * 8 - 2 * ntrails) * sizeof(double));
-
+    bufnz = (nz * 8 - 2 * (int64_t)ntrails);
+    //printf("size:%d,",bufnz);
+    //printf("%" PRId64 "\n", bufnz);
+    tf_dp_buf       = (double *) malloc(bufnz * sizeof(double));
+    if( tf_dp_buf == NULL )
+    {
+      printf("Failed to allocate buffer!\n");
+    }
     memcpy(zold, z, nz * sizeof(double));
 
     /* Zero-out vectors to start */
@@ -98,7 +106,15 @@ int graph_fused_lasso_weight_warm (int n, double *y, double *w,
         if (breakpoints[i]-breakpoints[i-1] > wbufsize) { wbufsize = breakpoints[i]-breakpoints[i-1]; }
     }
     z_wbuff         = (double *) malloc(wbufsize * sizeof(double));
+    if( z_wbuff == NULL )
+    {
+      printf("Failed to allocate z_wbuff buffer!\n");
+    }
     z_ybuff         = (double *) malloc(wbufsize * sizeof(double));
+    if( z_ybuff == NULL )
+    {
+      printf("Failed to allocate z_ybuff buffer!\n");
+    }
 
     /* weight for each fused lasso */
     for (i = 0; i < wbufsize; i++) { z_wbuff[i] = (*alpha) / 2.0; }
@@ -252,9 +268,9 @@ void update_z(int ntrails, int *trails, int *breakpoints, double *beta, double *
 {
     int i;
     int j;
-    int trailstart;
-    int trailend;
-    int trailsize;
+    int64_t trailstart;
+    int64_t trailend;
+    int64_t trailsize;
     double *x;
     double *a;
     double *b;
@@ -268,17 +284,18 @@ void update_z(int ntrails, int *trails, int *breakpoints, double *beta, double *
     {
         trailend = breakpoints[i];
         trailsize = trailend - trailstart;
-
         /* Calculate the trail y values: (beta + u) */
         for (j = trailstart; j < trailend; j++) { ybuf[j-trailstart] = beta[trails[j]] + u[j]; }
-
+        
         /* Calculate the starts of this z's buffers */
         x = tf_dp_buf + 8*trailstart - 2*i;
         a = x + 2*trailsize;
         b = x + 4*trailsize;
         tm = x + 6*trailsize;
         tp = x + 7*trailsize - 1;
-        
+        //printf("trailsize %" PRId64 "\n", trailsize);
+        //printf("trailstart %" PRId64 "\n", trailstart);
+        //printf("trailend %" PRId64 "\n", trailend);
         tf_dp_weight(trailsize, ybuf, wbuf, lam, z + trailstart,
                         x, a, b, tm, tp);
         
@@ -288,9 +305,9 @@ void update_z(int ntrails, int *trails, int *breakpoints, double *beta, double *
 
 void update_u(int n, double *beta, double *z, int *zmap, int *nzmap, double *u)
 {
-    int i;
-    int zmoffset;
-    int zmi;
+    int64_t i;
+    int64_t zmoffset;
+    int64_t zmi;
     double b;
 
     zmoffset = 0;

@@ -14,6 +14,8 @@ using namespace Rcpp;
 namespace binless {
 namespace fast {
 
+typedef Eigen::SparseMatrix<double, Eigen::RowMajor, long> SpMat;
+
 // class that holds summary statistics (aka IRLS weights)
 struct Summary {
   Summary() : phihat_(Eigen::VectorXd()), weight_(Eigen::VectorXd()) {}
@@ -37,7 +39,7 @@ class SummarizerSettings {
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, support);
   BINLESS_GET_SET_DECL(double, double, support_min);
   BINLESS_GET_SET_DECL(double, double, support_max);
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, binner);
+  BINLESS_GET_SET_DECL(SpMat, const SpMat&, binner);
   BINLESS_GET_SET_DECL(unsigned, unsigned, nbins);
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, nobs);
   
