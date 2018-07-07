@@ -5,6 +5,7 @@
 using namespace Rcpp;
 #include <Eigen/Core>
 
+#include "typedefs.hpp"
 #include "util.hpp" //bin_data_evenly
 #include "fast_residuals_pair.hpp"
 #include "FastData.hpp"
@@ -13,8 +14,6 @@ using namespace Rcpp;
 
 namespace binless {
 namespace fast {
-
-typedef Eigen::SparseMatrix<double, Eigen::RowMajor, long> SpMat;
 
 // class that holds summary statistics (aka IRLS weights)
 struct Summary {

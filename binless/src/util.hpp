@@ -6,6 +6,7 @@
 #include <map>
 #include <Eigen/Sparse>
 
+#include "typedefs.hpp"
 #include "BinnedData.hpp"
 
 std::vector<double> soft_threshold(const std::vector<double>& beta,
@@ -30,11 +31,11 @@ BinDesign make_even_bins(double lower, double upper, unsigned Nbins);
 //bin data given a boundary map in the form [a,b) [b,c) ... [y,z] with labels from 0 to N-1
 //Return in Nbins x Ndata sparse matrix form.
 //by default, drops unused bins (rows with only zeroes)
-Eigen::SparseMatrix<double, Eigen::RowMajor, long> bin_data(const Eigen::VectorXd& data, const BinDesign& begin2bin, bool drop = true);
+SpMat bin_data(const Eigen::VectorXd& data, const BinDesign& begin2bin, bool drop = true);
 
 //Bin data evenly across Nbins bins and return in Nbins x Ndata sparse matrix form.
 //by default, drops unused bins (rows with only zeroes)
-Eigen::SparseMatrix<double, Eigen::RowMajor, long> bin_data_evenly(const Eigen::VectorXd& data, unsigned Nbins, bool drop = true);
+SpMat bin_data_evenly(const Eigen::VectorXd& data, unsigned Nbins, bool drop = true);
 
 //build dense triangular view of a collection of hi-c matrices
 //arguments are taken as ordered factors whose length must correspond to the number of levels

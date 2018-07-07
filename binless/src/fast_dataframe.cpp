@@ -1,6 +1,6 @@
 #include "fast_dataframe.hpp"
 #include "graph_helpers.hpp"
-#include "csvfile.h"
+#include "csvfile.hpp"
 #include <algorithm>
 
 namespace binless {

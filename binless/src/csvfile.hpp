@@ -1,3 +1,6 @@
+#ifndef CSVFILE_HPP
+#define CSVFILE_HPP
+
 #ifndef USE_BOOST
 #define USE_BOOST 0
 #endif
@@ -135,3 +138,5 @@ inline static csvfile& flush(csvfile& file)
   file.flush();
   return file;
 }
+
+#endif

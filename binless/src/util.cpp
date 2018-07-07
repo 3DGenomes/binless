@@ -66,7 +66,7 @@ BinDesign make_even_bins(double lower, double upper, unsigned Nbins) {
   return BinDesign{Nbins,ret,begins,ends};
 }
 
-Eigen::SparseMatrix<double, Eigen::RowMajor, long> bin_data(const Eigen::VectorXd& data, const BinDesign& design, bool drop) {
+SpMat bin_data(const Eigen::VectorXd& data, const BinDesign& design, bool drop) {
   unsigned Ndata = data.rows();
   std::vector<Eigen::Triplet<double> > tripletList;
   tripletList.reserve(Ndata);
@@ -93,19 +93,19 @@ Eigen::SparseMatrix<double, Eigen::RowMajor, long> bin_data(const Eigen::VectorX
     newTripletList.reserve(Ndata);
     for (auto tr : tripletList) newTripletList.push_back(Eigen::Triplet<double>(row_map[tr.row()],tr.col(),tr.value()));
     //form new matrix and return
-    Eigen::SparseMatrix<double, Eigen::RowMajor, long> ret(new_idx,Ndata);
+    SpMat ret(new_idx,Ndata);
     ret.setFromTriplets(newTripletList.begin(), newTripletList.end());
     ret.makeCompressed();
     return ret;
   } else {
-    Eigen::SparseMatrix<double, Eigen::RowMajor, long> mat(design.Nbins,Ndata);
+    SpMat mat(design.Nbins,Ndata);
     mat.setFromTriplets(tripletList.begin(), tripletList.end());
     mat.makeCompressed();
     return mat;
   }
 }
 
-Eigen::SparseMatrix<double, Eigen::RowMajor, long> bin_data_evenly(const Eigen::VectorXd& data, unsigned Nbins, bool drop) {
+SpMat bin_data_evenly(const Eigen::VectorXd& data, unsigned Nbins, bool drop) {
   auto design = make_even_bins(data.minCoeff(),data.maxCoeff(),Nbins);
   return bin_data(data,design,drop);
 }
