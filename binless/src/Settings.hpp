@@ -8,9 +8,9 @@
 //and then specialize the Settings template on it
 template<typename T> struct Settings {};
 
-//settings for GFLLibrary
-class GFLLibrary;
-template<> struct Settings<GFLLibrary> {
+//settings for GFLLibrary_triangle
+class GFLLibrary_triangle;
+template<> struct Settings<GFLLibrary_triangle> {
     //initial adamts step size
     static const double get_alpha() { return 5.; }
     //inflation factor for adamts step update
@@ -18,6 +18,7 @@ template<> struct Settings<GFLLibrary> {
     //maximum number of adamts steps
     static const int get_ninner() { return 30000; }
 };
+
 
 //settings for FusedLassoGaussianEstimator
 template<typename Library> class FusedLassoGaussianEstimator;

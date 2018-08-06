@@ -5,7 +5,7 @@
 using namespace Rcpp;
 #include <vector>
 #include "FastData.hpp"
-#include "GFLLibrary.hpp"
+#include "GFLLibrary_triangle.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
 #include "fast_residuals.hpp"
 #include "fast_distribution.hpp"

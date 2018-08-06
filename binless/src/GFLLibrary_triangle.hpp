@@ -1,5 +1,5 @@
-#ifndef GFL_LIBRARY_HPP
-#define GFL_LIBRARY_HPP
+#ifndef GFL_LIBRARY_TRIANGLE_HPP
+#define GFL_LIBRARY_TRIANGLE_HPP
 
 #include <Rcpp.h>
 using namespace Rcpp;
@@ -10,15 +10,15 @@ using namespace Rcpp;
 std::vector<std::vector<int> > triangle_grid_chain(int nrows);
 
 //policy class that implements fused lasso solution using the GFL library
-class GFLLibrary {
+class GFLLibrary_triangle {
 public:
     
     typedef Rcpp::List GFLState_t;
     
     //init by cold start
-    GFLLibrary(unsigned nrows) : N_(nrows*(nrows+1)/2), counter_(0),
-     inflate_(Settings<GFLLibrary>::get_inflate()), ninner_(Settings<GFLLibrary>::get_ninner()),
-     alpha_(Settings<GFLLibrary>::get_alpha()) {
+    GFLLibrary_triangle(unsigned nrows) : N_(nrows*(nrows+1)/2), counter_(0),
+     inflate_(Settings<GFLLibrary_triangle>::get_inflate()), ninner_(Settings<GFLLibrary_triangle>::get_ninner()),
+     alpha_(Settings<GFLLibrary_triangle>::get_alpha()) {
         store_trails(nrows);
         reset();
     }
@@ -52,7 +52,7 @@ public:
     
 protected:
     //to avoid direct destruction by user
-    ~GFLLibrary() {}
+    ~GFLLibrary_triangle() {}
     
 private:
     

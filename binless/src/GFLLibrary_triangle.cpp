@@ -1,7 +1,7 @@
 #include <Rcpp.h>
 #include <vector>
 
-#include "GFLLibrary.hpp"
+#include "GFLLibrary_triangle.hpp"
 #include "gfl_graph_fl.h" //graph_fused_lasso_weight_warm
 
 std::vector<std::vector<int> > triangle_grid_chain(int nrows) {
@@ -33,7 +33,7 @@ std::vector<std::vector<int> > triangle_grid_chain(int nrows) {
     return(chains);
 }
 
-void GFLLibrary::store_trails(int nrows) {
+void GFLLibrary_triangle::store_trails(int nrows) {
     const std::vector<std::vector<int> > chains = triangle_grid_chain(nrows);
     trails_.clear();
     breakpoints_.clear();
@@ -47,7 +47,7 @@ void GFLLibrary::store_trails(int nrows) {
     tsz_ = trails_.size();
 }
 
-void GFLLibrary::reset() {
+void GFLLibrary_triangle::reset() {
     //setup initial values for a cold start
     counter_ = 0;
     beta_ = std::vector<double>(N_,0);
@@ -55,22 +55,22 @@ void GFLLibrary::reset() {
     u_ = std::vector<double>(tsz_,0);
 }
 
-void GFLLibrary::optimize(const std::vector<double>& y, const std::vector<double>& w, double lambda2, double converge) {
+void GFLLibrary_triangle::optimize(const std::vector<double>& y, const std::vector<double>& w, double lambda2, double converge) {
     //perform optimization on the C side
     double* py = const_cast<double*>(&y[0]);
     double* pw = const_cast<double*>(&w[0]);
     int counter = graph_fused_lasso_weight_warm (N_, py, pw, ntrails_, &trails_[0], &breakpoints_[0],
                                                lambda2, &alpha_, inflate_, ninner_, converge,
                                                &beta_[0], &z_[0], &u_[0]);
-    //Rcpp::Rcout << "GFLLibrary: " << counter << " steps\n";
+    //Rcpp::Rcout << "GFLLibrary_triangle: " << counter << " steps\n";
     counter_ += counter;
 }
 
-GFLLibrary::GFLState_t GFLLibrary::get_state() const {
+GFLLibrary_triangle::GFLState_t GFLLibrary_triangle::get_state() const {
     return Rcpp::List::create(_["z"]=z_, _["u"]=u_,  _["alpha"]=alpha_,  _["beta"]=beta_,  _["counter"]=counter_);
 }
 
-void GFLLibrary::set_state(const GFLState_t& state) {
+void GFLLibrary_triangle::set_state(const GFLState_t& state) {
     if (state.containsElementNamed("u") && Rcpp::as<std::vector<double> >(state["u"]).size() == tsz_) {
         z_ = Rcpp::as<std::vector<double> >(state["z"]);
         u_ = Rcpp::as<std::vector<double> >(state["u"]);
