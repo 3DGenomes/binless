@@ -4,8 +4,8 @@
 \alias{plot_raw}
 \title{Plot raw reads}
 \usage{
-plot_raw(dt, b1 = NULL, e1 = NULL, b2 = NULL, e2 = NULL, diagonal = T,
-  rsites = T)
+plot_raw(dt, b1 = NULL, e1 = NULL, b2 = NULL, e2 = NULL,
+  diagonal = T, rsites = T)
 }
 \arguments{
 \item{dt}{a reads data.table containing the parsed tsv reads}

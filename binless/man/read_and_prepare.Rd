@@ -4,11 +4,11 @@
 \alias{read_and_prepare}
 \title{Wrapper function for the whole preprocessing}
 \usage{
-read_and_prepare(infile, outprefix, condition, replicate, enzyme = "HindIII",
-  experiment = "Hi-C", name = paste(condition, enzyme, replicate),
-  skip = 0L, nrows = -1L, locus = NULL, circularize = -1,
-  dangling.L = c(0, 4), dangling.R = c(3, -1), maxlen = 600,
-  read.len = 40, dmin = 2000, save.data = T)
+read_and_prepare(infile, outprefix, condition, replicate,
+  enzyme = "HindIII", experiment = "Hi-C", name = paste(condition,
+  enzyme, replicate), skip = 0L, nrows = -1L, locus = NULL,
+  circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1),
+  maxlen = 600, read.len = 40, dmin = 2000, save.data = T)
 }
 \arguments{
 \item{infile}{character. Path to TadBit .tsv file}

@@ -6,8 +6,9 @@
 \usage{
 generate_fake_dataset(biases.ref = NULL, num_rsites = 3000,
   genome_size = 1e+06, eC = -4.4, eRJ = 3, eDE = 1, alpha = 2,
-  condition = "WT", replicate = "1", enzyme = "NA", name = paste("Fake",
-  condition, enzyme, replicate), dmin = 1000, signal = F)
+  condition = "WT", replicate = "1", enzyme = "NA",
+  name = paste("Fake", condition, enzyme, replicate), dmin = 1000,
+  signal = F)
 }
 \arguments{
 \item{num_rsites}{Number of restriction sites}

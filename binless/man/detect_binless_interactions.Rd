@@ -5,9 +5,10 @@
 \title{Perform binless interaction detection using fused lasso}
 \usage{
 detect_binless_interactions(cs, resolution = cs@settings$base.res,
-  group = "all", ncores = 1, tol.val = cs@settings$tol, verbose = T,
-  min.lambda2 = 0.1, fix.lambda1 = F, fix.lambda1.at = NA,
-  fix.lambda2 = F, fix.lambda2.at = NA, nperf = 50)
+  group = "all", ncores = 1, tol.val = cs@settings$tol,
+  verbose = T, min.lambda2 = 0.1, fix.lambda1 = F,
+  fix.lambda1.at = NA, fix.lambda2 = F, fix.lambda2.at = NA,
+  nperf = 50)
 }
 \arguments{
 \item{cs}{a normalized CSnorm object}

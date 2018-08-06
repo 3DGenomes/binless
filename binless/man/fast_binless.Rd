@@ -29,7 +29,10 @@ the same size as the number of datasets.}
 
 \item{bg_steps}{unsigned the maximum number of initial steps where no signal is fitted (default 5)}
 
-\item{free_decay}{the distance in bases up to which the decay is not forced to decrease (default 10000)}
+\item{free_decay}{integer the distance in bases up to which the decay is not forced to decrease (default 10000)}
+
+\item{compute_patchnos}{boolean whether to compute the patchno column or not (TRUE by default).
+On very large datasets, this is slow.}
 }
 \description{
 This function computes a fast approximation to the binless normalization of a given dataset
