@@ -19,6 +19,16 @@ template<> struct Settings<GFLLibrary_triangle> {
     static const int get_ninner() { return 30000; }
 };
 
+//settings for GFLLibrary_trapezoidal
+class GFLLibrary_trapezoidal;
+template<> struct Settings<GFLLibrary_trapezoidal> {
+    //initial adamts step size
+    static const double get_alpha() { return 5.; }
+    //inflation factor for adamts step update
+    static const double get_inflate() { return 2.; }
+    //maximum number of adamts steps
+    static const int get_ninner() { return 30000; }
+};
 
 //settings for FusedLassoGaussianEstimator
 template<typename Library> class FusedLassoGaussianEstimator;
