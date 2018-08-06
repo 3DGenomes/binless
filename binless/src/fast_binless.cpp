@@ -83,7 +83,8 @@ std::vector<double> shift_signal(const FastSignalData& data) {
 }
 
 List binless(const DataFrame obs, unsigned nbins, double alpha, const NumericVector lam2, const NumericVector lam1,
-             unsigned ngibbs, double tol_val, unsigned bg_steps, unsigned free_decay, bool compute_patchnos) {
+             unsigned ngibbs, double tol_val, unsigned bg_steps, unsigned free_decay, bool compute_patchnos,
+             const std::string csv_out) {
   //initialize return values, exposures and fused lasso optimizer
   Rcpp::Rcout << "init\n";
   NegativeBinomialDistribution nb_dist;
@@ -175,7 +176,7 @@ List binless(const DataFrame obs, unsigned nbins, double alpha, const NumericVec
   }
   Rcpp::Rcout << "done\n";
   //finalize and return
-  return Rcpp::List::create(_["mat"]=get_as_dataframe(out, expo, bias, dec, lam1, tol_val, compute_patchnos),
+  return Rcpp::List::create(_["mat"]=get_as_dataframe(out, expo, bias, dec, lam1, tol_val, compute_patchnos, csv_out),
                             _["biases"]=bias.get_state(), _["decay"]=dec.get_state(), _["exposures"]=expo.get_state(),
                             _["log_signal"]=out.get_log_signal(),
                             //_["diagnostics"]=diagnostics,

@@ -6,6 +6,10 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 
 ## [Unreleased]
 ### Added
+- use 64 bit integers in gfl_graph_fl to expand the index limit in lasso.
+- use long as StorageIndex to expand the limit of elements in Eigen SparseMatrix in fast binless.
+- possibility to dump fast binless output to csv file to limit the memory used in the creation of DataFrame.
+  To reduce the file size the csv will be compressed in gzip format using BOOST libraries if USE_BOOST is     activated in Makevars file.
 - possibility to prevent computation of patch numbers in fast binless. This can
   be slow in very large datasets.
 

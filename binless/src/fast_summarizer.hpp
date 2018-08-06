@@ -5,6 +5,7 @@
 using namespace Rcpp;
 #include <Eigen/Core>
 
+#include "typedefs.hpp"
 #include "util.hpp" //bin_data_evenly
 #include "fast_residuals_pair.hpp"
 #include "FastData.hpp"
@@ -37,7 +38,7 @@ class SummarizerSettings {
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, support);
   BINLESS_GET_SET_DECL(double, double, support_min);
   BINLESS_GET_SET_DECL(double, double, support_max);
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, binner);
+  BINLESS_GET_SET_DECL(SpMat, const SpMat&, binner);
   BINLESS_GET_SET_DECL(unsigned, unsigned, nbins);
   BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, nobs);
   
