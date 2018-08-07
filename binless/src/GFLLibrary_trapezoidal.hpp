@@ -51,19 +51,17 @@ public:
     //return internal state
     GFLState_t get_state() const;
     
-//protected:
+protected:
     //to avoid direct destruction by user
     ~GFLLibrary_trapezoidal() {}
-    
-    std::vector<double> extract_trapeze(const std::vector<double>& vec) const;
-    std::vector<double> fill_triangle(const std::vector<double>& y, const std::vector<double>& w) const;
-    friend void test_trap(unsigned nrows, unsigned maxdiag);
     
 private:
     
     void store_trails(int nrows, int maxdiag);
   
-    
+    std::vector<double> extract_trapeze(const std::vector<double>& vec) const;
+    std::vector<double> fill_triangle(const std::vector<double>& y, const std::vector<double>& w) const;
+  
     unsigned nrows_, maxdiag_;
     unsigned N_; //size of the fused lasso problem
     unsigned counter_;
@@ -76,8 +74,6 @@ private:
     double alpha_;
     std::vector<double> beta_tri_, beta_trap_, z_, u_;
 };
-
-void test_trap(unsigned nrows, unsigned maxdiag);
 
 
 

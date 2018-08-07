@@ -152,27 +152,3 @@ void GFLLibrary_trapezoidal::set_state(const GFLState_t& state) {
         counter_ = Rcpp::as<unsigned>(state["counter"]);
     }
 }
-
-void test_trap(unsigned nrows, unsigned maxdiag) {
-  GFLLibrary_trapezoidal gfl(nrows, maxdiag);
-  //std::vector<std::vector<int> > ret = trapezoidal_grid_chain(nrows, maxdiag);
-  std::vector<double> beta_tri;
-  int k = 0;
-  Rcpp::Rcout << "\n";
-  for (unsigned i=0; i<nrows; ++i) {
-    for (unsigned j=i; j<nrows; ++j) {
-      beta_tri.push_back(k++);
-      Rcpp::Rcout << k << " ";
-    }
-    Rcpp::Rcout << "\n";
-  }
-  std::vector<double> w(beta_tri.size(),1.);
-  gfl.beta_trap_ = gfl.extract_trapeze(beta_tri);
-  std::vector<double> ret = gfl.fill_triangle(beta_tri,w);
-  Rcpp::Rcout << "ret has length " << ret.size() << "\n";
-  for (unsigned i=0; i<ret.size(); ++i) {
-    Rcpp::Rcout << ret[i]+1 << " ";
-    Rcpp::Rcout << "\n";
-  }
-}
-
