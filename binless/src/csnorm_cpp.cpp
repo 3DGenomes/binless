@@ -18,11 +18,11 @@ RCPP_MODULE(binless_cpp) {
     function("fast_binless", &binless::fast::binless,
              List::create(_["obs"], _["nbins"], _["alpha"], _["lam2"], _["lam1"]=0., _["nouter"]=25, _["tol_val"]=2e-1,
                           _["bg_steps"]=5, _["free_decay"]=10000, _["compute_patchnos"]=true,
-                          _["csv_out"]="", _["maxdiag"]=100),
+                          _["csv_out"]="", _["maxdiag"]=0),
              "documentation for fast_binless ");
     function("fast_binless_difference", &binless::fast::binless_difference,
              List::create(_["obs"], _["ref"], _["alpha"],  _["lam2"], _["lam1"]=0., _["tol_val"]=2e-1,
-                          _["compute_patchnos"]=true, _["maxdiag"]=100),
+                          _["compute_patchnos"]=true, _["maxdiag"]=0),
              "documentation for fast_binless_difference ");
     
     function("generate_spline_base", &generate_spline_base, "documentation for generate_spline_base ");
@@ -30,6 +30,6 @@ RCPP_MODULE(binless_cpp) {
     function("rcpp_cts_to_signal_mat", &rcpp_cts_to_signal_mat, "documentation for rcpp_cts_to_signal_mat ");
     
     function("create_empty_matrix_cpp", &create_empty_matrix_cpp, "documentation for create_empty_matrix_cpp ");
-
+    
 }
 
