@@ -29,11 +29,11 @@ struct Params<GAM> {
     set_mean(Rcpp::as<double>(state["mean"]));
   }
   
-  BINLESS_FORBID_COPY(Params);
+  BINLESS_FORBID_COPY(Params)
   
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, beta);
-  BINLESS_GET_SET_DECL(double, double, lambda);
-  BINLESS_GET_SET_DECL(double, double, mean);
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, beta)
+  BINLESS_GET_SET_DECL(double, double, lambda)
+  BINLESS_GET_SET_DECL(double, double, mean)
   
 };
 
@@ -43,17 +43,17 @@ struct Params<GAM> {
 template<>
 class FitterSettings<GAM> {
   
-  BINLESS_GET_CONSTREF_DECL(unsigned, max_iter);
-  BINLESS_GET_CONSTREF_DECL(double, tol_val);
-  BINLESS_GET_CONSTREF_DECL(double, sigma);
-  BINLESS_GET_CONSTREF_DECL(double, K);
-  BINLESS_GET_CONSTREF_DECL(unsigned, nbins);
-  BINLESS_GET_CONSTREF_DECL(Eigen::VectorXd, nobs);
+  BINLESS_GET_CONSTREF_DECL(unsigned, max_iter)
+  BINLESS_GET_CONSTREF_DECL(double, tol_val)
+  BINLESS_GET_CONSTREF_DECL(double, sigma)
+  BINLESS_GET_CONSTREF_DECL(double, K)
+  BINLESS_GET_CONSTREF_DECL(unsigned, nbins)
+  BINLESS_GET_CONSTREF_DECL(Eigen::VectorXd, nobs)
   
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, X);
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, D);
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, Cin);
-  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, Ceq);
+  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, X)
+  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, D)
+  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, Cin)
+  BINLESS_GET_SET_DECL(Eigen::SparseMatrix<double>, const Eigen::SparseMatrix<double>&, Ceq)
   
   
 protected:
@@ -94,8 +94,8 @@ public:
   //get X*beta
   Eigen::VectorXd get_estimate() const { return get_settings().get_X() * get_params().get_beta(); }
   
-  BINLESS_GET_CONSTREF_DECL(FitterSettings<GAM>, settings);
-  BINLESS_GET_REF_DECL(Params<GAM>, params);
+  BINLESS_GET_CONSTREF_DECL(FitterSettings<GAM>, settings)
+  BINLESS_GET_REF_DECL(Params<GAM>, params)
   
 private:
   Eigen::VectorXd get_beta() const { return get_params().get_beta(); }
