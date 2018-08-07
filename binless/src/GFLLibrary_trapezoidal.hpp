@@ -16,9 +16,10 @@ public:
     typedef Rcpp::List GFLState_t;
     
     //init by cold start
-    GFLLibrary_trapezoidal(unsigned nrows, unsigned maxdiag) : N_(nrows*(nrows+1)/2), nrows_(nrows), maxdiag_(std::min(maxdiag,nrows)),
-     counter_(0), inflate_(Settings<GFLLibrary_trapezoidal>::get_inflate()), ninner_(Settings<GFLLibrary_trapezoidal>::get_ninner()),
-     alpha_(Settings<GFLLibrary_trapezoidal>::get_alpha()) {
+    GFLLibrary_trapezoidal(unsigned nrows, unsigned maxdiag) : nrows_(nrows), maxdiag_(std::min(maxdiag,nrows)),
+     N_(maxdiag_*(nrows_-maxdiag_+1) + (maxdiag_-1)*maxdiag_/2), counter_(0),
+     inflate_(Settings<GFLLibrary_trapezoidal>::get_inflate()),
+     ninner_(Settings<GFLLibrary_trapezoidal>::get_ninner()), alpha_(Settings<GFLLibrary_trapezoidal>::get_alpha()) {
         store_trails(nrows_, maxdiag_);
         reset();
     }
@@ -36,7 +37,7 @@ public:
     
     //return modified quantities
     std::vector<double> get_beta() const {
-        return beta_;
+        return beta_tri_;
     }
     
     unsigned get_ninner() const {
@@ -50,16 +51,21 @@ public:
     //return internal state
     GFLState_t get_state() const;
     
-protected:
+//protected:
     //to avoid direct destruction by user
     ~GFLLibrary_trapezoidal() {}
+    
+    std::vector<double> extract_trapeze(const std::vector<double>& vec) const;
+    std::vector<double> fill_triangle(const std::vector<double>& y, const std::vector<double>& w) const;
+    friend void test_trap(unsigned nrows, unsigned maxdiag);
     
 private:
     
     void store_trails(int nrows, int maxdiag);
+  
     
-    unsigned N_; //size of the fused lasso problem
     unsigned nrows_, maxdiag_;
+    unsigned N_; //size of the fused lasso problem
     unsigned counter_;
     double inflate_;
     int ninner_;
@@ -68,8 +74,12 @@ private:
     unsigned tsz_;
     
     double alpha_;
-    std::vector<double> beta_, z_, u_;
+    std::vector<double> beta_tri_, beta_trap_, z_, u_;
 };
+
+void test_trap(unsigned nrows, unsigned maxdiag);
+
+
 
 #endif
 
