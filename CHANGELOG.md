@@ -12,6 +12,8 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
   To reduce the file size the csv will be compressed in gzip format using BOOST libraries if USE_BOOST is     activated in Makevars file.
 - possibility to prevent computation of patch numbers in fast binless. This can
   be slow in very large datasets.
+- maxdiag argument in fast_binless allows to fit only the first
+  counter-diagonals, for speed purposes
 
 ### Fixed
 - fast binless can be run on matrices of up to 65535 bins. That means human

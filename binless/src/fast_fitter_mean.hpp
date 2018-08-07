@@ -26,10 +26,10 @@ struct Params<Mean> {
     set_mean(Rcpp::as<double>(state["mean"]));
   }
   
-  BINLESS_FORBID_COPY(Params);
+  BINLESS_FORBID_COPY(Params)
   
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, estimate);
-  BINLESS_GET_SET_DECL(double, double, mean);
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, estimate)
+  BINLESS_GET_SET_DECL(double, double, mean)
 };
 
 // class that holds the data used to fit summaries and generate corresponding params
@@ -38,8 +38,8 @@ struct Params<Mean> {
 template<>
 class FitterSettings<Mean> {
   
-  BINLESS_GET_CONSTREF_DECL(unsigned, nbins);
-  BINLESS_GET_CONSTREF_DECL(Eigen::VectorXd, nobs);
+  BINLESS_GET_CONSTREF_DECL(unsigned, nbins)
+  BINLESS_GET_CONSTREF_DECL(Eigen::VectorXd, nobs)
   
 protected:
   FitterSettings(unsigned nbins, const Eigen::VectorXd& nobs) : nbins_(nbins), nobs_(nobs) {}
@@ -81,8 +81,8 @@ public:
   //get X*beta
   Eigen::VectorXd get_estimate() const { return get_params().get_estimate(); }
   
-  BINLESS_GET_CONSTREF_DECL(FitterSettings<Mean>, settings);
-  BINLESS_GET_REF_DECL(Params<Mean>, params);
+  BINLESS_GET_CONSTREF_DECL(FitterSettings<Mean>, settings)
+  BINLESS_GET_REF_DECL(Params<Mean>, params)
   
 private:
   void set_estimate(const Eigen::VectorXd& estimate) { get_params().set_estimate(estimate); }

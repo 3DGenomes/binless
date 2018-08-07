@@ -84,7 +84,7 @@ std::vector<double> shift_signal(const FastSignalData& data) {
 
 List binless(const DataFrame obs, unsigned nbins, double alpha, const NumericVector lam2, const NumericVector lam1,
              unsigned ngibbs, double tol_val, unsigned bg_steps, unsigned free_decay, bool compute_patchnos,
-             const std::string csv_out) {
+             const std::string csv_out, unsigned maxdiag) {
   //initialize return values, exposures and fused lasso optimizer
   Rcpp::Rcout << "init\n";
   NegativeBinomialDistribution nb_dist;
@@ -115,7 +115,7 @@ List binless(const DataFrame obs, unsigned nbins, double alpha, const NumericVec
   bias.update_params();
   double current_tol_val = 1.;
   std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
-                                                             FusedLassoGaussianEstimator<GFLLibrary>(nbins, current_tol_val/20.));
+                                                             FusedLassoGaussianEstimator<GFLLibrary>(nbins, current_tol_val/20., maxdiag));
   const Eigen::ArrayXd lambda2_vals = (lam2.size() == out.get_ndatasets())
                                      ? Rcpp::as<Eigen::ArrayXd>(lam2)
                                      : Eigen::ArrayXd::Constant(out.get_ndatasets(),lam2[0]);
@@ -183,7 +183,8 @@ List binless(const DataFrame obs, unsigned nbins, double alpha, const NumericVec
                             _["nbins"]=nbins);
 }
 
-Rcpp::List binless_eval_cv(const List obs, double alpha, const NumericVector lam2, const NumericVector lam1, unsigned group, double tol_val) {
+Rcpp::List binless_eval_cv(const List obs, double alpha, const NumericVector lam2, const NumericVector lam1,
+                           unsigned group, double tol_val, unsigned maxdiag) {
   //setup distribution
   NegativeBinomialDistribution nb_dist;
   Sampler<NegativeBinomialDistribution> nb_sampler(nb_dist);
@@ -211,7 +212,7 @@ Rcpp::List binless_eval_cv(const List obs, double alpha, const NumericVector lam
   bias.set_state(obs["biases"]);
   //
   const double converge = tol_val/20.;
-  std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(1, FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge));
+  std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(1, FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge, maxdiag));
   //compute cv
   Rcpp::Rcout << "compute\n";
   std::vector<DataFrame> diagnostics;
@@ -232,7 +233,7 @@ Rcpp::List binless_eval_cv(const List obs, double alpha, const NumericVector lam
 }
 
 Rcpp::DataFrame binless_difference(const List obs, unsigned ref, double alpha, const NumericVector lam2,
-                                   const NumericVector lam1, double tol_val, bool compute_patchnos) {
+                                   const NumericVector lam1, double tol_val, bool compute_patchnos, unsigned maxdiag) {
   //setup distribution
   NegativeBinomialDistribution nb_dist;
   Sampler<NegativeBinomialDistribution> nb_sampler(nb_dist);
@@ -260,7 +261,7 @@ Rcpp::DataFrame binless_difference(const List obs, unsigned ref, double alpha, c
   //
   const double converge = tol_val/20.;
   std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets() - 1,
-                                                             FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge));
+                                                             FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge, maxdiag));
   const Eigen::ArrayXd lambda2_vals = (lam2.size() == out.get_ndatasets() - 1)
     ? Rcpp::as<Eigen::ArrayXd>(lam2)
       : Eigen::ArrayXd::Constant(out.get_ndatasets() - 1, lam2[0]);

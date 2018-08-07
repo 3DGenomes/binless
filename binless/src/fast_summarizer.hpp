@@ -18,9 +18,9 @@ namespace fast {
 // class that holds summary statistics (aka IRLS weights)
 struct Summary {
   Summary() : phihat_(Eigen::VectorXd()), weight_(Eigen::VectorXd()) {}
-  BINLESS_FORBID_COPY(Summary);
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, phihat);
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight);
+  BINLESS_FORBID_COPY(Summary)
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, phihat)
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, weight)
 };
 
 template<typename Leg, typename Method>
@@ -35,12 +35,12 @@ struct SummarizerTraits {
 // domain-specific child
 class SummarizerSettings {
   
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, support);
-  BINLESS_GET_SET_DECL(double, double, support_min);
-  BINLESS_GET_SET_DECL(double, double, support_max);
-  BINLESS_GET_SET_DECL(SpMat, const SpMat&, binner);
-  BINLESS_GET_SET_DECL(unsigned, unsigned, nbins);
-  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, nobs);
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, support)
+  BINLESS_GET_SET_DECL(double, double, support_min)
+  BINLESS_GET_SET_DECL(double, double, support_max)
+  BINLESS_GET_SET_DECL(SpMat, const SpMat&, binner)
+  BINLESS_GET_SET_DECL(unsigned, unsigned, nbins)
+  BINLESS_GET_SET_DECL(Eigen::VectorXd, const Eigen::VectorXd&, nobs)
   
 protected:
   SummarizerSettings() {}
@@ -53,8 +53,8 @@ public:
   SummarizerImpl(const FastData& data, const Config<Leg,Method>& conf) : 
     settings_(SummarizerSettingsImpl<Leg,Method>(data, conf)), summary_() {}
   
-  BINLESS_GET_CONSTREF_DECL(SummarizerSettings, settings); //store type that is agnostic to Leg and Method
-  BINLESS_GET_REF_DECL(Summary, summary);
+  BINLESS_GET_CONSTREF_DECL(SummarizerSettings, settings) //store type that is agnostic to Leg and Method
+  BINLESS_GET_REF_DECL(Summary, summary)
   
 };
 

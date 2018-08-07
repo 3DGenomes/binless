@@ -25,6 +25,13 @@
 #' @param free_decay integer the distance in bases up to which the decay is not forced to decrease (default 10000)
 #' @param compute_patchnos boolean whether to compute the patchno column or not (TRUE by default).
 #'  On very large datasets, this is slow.
+#' @param csv_out If a string is provided here, will write the results of the computation to that file
+#'  instead of returning them. Useful for very large matrices to speed things up.
+#' @param maxdiag Only compute matrix on the first maxdiag counter-diagonals. By default, maxdiag is zero
+#' which amounts to compute it on all counter-diagonals. Can be used to speed up calculations on large
+#' matrices. The returned matrix contains a single value for all entries further than maxdiag, which 
+#' corresponds to the fused lasso solution with infinite penalty on the values further than maxdiag. Useful
+#' to set exp(lambda1) to a sensible value when maxdiag is beyond regions with any signal.
 #' 
 #' @export
 #' @name fast_binless 
