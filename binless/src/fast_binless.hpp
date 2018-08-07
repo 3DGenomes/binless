@@ -5,7 +5,7 @@
 using namespace Rcpp;
 #include <vector>
 #include "FastData.hpp"
-#include "GFLLibrary_trapezoidal.hpp"
+#include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
 #include "fast_residuals.hpp"
 #include "fast_distribution.hpp"
@@ -28,14 +28,14 @@ std::vector<double> shift_signal(const FastSignalData& data);
 
 Rcpp::List binless(const DataFrame obs, unsigned nbins, double alpha, const NumericVector lam2, const NumericVector lam1 = NumericVector(1),
                    unsigned nouter=25, double tol_val=2e-1, unsigned bg_steps=5, unsigned free_decay=10000, bool compute_patchnos=true,
-                   const std::string csv_out="", unsigned maxdiag=100);
+                   const std::string csv_out="", unsigned maxdiag=0);
 
 Rcpp::List binless_eval_cv(const List obs, double alpha, const NumericVector lam2, const NumericVector lam1 = NumericVector(1),
-                           unsigned group = 0, double tol_val = 1e-1, unsigned maxdiag=100);
+                           unsigned group = 0, double tol_val = 1e-1, unsigned maxdiag=0);
 
 Rcpp::DataFrame binless_difference(const List obs, unsigned ref, double alpha, const NumericVector lam2,
                                    const NumericVector lam1 = NumericVector(1), double tol_val=2e-1, bool compute_patchnos=true,
-                                   unsigned maxdiag=100);
+                                   unsigned maxdiag=0);
 
 #include "fast_binless.ipp"
 

@@ -11,7 +11,7 @@ using namespace Rcpp;
 #include "fast_decay.hpp"
 #include "fast_bias_mean.hpp"
 #include "fast_dataframe.hpp"
-#include "GFLLibrary_trapezoidal.hpp"
+#include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
 #include "spline.hpp"
 #include "gam.hpp"
@@ -114,8 +114,8 @@ List binless(const DataFrame obs, unsigned nbins, double alpha, const NumericVec
   bias.set_poisson_lsq_summary(expected, out);
   bias.update_params();
   double current_tol_val = 1.;
-  std::vector<FusedLassoGaussianEstimator<GFLLibrary_trapezoidal> > flos(out.get_ndatasets(),
-                                                             FusedLassoGaussianEstimator<GFLLibrary_trapezoidal>(nbins, current_tol_val/20., maxdiag));
+  std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets(),
+                                                             FusedLassoGaussianEstimator<GFLLibrary>(nbins, current_tol_val/20., maxdiag));
   const Eigen::ArrayXd lambda2_vals = (lam2.size() == out.get_ndatasets())
                                      ? Rcpp::as<Eigen::ArrayXd>(lam2)
                                      : Eigen::ArrayXd::Constant(out.get_ndatasets(),lam2[0]);
@@ -212,7 +212,7 @@ Rcpp::List binless_eval_cv(const List obs, double alpha, const NumericVector lam
   bias.set_state(obs["biases"]);
   //
   const double converge = tol_val/20.;
-  std::vector<FusedLassoGaussianEstimator<GFLLibrary_trapezoidal> > flos(1, FusedLassoGaussianEstimator<GFLLibrary_trapezoidal>(nbins, converge, maxdiag));
+  std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(1, FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge, maxdiag));
   //compute cv
   Rcpp::Rcout << "compute\n";
   std::vector<DataFrame> diagnostics;
@@ -260,8 +260,8 @@ Rcpp::DataFrame binless_difference(const List obs, unsigned ref, double alpha, c
   bias.set_state(obs["biases"]);
   //
   const double converge = tol_val/20.;
-  std::vector<FusedLassoGaussianEstimator<GFLLibrary_trapezoidal> > flos(out.get_ndatasets() - 1,
-                                                             FusedLassoGaussianEstimator<GFLLibrary_trapezoidal>(nbins, converge, maxdiag));
+  std::vector<FusedLassoGaussianEstimator<GFLLibrary> > flos(out.get_ndatasets() - 1,
+                                                             FusedLassoGaussianEstimator<GFLLibrary>(nbins, converge, maxdiag));
   const Eigen::ArrayXd lambda2_vals = (lam2.size() == out.get_ndatasets() - 1)
     ? Rcpp::as<Eigen::ArrayXd>(lam2)
       : Eigen::ArrayXd::Constant(out.get_ndatasets() - 1, lam2[0]);

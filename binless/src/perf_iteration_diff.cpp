@@ -5,7 +5,7 @@ using namespace Rcpp;
 
 #include "perf_iteration_diff.hpp"
 
-#include "GFLLibrary_triangle.hpp"
+#include "GFLLibrary.hpp"
 #include "FusedLassoGaussianEstimator.hpp"
 #include "WeightsUpdater.hpp"
 #include "IRLSEstimator.hpp"
@@ -29,7 +29,7 @@ List wgfl_diff_BIC(const DataFrame cts, const DataFrame ref, double dispersion,
     //setup computation of fused lasso solution
     bool converged = true;
     const double converge = tol_val/20.;
-    FusedLassoGaussianEstimator<GFLLibrary_triangle> flo(raw.get_nbins(), converge); //size of the problem and convergence criterion
+    FusedLassoGaussianEstimator<GFLLibrary> flo(raw.get_nbins(), converge); //size of the problem and convergence criterion
     flo.set_state(GFLState);
     WeightsUpdater<Difference> wt(raw, binned); //size of the problem and input data
     std::vector<double> beta = as<std::vector<double> >(beta_i);
