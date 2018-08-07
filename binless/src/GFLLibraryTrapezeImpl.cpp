@@ -2,7 +2,7 @@
 #include <vector>
 #include <numeric>
 
-#include "GFLLibrary_trapezoidal.hpp"
+#include "GFLLibraryTrapezeImpl.hpp"
 #include "gfl_graph_fl.h" //graph_fused_lasso_weight_warm
 
 std::vector<std::vector<int> > trapezoidal_grid_chain(int nrows, int maxdiag) {
@@ -68,7 +68,7 @@ std::vector<std::vector<int> > trapezoidal_grid_chain(int nrows, int maxdiag) {
   return(chains);
 }
 
-void GFLLibrary_trapezoidal::store_trails(int nrows, int maxdiag) {
+void GFLLibraryTrapezeImpl::store_trails(int nrows, int maxdiag) {
     const std::vector<std::vector<int> > chains = trapezoidal_grid_chain(nrows, maxdiag);
     trails_.clear();
     breakpoints_.clear();
@@ -82,31 +82,31 @@ void GFLLibrary_trapezoidal::store_trails(int nrows, int maxdiag) {
     tsz_ = trails_.size();
 }
 
-void GFLLibrary_trapezoidal::reset() {
+void GFLLibraryTrapezeImpl::reset() {
     //setup initial values for a cold start
-    counter_ = 0;
-    beta_trap_ = std::vector<double>(N_,0);
+    set_ninner(0);
+    beta_impl_ = std::vector<double>(N_,0);
     z_ = std::vector<double>(tsz_,0);
     u_ = std::vector<double>(tsz_,0);
 }
 
-std::vector<double> GFLLibrary_trapezoidal::extract_trapeze(const std::vector<double>& vec) const {
+std::vector<double> GFLLibraryTrapezeImpl::extract_trapeze(const std::vector<double>& vec) const {
   std::vector<double> ret;
   ret.reserve(N_);
-  for (unsigned i=0; i<nrows_; ++i) {
-    unsigned idx_base = i*(i+1)/2 + i*(nrows_-i);
+  for (int i=0; i<nrows_; ++i) {
+    int idx_base = i*(i+1)/2 + i*(nrows_-i);
     ret.insert(ret.end(), vec.begin()+idx_base, vec.begin()+idx_base+std::min(maxdiag_,nrows_-i));
   }
   return(ret);
 }
 
-std::vector<double> GFLLibrary_trapezoidal::fill_triangle(const std::vector<double>& y, const std::vector<double>& w) const {
+std::vector<double> GFLLibraryTrapezeImpl::fill_triangle(const std::vector<double>& y, const std::vector<double>& w) const {
   //compute average value
   double sum_wy=0;
   double sum_w=0;
-  for (unsigned i=0; i<nrows_; ++i) {
-    unsigned idx_base = i*(i+1)/2 + i*(nrows_-i);
-    for (unsigned d=maxdiag_; i+d<nrows_; ++d) {
+  for (int i=0; i<nrows_; ++i) {
+    int idx_base = i*(i+1)/2 + i*(nrows_-i);
+    for (int d=maxdiag_; i+d<nrows_; ++d) {
       sum_wy += w[idx_base+d]*y[idx_base+d];
       sum_w += w[idx_base+d];
     }
@@ -115,40 +115,44 @@ std::vector<double> GFLLibrary_trapezoidal::fill_triangle(const std::vector<doub
   //create return vector, filled with average value
   std::vector<double> ret(nrows_*(nrows_+1)/2, avg);
   //fill in lasso solution on trapeze
-  unsigned j=0;
-  for (unsigned i=0; i<nrows_; ++i) {
-    unsigned idx_base = i*(i+1)/2 + i*(nrows_-i);
-    for (unsigned d=0; d<std::min(maxdiag_,nrows_-i); ++d) {
-      ret[idx_base+d] = beta_trap_[j++];
+  int j=0;
+  for (int i=0; i<nrows_; ++i) {
+    int idx_base = i*(i+1)/2 + i*(nrows_-i);
+    for (int d=0; d<std::min(maxdiag_,nrows_-i); ++d) {
+      ret[idx_base+d] = beta_impl_[j++];
     }
   }
+  Rcpp::Rcout << "average = " << avg << " beta[1,3] = " << beta_impl_[2] << " " << ret[2] << "\n";
   return(ret);
 }
 
-void GFLLibrary_trapezoidal::optimize(const std::vector<double>& y, const std::vector<double>& w, double lambda2, double converge) {
+void GFLLibraryTrapezeImpl::optimize(const std::vector<double>& y, const std::vector<double>& w, double lambda2, double converge) {
     //perform optimization on the C side
     const std::vector<double> y_trap = extract_trapeze(y);
     const std::vector<double> w_trap = extract_trapeze(w);
     double* py = const_cast<double*>(&y_trap[0]);
     double* pw = const_cast<double*>(&w_trap[0]);
+    double alpha = get_alpha();
     int counter = graph_fused_lasso_weight_warm (N_, py, pw, ntrails_, &trails_[0], &breakpoints_[0],
-                                               lambda2, &alpha_, inflate_, ninner_, converge,
-                                               &beta_trap_[0], &z_[0], &u_[0]);
-    beta_tri_ = fill_triangle(y,w);
-    //Rcpp::Rcout << "GFLLibrary_trapezoidal: " << counter << " steps\n";
-    counter_ += counter;
+                                               lambda2, &alpha, get_inflate(), get_ninner_max(), converge,
+                                               &beta_impl_[0], &z_[0], &u_[0]);
+    set_alpha(alpha);
+    set_beta(fill_triangle(y,w));
+    set_ninner(get_ninner() + counter);
 }
 
-GFLLibrary_trapezoidal::GFLState_t GFLLibrary_trapezoidal::get_state() const {
-    return Rcpp::List::create(_["z"]=z_, _["u"]=u_,  _["alpha"]=alpha_,  _["beta_trap"]=beta_trap_,  _["counter"]=counter_);
+GFLLibraryTrapezeImpl::GFLState_t GFLLibraryTrapezeImpl::get_state() const {
+    return Rcpp::List::create(_["z"]=z_, _["u"]=u_,  _["alpha"]=get_alpha(),  _["beta"]=beta_impl_,
+                              _["counter"]=get_ninner(), _["maxdiag"]=maxdiag_);
 }
 
-void GFLLibrary_trapezoidal::set_state(const GFLState_t& state) {
-    if (state.containsElementNamed("u") && Rcpp::as<std::vector<double> >(state["u"]).size() == tsz_) {
+void GFLLibraryTrapezeImpl::set_state(const GFLState_t& state) {
+    if (state.containsElementNamed("u") && Rcpp::as<std::vector<double> >(state["u"]).size() == tsz_
+          && state.containsElementNamed("maxdiag") && Rcpp::as<int>(state["maxdiag"])==maxdiag_ ) {
         z_ = Rcpp::as<std::vector<double> >(state["z"]);
         u_ = Rcpp::as<std::vector<double> >(state["u"]);
-        beta_trap_ = Rcpp::as<std::vector<double> >(state["beta_trap"]);
-        alpha_ = Rcpp::as<double>(state["alpha"]);
-        counter_ = Rcpp::as<unsigned>(state["counter"]);
+        beta_impl_ = Rcpp::as<std::vector<double> >(state["beta"]);
+        set_alpha(Rcpp::as<double>(state["alpha"]));
+        set_ninner(Rcpp::as<unsigned>(state["counter"]));
     }
 }
