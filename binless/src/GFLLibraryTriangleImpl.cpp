@@ -5,7 +5,8 @@
 #include "gfl_graph_fl.h" //graph_fused_lasso_weight_warm
 
 std::vector<std::vector<int> > triangle_grid_chain(int nrows) {
-    int ntotal = nrows*(nrows+1)/2-1;
+    unsigned ntotal = nrows;
+    ntotal = ntotal*(ntotal+1)/2-1;
     std::vector<std::vector<int> > chains;
     int l = nrows;
     std::vector<int> current(1,0);

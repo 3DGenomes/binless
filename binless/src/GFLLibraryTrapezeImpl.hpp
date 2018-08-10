@@ -45,7 +45,7 @@ private:
     int nrows_, maxdiag_;
     unsigned N_; //size of the fused lasso problem
     int ntrails_;
-    std::vector<int> trails_, breakpoints_;
+    std::vector<unsigned> trails_, breakpoints_;
     unsigned tsz_;
     
     std::vector<double> beta_impl_, z_, u_;

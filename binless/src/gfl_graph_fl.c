@@ -51,7 +51,7 @@ int graph_fused_lasso_warm (int n, double *y,
 }
 
 int graph_fused_lasso_weight_warm (int n, double *y, double *w,
-                        int ntrails, int *trails, int *breakpoints,
+                        int ntrails, unsigned *trails, unsigned *breakpoints,
                         double lam, double *alpha, double inflate,
                         int maxsteps, double converge,
                         double *beta, double *z, double *u)
@@ -264,7 +264,7 @@ void update_beta_weight(int n, double *y, double *w, double *z, double *u, int *
 }
 
 
-void update_z(int ntrails, int *trails, int *breakpoints, double *beta, double *u, double lam, double *ybuf, double *wbuf, double *tf_dp_buf, double *z)
+void update_z(int ntrails, unsigned *trails, unsigned *breakpoints, double *beta, double *u, double lam, double *ybuf, double *wbuf, double *tf_dp_buf, double *z)
 {
     int i;
     int j;

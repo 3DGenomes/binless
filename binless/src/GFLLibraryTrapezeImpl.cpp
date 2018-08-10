@@ -92,10 +92,15 @@ void GFLLibraryTrapezeImpl::reset() {
 
 std::vector<double> GFLLibraryTrapezeImpl::extract_trapeze(const std::vector<double>& vec) const {
   std::vector<double> ret;
+  //Rcpp::Rcout << "max_idx_base:" << (((unsigned)nrows_-1)*((unsigned)nrows_)/2+((unsigned)nrows_-1)+(unsigned)maxdiag_) << "\n";
   ret.reserve(N_);
-  for (int i=0; i<nrows_; ++i) {
-    int idx_base = i*(i+1)/2 + i*(nrows_-i);
-    ret.insert(ret.end(), vec.begin()+idx_base, vec.begin()+idx_base+std::min(maxdiag_,nrows_-i));
+  for(unsigned i=0; i<nrows_; ++i) {
+    unsigned idx_base = i*(i+1)/2 + i*(nrows_-i);
+    auto beg_itr = vec.begin();
+    auto end_itr = vec.begin();
+    std::advance( beg_itr, idx_base );
+    std::advance( end_itr, idx_base+std::min<unsigned>((unsigned)maxdiag_,nrows_-i));
+    ret.insert(ret.end(), beg_itr, end_itr);
   }
   return(ret);
 }
@@ -104,8 +109,8 @@ std::vector<double> GFLLibraryTrapezeImpl::fill_triangle(const std::vector<doubl
   //compute average value
   double sum_wy=0;
   double sum_w=0;
-  for (int i=0; i<nrows_; ++i) {
-    int idx_base = i*(i+1)/2 + i*(nrows_-i);
+  for (unsigned i=0; i<nrows_; ++i) {
+    unsigned idx_base = i*(i+1)/2 + i*(nrows_-i);
     for (int d=maxdiag_; i+d<nrows_; ++d) {
       sum_wy += w[idx_base+d]*y[idx_base+d];
       sum_w += w[idx_base+d];
@@ -113,12 +118,12 @@ std::vector<double> GFLLibraryTrapezeImpl::fill_triangle(const std::vector<doubl
   }
   double avg = sum_wy/sum_w;
   //create return vector, filled with average value
-  std::vector<double> ret(nrows_*(nrows_+1)/2, avg);
+  std::vector<double> ret((unsigned)nrows_*((unsigned)nrows_+1)/2, avg);
   //fill in lasso solution on trapeze
-  int j=0;
-  for (int i=0; i<nrows_; ++i) {
-    int idx_base = i*(i+1)/2 + i*(nrows_-i);
-    for (int d=0; d<std::min(maxdiag_,nrows_-i); ++d) {
+  unsigned j=0;
+  for (unsigned i=0; i<nrows_; ++i) {
+    unsigned idx_base = i*(i+1)/2 + i*(nrows_-i);
+    for (int d=0; d<std::min<unsigned>(maxdiag_,nrows_-i); ++d) {
       ret[idx_base+d] = beta_impl_[j++];
     }
   }
