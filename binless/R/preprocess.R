@@ -115,13 +115,13 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
   } else if (class(obj)[1] == "CSnorm") {
     if (!is.null(b1)) stop("b1 must be NULL when passing CSnorm object")
     if (!is.null(b2)) stop("b2 must be NULL when passing CSnorm object")
-    bin_borders=cs@biases[,seq(min(pos)-1,max(pos)+1,resolution)] #we discard the last incomplete bin
+    bin_borders=obj@biases[,seq(min(pos)-1,max(pos)+1,resolution)] #we discard the last incomplete bin
     bins=cut(head(bin_borders,n=length(bin_borders)-1)+resolution/2, bin_borders,
              ordered_result=T, right=F, include.lowest=T,dig.lab=12)
     #build empty counts matrix
-    counts=create_empty_matrix(name=cs@experiments[,ordered(name,name)], bins=bins)
+    counts=create_empty_matrix(name=obj@experiments[,ordered(name,name)], bins=bins)
     #add number of observables
-    ncounts=cs@biases[,.(name,bin=cut(pos, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12))][
+    ncounts=obj@biases[,.(name,bin=cut(pos, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12))][
       !is.na(bin),.(nobs=.N),keyby=c("name","bin")]
     setnames(ncounts,c("bin","nobs"),c("bin1","nobs1"))
     counts=ncounts[counts,,on=c("name","bin1")]
@@ -131,7 +131,7 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
     counts[bin1==bin2,nobs:=as.integer(nobs/2)]
     setkeyv(counts,c("name","bin1","bin2"))
     #count reads and fill matrix
-    poscounts=cs@counts[,.(name,bin1=cut(pos1, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+    poscounts=obj@counts[,.(name,bin1=cut(pos1, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                                 bin2=cut(pos2, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                            observed=contact.close+contact.far+contact.up+contact.down)][
                              (!is.na(bin1))&(!is.na(bin2)),.(observed=sum(observed)),keyby=key(counts)]

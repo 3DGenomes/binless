@@ -25,6 +25,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - bug causing failed assertion during init on rare occasions in fast binless
 - considerable speedup of init phase in fast binless
 - installation link
+- bug causing bin_data to fail if passed argument was not named cs
 
 ## [0.12.0]
 ### Added
