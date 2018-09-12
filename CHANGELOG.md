@@ -15,6 +15,10 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - maxdiag argument in fast_binless allows to fit only the first
   counter-diagonals, for speed purposes
 
+### Changed
+- changed plot appearance for binless matrices, by default the median value is
+  white
+
 ### Fixed
 - fast binless can be run on matrices of up to 65535 bins. That means human
   chromosome 1 at 3.8kb resolution

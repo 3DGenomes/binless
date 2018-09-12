@@ -192,7 +192,10 @@ plot_raw = function(dt, b1=NULL, e1=NULL, b2=NULL, e2=NULL, diagonal=T, rsites=T
 #' @export
 #'
 #' @examples
-plot_binless_matrix = function(mat, upper="binless", lower="observed", trans="log10", facet="name", limits=NULL, label=NA) {
+
+plot_binless_matrix = function(mat, upper="binless", lower="observed", trans="log10",
+                               facet="name", limits=NULL, label=NA,
+                               midpoint=ifelse(trans=="log10"&upper=="binless",mat[,log10(median(binless))],0)) {
   data=copy(mat)
   if (!("begin1" %in% names(data) && "begin2" %in% names(data))) {
     if (data[,is.factor(bin1)] && data[,is.factor(bin2)]) {
@@ -215,7 +218,8 @@ plot_binless_matrix = function(mat, upper="binless", lower="observed", trans="lo
     geom_raster(aes_string(bin2,bin1,fill=lower),hjust=just,vjust=just)
   if (all(facet %in% names(data))) p = p + facet_wrap(facet)
   #set colour scale
-  p=p+scale_fill_gradient2(low=muted("blue"),high=muted("red"),na.value = "white", limits=limits, oob=squish, trans=trans)
+  p=p+scale_fill_gradient2(low=muted("blue"),high=muted("red"),
+                           midpoint=midpoint, na.value = "white", limits=limits, oob=squish, trans=trans)
   #set visual appearance
   p=p+coord_fixed()+theme_minimal()+
     theme(panel.background = element_rect(fill = "white", colour = "black"),
