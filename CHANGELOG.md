@@ -14,6 +14,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
   be slow in very large datasets.
 - maxdiag argument in fast_binless allows to fit only the first
   counter-diagonals, for speed purposes
+- `get_ligation_ratio` helper
 
 ### Changed
 - changed plot appearance for binless matrices, by default the median value is

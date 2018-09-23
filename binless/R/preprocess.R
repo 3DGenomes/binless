@@ -697,3 +697,29 @@ subsample_csnorm = function(cs, subsampling.pc=100) {
       biases=biases, counts=counts)
 }
 
+
+#' Compute the ligation ratio from a TadBit unfiltered tsv file
+#' 
+#' @param fname a tsv file path
+#' @inheritParams read_tsv
+#' @inheritParams categorize_by_new_type
+#'   
+#' @return The ligation ratio and the number of dangling and other ends
+#' @export
+#' 
+#' @examples
+get_ligation_ratio = function(fname, maxlen, read.len, dangling.L, dangling.R, locus=NULL) {
+  data = read_tsv(fname,locus=locus)
+  #remove fbm
+  data = data[!grepl("[#~]",id)]
+  #remove far from diagonal and not pointing inwards
+  data = data[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & length1 %in% read.len]
+  #generate stats
+  data[,is.dangling:=((rbegin1 - re.closest1) %in% dangling.L) & ((rbegin2 - re.closest2) %in% dangling.R)]
+  ret=data.table(ndangling=data[is.dangling==T,.N],ntotal=data[,.N])
+  ret[,LR:=100*(1-ndangling/ntotal)]
+  ret
+}
+
+
+
