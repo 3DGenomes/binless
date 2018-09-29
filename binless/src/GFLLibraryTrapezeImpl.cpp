@@ -9,7 +9,7 @@ std::vector<std::vector<int> > trapezoidal_grid_chain(int nrows, int maxdiag) {
   if (maxdiag > (nrows+1)/2) Rcpp::stop("maxdiag is too large for this implementation!\n");
   if (maxdiag <= 1) Rcpp::stop("maxdiag must be at least 2!\n");
   int nfull = nrows-maxdiag+1; //number of rows with maxdiag elements
-  int ntotal = nfull*maxdiag + (maxdiag-1)*maxdiag/2; //total number of elements in trapeze
+  //int ntotal = nfull*maxdiag + (maxdiag-1)*maxdiag/2; //total number of elements in trapeze
   std::vector<std::vector<int> > chains;
   // full rows
   for (int rowno=1; rowno <= nfull; ++rowno) {
@@ -19,7 +19,7 @@ std::vector<std::vector<int> > trapezoidal_grid_chain(int nrows, int maxdiag) {
     chains.push_back(current);
   }
   //last rows with decreasing size
-  int csz = maxdiag-1;
+  unsigned csz = maxdiag-1;
   std::vector<int> current;
   for (int i=nfull*maxdiag; csz > 1; ++i) {
     current.push_back(i);
@@ -60,7 +60,7 @@ std::vector<std::vector<int> > trapezoidal_grid_chain(int nrows, int maxdiag) {
     //first maxdiag-1 elements are taken from previous column
     std::vector<int> previous(chains.back());
     std::vector<int> current;
-    for (int i=1; i<previous.size(); ++i) current.push_back(previous[i]+1);
+    for (unsigned i=1; i<previous.size(); ++i) current.push_back(previous[i]+1);
     //last element is computed
     current.push_back(current.back()+colno);
     chains.push_back(current);
@@ -94,7 +94,7 @@ std::vector<double> GFLLibraryTrapezeImpl::extract_trapeze(const std::vector<dou
   std::vector<double> ret;
   //Rcpp::Rcout << "max_idx_base:" << (((unsigned)nrows_-1)*((unsigned)nrows_)/2+((unsigned)nrows_-1)+(unsigned)maxdiag_) << "\n";
   ret.reserve(N_);
-  for(unsigned i=0; i<nrows_; ++i) {
+  for(unsigned i=0; i<(unsigned)nrows_; ++i) {
     unsigned idx_base = i*(i+1)/2 + i*(nrows_-i);
     auto beg_itr = vec.begin();
     auto end_itr = vec.begin();
@@ -109,9 +109,9 @@ std::vector<double> GFLLibraryTrapezeImpl::fill_triangle(const std::vector<doubl
   //compute average value
   double sum_wy=0;
   double sum_w=0;
-  for (unsigned i=0; i<nrows_; ++i) {
+  for (unsigned i=0; i<(unsigned)nrows_; ++i) {
     unsigned idx_base = i*(i+1)/2 + i*(nrows_-i);
-    for (int d=maxdiag_; i+d<nrows_; ++d) {
+    for (unsigned d=(unsigned)maxdiag_; i+d<(unsigned)nrows_; ++d) {
       sum_wy += w[idx_base+d]*y[idx_base+d];
       sum_w += w[idx_base+d];
     }
@@ -121,9 +121,9 @@ std::vector<double> GFLLibraryTrapezeImpl::fill_triangle(const std::vector<doubl
   std::vector<double> ret((unsigned)nrows_*((unsigned)nrows_+1)/2, avg);
   //fill in lasso solution on trapeze
   unsigned j=0;
-  for (unsigned i=0; i<nrows_; ++i) {
+  for (unsigned i=0; i<(unsigned)nrows_; ++i) {
     unsigned idx_base = i*(i+1)/2 + i*(nrows_-i);
-    for (int d=0; d<std::min<unsigned>(maxdiag_,nrows_-i); ++d) {
+    for (unsigned d=0; d<std::min<unsigned>((unsigned)maxdiag_,(unsigned)nrows_-i); ++d) {
       ret[idx_base+d] = beta_impl_[j++];
     }
   }

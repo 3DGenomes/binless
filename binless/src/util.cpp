@@ -114,8 +114,8 @@ Rcpp::DataFrame create_empty_matrix_cpp(Rcpp::IntegerVector name_ordered, Rcpp::
   //extract info and create vectors
   Rcpp::CharacterVector name_labels(name_ordered.attr("levels"));
   Rcpp::CharacterVector bin_labels(bins_ordered.attr("levels"));
-  unsigned n_names = name_labels.size();
-  unsigned n_bins = bin_labels.size();
+  int n_names = name_labels.size();
+  int n_bins = bin_labels.size();
   std::vector<int> name,bin1,bin2;
   unsigned nrows = n_names * (n_bins * (n_bins+1))/2;
   name.reserve(nrows);

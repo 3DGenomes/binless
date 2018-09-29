@@ -19,19 +19,19 @@ extern "C" {
 
 
 int graph_fused_lasso (int n, double *y,
-                        int ntrails, int *trails, int *breakpoints,
+                        int ntrails, unsigned *trails, unsigned *breakpoints,
                         double lam, double *alpha, double inflate,
                         int maxsteps, double converge,
                         double *beta);
 
 int graph_fused_lasso_weight (int n, double *y, double *w,
-                        int ntrails, int *trails, int *breakpoints,
+                        int ntrails, unsigned *trails, unsigned *breakpoints,
                         double lam, double *alpha, double inflate,
                         int maxsteps, double converge,
                         double *beta);
 
 int graph_fused_lasso_warm (int n, double *y,
-                        int ntrails, int *trails, int *breakpoints,
+                        int ntrails, unsigned *trails, unsigned *breakpoints,
                         double lam, double *alpha, double inflate,
                         int maxsteps, double converge,
                         double *beta, double *z, double *u);

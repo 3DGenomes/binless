@@ -5,10 +5,10 @@
 #include "gfl_graph_fl.h" //graph_fused_lasso_weight_warm
 
 std::vector<std::vector<int> > triangle_grid_chain(int nrows) {
-    unsigned ntotal = nrows;
+    int ntotal = nrows;
     ntotal = ntotal*(ntotal+1)/2-1;
     std::vector<std::vector<int> > chains;
-    int l = nrows;
+    unsigned l = nrows;
     std::vector<int> current(1,0);
     //rows of consecutive numbers
     for (int i=1; i<=ntotal; ++i) {

@@ -28,6 +28,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - installation link
 - bug causing bin_data to fail if passed argument was not named cs
 - segfaults caused by invalid Rcpp::wrap applied to unsigned (not supported)
+- several warnings due to unsigned to int cast
 
 ## [0.12.0]
 ### Added
