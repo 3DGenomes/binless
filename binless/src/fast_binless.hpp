@@ -33,7 +33,7 @@ Rcpp::List binless(const DataFrame obs, unsigned nbins, double alpha, const Nume
 Rcpp::List binless_eval_cv(const List obs, double alpha, const NumericVector lam2, const NumericVector lam1 = NumericVector(1),
                            unsigned group = 0, double tol_val = 1e-1, unsigned maxdiag=0);
 
-Rcpp::DataFrame binless_difference(const List obs, unsigned ref, double alpha, const NumericVector lam2,
+Rcpp::DataFrame binless_difference(const List obs, int ref, double alpha, const NumericVector lam2,
                                    const NumericVector lam1 = NumericVector(1), double tol_val=2e-1, bool compute_patchnos=true,
                                    unsigned maxdiag=0);
 

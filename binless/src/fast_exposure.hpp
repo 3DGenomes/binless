@@ -35,7 +35,7 @@ public:
   SummarizerSettingsImpl(const FastData& data, const Config<Exposure,Mean>&) {
     //ids for each dataset
     auto name_std = data.get_name();
-    const Eigen::Map<const Eigen::Matrix<unsigned,Eigen::Dynamic,1> > name_data(name_std.data(),name_std.size());
+    const Eigen::Map<const Eigen::VectorXi > name_data(name_std.data(),name_std.size());
     set_support_min(name_data.minCoeff());
     set_support_max(name_data.maxCoeff());
     //binner matrix

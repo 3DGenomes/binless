@@ -5,7 +5,7 @@ SignalTriplet step_signal(const FastSignalData& data, const ResidualsPair& z,
     //build signal matrix
     auto dlog_signal = data.get_log_signal();
     std::vector<double> phihat,weights;
-    std::vector<unsigned> nobs = data.get_nobs();
+    std::vector<int> nobs = data.get_nobs();
     phihat.reserve(data.get_N());
     weights.reserve(data.get_N());
     auto dbin1 = data.get_bin1();
@@ -27,7 +27,7 @@ SignalTriplet step_signal(const FastSignalData& data, const ResidualsPair& z,
         //run fused lasso
         std::vector<double> y(phihat.cbegin() + dset*data.get_ncells(), phihat.cbegin() + (dset+1)*data.get_ncells());
         std::vector<double> wt(weights.cbegin() + dset*data.get_ncells(), weights.cbegin() + (dset+1)*data.get_ncells());
-        std::vector<unsigned> no(nobs.cbegin() + dset*data.get_ncells(), nobs.cbegin() + (dset+1)*data.get_ncells());
+        std::vector<int> no(nobs.cbegin() + dset*data.get_ncells(), nobs.cbegin() + (dset+1)*data.get_ncells());
         flos[dset].optimize(y, wt, lam2[dset]);
         //compute weighted average
         std::vector<double> beta = flos[dset].get();

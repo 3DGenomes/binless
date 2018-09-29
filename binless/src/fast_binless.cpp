@@ -232,7 +232,7 @@ Rcpp::List binless_eval_cv(const List obs, double alpha, const NumericVector lam
   return Rcpp::wrap(diagnostics);
 }
 
-Rcpp::DataFrame binless_difference(const List obs, unsigned ref, double alpha, const NumericVector lam2,
+Rcpp::DataFrame binless_difference(const List obs, int ref, double alpha, const NumericVector lam2,
                                    const NumericVector lam1, double tol_val, bool compute_patchnos, unsigned maxdiag) {
   //setup distribution
   NegativeBinomialDistribution nb_dist;

@@ -27,6 +27,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - considerable speedup of init phase in fast binless
 - installation link
 - bug causing bin_data to fail if passed argument was not named cs
+- segfaults caused by invalid Rcpp::wrap applied to unsigned (not supported)
 
 ## [0.12.0]
 ### Added

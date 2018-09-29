@@ -12,7 +12,7 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const ExposureEst
   //bias, decay, signal with decay and exposures, and log_background matrix (w/ offset)
   std::vector<double> biasmat,decaymat,signal,binless,background;
   std::vector<double> log_signal(data.get_log_signal());
-  std::vector<unsigned> nobs(data.get_nobs()), name(data.get_name());
+  std::vector<int> nobs(data.get_nobs()), name(data.get_name());
   
   Eigen::VectorXd exposures = expo.get_data_estimate();
   Eigen::VectorXd log_biases = bias.get_data_estimate();
@@ -76,10 +76,10 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Signal>& data, const ExposureEst
     std::vector<double> patchnos;
     patchnos.reserve(data.get_N());
     if (compute_patchnos) {
-      std::vector<unsigned> dbin1(data.get_bin1()), dbin2(data.get_bin2());
+      std::vector<int> dbin1(data.get_bin1()), dbin2(data.get_bin2());
       for (unsigned dset=0; dset<data.get_ndatasets(); ++dset) {
-        std::vector<unsigned> d_bin1(dbin1.cbegin() + dset*data.get_ncells(), dbin1.cbegin() + (dset+1)*data.get_ncells());
-        std::vector<unsigned> d_bin2(dbin2.cbegin() + dset*data.get_ncells(), dbin2.cbegin() + (dset+1)*data.get_ncells());
+        std::vector<int> d_bin1(dbin1.cbegin() + dset*data.get_ncells(), dbin1.cbegin() + (dset+1)*data.get_ncells());
+        std::vector<int> d_bin2(dbin2.cbegin() + dset*data.get_ncells(), dbin2.cbegin() + (dset+1)*data.get_ncells());
         std::vector<double> d_beta(log_signal.cbegin() + dset*data.get_ncells(), log_signal.cbegin() + (dset+1)*data.get_ncells());
         IntegerVector patchno = get_patch_numbers(data.get_nbins(), tol_val, Rcpp::wrap(d_bin1), Rcpp::wrap(d_bin2), Rcpp::wrap(d_beta));
         for (const double v : patchno) patchnos.push_back(v);
@@ -119,10 +119,10 @@ Rcpp::DataFrame get_as_dataframe(const FastData<Difference>& data, const Numeric
   std::vector<double> patchnos;
   patchnos.reserve(data.get_N());
   if (compute_patchnos) {
-    std::vector<unsigned> dbin1(data.get_bin1()), dbin2(data.get_bin2());
+    std::vector<int> dbin1(data.get_bin1()), dbin2(data.get_bin2());
     for (unsigned dset=0; dset<data.get_ndatasets(); ++dset) {
-      std::vector<unsigned> d_bin1(dbin1.cbegin() + dset*data.get_ncells(), dbin1.cbegin() + (dset+1)*data.get_ncells());
-      std::vector<unsigned> d_bin2(dbin2.cbegin() + dset*data.get_ncells(), dbin2.cbegin() + (dset+1)*data.get_ncells());
+      std::vector<int> d_bin1(dbin1.cbegin() + dset*data.get_ncells(), dbin1.cbegin() + (dset+1)*data.get_ncells());
+      std::vector<int> d_bin2(dbin2.cbegin() + dset*data.get_ncells(), dbin2.cbegin() + (dset+1)*data.get_ncells());
       std::vector<double> d_beta(log_difference.cbegin() + dset*data.get_ncells(), log_difference.cbegin() + (dset+1)*data.get_ncells());
       IntegerVector patchno = get_patch_numbers(data.get_nbins(), tol_val, Rcpp::wrap(d_bin1), Rcpp::wrap(d_bin2), Rcpp::wrap(d_beta));
       for (const double v : patchno) patchnos.push_back(v);
