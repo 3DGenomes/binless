@@ -139,7 +139,7 @@ get_signal_matrix = function(cs, resolution=cs@settings$base.res, groups=cs@expe
     sbins=c(cs@biases[,min(pos)-1],cs@biases[,max(pos)+1])
     signal.bins=unique(cut(c(sbins,head(sbins,n=-1)+resolution/2), sbins,
                            ordered_result=T, right=F, include.lowest=T,dig.lab=12))
-    mat=CJ(name=groups[,groupname],bin1=signal.bins,bin2=signal.bins,sorted=F,unique=F)[bin2>=bin1]
+    mat=create_empty_matrix(name=groups[,ordered(groupname)], bins=ordered(signal.bins))
     mat[,phi:=0]
   } else {
     #report phi values for each group
@@ -154,8 +154,7 @@ get_signal_matrix = function(cs, resolution=cs@settings$base.res, groups=cs@expe
                                         ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                              bin=cut(pos, sbins, ordered_result=T, right=F, include.lowest=T,dig.lab=12)))
       stopifnot(bins[,.N]==length(sbins)-1)
-      mat=CJ(name=groups[,groupname],bin1=bins[,unique(bin)],bin2=bins[,unique(bin)],
-             sorted=F,unique=F)[bin2>=bin1]
+      mat=create_empty_matrix(name=groups[,ordered(groupname)], bins=ordered(signal.bins))
       mat=merge(mat,bins,by.x="bin1",by.y="bin",all.y=T)
       mat=merge(mat,bins,by.x="bin2",by.y="bin",all.y=T, suffixes=c("1","2"))
       mat=merge(mat,refmat,by=c("name","refbin1","refbin2"),all.x=T)

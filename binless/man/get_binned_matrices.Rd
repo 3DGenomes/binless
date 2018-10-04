@@ -4,7 +4,8 @@
 \alias{get_binned_matrices}
 \title{Fetch grouped matrices from CSnorm object}
 \usage{
-get_binned_matrices(cs, resolution = cs@settings$base.res, group = "all")
+get_binned_matrices(cs, resolution = cs@settings$base.res,
+  group = "all")
 }
 \arguments{
 \item{cs}{CSnorm object.}

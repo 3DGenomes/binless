@@ -4,8 +4,8 @@
 \alias{group_datasets}
 \title{Group binned matrices of datasets}
 \usage{
-group_datasets(cs, resolution, group = c("condition", "replicate", "enzyme",
-  "experiment"), verbose = T, ncores = 1)
+group_datasets(cs, resolution, group = c("condition", "replicate",
+  "enzyme", "experiment"), verbose = T, ncores = 1)
 }
 \arguments{
 \item{cs}{CSnorm object, normalized.}

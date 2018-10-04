@@ -23,6 +23,14 @@ public:
     FusedLassoGaussianEstimator(unsigned nrows, double tol) : Library(nrows), tol_(tol),
     clamp_(Settings<FusedLassoGaussianEstimator<Library> >::get_clamp()) {}
     
+    //approximate lasso solution computed on the first maxdiag counter-diagonals (included)
+    //requesting precision to be below a given convergence criterion
+    //final beta value will be clamped if clamp > 0
+    //if maxdiag >= nrows, equivalent to the previous overload, computing the exact solution
+    //for data beyond maxdiag, set beta to weighted average of all points
+    FusedLassoGaussianEstimator(unsigned nrows, double tol, unsigned maxdiag) : Library(nrows, std::min(maxdiag,nrows)), tol_(tol),
+    clamp_(Settings<FusedLassoGaussianEstimator<Library> >::get_clamp()) {}
+    
     //run the optimization on the given data. The objective is
     // sum_i w_i(y_i-beta_i)^2 + lambda2 * sum_ij |beta_i-beta_j|
     // y, w and lambda2 are held constant, while beta starts at beta_init

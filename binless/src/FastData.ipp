@@ -1,16 +1,16 @@
 
 template<typename Derived>
 FastDataCore<Derived>::FastDataCore(const DataFrame& obs, unsigned nbins) :
-name_(Rcpp::as<std::vector<unsigned> >(obs["name"])),
-bin1_(Rcpp::as<std::vector<unsigned> >(obs["bin1"])),
-pos1_(Rcpp::as<std::vector<unsigned> >(obs["pos1"])),
-bin2_(Rcpp::as<std::vector<unsigned> >(obs["bin2"])),
-pos2_(Rcpp::as<std::vector<unsigned> >(obs["pos2"])),
+name_(Rcpp::as<std::vector<int> >(obs["name"])),
+bin1_(Rcpp::as<std::vector<int> >(obs["bin1"])),
+pos1_(Rcpp::as<std::vector<int> >(obs["pos1"])),
+bin2_(Rcpp::as<std::vector<int> >(obs["bin2"])),
+pos2_(Rcpp::as<std::vector<int> >(obs["pos2"])),
 name_levels_(Rcpp::as<Rcpp::IntegerVector>(obs["name"]).attr("levels")),
 bin1_levels_(Rcpp::as<Rcpp::IntegerVector>(obs["bin1"]).attr("levels")),
 bin2_levels_(Rcpp::as<Rcpp::IntegerVector>(obs["bin2"]).attr("levels")),
-observed_(Rcpp::as<std::vector<unsigned> >(obs["observed"])),
-nobs_(Rcpp::as<std::vector<unsigned> >(obs["nobs"])),
+observed_(Rcpp::as<std::vector<int> >(obs["observed"])),
+nobs_(Rcpp::as<std::vector<int> >(obs["nobs"])),
 distance_(Rcpp::as<std::vector<double> >(obs["distance"])),
 nbins_(nbins), ncells_(nbins*(nbins+1)/2), ndatasets_(*std::max_element(name_.begin(), name_.end())), N_(ndatasets_*ncells_),
 beta_(std::vector<double>(N_,0)),

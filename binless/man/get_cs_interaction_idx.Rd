@@ -4,7 +4,8 @@
 \alias{get_cs_interaction_idx}
 \title{Fetch CSinter object from CSgroup object}
 \usage{
-get_cs_interaction_idx(csg, type, threshold = -1, ref = NULL, raise = T)
+get_cs_interaction_idx(csg, type, threshold = -1, ref = NULL,
+  raise = T)
 }
 \arguments{
 \item{type}{}

@@ -4,7 +4,8 @@
 \alias{get_interactions}
 \title{Fetch detected interactions from CSnorm object}
 \usage{
-get_interactions(cs, type, resolution, group, threshold = -1, ref = NULL)
+get_interactions(cs, type, resolution, group, threshold = -1,
+  ref = NULL)
 }
 \description{
 Fetch detected interactions from CSnorm object

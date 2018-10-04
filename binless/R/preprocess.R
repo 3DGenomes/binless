@@ -115,13 +115,13 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
   } else if (class(obj)[1] == "CSnorm") {
     if (!is.null(b1)) stop("b1 must be NULL when passing CSnorm object")
     if (!is.null(b2)) stop("b2 must be NULL when passing CSnorm object")
-    bin_borders=cs@biases[,seq(min(pos)-1,max(pos)+1,resolution)] #we discard the last incomplete bin
+    bin_borders=obj@biases[,seq(min(pos)-1,max(pos)+1,resolution)] #we discard the last incomplete bin
     bins=cut(head(bin_borders,n=length(bin_borders)-1)+resolution/2, bin_borders,
              ordered_result=T, right=F, include.lowest=T,dig.lab=12)
     #build empty counts matrix
-    counts=CJ(name=cs@experiments[,name],bin1=bins,bin2=bins)[bin2>=bin1]
+    counts=create_empty_matrix(name=obj@experiments[,ordered(name,name)], bins=bins)
     #add number of observables
-    ncounts=cs@biases[,.(name,bin=cut(pos, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12))][
+    ncounts=obj@biases[,.(name,bin=cut(pos, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12))][
       !is.na(bin),.(nobs=.N),keyby=c("name","bin")]
     setnames(ncounts,c("bin","nobs"),c("bin1","nobs1"))
     counts=ncounts[counts,,on=c("name","bin1")]
@@ -131,7 +131,7 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
     counts[bin1==bin2,nobs:=as.integer(nobs/2)]
     setkeyv(counts,c("name","bin1","bin2"))
     #count reads and fill matrix
-    poscounts=cs@counts[,.(name,bin1=cut(pos1, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
+    poscounts=obj@counts[,.(name,bin1=cut(pos1, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                                 bin2=cut(pos2, bin_borders, ordered_result=T, right=F, include.lowest=T,dig.lab=12),
                            observed=contact.close+contact.far+contact.up+contact.down)][
                              (!is.na(bin1))&(!is.na(bin2)),.(observed=sum(observed)),keyby=key(counts)]
@@ -696,4 +696,30 @@ subsample_csnorm = function(cs, subsampling.pc=100) {
       zeros=cs@zeros,
       biases=biases, counts=counts)
 }
+
+
+#' Compute the ligation ratio from a TadBit unfiltered tsv file
+#' 
+#' @param fname a tsv file path
+#' @inheritParams read_tsv
+#' @inheritParams categorize_by_new_type
+#'   
+#' @return The ligation ratio and the number of dangling and other ends
+#' @export
+#' 
+#' @examples
+get_ligation_ratio = function(fname, maxlen, read.len, dangling.L, dangling.R, locus=NULL) {
+  data = read_tsv(fname,locus=locus)
+  #remove fbm
+  data = data[!grepl("[#~]",id)]
+  #remove far from diagonal and not pointing inwards
+  data = data[rbegin2-rbegin1 < maxlen & strand1==1 & strand2==0 & length1 %in% read.len]
+  #generate stats
+  data[,is.dangling:=((rbegin1 - re.closest1) %in% dangling.L) & ((rbegin2 - re.closest2) %in% dangling.R)]
+  ret=data.table(ndangling=data[is.dangling==T,.N],ntotal=data[,.N])
+  ret[,LR:=100*(1-ndangling/ntotal)]
+  ret
+}
+
+
 

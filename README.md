@@ -6,21 +6,28 @@ Refer to the [CHANGELOG](CHANGELOG.md) for the latest changes
 
 ### Installation
 
-The easy way is to let `devtools` do the installation for you. Type the
-following in an R shell
+#### The easy way
+Let `devtools` do the installation for you. Type the following in an R shell
 
 ```
 install.packages("devtools")
-devtools::install_github("3DGenomes/binless")
+devtools::install_github("3DGenomes/binless",subdir="binless")
 ```
 
-Otherwise, you can install it manually as follows:
+#### Manual installation
+You can also install it manually as follows:
 
 * Download the latest release [here](../../releases/latest)
 * Unpack it in a clean folder on your machine, and hit `R CMD INSTALL --preclean binless`
   in a shell.
 * If it complains that some packages are not installed, you must install them in
   R using `install.packages`
+
+#### Requirements
+The minimum required R version is `3.2.0`
+Binless uses the following packages: `data.table`, `Hmisc`, `foreach`,
+`doParallel`, `MASS`, `matrixStats`, `ggplot2`, `dplyr`, `Matrix`, `quadprog`,
+`scales`, `utils`
 
 ### How does it work?
 
@@ -67,9 +74,10 @@ not interested in binless normalization, check out the short tutorial
 
 ### Questions? Problems?
 
-Please use the GitHub issues tracker to report anything, rather than
-sending an e-mail. You can use it to report bugs, ask questions or suggest new
-features. We are looking forward to your feedback!
+Check out the [FAQ](https://github.com/3DGenomes/binless/issues?q=label%3AFAQ)
+in the GitHub issues tracker. If you don't find anything, just file an issue by
+clicking on the "New issue" button. You can use it to report bugs, ask questions
+or suggest new features. We are looking forward to your feedback!
 
 ### Citation
 

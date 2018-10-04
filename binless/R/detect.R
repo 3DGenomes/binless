@@ -30,7 +30,7 @@ predict_binned_matrices_irls = function(cts, dispersion) {
   bl1=cts[,levels(bin1)]
   bins=ordered(1:length(bl1))
   levels(bins) <- bl1
-  fullmat=CJ(name=cts[,unique(name)],bin1=bins,bin2=bins,sorted=T)[bin2>=bin1]
+  fullmat=create_empty_matrix(name=cts[,ordered(unique(name))], bins=bins)
   mat=mat[fullmat]
   mat[is.na(observed),c("nobs","observed","normalized"):=list(0,0,0)]
   mat[,diag.idx:=unclass(bin2)-unclass(bin1)]

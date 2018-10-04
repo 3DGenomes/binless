@@ -66,40 +66,84 @@ BinDesign make_even_bins(double lower, double upper, unsigned Nbins) {
   return BinDesign{Nbins,ret,begins,ends};
 }
 
-Eigen::SparseMatrix<double, Eigen::RowMajor> bin_data(const Eigen::VectorXd& data, const BinDesign& design, bool drop) {
+SpMat bin_data(const Eigen::VectorXd& data, const BinDesign& design, bool drop) {
   unsigned Ndata = data.rows();
   std::vector<Eigen::Triplet<double> > tripletList;
   tripletList.reserve(Ndata);
   for (unsigned i=0; i<Ndata; ++i) {
     auto it = design.map.upper_bound(data(i));
-    if (it == design.map.end()) it = design.map.lower_bound(data(i));
-    unsigned j = it->second - 1; //upper_bound returns pointer to next bin
+    unsigned j;
+    if (it == design.map.end()) {
+      j = design.map.rbegin()->second -1; //place in last bin
+    } else {
+      j = it->second - 1; //upper_bound returns pointer to next bin
+    }
     tripletList.push_back(Eigen::Triplet<double>(j,i,1.));
   }
-  Eigen::SparseMatrix<double, Eigen::RowMajor> mat(design.Nbins,Ndata);
-  mat.setFromTriplets(tripletList.begin(), tripletList.end());
   if (drop) {
-    Eigen::SparseMatrix<double, Eigen::RowMajor> ret(design.Nbins,Ndata);
-    unsigned Nrow=0;
-    for (unsigned i=0; i<design.Nbins; ++i) {
-      if (mat.row(i).sum()>0) ret.row(Nrow++) = mat.row(i);
-    }
-    ret.conservativeResize(Nrow,Ndata);
+    //get which rows are empty
+    std::vector<bool> has_value(design.Nbins,false);
+    for (auto tr : tripletList) has_value[tr.row()] = true; 
+    //create map from old to new indices
+    std::map<unsigned,unsigned> row_map;
+    unsigned new_idx=0;
+    for (unsigned old_idx=0; old_idx<design.Nbins; old_idx++) if(has_value[old_idx]) row_map[old_idx]=new_idx++;
+    //make new triplet list, dropping empty rows
+    std::vector<Eigen::Triplet<double> > newTripletList;
+    newTripletList.reserve(Ndata);
+    for (auto tr : tripletList) newTripletList.push_back(Eigen::Triplet<double>(row_map[tr.row()],tr.col(),tr.value()));
+    //form new matrix and return
+    SpMat ret(new_idx,Ndata);
+    ret.setFromTriplets(newTripletList.begin(), newTripletList.end());
     ret.makeCompressed();
     return ret;
   } else {
+    SpMat mat(design.Nbins,Ndata);
+    mat.setFromTriplets(tripletList.begin(), tripletList.end());
     mat.makeCompressed();
     return mat;
   }
 }
 
-Eigen::SparseMatrix<double, Eigen::RowMajor> bin_data_evenly(const Eigen::VectorXd& data, unsigned Nbins, bool drop) {
+SpMat bin_data_evenly(const Eigen::VectorXd& data, unsigned Nbins, bool drop) {
   auto design = make_even_bins(data.minCoeff(),data.maxCoeff(),Nbins);
   return bin_data(data,design,drop);
 }
 
-
-
+Rcpp::DataFrame create_empty_matrix_cpp(Rcpp::IntegerVector name_ordered, Rcpp::IntegerVector bins_ordered) {
+  //extract info and create vectors
+  Rcpp::CharacterVector name_labels(name_ordered.attr("levels"));
+  Rcpp::CharacterVector bin_labels(bins_ordered.attr("levels"));
+  int n_names = name_labels.size();
+  int n_bins = bin_labels.size();
+  std::vector<int> name,bin1,bin2;
+  unsigned nrows = n_names * (n_bins * (n_bins+1))/2;
+  name.reserve(nrows);
+  bin1.reserve(nrows);
+  bin2.reserve(nrows);
+  //build vectors
+  for (int n=1; n <= n_names; ++n) {
+    for (int i=1; i <= n_bins; ++i) {
+      for (int j=i; j <= n_bins; ++j) {
+        name.push_back(n);
+        bin1.push_back(i);
+        bin2.push_back(j);
+      }
+    }
+  }
+  //convert to rcpp
+  Rcpp::IntegerVector rname(Rcpp::wrap(name));
+  rname.attr("levels") = name_labels;
+  rname.attr("class") = CharacterVector::create("ordered", "factor");
+  Rcpp::IntegerVector rbin1(Rcpp::wrap(bin1));
+  rbin1.attr("levels") = bin_labels;
+  rbin1.attr("class") = CharacterVector::create("ordered", "factor");
+  Rcpp::IntegerVector rbin2(Rcpp::wrap(bin2));
+  rbin2.attr("levels") = bin_labels;
+  rbin2.attr("class") = CharacterVector::create("ordered", "factor");
+  //return data frame
+  return Rcpp::DataFrame::create(_["name"]=rname, _["bin1"]=rbin1, _["bin2"]=rbin2);
+}
 
 
 

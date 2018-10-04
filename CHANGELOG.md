@@ -4,6 +4,33 @@ All notable changes to *binless* will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 for versions 0.x of binless, minor releases might break backwards compatibility.
 
+## [0.13.0]
+### Added
+- use 64 bit integers in gfl_graph_fl to expand the index limit in lasso.
+- use long as StorageIndex to expand the limit of elements in Eigen SparseMatrix in fast binless.
+- possibility to dump fast binless output to csv file to limit the memory used in the creation of DataFrame.
+  To reduce the file size the csv will be compressed in gzip format using BOOST libraries if USE_BOOST is     activated in Makevars file.
+- possibility to prevent computation of patch numbers in fast binless. This can
+  be slow in very large datasets.
+- maxdiag argument in fast_binless allows to fit only the first
+  counter-diagonals, for speed purposes
+- `get_ligation_ratio` helper
+
+### Changed
+- changed plot appearance for binless matrices, by default the median value is
+  white
+
+### Fixed
+- fast binless can be run on matrices of up to 65535 bins. That means human
+  chromosome 1 at 3.8kb resolution
+- bug causing failed assertion during init on rare occasions in fast binless
+- considerable speedup of init phase in fast binless
+- installation link
+- bug causing bin_data to fail if passed argument was not named cs
+- segfaults caused by invalid Rcpp::wrap applied to unsigned (not supported)
+- several warnings due to unsigned to int cast
+- updated readme to indicate dependencies
+
 ## [0.12.0]
 ### Added
 - First part of decay in fast binless is not forced to decrease. Use `free_diag`
@@ -94,7 +121,8 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - Initial commit
 
 
-[0.12.0]: ../../compare/v0.11.0...HEAD
+[0.13.0]: ../../compare/v0.12.0...HEAD
+[0.12.0]: ../../compare/v0.11.0...v0.12.0
 [0.11.0]: ../../compare/v0.10.2...v0.11.0
 [0.10.2]: ../../compare/v0.10.1...v0.10.2
 [0.10.1]: ../../compare/v0.10.0...v0.10.1

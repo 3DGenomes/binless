@@ -35,18 +35,16 @@ bounds_t BoundsOptimizer<ZeroOffset, Sign>::optimize_bounds(double val) const {
     Rcpp::LogicalVector grp1 = beta_ > val, grp2 = beta_ < -val;
     Rcpp::NumericVector w1 = weight_[grp1];
     Rcpp::NumericVector w2 = weight_[grp2];
-    bool grp1empty = w1.size() == 0 || sum(w1) == 0;
-    bool grp2empty = w2.size() == 0 || sum(w2) == 0;
-    double xk,xkp1;
+    double xk; //,xkp1;
     if (val>maxabsval_) {
         xk=maxabsval_;
-        xkp1=std::numeric_limits<double>::infinity();
+        //xkp1=std::numeric_limits<double>::infinity();
     } else if (val<minabsval_) {
         xk=0;
-        xkp1=minabsval_;
+        //xkp1=minabsval_;
     } else {
         xk=max(Rcpp::as<Rcpp::NumericVector>(absval_[absval_<=val]));
-        xkp1=min(Rcpp::as<Rcpp::NumericVector>(absval_[absval_>val]));
+        //xkp1=min(Rcpp::as<Rcpp::NumericVector>(absval_[absval_>val]));
     }
     double UB = xk;
     return bounds_t{-UB,UB};

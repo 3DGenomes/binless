@@ -22,7 +22,16 @@
 #' @param nouter unsigned The maximum number of iterations that should be performed (default 25)
 #' @param tol_val double tolerance on the values for convergence and the fused lasso (default 2e-1)
 #' @param bg_steps unsigned the maximum number of initial steps where no signal is fitted (default 5)
-#' @param free_decay the distance in bases up to which the decay is not forced to decrease (default 10000)
+#' @param free_decay integer the distance in bases up to which the decay is not forced to decrease (default 10000)
+#' @param compute_patchnos boolean whether to compute the patchno column or not (TRUE by default).
+#'  On very large datasets, this is slow.
+#' @param csv_out If a string is provided here, will write the results of the computation to that file
+#'  instead of returning them. Useful for very large matrices to speed things up.
+#' @param maxdiag Only compute matrix on the first maxdiag counter-diagonals. By default, maxdiag is zero
+#' which amounts to compute it on all counter-diagonals. Can be used to speed up calculations on large
+#' matrices. The returned matrix contains a single value for all entries further than maxdiag, which 
+#' corresponds to the fused lasso solution with infinite penalty on the values further than maxdiag. Useful
+#' to set exp(lambda1) to a sensible value when maxdiag is beyond regions with any signal.
 #' 
 #' @export
 #' @name fast_binless 
@@ -62,5 +71,21 @@ bin_cts_to_mat = function(cs, cts, resolution) {
 }
 
 
-
+#' Generate an empty matrix in triangular form.
+#' 
+#' arguments are taken as ordered factors
+#' returned matrix is of size n_names * n_bins * (n_bins+1) / 2
+#' n_names and n_bins are the number of levels in the name and bins factors
+#'
+#' @param name an ordered factor of names
+#' @param bins an ordered factor of bins
+#'
+#' @return
+#'
+#' @examples
+create_empty_matrix = function(name, bins) {
+  dt=binless:::create_empty_matrix_cpp(name,bins)
+  dt=setDT(dt,key=c("name","bin1","bin2"))
+  return(dt)
+}
 

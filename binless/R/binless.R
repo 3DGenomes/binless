@@ -15,7 +15,7 @@
 #'
 #' @section Normalization:
 #' \code{\link{normalize_binless}}
-#' \code{\link{run_exact}}
+#' \code{\link{fast_binless}}
 #'
 #' @section Postprocessing:
 #' \code{\link{bin_all_datasets}}
@@ -34,9 +34,9 @@
 #' @import foreach
 #' @import matrixStats
 #' @import ggplot2
+#' @import scales
 #' @import Matrix
 #' @import quadprog
-#' @importFrom scales muted
 #' @importFrom Hmisc cut2
 #' @importFrom dplyr ntile
 #' @importFrom utils packageVersion

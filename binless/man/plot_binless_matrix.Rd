@@ -5,7 +5,9 @@
 \title{make plot of binless matrix}
 \usage{
 plot_binless_matrix(mat, upper = "binless", lower = "observed",
-  trans = "log10", facet = "name", limits = NULL, label = NA)
+  trans = "log10", facet = "name", limits = NULL, label = NA,
+  midpoint = ifelse(trans == "log10" & upper == "binless", mat[,
+  log10(median(binless))], 0))
 }
 \arguments{
 \item{mat}{the binless matrix}

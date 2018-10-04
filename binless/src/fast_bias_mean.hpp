@@ -38,8 +38,8 @@ public:
     //log_distance and bounds
     auto pos1_std = data.get_pos1();
     auto pos2_std = data.get_pos2();
-    const Eigen::Map<const Eigen::Matrix<unsigned,Eigen::Dynamic,1> > pos1_data(pos1_std.data(),pos1_std.size());
-    const Eigen::Map<const Eigen::Matrix<unsigned,Eigen::Dynamic,1> > pos2_data(pos2_std.data(),pos2_std.size());
+    const Eigen::Map<const Eigen::VectorXi > pos1_data(pos1_std.data(),pos1_std.size());
+    const Eigen::Map<const Eigen::VectorXi > pos2_data(pos2_std.data(),pos2_std.size());
     Eigen::VectorXd pos_data(pos1_data.rows()+pos2_data.rows());
     pos_data << pos1_data.cast<double>(), pos2_data.cast<double>();
     set_support_min( pos_data.minCoeff() );

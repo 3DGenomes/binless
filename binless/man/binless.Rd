@@ -24,7 +24,7 @@ or interaction difference detection. See publication TODO.
 \section{Normalization}{
 
 \code{\link{normalize_binless}}
-\code{\link{run_exact}}
+\code{\link{fast_binless}}
 }
 
 \section{Postprocessing}{

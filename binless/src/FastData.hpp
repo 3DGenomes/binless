@@ -19,16 +19,16 @@ public:
   unsigned get_nbins() const { return nbins_; }
   unsigned get_ncells() const { return ncells_; }
   unsigned get_ndatasets() const { return ndatasets_; }
-  std::vector<unsigned> get_name() const { return name_; }
-  std::vector<unsigned> get_bin1() const { return bin1_; }
-  std::vector<unsigned> get_pos1() const { return pos1_; }
-  std::vector<unsigned> get_bin2() const { return bin2_; }
-  std::vector<unsigned> get_pos2() const { return pos2_; }
+  std::vector<int> get_name() const { return name_; }
+  std::vector<int> get_bin1() const { return bin1_; }
+  std::vector<int> get_pos1() const { return pos1_; }
+  std::vector<int> get_bin2() const { return bin2_; }
+  std::vector<int> get_pos2() const { return pos2_; }
   Rcpp::IntegerVector get_name_factor() const { return wrap_ordered(name_, name_levels_); }
   Rcpp::IntegerVector get_bin1_factor() const { return wrap_ordered(bin1_, bin1_levels_); }
   Rcpp::IntegerVector get_bin2_factor() const { return wrap_ordered(bin2_, bin2_levels_); } 
-  std::vector<unsigned> get_observed() const { return observed_; }
-  std::vector<unsigned> get_nobs() const { return nobs_; }
+  std::vector<int> get_observed() const { return observed_; }
+  std::vector<int> get_nobs() const { return nobs_; }
   std::vector<double> get_distance() const { return distance_; }
   
   std::vector<double> get_beta() const { return beta_; }
@@ -47,16 +47,16 @@ public:
   void set_exposures(const std::vector<double>& exposures) { exposures_ = exposures; }
   
 private:
-  Rcpp::IntegerVector wrap_ordered(std::vector<unsigned> vec, Rcpp::CharacterVector levels) const {
+  Rcpp::IntegerVector wrap_ordered(std::vector<int> vec, Rcpp::CharacterVector levels) const {
     Rcpp::IntegerVector rvec(Rcpp::wrap(vec));
     rvec.attr("levels") = levels;
     rvec.attr("class") = CharacterVector::create("ordered", "factor");
     return rvec;
   }
   
-  const std::vector<unsigned> name_,bin1_,pos1_,bin2_,pos2_;  //N(N+1)/2
+  const std::vector<int> name_,bin1_,pos1_,bin2_,pos2_;  //N(N+1)/2
   Rcpp::CharacterVector name_levels_, bin1_levels_, bin2_levels_;
-  const std::vector<unsigned> observed_, nobs_; //N(N+1)/2
+  const std::vector<int> observed_, nobs_; //N(N+1)/2
   const std::vector<double> distance_;
   const unsigned nbins_, ncells_, ndatasets_, N_;
   std::vector<double> beta_,betahat_,weights_; //N(N+1)/2
@@ -84,9 +84,9 @@ public:
 
 template<> class FastData<Difference> : public FastDataCore<FastData<Difference> > {
 public:
-  FastData(const DataFrame& obs, unsigned nbins, unsigned ref) :
+  FastData(const DataFrame& obs, unsigned nbins, int ref) :
   FastDataCore(obs,nbins), phi_ref_(std::vector<double>(get_N(),0)), ref_(ref-1) {
-    std::vector<unsigned> name = get_name();
+    std::vector<int> name = get_name();
     if (*std::max_element(name.begin(), name.end()) < ref || ref < 1) Rcpp::stop("Ref is not in the allowed range");
   }
   
@@ -107,7 +107,7 @@ public:
   
 private:
   std::vector<double> phi_ref_;
-  unsigned ref_;
+  int ref_;
 };
 
 #include "FastData.ipp"

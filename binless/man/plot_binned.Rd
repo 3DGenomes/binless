@@ -4,8 +4,8 @@
 \alias{plot_binned}
 \title{Plot reads in binned form at a given resolution}
 \usage{
-plot_binned(dt, resolution, b1, e1, b2 = NULL, e2 = NULL, diagonal = F,
-  rsites = F)
+plot_binned(dt, resolution, b1, e1, b2 = NULL, e2 = NULL,
+  diagonal = F, rsites = F)
 }
 \arguments{
 \item{dt}{a reads data.table containing the parsed tsv reads}
