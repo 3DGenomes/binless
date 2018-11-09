@@ -8,6 +8,8 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 ### Changed
 - Tutorials now use the smaller SEMA3C dataset, which can be run quickly on a
   laptop
+### Removed
+- Old article/ folder
 
 ## [0.13.0]
 ### Added
