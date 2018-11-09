@@ -128,7 +128,8 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - Initial commit
 
 
-[0.13.0]: ../../compare/v0.12.0...HEAD
+[0.14.0]: ../../compare/v0.13.0...HEAD
+[0.13.0]: ../../compare/v0.12.0...v0.13.0
 [0.12.0]: ../../compare/v0.11.0...v0.12.0
 [0.11.0]: ../../compare/v0.10.2...v0.11.0
 [0.10.2]: ../../compare/v0.10.1...v0.10.2
