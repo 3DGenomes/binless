@@ -1,7 +1,7 @@
 Package: binless
 Type: Package
 Title: binless: Resolution-independent Normalization And Interaction Detection For Hi-C Data
-Version: 0.13.0
+Version: 0.14.0
 Authors@R: person("Yannick", "Spill", email = "yannick.spill@nsup.org", role = c("aut", "cre"))
 Description: Provides resolution-independent normalization of Hi-C data, and
     permits interaction and difference detection.

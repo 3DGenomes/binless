@@ -14,6 +14,8 @@ install.packages("devtools")
 devtools::install_github("3DGenomes/binless",subdir="binless")
 ```
 
+Installation should take about 10 minutes.
+
 #### Manual installation
 You can also install it manually as follows:
 
@@ -29,11 +31,16 @@ Binless uses the following packages: `data.table`, `Hmisc`, `foreach`,
 `doParallel`, `MASS`, `matrixStats`, `ggplot2`, `dplyr`, `Matrix`, `quadprog`,
 `scales`, `utils`
 
+Binless has been developed and tested on a MacBook Pro (2015) and on a CentOS 7 
+linux workstation with 128Gb RAM and 32 cores. Resource usage can go from modest 
+(fast binless will run on a laptop for loci <10Mb) to huge (fast binless on
+human chromosome 1 at 5kb base resolution requires about 500Gb of RAM).
+
 ### How does it work?
 
 In the `example/` folder, we provide plots and files to perform a normalization,
 taken from publicly available data (Rao *et al.*, 2014). Alternatively you can
-use your own data.  Start with something not too large, for example 2Mb. If you
+use your own data.  Start with something not too large, for example 1Mb. If you
 want a quick and dirty overview, skip to the *Fast binless* section. Otherwise,
 read on.
 
@@ -55,16 +62,15 @@ on the `CSnorm` object you built at the previous step. Once normalized, datasets
 can be combined, and signal and difference detection can be performed.  **This
 is the full-blown version of the algorithm, with statistically
 significant output**. Note that this is a beta version, so check for updates
-frequently.
+regularly.
 
 ### Fast binless
 
 See `fast_binless.R`. Here, we implemented a fast approximation with fixed
-fusion penalty and an approximate decay. You can either use a `CSnorm` object
+fusion penalty and approximate decay and bias terms. You can either use a `CSnorm` object
 produced at the preprocessing stage, or directly provide the binned raw matrix.
 **This is a fast and approximate version of the full algorithm, so you will not
-get statistically significant output**, and it might not look as *smooth* as the
-full-blown algorithm. But you can try out a whole chromosome ;)
+get statistically significant output**. But you can try out a whole chromosome ;)
 
 ### Base-resolution (arrow) plots
 
@@ -108,7 +114,7 @@ the following columns
 1. `re.up2`
 1. `re.dn2`
 
-Binned raw matrix (used for fast binless): tab or space-separated text file
+Binned raw matrix (used for fast binless): tab, comma or space-separated text file
 containing multiple datasets. The first line is a header that must start with
 `"name" "bin1" "pos1" "bin2" "pos2" "distance" "observed" "nobs"`. Optionally, more columns
 can be added but make sure their column names are different.
@@ -124,8 +130,5 @@ can be added but make sure their column names are different.
 Note that `name` will be converted to R factors, so you an also
 provide them as integers starting at 1 (i.e. use 1 for the first dataset, 2 for the second etc.).
 Also, **you must have pos2 >= pos1, and the data must be sorted by name, pos1 and pos2, in that order**.
-
-
-
 
 

@@ -4,6 +4,13 @@ All notable changes to *binless* will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 for versions 0.x of binless, minor releases might break backwards compatibility.
 
+## [0.14.0]
+### Changed
+- Tutorials now use the smaller SEMA3C dataset, which can be run quickly on a
+  laptop
+### Removed
+- Old article/ folder
+
 ## [0.13.0]
 ### Added
 - use 64 bit integers in gfl_graph_fl to expand the index limit in lasso.
@@ -121,7 +128,8 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - Initial commit
 
 
-[0.13.0]: ../../compare/v0.12.0...HEAD
+[0.14.0]: ../../compare/v0.13.0...HEAD
+[0.13.0]: ../../compare/v0.12.0...v0.13.0
 [0.12.0]: ../../compare/v0.11.0...v0.12.0
 [0.11.0]: ../../compare/v0.10.2...v0.11.0
 [0.10.2]: ../../compare/v0.10.1...v0.10.2
