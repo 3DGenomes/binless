@@ -28,6 +28,8 @@
 #' \code{\link{plot_binless_matrix}}
 #'
 #' @useDynLib binless, .registration = TRUE
+#' @import Rcpp
+#' @import RcppEigen
 #' @import data.table
 #' @import doParallel
 #' @import foreach
