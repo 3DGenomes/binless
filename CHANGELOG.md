@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 for versions 0.x of binless, minor releases might break backwards compatibility.
 
 ## [Unreleased]
+### Added
+- less errors regarding documentation when compiling
 
 ## [0.14.0]
 ### Changed
