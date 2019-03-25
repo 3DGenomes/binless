@@ -24,3 +24,6 @@ The same data.table, with an additional "category" column
 \description{
 Performs classification according to cut-site normalization scheme
 }
+\examples{
+" "
+}

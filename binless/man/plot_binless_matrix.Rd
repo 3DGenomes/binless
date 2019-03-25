@@ -19,6 +19,12 @@ triangle. Default: phi. Formulae are allowed (ggplot2 aes syntax)}
 
 \item{limits}{set to a pair of values to enforce plot and colour scale to be within these values}
 }
+\value{
+" "
+}
 \description{
 make plot of binless matrix
+}
+\examples{
+" "
 }

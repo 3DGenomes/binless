@@ -7,9 +7,19 @@
 predict_binned_matrices_irls(cts, dispersion)
 }
 \arguments{
+\item{cts}{cts}
+
+\item{dispersion}{dispersion}
+
 \item{verbose}{boolean.}
+}
+\value{
+" "
 }
 \description{
 fast IRLS and zero counts approximation
+}
+\examples{
+" "
 }
 \keyword{internal}

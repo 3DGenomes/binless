@@ -10,4 +10,7 @@ get_interactions(cs, type, resolution, group, threshold = -1,
 \description{
 Fetch detected interactions from CSnorm object
 }
+\examples{
+" "
+}
 \keyword{internal}

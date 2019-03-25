@@ -21,3 +21,6 @@ a data.table containing the differences
 \description{
 Fetch binless differences from CSnorm object
 }
+\examples{
+" "
+}

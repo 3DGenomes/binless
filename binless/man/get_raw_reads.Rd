@@ -19,3 +19,6 @@ reads data.table subset
 \description{
 Get subset of raw reads
 }
+\examples{
+" "
+}

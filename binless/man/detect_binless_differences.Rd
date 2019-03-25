@@ -49,3 +49,6 @@ the binned matrix with additional information relating to these
 \description{
 Binless detection of significant differences with a reference
 }
+\examples{
+" "
+}

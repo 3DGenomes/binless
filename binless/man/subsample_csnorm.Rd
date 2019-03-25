@@ -17,3 +17,6 @@ The csnorm object with updated biases and counts slots
 \description{
 Take a random subset of the reads of a given csnorm object
 }
+\examples{
+" "
+}

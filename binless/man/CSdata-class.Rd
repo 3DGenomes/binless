@@ -4,6 +4,9 @@
 \name{CSdata-class}
 \alias{CSdata-class}
 \title{Class to hold a single experiment}
+\value{
+" "
+}
 \description{
 Class to hold a single experiment
 }
@@ -21,3 +24,6 @@ Class to hold a single experiment
 \item{\code{counts}}{data.table. The reads data for that experiment}
 }}
 
+\examples{
+" "
+}

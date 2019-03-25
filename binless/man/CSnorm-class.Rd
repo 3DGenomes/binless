@@ -4,6 +4,9 @@
 \name{CSnorm-class}
 \alias{CSnorm-class}
 \title{Class to hold cut-site normalization data}
+\value{
+" "
+}
 \description{
 Class to hold cut-site normalization data
 }
@@ -29,3 +32,6 @@ Class to hold cut-site normalization data
 \item{\code{binned}}{list. Binned matrices and differences}
 }}
 
+\examples{
+" "
+}

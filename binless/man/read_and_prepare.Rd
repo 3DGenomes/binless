@@ -62,3 +62,6 @@ A CSdata object
 See \code{\link{read_tsv}}, \code{\link{categorize_by_new_type}} and 
 \code{\link{prepare_for_sparse_cs_norm}} for further detail and arguments.
 }
+\examples{
+" "
+}

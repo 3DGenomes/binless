@@ -5,7 +5,7 @@
 \title{Fast binless signal calculation}
 \usage{
 fast_binless(obs, nbins, alpha, lam2, lam1 = 0, nouter = 25, tol_val = 2e-1,
- bg_steps = 5, free_decay = 10000)
+ bg_steps = 5, free_decay = 10000, compute_patchnos = TRUE, csv_out = "", maxdiag = 0)
 }
 \arguments{
 \item{obs}{DataFrame containing at least 4 named columns: name, bin1, bin2 and observed.

@@ -7,6 +7,8 @@
 fast_binless_difference(out, ref, alpha, lam2, lam1 = 0, tol_val = 2e-1)
 }
 \arguments{
+\item{out}{The output of fast_binless}
+
 \item{ref}{unsigned integer corresponding to the index (starting at 1) of the dataset to use as reference}
 
 \item{lam2}{numeric positive value for the fusion penalty, or a vector of

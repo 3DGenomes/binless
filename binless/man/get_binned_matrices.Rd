@@ -21,3 +21,6 @@ a data.table containing the binned matrices
 \description{
 Fetch grouped matrices from CSnorm object
 }
+\examples{
+" "
+}

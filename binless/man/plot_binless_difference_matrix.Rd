@@ -9,7 +9,13 @@ plot_binless_difference_matrix(mat)
 \arguments{
 \item{mat}{the binless matrix data.table}
 }
+\value{
+" "
+}
 \description{
 Plots the difference in log2 scale (unit is log2 fold change) and caps the maximum
 difference (in absolute value) to log2FC = 3.
+}
+\examples{
+" "
 }

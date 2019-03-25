@@ -31,6 +31,12 @@ move a bit because of the CV+kSD criterion}
 
 \item{nperf}{number of IRLS iterations (default 50)}
 }
+\value{
+" "
+}
 \description{
 Perform binless interaction detection using fused lasso
+}
+\examples{
+" "
 }

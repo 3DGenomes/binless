@@ -20,6 +20,12 @@ plot_binned(dt, resolution, b1, e1, b2 = NULL, e2 = NULL,
 
 \item{rsites}{logical, default FALSE. Should restriction sites be indicated?}
 }
+\value{
+" "
+}
 \description{
 Plot reads in binned form at a given resolution
+}
+\examples{
+" "
 }

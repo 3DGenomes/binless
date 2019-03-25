@@ -14,6 +14,8 @@ group_datasets(cs, resolution, group = c("condition", "replicate",
 
 \item{group}{The type of grouping to be performed. Any combination of the given arguments is possible.}
 
+\item{verbose}{verbose}
+
 \item{ncores}{integer. The number of cores to parallelize the zeros calculation on.}
 }
 \value{
@@ -21,4 +23,7 @@ CSnorm object
 }
 \description{
 Group binned matrices of datasets
+}
+\examples{
+" "
 }

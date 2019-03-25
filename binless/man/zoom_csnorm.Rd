@@ -15,3 +15,6 @@ The csnorm object with updated biases and counts slots
 \description{
 Will remove any pre-existing normalization parameters
 }
+\examples{
+" "
+}

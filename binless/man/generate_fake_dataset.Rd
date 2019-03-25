@@ -25,3 +25,6 @@ a list of biases and counts, similar to \code{\link{prepare_for_sparse_cs_norm}}
 \description{
 Generate a fake dataset that follows the cut site normalization model's specifications
 }
+\examples{
+" "
+}

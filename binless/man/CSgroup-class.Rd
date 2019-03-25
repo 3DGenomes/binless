@@ -4,6 +4,9 @@
 \name{CSgroup-class}
 \alias{CSgroup-class}
 \title{Class for one dataset grouping at a given (base) resolution}
+\value{
+" "
+}
 \description{
 Class for one dataset grouping at a given (base) resolution
 }
@@ -16,11 +19,16 @@ Class for one dataset grouping at a given (base) resolution
 
 \item{\code{resolution}}{in bases.}
 
-\item{\code{group}}{}
+\item{\code{group}}{group}
 
 \item{\code{cts}}{data.table. The counts and predicted means used in all calculations.}
 
-\item{\code{names}}{}
+\item{\code{par}}{par}
+
+\item{\code{names}}{names}
 }}
 
+\examples{
+" "
+}
 \keyword{internal}

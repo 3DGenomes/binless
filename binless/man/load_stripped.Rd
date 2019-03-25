@@ -19,3 +19,6 @@ A cs object on which signal detection can be performed
 Load normalized CS object saved with save_stripped,
 rebuild zeros data.table
 }
+\examples{
+" "
+}
