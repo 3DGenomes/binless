@@ -30,6 +30,7 @@
 #' @useDynLib binless, .registration = TRUE
 #' @import Rcpp
 #' @import RcppEigen
+#' @import methods
 #' @import data.table
 #' @import doParallel
 #' @import foreach
