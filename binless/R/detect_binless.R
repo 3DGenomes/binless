@@ -50,10 +50,10 @@ prepare_difference_estimation = function(cs, csg, resolution, ref, tol.val, nper
 #'  (resp. lambda2) to the provided value instead of optimizing it
 #' @param nperf number of IRLS iterations (default 50)
 #'   
-#' @return 
+#' @return " "
 #' @export
 #' 
-#' @examples
+#' @examples " "
 detect_binless_interactions = function(cs, resolution=cs@settings$base.res, group="all", ncores=1, tol.val=cs@settings$tol, verbose=T,
                                        min.lambda2=.1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA, nperf=50){
   if (verbose==T) cat("Binless interaction detection with resolution=",resolution," and group=",group,"\n")
@@ -111,7 +111,7 @@ detect_binless_interactions = function(cs, resolution=cs@settings$base.res, grou
 #'   significant interactions
 #' @export
 #' 
-#' @examples
+#' @examples " "
 detect_binless_differences = function(cs, ref, resolution=cs@settings$base.res, group="all", ncores=1, tol.val=cs@settings$tol, verbose=T,
                                       min.lambda2=.1, fix.lambda1=F, fix.lambda1.at=NA, fix.lambda2=F, fix.lambda2.at=NA, nperf=50){
   if (verbose==T) cat("Binless difference detection with resolution=",resolution,

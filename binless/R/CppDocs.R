@@ -80,9 +80,9 @@ bin_cts_to_mat = function(cs, cts, resolution) {
 #' @param name an ordered factor of names
 #' @param bins an ordered factor of bins
 #'
-#' @return
+#' @return " "
 #'
-#' @examples
+#' @examples " "
 create_empty_matrix = function(name, bins) {
   dt=binless:::create_empty_matrix_cpp(name,bins)
   dt=setDT(dt,key=c("name","bin1","bin2"))

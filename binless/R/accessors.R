@@ -3,8 +3,8 @@ NULL
 
 #' Fetch CSgroup indices from CSnorm object
 #'
-#' @param resolution 
-#' @param group
+#' @param resolution resolution 
+#' @param group group
 #' @param raise boolean. If T raise an exception, otherwise return -1.
 #' @param cs CSnorm object
 #'
@@ -12,7 +12,7 @@ NULL
 #' @keywords internal
 #' @export
 #'
-#' @examples
+#' @examples " "
 get_cs_group_idx = function(cs, resolution, group, raise=T) {
   if(length(cs@groups)>0) {
     for (i in 1:length(cs@groups)) {
@@ -28,17 +28,17 @@ get_cs_group_idx = function(cs, resolution, group, raise=T) {
 
 #' Fetch CSinter object from CSgroup object
 #'
-#' @param csg
-#' @param type 
-#' @param threshold 
-#' @param ref 
-#' @param raise 
+#' @param csg csg
+#' @param type type
+#' @param threshold threshold
+#' @param ref ref
+#' @param raise raise
 #'
-#' @return
+#' @return " "
 #' @keywords internal
 #' @export
 #'
-#' @examples
+#' @examples " "
 get_cs_interaction_idx = function(csg, type, threshold=-1, ref=NULL, raise=T) {
   if(length(csg@interactions)>0) {
     for (i in 1:length(csg@interactions)) {
@@ -66,7 +66,7 @@ get_cs_interaction_idx = function(csg, type, threshold=-1, ref=NULL, raise=T) {
 #' @return a data.table containing the binned matrices
 #' @export
 #' 
-#' @examples
+#' @examples " "
 get_binned_matrices = function(cs, resolution=cs@settings$base.res, group="all") {
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csb=cs@groups[[idx1]]
@@ -77,7 +77,7 @@ get_binned_matrices = function(cs, resolution=cs@settings$base.res, group="all")
 #' 
 #' @keywords internal
 #' 
-#' @examples
+#' @examples " "
 get_interactions = function(cs, type, resolution, group, threshold=-1, ref=NULL) {
   idx1=get_cs_group_idx(cs, resolution, group, raise=T)
   csg=cs@groups[[idx1]]
@@ -94,7 +94,7 @@ get_interactions = function(cs, type, resolution, group, threshold=-1, ref=NULL)
 #' @return a data.table containing the interactions
 #' @export
 #' 
-#' @examples
+#' @examples " "
 get_binned_interactions = function(cs, resolution=cs@settings$base.res, group="all", threshold=0.95) {
   type="CSsig"
   ref=NULL
@@ -109,7 +109,7 @@ get_binned_interactions = function(cs, resolution=cs@settings$base.res, group="a
 #' @return a data.table containing the interactions
 #' @export
 #' 
-#' @examples
+#' @examples " "
 get_binless_interactions = function(cs, resolution=cs@settings$base.res, group="all") {
   type="CSbsig"
   ref=NULL
@@ -126,7 +126,7 @@ get_binless_interactions = function(cs, resolution=cs@settings$base.res, group="
 #' @return a data.table containing the differences
 #' @export
 #' 
-#' @examples
+#' @examples " "
 get_binned_differences = function(cs, ref, resolution=cs@settings$base.res, group="all", threshold=0.95) {
   type="CSdiff"
   mat=get_interactions(cs, type, resolution, group, threshold, ref)
@@ -140,7 +140,7 @@ get_binned_differences = function(cs, ref, resolution=cs@settings$base.res, grou
 #' @return a data.table containing the differences
 #' @export
 #' 
-#' @examples
+#' @examples " "
 get_binless_differences = function(cs, ref, resolution=cs@settings$base.res, group="all") {
   type="CSbdiff"
   threshold=-1

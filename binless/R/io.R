@@ -9,7 +9,7 @@ NULL
 #'   
 #' @export
 #' 
-#' @examples
+#' @examples " "
 save_stripped = function(cs, fname) {
   cs@diagnostics=list(params=data.table())
   cs@zeros=data.table()
@@ -39,7 +39,7 @@ save_stripped = function(cs, fname) {
 #'
 #' @export
 #' 
-#' @examples
+#' @examples " "
 load_stripped = function(fname, ncores=1) {
   cat("Loading stripped file\n")
   cs=get(load(fname))
@@ -68,7 +68,7 @@ load_stripped = function(fname, ncores=1) {
 #'   second is for the parameters.
 #' @export
 #' 
-#' @examples
+#' @examples " "
 plot_diagnostics = function(cs, start=1, end=Inf) {
   if (is.infinite(end) || cs@diagnostics$params[,max(step)]<end) end = cs@diagnostics$params[,max(step)] 
   plot=ggplot(cs@diagnostics$params[step>=start&step<end+1,.(step,leg,value)])+
@@ -91,10 +91,10 @@ plot_diagnostics = function(cs, start=1, end=Inf) {
 #' @param diagonal logical, default FALSE. Should the diagonal be indicated? 
 #' @param rsites logical, default FALSE. Should restriction sites be indicated?
 #'
-#' @return
+#' @return " "
 #' @export
 #'
-#' @examples
+#' @examples " "
 plot_binned = function(dt, resolution, b1, e1, b2=NULL, e2=NULL, diagonal=F, rsites=F) {
   if (is.null(b2)) b2=b1
   if (is.null(e2)) e2=e1
@@ -118,10 +118,10 @@ plot_binned = function(dt, resolution, b1, e1, b2=NULL, e2=NULL, diagonal=F, rsi
 #'
 #' @inheritParams plot_binned
 #'
-#' @return
+#' @return " "
 #' @export
 #'
-#' @examples
+#' @examples " "
 plot_raw = function(dt, b1=NULL, e1=NULL, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
   if (is.null(b1)) b1 = dt[,min(rbegin1)]
   if (is.null(e1)) e1 = dt[,max(rend2)]
@@ -188,10 +188,10 @@ plot_raw = function(dt, b1=NULL, e1=NULL, b2=NULL, e2=NULL, diagonal=T, rsites=T
 #' @param facet what to facet on. Default: name. Pass a character vector for multiple facets
 #' @param limits set to a pair of values to enforce plot and colour scale to be within these values
 #'
-#' @return
+#' @return " "
 #' @export
 #'
-#' @examples
+#' @examples " "
 
 plot_binless_matrix = function(mat, upper="binless", lower="observed", trans="log10",
                                facet="name", limits=NULL, label=NA,
@@ -239,10 +239,10 @@ plot_binless_matrix = function(mat, upper="binless", lower="observed", trans="lo
 #'
 #' @param mat the binless matrix data.table
 #'
-#' @return
+#' @return " "
 #' @export
 #'
-#' @examples
+#' @examples " "
 plot_binless_signal_matrix = function(mat) {
   plot_binless_matrix(mat,upper="log2(signal)", lower="log2(signal)", trans="identity", limits=c(-3,3), label="log2 FC")
 }
@@ -254,10 +254,10 @@ plot_binless_signal_matrix = function(mat) {
 #'
 #' @param mat the binless matrix data.table
 #'
-#' @return
+#' @return " "
 #' @export
 #'
-#' @examples
+#' @examples " "
 plot_binless_difference_matrix = function(mat) {
   plot_binless_matrix(mat,upper="log2(difference)", lower="log2(difference)", trans="identity", limits=c(-3,3), label="log2 FC")
 }

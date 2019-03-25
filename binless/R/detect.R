@@ -5,15 +5,15 @@ NULL
 #' 
 #' fast IRLS and zero counts approximation
 #'
-#' @param cts
-#' @param dispersion
+#' @param cts cts
+#' @param dispersion dispersion
 #' @param verbose boolean.
 #'
-#' @return
+#' @return " "
 #' @keywords internal
 #' @export
 #'
-#' @examples
+#' @examples " "
 predict_binned_matrices_irls = function(cts, dispersion) {
   #predict means
   cts[,c("decay","biases","mu.nosig"):=list(exp(log_decay),exp(log_bias),exp(lmu.nosig))]
@@ -44,13 +44,13 @@ predict_binned_matrices_irls = function(cts, dispersion) {
 #' @param cs CSnorm object, normalized.
 #' @param resolution integer. The desired resolution of the matrix.
 #' @param group The type of grouping to be performed. Any combination of the given arguments is possible.
-#' @param verbose
+#' @param verbose verbose
 #' @param ncores integer. The number of cores to parallelize the zeros calculation on.
 #'
 #' @return CSnorm object
 #' @export
 #'
-#' @examples
+#' @examples " "
 group_datasets = function(cs, resolution, group=c("condition","replicate","enzyme","experiment"),
                           verbose=T, ncores=1) {
   ### fetch and check inputs
@@ -115,7 +115,7 @@ group_datasets = function(cs, resolution, group=c("condition","replicate","enzym
 #'   
 #' @export
 #' 
-#' @examples
+#' @examples " "
 bin_all_datasets = function(cs, resolution=cs@settings$base.res, ncores=1, verbose=T) {
   group_datasets(cs, resolution=resolution, group="all", ncores=ncores, verbose=verbose)
 }

@@ -111,7 +111,7 @@ gauss_common_muhat_mean_biases = function(cs) {
 #' @keywords internal
 #' @export
 #'
-#' @examples
+#' @examples " "
 add_bin_bounds_and_distance = function(mat) {
   bin1.begin=mat[,bin1]
   bin1.end=mat[,bin1]
