@@ -28,7 +28,6 @@
 #' \code{\link{plot_binless_matrix}}
 #'
 #' @useDynLib binless, .registration = TRUE
-#' @import methods
 #' @import data.table
 #' @import doParallel
 #' @import foreach
