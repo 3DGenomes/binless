@@ -32,6 +32,7 @@ Collate:
     'CppDocs.R'
     'binless.R'
     'accessors.R'
+    'chromosome.R'
     'classes.R'
     'common.R'
     'detect.R'

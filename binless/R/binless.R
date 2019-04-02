@@ -32,6 +32,7 @@
 #' @import RcppEigen
 #' @import methods
 #' @import data.table
+#' @import parallel
 #' @import doParallel
 #' @import foreach
 #' @import matrixStats
