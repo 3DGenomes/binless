@@ -721,5 +721,41 @@ get_ligation_ratio = function(fname, maxlen, read.len, dangling.L, dangling.R, l
   ret
 }
 
+#' Compute directionality index on a matrix
+#' 
+#' @param hicmat,nw,n,triag
+#' 
+#' @keywords internal
+#' 
+di_index = function(hicmat,nw,n,triag=T) {
+  if(triag) {
+    A = matrix(NA,n,n)
+    A[lower.tri(A,diag=TRUE)] = hicmat
+    A = t(A)
+    A[lower.tri(A)] <- t(A)[lower.tri(A)]
+  } else {
+    A = hicmat
+  }
+  #signal1 = rep(0,n)
+  signal1 = foreach (i=(1+nw):(n-nw),.combine=c) %do% {
+    vect_left = foreach (k=(i-nw):(i-1),.combine=c) %do% {
+      if(k < 1) return(NA)
+      if(A[i,k] > 0) return(log(A[i,k]))
+      else return(0);
+    }
+    vect_left = vect_left[!is.na(vect_left)]
+    vect_right = foreach (k=(i+1):(i+nw),.combine=c) %do% {
+      if(k > n) return(NA)
+      if(A[i,k] > 0) return(log(A[i,k]))
+      else return(0);
+    }
+    vect_right = vect_right[!is.na(vect_right)]
+    
+    if(sum(vect_left) != 0 && sum(vect_right) != 0) return(t.test(vect_right,vect_left, paired = TRUE)$statistic)
+    else return(0)
+  }
+  return(sd(signal1))
+}
+
 
 
