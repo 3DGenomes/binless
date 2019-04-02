@@ -184,17 +184,23 @@ plot_raw = function(dt, b1=NULL, e1=NULL, b2=NULL, e2=NULL, diagonal=T, rsites=T
 #'
 #' @param mat the binless matrix
 #' @param upper,lower the name of the column to plot in upper (resp. lower)
-#'  triangle. Default: phi. Formulae are allowed (ggplot2 aes syntax)
+#'  triangle. Default: binless (resp. observed) Formulae are allowed (ggplot2 aes syntax)
 #' @param facet what to facet on. Default: name. Pass a character vector for multiple facets
-#' @param limits set to a pair of values to enforce plot and colour scale to be within these values
+#' @param trans the transform to use (see ggplot2 scale_x_continuous) 
+#' @param label which name to give to the fill colour (NA reverts to the value of upper)
+#' @param limits set to a pair of values to enforce plot and colour scale to be within these
+#'  values (see ggplot2 scale_fill_gradient2). Default is full scale except for binless matrix on log10 scale,
+#'  capped at 99.9th percentile.
+#' @param midpoint which value corresponds to a white colour. Default is 0, except for binless matrix
+#'  on log10 scale, for which it's the median (see ggplot2 scale_fill_gradient2)
 #'
 #' @return " "
 #' @export
 #'
 #' @examples " "
 
-plot_binless_matrix = function(mat, upper="binless", lower="observed", trans="log10",
-                               facet="name", limits=NULL, label=NA,
+plot_binless_matrix = function(mat, upper="binless", lower="observed", facet="name", trans="log10", label=NA,
+                               limits=if(trans=="log10"&upper=="binless"){as.vector(mat[,c(min(binless),quantile(binless,0.999))])}else{NULL},
                                midpoint=ifelse(trans=="log10"&upper=="binless",mat[,log10(median(binless))],0)) {
   data=copy(mat)
   if (!("begin1" %in% names(data) && "begin2" %in% names(data))) {
