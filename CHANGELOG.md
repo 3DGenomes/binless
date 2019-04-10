@@ -8,6 +8,7 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 ### Added
 - less errors regarding documentation when compiling
 - New `chromosome_binless.R` script to normalize whole chromosomes
+- New virtual 4C plot, example in `fast_binless.R`
 
 ## [0.14.0]
 ### Changed
