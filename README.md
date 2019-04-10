@@ -72,6 +72,13 @@ produced at the preprocessing stage, or directly provide the binned raw matrix.
 **This is a fast and approximate version of the full algorithm, so you will not
 get statistically significant output**. But you can try out a whole chromosome ;)
 
+### Chromosome-wide normalization
+
+Binless is meant for locus-specific normalization. If however you need
+binless on a whole chromosome, the script `chromosome_binless.R` can be used to
+combine optimized and fast binless in order to get a good first guess. See the
+paper for the procedure used to estimate the required parameters.
+
 ### Base-resolution (arrow) plots
 
 If you just want to see how your data looks like with the arrow plots and are
