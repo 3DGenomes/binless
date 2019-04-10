@@ -268,3 +268,57 @@ plot_binless_difference_matrix = function(mat) {
   plot_binless_matrix(mat,upper="log2(difference)", lower="log2(difference)", trans="identity", limits=c(-3,3), label="log2 FC")
 }
 
+#' Make a virtual 4C plot
+#' 
+#' Will show value of binless matrix at this viewpoint, along with (rescaled) original observations
+#' 
+#' @param mat the binless matrix data.table
+#' @param start,width the start and width of the 4C viewpoint. Will be rounded to multiples
+#'  of the matrix base resolution. If width spans several base.res intervals, will average
+#'  the resulting observations based on the distance of each interaction
+#'
+#' @return " "
+#' @export
+#'
+#' @examples " "
+plot_virtual_4C = function(mat,start,width=5000) {
+  #prepare data
+  base.res=as.integer(c(tstrsplit(as.character(mat[,bin1[1]]), "[][,)]"),recursive=T)[2:3])
+  base.res=base.res[2]-base.res[1]
+  data=copy(mat)
+  if (!("begin1" %in% names(data) && "begin2" %in% names(data))) {
+    if (data[,is.factor(bin1)] && data[,is.factor(bin2)]) {
+      data = add_bin_bounds_and_distance(data)
+    } else {
+      stop("Missing begin1 and begin2 columns")
+    }
+  }
+  #select region to plot
+  virt=data[begin2>=start&begin2+base.res<=start+width&begin1!=begin2,.(name,begin1,begin2,observed=as.numeric(observed),binless)]
+  setnames(virt,c("begin1","begin2"),c("begin2","begin1"))
+  virt=rbind(virt,data[begin1>=start&begin1+base.res<=start+width,.(name,begin1,begin2,observed=as.numeric(observed),binless)])
+  #
+  #average and rescale data
+  virt[,distance:=begin2-begin1+base.res/2] # distance can be < 0
+  virt = melt(virt, id.vars = c("name","begin1","begin2","distance"))
+  if (any(virt[,is.na(value)])) {
+    cat("Warning: NA values found in mat object, replacing them with 1, except for raw counts,",
+        "replaced by 0. Make sure this is what you want!\n")
+    virt[is.na(value),value:=ifelse(variable=="observed",0,1)]
+  }
+  virt=virt[,.(value=mean(value)),keyby=c("name","distance","variable")]
+  virt=dcast(virt,name+distance~variable)
+  virt[,observed:=observed/sum(observed)*sum(binless),by=name]
+  #
+  #plot resulting viewpoint
+  p=ggplot(virt)+geom_line(aes(distance,binless))+
+    geom_point(aes(distance,observed),data=virt[observed!=0],alpha=0.1)+
+    facet_wrap(~name)+scale_y_log10()+
+    geom_vline(aes(xintercept=0),colour="red")+
+    ggtitle(paste0("viewpoint ",start,"-",start+base.res))
+  print(p)
+  invisible(p)
+}
+
+
+
