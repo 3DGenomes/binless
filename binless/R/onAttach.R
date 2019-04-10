@@ -1,4 +1,4 @@
 .onAttach <- function(libname, pkgname) {
-   cat("Binless version",as.character(packageVersion("binless")),"\n")
+   packageStartupMessage(paste0("Binless version ",as.character(packageVersion("binless")),"\n"))
 }
 

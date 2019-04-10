@@ -6,7 +6,13 @@
 \usage{
 update_diagnostics(cs, step, leg, runtime)
 }
+\value{
+" "
+}
 \description{
 update diagnostics data table or create it if not existing
+}
+\examples{
+" "
 }
 \keyword{internal}

@@ -5,7 +5,9 @@
 \title{make plot of binless matrix}
 \usage{
 plot_binless_matrix(mat, upper = "binless", lower = "observed",
-  trans = "log10", facet = "name", limits = NULL, label = NA,
+  facet = "name", trans = "log10", label = NA, limits = if (trans
+  == "log10" & upper == "binless") {     as.vector(mat[, c(min(binless),
+  quantile(binless, 0.999))]) } else {     NULL },
   midpoint = ifelse(trans == "log10" & upper == "binless", mat[,
   log10(median(binless))], 0))
 }
@@ -13,12 +15,27 @@ plot_binless_matrix(mat, upper = "binless", lower = "observed",
 \item{mat}{the binless matrix}
 
 \item{upper, lower}{the name of the column to plot in upper (resp. lower)
-triangle. Default: phi. Formulae are allowed (ggplot2 aes syntax)}
+triangle. Default: binless (resp. observed) Formulae are allowed (ggplot2 aes syntax)}
 
 \item{facet}{what to facet on. Default: name. Pass a character vector for multiple facets}
 
-\item{limits}{set to a pair of values to enforce plot and colour scale to be within these values}
+\item{trans}{the transform to use (see ggplot2 scale_x_continuous)}
+
+\item{label}{which name to give to the fill colour (NA reverts to the value of upper)}
+
+\item{limits}{set to a pair of values to enforce plot and colour scale to be within these
+values (see ggplot2 scale_fill_gradient2). Default is full scale except for binless matrix on log10 scale,
+capped at 99.9th percentile.}
+
+\item{midpoint}{which value corresponds to a white colour. Default is 0, except for binless matrix
+on log10 scale, for which it's the median (see ggplot2 scale_fill_gradient2)}
+}
+\value{
+" "
 }
 \description{
 make plot of binless matrix
+}
+\examples{
+" "
 }

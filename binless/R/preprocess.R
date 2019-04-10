@@ -11,7 +11,7 @@ NULL
 #' @return a data.table
 #' @export
 #'
-#' @examples
+#' @examples " "
 read_tsv = function(fname, nrows=-1L, skip=0L, locus=NULL) {
   data = fread(fname, col.names=c("id", "chr1","begin1","strand1", "length1",
                                   "re.up1","re.dn1",
@@ -75,7 +75,7 @@ read_tsv = function(fname, nrows=-1L, skip=0L, locus=NULL) {
 #' @return reads data.table subset
 #' @export
 #'
-#' @examples
+#' @examples " "
 get_raw_reads = function(data, b1, e1, b2=NULL, e2=NULL) {
   if (is.null(b2)) b2=b1
   if (is.null(e2)) e2=e1
@@ -100,7 +100,7 @@ get_raw_reads = function(data, b1, e1, b2=NULL, e2=NULL) {
 #'   not true since we discard all counts smaller than dmin.
 #' @export
 #'
-#' @examples
+#' @examples " "
 bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
   counts=data.table()
   if (class(obj)[1] == "data.table") {
@@ -161,7 +161,7 @@ bin_data = function(obj, resolution, b1=NULL, b2=NULL) {
 #' @return The same data.table, with an additional "category" column
 #' @export
 #' 
-#' @examples
+#' @examples " "
 categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0), dangling.R = c(3), read.len=40) {
   sub[,category:="other"]
   #careful: order is important because attribution criteria overlap
@@ -197,7 +197,7 @@ categorize_by_new_type = function(sub, maxlen=600, dangling.L = c(0), dangling.R
 #'   total number of reads of different categories at each cut site.
 #' @keywords internal
 #' 
-#' @examples
+#' @examples " "
 prepare_for_sparse_cs_norm = function(data, both=F, circularize=-1) {
   #get counts that are not other, random or self circle
   cat("Sum up counts and biases\n")
@@ -308,7 +308,7 @@ dset_statistics = function(biases,counts){
 #' @return a list of biases and counts, similar to \code{\link{prepare_for_sparse_cs_norm}}
 #' @export
 #'
-#' @examples
+#' @examples " "
 generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1000000, eC=-4.4, eRJ=3, eDE=1, alpha=2,
                                  condition="WT", replicate="1", enzyme="NA",
                                  name = paste("Fake", condition, enzyme, replicate), dmin=1000, signal=F) {
@@ -404,7 +404,7 @@ generate_fake_dataset = function(biases.ref=NULL, num_rsites=3000, genome_size=1
 #'   plots.
 #' @export
 #' 
-#' @examples
+#' @examples " "
 examine_dataset = function(infile, window=15, maxlen=1000, skip.fbm=T, read.len=40, skip=0L, nrows=-1L, locus=NULL) {
   if (is.character(infile)) {
     data=read_tsv(infile, skip=skip, nrows=nrows, locus=locus)
@@ -460,7 +460,7 @@ examine_dataset = function(infile, window=15, maxlen=1000, skip.fbm=T, read.len=
 #' @return A CSdata object
 #' @export
 #' 
-#' @examples
+#' @examples " "
 read_and_prepare = function(infile, outprefix, condition, replicate, enzyme = "HindIII", experiment = "Hi-C",
                             name = paste(condition, enzyme, replicate), skip = 0L, nrows = -1L, locus=NULL,
                             circularize = -1, dangling.L = c(0, 4), dangling.R = c(3, -1), maxlen = 600,
@@ -572,7 +572,7 @@ fuse_close_cut_sites = function(biases,counts,dfuse,name,circularize) {
 #' @return CSnorm object
 #' @export
 #'
-#' @examples
+#' @examples " "
 merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enzyme","condition"), dfuse=5, qmin=0.01) {
   cat("compile table of experiments, sorted by id\n")
   experiments = rbindlist(lapply(datasets, function(x) x@info))
@@ -648,7 +648,7 @@ merge_cs_norm_datasets = function(datasets, different.decays=c("none","all","enz
 #' @return The csnorm object with updated biases and counts slots
 #' @export
 #' 
-#' @examples
+#' @examples " "
 zoom_csnorm = function(cs, begin, end) {
   stopifnot(begin<end)
   if (begin<cs@biases[,min(pos)]) cat("Warning: begin < cs@biases[,min(pos)]\n")
@@ -679,7 +679,7 @@ zoom_csnorm = function(cs, begin, end) {
 #' @return The csnorm object with updated biases and counts slots
 #' @export
 #' 
-#' @examples
+#' @examples " "
 subsample_csnorm = function(cs, subsampling.pc=100) {
   biases=copy(cs@biases)
   biases[,dangling.L:=rbinom(.N,dangling.L,subsampling.pc/100)]
@@ -707,7 +707,7 @@ subsample_csnorm = function(cs, subsampling.pc=100) {
 #' @return The ligation ratio and the number of dangling and other ends
 #' @export
 #' 
-#' @examples
+#' @examples " "
 get_ligation_ratio = function(fname, maxlen, read.len, dangling.L, dangling.R, locus=NULL) {
   data = read_tsv(fname,locus=locus)
   #remove fbm
@@ -719,6 +719,42 @@ get_ligation_ratio = function(fname, maxlen, read.len, dangling.L, dangling.R, l
   ret=data.table(ndangling=data[is.dangling==T,.N],ntotal=data[,.N])
   ret[,LR:=100*(1-ndangling/ntotal)]
   ret
+}
+
+#' Compute directionality index on a matrix
+#' 
+#' @param hicmat,nw,n,triag
+#' 
+#' @keywords internal
+#' 
+di_index = function(hicmat,nw,n,triag=T) {
+  if(triag) {
+    A = matrix(NA,n,n)
+    A[lower.tri(A,diag=TRUE)] = hicmat
+    A = t(A)
+    A[lower.tri(A)] <- t(A)[lower.tri(A)]
+  } else {
+    A = hicmat
+  }
+  #signal1 = rep(0,n)
+  signal1 = foreach (i=(1+nw):(n-nw),.combine=c) %do% {
+    vect_left = foreach (k=(i-nw):(i-1),.combine=c) %do% {
+      if(k < 1) return(NA)
+      if(A[i,k] > 0) return(log(A[i,k]))
+      else return(0);
+    }
+    vect_left = vect_left[!is.na(vect_left)]
+    vect_right = foreach (k=(i+1):(i+nw),.combine=c) %do% {
+      if(k > n) return(NA)
+      if(A[i,k] > 0) return(log(A[i,k]))
+      else return(0);
+    }
+    vect_right = vect_right[!is.na(vect_right)]
+    
+    if(sum(vect_left) != 0 && sum(vect_right) != 0) return(t.test(vect_right,vect_left, paired = TRUE)$statistic)
+    else return(0)
+  }
+  return(sd(signal1))
 }
 
 

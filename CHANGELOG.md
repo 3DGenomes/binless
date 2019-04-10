@@ -4,6 +4,12 @@ All notable changes to *binless* will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 for versions 0.x of binless, minor releases might break backwards compatibility.
 
+## [0.15.0]
+### Added
+- less errors regarding documentation when compiling
+- New `chromosome_binless.R` script to normalize whole chromosomes
+- New virtual 4C plot, example in `fast_binless.R`
+
 ## [0.14.0]
 ### Changed
 - Tutorials now use the smaller SEMA3C dataset, which can be run quickly on a
@@ -128,7 +134,8 @@ for versions 0.x of binless, minor releases might break backwards compatibility.
 - Initial commit
 
 
-[0.14.0]: ../../compare/v0.13.0...HEAD
+[0.15.0]: ../../compare/v0.14.0...HEAD
+[0.14.0]: ../../compare/v0.13.0...v0.14.0
 [0.13.0]: ../../compare/v0.12.0...v0.13.0
 [0.12.0]: ../../compare/v0.11.0...v0.12.0
 [0.11.0]: ../../compare/v0.10.2...v0.11.0

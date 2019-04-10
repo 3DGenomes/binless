@@ -7,7 +7,7 @@
 #' model is meant for a quick overview of the data.
 #'
 #' @usage fast_binless(obs, nbins, alpha, lam2, lam1 = 0, nouter = 25, tol_val = 2e-1,
-#'  bg_steps = 5, free_decay = 10000)
+#'  bg_steps = 5, free_decay = 10000, compute_patchnos = TRUE, csv_out = "", maxdiag = 0)
 #'
 #' @param obs DataFrame containing at least 4 named columns: name, bin1, bin2 and observed.
 #'  The first three must be convertible to integer vectors (like factors) and must range from
@@ -43,6 +43,7 @@ NULL
 #' 
 #' @usage fast_binless_difference(out, ref, alpha, lam2, lam1 = 0, tol_val = 2e-1)
 #'
+#' @param out The output of fast_binless
 #' @param ref unsigned integer corresponding to the index (starting at 1) of the dataset to use as reference
 #' @param lam2 numeric positive value for the fusion penalty, or a vector of
 #' the same size as the number of datasets minus one.
@@ -80,9 +81,9 @@ bin_cts_to_mat = function(cs, cts, resolution) {
 #' @param name an ordered factor of names
 #' @param bins an ordered factor of bins
 #'
-#' @return
+#' @return " "
 #'
-#' @examples
+#' @examples " "
 create_empty_matrix = function(name, bins) {
   dt=binless:::create_empty_matrix_cpp(name,bins)
   dt=setDT(dt,key=c("name","bin1","bin2"))

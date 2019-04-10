@@ -17,7 +17,7 @@ NULL
 #'   significant interactions
 #' @export
 #' 
-#' @examples
+#' @examples " "
 detect_binned_interactions = function(cs, resolution=cs@settings$base.res, group="all", threshold=0.95, ncores=1,
                                       niter=100, tol=cs@settings$tol, verbose=T){
   ### get CSgroup object
@@ -70,7 +70,7 @@ detect_binned_interactions = function(cs, resolution=cs@settings$base.res, group
 #'   significant interactions
 #' @export
 #' 
-#' @examples
+#' @examples " "
 detect_binned_differences = function(cs, ref, resolution=cs@settings$base.res, group="all", threshold=0.95, ncores=1,
                                      niter=100, tol=cs@settings$tol, verbose=T){
   ### get CSgroup object

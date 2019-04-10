@@ -21,7 +21,7 @@ RCPP_MODULE(binless_cpp) {
                           _["csv_out"]="", _["maxdiag"]=0),
              "documentation for fast_binless ");
     function("fast_binless_difference", &binless::fast::binless_difference,
-             List::create(_["obs"], _["ref"], _["alpha"],  _["lam2"], _["lam1"]=0., _["tol_val"]=2e-1,
+             List::create(_["out"], _["ref"], _["alpha"],  _["lam2"], _["lam1"]=0., _["tol_val"]=2e-1,
                           _["compute_patchnos"]=true, _["maxdiag"]=0),
              "documentation for fast_binless_difference ");
     

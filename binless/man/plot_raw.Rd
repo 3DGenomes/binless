@@ -22,6 +22,12 @@ plot_raw(dt, b1 = NULL, e1 = NULL, b2 = NULL, e2 = NULL,
 
 \item{rsites}{logical, default FALSE. Should restriction sites be indicated?}
 }
+\value{
+" "
+}
 \description{
 Plot raw reads
+}
+\examples{
+" "
 }

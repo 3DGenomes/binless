@@ -1,8 +1,10 @@
 Package: binless
 Type: Package
 Title: binless: Resolution-independent Normalization And Interaction Detection For Hi-C Data
-Version: 0.14.0
+Version: 0.15.0
 Authors@R: person("Yannick", "Spill", email = "yannick.spill@nsup.org", role = c("aut", "cre"))
+Author: Yannick Spill [aut, cre]
+Maintainer: Yannick Spill <yannick.spill@nsup.org>
 Description: Provides resolution-independent normalization of Hi-C data, and
     permits interaction and difference detection.
 License: LGPL-3
@@ -24,12 +26,13 @@ Imports:
     scales,
     utils
 LinkingTo: BH (>= 1.60.0), Rcpp (>= 0.12.0), RcppEigen
-RoxygenNote: 6.1.0
+RoxygenNote: 6.1.1
 NeedsCompilation: yes
 Collate: 
     'CppDocs.R'
     'binless.R'
     'accessors.R'
+    'chromosome.R'
     'classes.R'
     'common.R'
     'detect.R'

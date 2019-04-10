@@ -9,7 +9,9 @@ get_cs_group_idx(cs, resolution, group, raise = T)
 \arguments{
 \item{cs}{CSnorm object}
 
-\item{resolution}{}
+\item{resolution}{resolution}
+
+\item{group}{group}
 
 \item{raise}{boolean. If T raise an exception, otherwise return -1.}
 }
@@ -18,5 +20,8 @@ CSgroup object index
 }
 \description{
 Fetch CSgroup indices from CSnorm object
+}
+\examples{
+" "
 }
 \keyword{internal}

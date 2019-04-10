@@ -136,10 +136,10 @@ fresh_start = function(cs, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.
 
 #' update diagnostics data table or create it if not existing
 #'
-#' @return
+#' @return " "
 #' @keywords internal
 #'
-#' @examples
+#' @examples " "
 update_diagnostics = function(cs, step, leg, runtime) {
   params=data.table(step=step,leg=leg,value=cs@par$value,runtime=runtime)
   tmp=as.data.table(lapply(cs@par,list))
@@ -155,7 +155,7 @@ update_diagnostics = function(cs, step, leg, runtime) {
 #' @keywords internal
 #' @export
 #'
-#' @examples
+#' @examples " "
 get_all_values = function(cs, param, trans) {
   #get value in tmp as vector of lists, remove NULL lists
   legs=c("expo","disp","bias","decay","signal")
@@ -274,7 +274,7 @@ get_residuals = function(cts.common, viewpoint) {
 #' @return A csnorm object
 #' @export
 #' 
-#' @examples
+#' @examples " "
 #' 
 normalize_binless = function(cs, restart=F, bf_per_kb=50, bf_per_decade=10, bins_per_bf=10, base.res=5000,
                      ngibbs = 25, bg.steps=5, iter=100, verbose=T, init.dispersion=.1, nrows.dispersion = 100,

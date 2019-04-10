@@ -9,7 +9,7 @@ NULL
 #' @return a CSbinned object containing the ICEd matrix
 #' @export
 #'
-#' @examples
+#' @examples " "
 iterative_normalization = function(mat, niterations=100, namecol="name", verbose=T) {
   if (verbose==T) cat("*** iterative normalization with ",niterations," iterations\n")
   raw=mat[,.(name,bin1,bin2,observed)]

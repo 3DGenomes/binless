@@ -38,3 +38,6 @@ the binned matrix with additional information relating to these
 \description{
 Binned detection of significant differences with a reference
 }
+\examples{
+" "
+}

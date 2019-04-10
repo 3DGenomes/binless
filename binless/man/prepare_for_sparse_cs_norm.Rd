@@ -24,4 +24,7 @@ A list containing biases and counts, two data tables representing the
 Parse reads data.table and extract necessary objects for cut-site
 normalization
 }
+\examples{
+" "
+}
 \keyword{internal}

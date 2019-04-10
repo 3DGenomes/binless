@@ -20,3 +20,6 @@ a data.table
 \description{
 Read TADBit tsv file and return (paired-end) reads as data.table
 }
+\examples{
+" "
+}

@@ -127,7 +127,6 @@ std::vector<double> GFLLibraryTrapezeImpl::fill_triangle(const std::vector<doubl
       ret[idx_base+d] = beta_impl_[j++];
     }
   }
-  Rcpp::Rcout << "average = " << avg << " beta[1,3] = " << beta_impl_[2] << " " << ret[2] << "\n";
   return(ret);
 }
 

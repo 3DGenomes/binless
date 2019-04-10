@@ -34,3 +34,6 @@ Two plots, pdangling to determine dangling.L and dangling.R, and
 \description{
 Diagnostic plots to determine dangling.L, dangling.R and maxlen arguments
 }
+\examples{
+" "
+}

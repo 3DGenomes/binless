@@ -9,4 +9,7 @@ get_all_values(cs, param, trans)
 \description{
 Returns one param's values during optimization
 }
+\examples{
+" "
+}
 \keyword{internal}

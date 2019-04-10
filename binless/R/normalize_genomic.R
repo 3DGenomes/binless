@@ -180,11 +180,11 @@ gauss_genomic = function(cs, cts.common, verbose=T, constrain=F) {
 #' @param cs normalized CSnorm object
 #' @param points_per_kb number of evaluation points per kb
 #'
-#' @return
+#' @return " "
 #' @keywords internal
 #' @export
 #'
-#' @examples
+#' @examples " "
 generate_genomic_biases = function(cs, points_per_kb=10) {
   beta_iota = cs@par$genomic_beta[,beta_iota]
   beta_rho = cs@par$genomic_beta[,beta_rho]

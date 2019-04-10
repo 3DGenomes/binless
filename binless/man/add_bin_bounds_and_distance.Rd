@@ -9,4 +9,7 @@ add_bin_bounds_and_distance(mat)
 \description{
 Add begin and end for a binned matrix, as well as middle position and average distance
 }
+\examples{
+" "
+}
 \keyword{internal}

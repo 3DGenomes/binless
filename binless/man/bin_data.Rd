@@ -25,3 +25,6 @@ a data.table representing the binned data. Will contain
 \description{
 Bin a reads data.table into a matrix of a given resolution
 }
+\examples{
+" "
+}

@@ -30,3 +30,6 @@ The ligation ratio and the number of dangling and other ends
 \description{
 Compute the ligation ratio from a TadBit unfiltered tsv file
 }
+\examples{
+" "
+}

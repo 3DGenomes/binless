@@ -9,7 +9,7 @@ NULL
 #'   
 #' @export
 #' 
-#' @examples
+#' @examples " "
 save_stripped = function(cs, fname) {
   cs@diagnostics=list(params=data.table())
   cs@zeros=data.table()
@@ -39,7 +39,7 @@ save_stripped = function(cs, fname) {
 #'
 #' @export
 #' 
-#' @examples
+#' @examples " "
 load_stripped = function(fname, ncores=1) {
   cat("Loading stripped file\n")
   cs=get(load(fname))
@@ -68,7 +68,7 @@ load_stripped = function(fname, ncores=1) {
 #'   second is for the parameters.
 #' @export
 #' 
-#' @examples
+#' @examples " "
 plot_diagnostics = function(cs, start=1, end=Inf) {
   if (is.infinite(end) || cs@diagnostics$params[,max(step)]<end) end = cs@diagnostics$params[,max(step)] 
   plot=ggplot(cs@diagnostics$params[step>=start&step<end+1,.(step,leg,value)])+
@@ -91,10 +91,10 @@ plot_diagnostics = function(cs, start=1, end=Inf) {
 #' @param diagonal logical, default FALSE. Should the diagonal be indicated? 
 #' @param rsites logical, default FALSE. Should restriction sites be indicated?
 #'
-#' @return
+#' @return " "
 #' @export
 #'
-#' @examples
+#' @examples " "
 plot_binned = function(dt, resolution, b1, e1, b2=NULL, e2=NULL, diagonal=F, rsites=F) {
   if (is.null(b2)) b2=b1
   if (is.null(e2)) e2=e1
@@ -118,10 +118,10 @@ plot_binned = function(dt, resolution, b1, e1, b2=NULL, e2=NULL, diagonal=F, rsi
 #'
 #' @inheritParams plot_binned
 #'
-#' @return
+#' @return " "
 #' @export
 #'
-#' @examples
+#' @examples " "
 plot_raw = function(dt, b1=NULL, e1=NULL, b2=NULL, e2=NULL, diagonal=T, rsites=T) {
   if (is.null(b1)) b1 = dt[,min(rbegin1)]
   if (is.null(e1)) e1 = dt[,max(rend2)]
@@ -184,17 +184,23 @@ plot_raw = function(dt, b1=NULL, e1=NULL, b2=NULL, e2=NULL, diagonal=T, rsites=T
 #'
 #' @param mat the binless matrix
 #' @param upper,lower the name of the column to plot in upper (resp. lower)
-#'  triangle. Default: phi. Formulae are allowed (ggplot2 aes syntax)
+#'  triangle. Default: binless (resp. observed) Formulae are allowed (ggplot2 aes syntax)
 #' @param facet what to facet on. Default: name. Pass a character vector for multiple facets
-#' @param limits set to a pair of values to enforce plot and colour scale to be within these values
+#' @param trans the transform to use (see ggplot2 scale_x_continuous) 
+#' @param label which name to give to the fill colour (NA reverts to the value of upper)
+#' @param limits set to a pair of values to enforce plot and colour scale to be within these
+#'  values (see ggplot2 scale_fill_gradient2). Default is full scale except for binless matrix on log10 scale,
+#'  capped at 99.9th percentile.
+#' @param midpoint which value corresponds to a white colour. Default is 0, except for binless matrix
+#'  on log10 scale, for which it's the median (see ggplot2 scale_fill_gradient2)
 #'
-#' @return
+#' @return " "
 #' @export
 #'
-#' @examples
+#' @examples " "
 
-plot_binless_matrix = function(mat, upper="binless", lower="observed", trans="log10",
-                               facet="name", limits=NULL, label=NA,
+plot_binless_matrix = function(mat, upper="binless", lower="observed", facet="name", trans="log10", label=NA,
+                               limits=if(trans=="log10"&upper=="binless"){as.vector(mat[,c(min(binless),quantile(binless,0.999))])}else{NULL},
                                midpoint=ifelse(trans=="log10"&upper=="binless",mat[,log10(median(binless))],0)) {
   data=copy(mat)
   if (!("begin1" %in% names(data) && "begin2" %in% names(data))) {
@@ -239,10 +245,10 @@ plot_binless_matrix = function(mat, upper="binless", lower="observed", trans="lo
 #'
 #' @param mat the binless matrix data.table
 #'
-#' @return
+#' @return " "
 #' @export
 #'
-#' @examples
+#' @examples " "
 plot_binless_signal_matrix = function(mat) {
   plot_binless_matrix(mat,upper="log2(signal)", lower="log2(signal)", trans="identity", limits=c(-3,3), label="log2 FC")
 }
@@ -254,11 +260,65 @@ plot_binless_signal_matrix = function(mat) {
 #'
 #' @param mat the binless matrix data.table
 #'
-#' @return
+#' @return " "
 #' @export
 #'
-#' @examples
+#' @examples " "
 plot_binless_difference_matrix = function(mat) {
   plot_binless_matrix(mat,upper="log2(difference)", lower="log2(difference)", trans="identity", limits=c(-3,3), label="log2 FC")
 }
+
+#' Make a virtual 4C plot
+#' 
+#' Will show value of binless matrix at this viewpoint, along with (rescaled) original observations
+#' 
+#' @param mat the binless matrix data.table
+#' @param start,width the start and width of the 4C viewpoint. Will be rounded to multiples
+#'  of the matrix base resolution. If width spans several base.res intervals, will average
+#'  the resulting observations based on the distance of each interaction
+#'
+#' @return " "
+#' @export
+#'
+#' @examples " "
+plot_virtual_4C = function(mat,start,width=5000) {
+  #prepare data
+  base.res=as.integer(c(tstrsplit(as.character(mat[,bin1[1]]), "[][,)]"),recursive=T)[2:3])
+  base.res=base.res[2]-base.res[1]
+  data=copy(mat)
+  if (!("begin1" %in% names(data) && "begin2" %in% names(data))) {
+    if (data[,is.factor(bin1)] && data[,is.factor(bin2)]) {
+      data = add_bin_bounds_and_distance(data)
+    } else {
+      stop("Missing begin1 and begin2 columns")
+    }
+  }
+  #select region to plot
+  virt=data[begin2>=start&begin2+base.res<=start+width&begin1!=begin2,.(name,begin1,begin2,observed=as.numeric(observed),binless)]
+  setnames(virt,c("begin1","begin2"),c("begin2","begin1"))
+  virt=rbind(virt,data[begin1>=start&begin1+base.res<=start+width,.(name,begin1,begin2,observed=as.numeric(observed),binless)])
+  #
+  #average and rescale data
+  virt[,distance:=begin2-begin1+base.res/2] # distance can be < 0
+  virt = melt(virt, id.vars = c("name","begin1","begin2","distance"))
+  if (any(virt[,is.na(value)])) {
+    cat("Warning: NA values found in mat object, replacing them with 1, except for raw counts,",
+        "replaced by 0. Make sure this is what you want!\n")
+    virt[is.na(value),value:=ifelse(variable=="observed",0,1)]
+  }
+  virt=virt[,.(value=mean(value)),keyby=c("name","distance","variable")]
+  virt=dcast(virt,name+distance~variable)
+  virt[,observed:=observed/sum(observed)*sum(binless),by=name]
+  #
+  #plot resulting viewpoint
+  p=ggplot(virt)+geom_line(aes(distance,binless))+
+    geom_point(aes(distance,observed),data=virt[observed!=0],alpha=0.1)+
+    facet_wrap(~name)+scale_y_log10()+
+    geom_vline(aes(xintercept=0),colour="red")+
+    ggtitle(paste0("viewpoint ",start,"-",start+base.res))
+  print(p)
+  invisible(p)
+}
+
+
 

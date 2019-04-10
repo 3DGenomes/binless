@@ -18,3 +18,6 @@ a CSbinned object containing the ICEd matrix
 \description{
 Apply the ICE algorithm to a binned matrix
 }
+\examples{
+" "
+}

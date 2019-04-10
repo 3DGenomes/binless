@@ -8,15 +8,23 @@ get_cs_interaction_idx(csg, type, threshold = -1, ref = NULL,
   raise = T)
 }
 \arguments{
-\item{type}{}
+\item{csg}{csg}
 
-\item{threshold}{}
+\item{type}{type}
 
-\item{ref}{}
+\item{threshold}{threshold}
 
-\item{raise}{}
+\item{ref}{ref}
+
+\item{raise}{raise}
+}
+\value{
+" "
 }
 \description{
 Fetch CSinter object from CSgroup object
+}
+\examples{
+" "
 }
 \keyword{internal}

@@ -9,8 +9,14 @@ plot_binless_signal_matrix(mat)
 \arguments{
 \item{mat}{the binless matrix data.table}
 }
+\value{
+" "
+}
 \description{
 This function is to ensure a consistent representation of signal matrices
 Plots the signal in log2 scale (unit is log2 fold change) and caps the maximum
 signal to log2FC = 3.
+}
+\examples{
+" "
 }

@@ -12,10 +12,13 @@ create_empty_matrix(name, bins)
 \item{bins}{an ordered factor of bins}
 }
 \value{
-
+" "
 }
 \description{
 arguments are taken as ordered factors
 returned matrix is of size n_names * n_bins * (n_bins+1) / 2
 n_names and n_bins are the number of levels in the name and bins factors
+}
+\examples{
+" "
 }

@@ -20,3 +20,6 @@ Two plots in a list. The first is for the four log-likelihoods, the
 Diagnostics plots to monitor convergence of normalization (gaussian
 approximation)
 }
+\examples{
+" "
+}

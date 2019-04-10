@@ -9,10 +9,10 @@ NULL
 #' @slot biases data.table. The cut-site information for that experiment
 #' @slot counts data.table. The reads data for that experiment
 #'
-#' @return
+#' @return " "
 #' @export
 #'
-#' @examples
+#' @examples " "
 setClass("CSdata",
          slots = list(info="list",
                       settings="list",
@@ -96,16 +96,16 @@ setMethod("show", signature="CSbdiff", definition=function(object) {
 #' @slot mat data.table. 
 #' @slot interactions list. 
 #' @slot resolution in bases.
-#' @slot group 
+#' @slot group group
 #' @slot cts data.table. The counts and predicted means used in all calculations.
-#' @slot par
-#' @slot names 
+#' @slot par par
+#' @slot names names
 #'
-#' @return
+#' @return " "
 #' @keywords internal
 #' @export
 #'
-#' @examples
+#' @examples " "
 setClass("CSgroup",
          slots = list(mat="data.table",
                       interactions="list",
@@ -142,10 +142,10 @@ setMethod("show",signature="CSgroup",definition=function(object) {
 #' @slot pred list. Predicted quantities
 #' @slot binned list. Binned matrices and differences
 #'
-#' @return
+#' @return " "
 #' @export
 #'
-#' @examples
+#' @examples " "
 setClass("CSnorm",
          slots = list(experiments="data.table",
                       design="data.table",

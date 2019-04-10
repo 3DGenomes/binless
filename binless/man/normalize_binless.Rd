@@ -69,5 +69,6 @@ A csnorm object
 Binless normalization
 }
 \examples{
+" "
 
 }

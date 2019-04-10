@@ -21,3 +21,6 @@ a data.table containing the interactions
 \description{
 Fetch binless interactions from CSnorm object
 }
+\examples{
+" "
+}

@@ -16,3 +16,6 @@ save_stripped(cs, fname)
 Save normalized CS object, discarding everything but
 input counts and final normalization parameters
 }
+\examples{
+" "
+}

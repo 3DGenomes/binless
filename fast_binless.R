@@ -63,6 +63,12 @@ plot_binless_matrix(a, upper="binless", lower="binless")
 plot_binless_matrix(a, upper="binless", lower="observed")
 #ggsave(filename="example/rao_HiC056-03_12M_fast_binless_and_observed.pdf", width=18,height=8)
 
+#virtual 4C plots
+plot_virtual_4C(a, start=80700000, width=10000)
+#ggsave(filename="example/rao_HiC056-03_12M_virtual_4C_8.07M.pdf", width=18,height=8)
+plot_virtual_4C(a, start=81450000, width=10000)
+#ggsave(filename="example/rao_HiC056-03_12M_virtual_4C_8.145M.pdf", width=18,height=8)
+
 
 ### Difference detection
 

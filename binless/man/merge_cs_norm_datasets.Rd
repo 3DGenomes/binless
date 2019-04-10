@@ -28,3 +28,6 @@ This will do some cleanup on the data, namely:
 Note that you can customize the design, as long as you keep the numbering sequential
 and starting at 1.
 }
+\examples{
+" "
+}

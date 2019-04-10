@@ -13,7 +13,12 @@ bin_all_datasets(cs, resolution = cs@settings$base.res, ncores = 1,
 \item{resolution}{integer. The desired resolution of the matrix.}
 
 \item{ncores}{integer. The number of cores to parallelize the zeros calculation on.}
+
+\item{verbose}{verbose}
 }
 \description{
 Bin normalized datasets
+}
+\examples{
+" "
 }

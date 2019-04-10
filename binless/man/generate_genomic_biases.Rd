@@ -11,7 +11,13 @@ generate_genomic_biases(cs, points_per_kb = 10)
 
 \item{points_per_kb}{number of evaluation points per kb}
 }
+\value{
+" "
+}
 \description{
 Generate iota and rho genomic biases on evenly spaced points along the genome
+}
+\examples{
+" "
 }
 \keyword{internal}
