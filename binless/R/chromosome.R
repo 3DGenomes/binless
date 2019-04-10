@@ -389,7 +389,92 @@ chromosome_binless = function(sample, sample2=NA, zoom_region="full", ncores=16,
   
   }
   
-
-
 }
+
+#' Read matrices written by \code{\link{chromosome_binless}}
+#'
+#' This procedure produces a mat object amenable to \code{\link{plot_binless_matrix}}.
+#'
+#' @param sample The name to use for the sample
+#' @param sample2 If difference matrices are to be loaded, the name to use for
+#'   the second sample
+#' @param zoom_region If "full" (default), will load complete dataset. If a
+#'   vector c(start,end) is passed, will read only this portion.
+#' @param out_prefix The output prefix used to store matrices.
+#' @param read.raw Whether to load _raw_band.RData file(s). Default TRUE.
+#' @param read.binless Whether to load _binless_band.RData file(s). Default
+#'   TRUE.
+#' @param read.signal Whether to load _log10signal.RData file(s). Default TRUE.
+#' @param read.difference Whether to load _log10diff.RData file (if applicable).
+#'   Default TRUE.
+#' @param read.signif Whether to load _log10diff_signif.RData file (if
+#'   applicable). Default TRUE.
+#'
+#' @return mat data.table
+#' @export
+#'
+#' @examples " "
+read_chromosome_binless = function(sample, sample2=NA, zoom_region="full",
+                              out_prefix="chromosome_binless", read.raw=T, read.binless=T,
+                              read.signal=T, read.difference=T, read.signif=T) {
+  calc.differences = !is.na(sample2)
+  
+  #prepare file loading
+  sig.mask=c(read.raw,read.binless,read.signal)
+  fnames=paste0(c("_raw_band","_binless_band","_log10signal"),".RData")[sig.mask]
+  varnames=c("observed","binless","signal")[sig.mask]
+  transnames=c("id","id","e10")[sig.mask]
+  if (calc.differences==F){
+    fnames=data.table(sample=sample,fname=paste0(out_prefix,fnames),variable=varnames,trans=transnames)
+  } else {
+    a=data.table(sample=sample,fname=paste0(out_prefix,"_ref",fnames),variable=varnames,trans=transnames)
+    a=rbind(a,data.table(sample=sample2,fname=paste0(out_prefix,"_target",fnames),variable=varnames,trans=transnames))
+    diff.mask=c(read.difference,read.signif)
+    fnames=paste0(c("_log10diff","_log10diff_signif"),".RData")[diff.mask]
+    varnames=c("difference","signif")[diff.mask]
+    transnames=c("e10","e10")[diff.mask]
+    fnames=rbind(a,data.table(sample=sample2,fname=paste0(out_prefix,fnames),variable=varnames,trans=transnames))
+  }
+  
+  #read base resolution
+  first_bin=rownames(get(load(fnames[1,fname])))[1]
+  base.res=as.integer(tstrsplit(first_bin,"-"))
+  base.res=base.res[2]-base.res[1]
+  
+  #load files and dcast
+  mat = foreach(idx=1:(fnames[,.N]),.combine=rbind) %do% {
+    mat=get(load(fnames[idx,fname]))
+    if (nnzero(mat)>0) {
+      rn=as.integer(tstrsplit(rownames(mat),"-")[[1]])
+      mat=as.data.table(summary(mat))[,.(name=fnames[idx,sample],begin1=rn[as.integer(i)],begin2=rn[as.integer(j)],
+                                         variable=fnames[idx,variable],value=x)]
+      #
+      if (!(length(zoom_region)==1 && zoom_region == "full")) {
+        mat = mat[begin1>=zoom_region[1]&begin1<=zoom_region[2]&begin2>=zoom_region[1]&begin2<=zoom_region[2]]
+      }
+      #
+      if (fnames[idx,trans] == "e10") {
+        mat[,value:=10**value]
+      } else {
+        stopifnot(fnames[idx,trans]=="id")
+      }
+    } else {
+      mat=data.table()
+    }
+    mat
+  }
+  mat = dcast(mat,name+begin1+begin2~variable,value.var="value")
+  
+  #polish columns and return
+  mat[,name:=ordered(name,ifelse(calc.differences==T,c(sample,sample2),sample))]
+  bin_labels=mat[,sort(unique(begin1))]
+  bin_labels=paste0("[",bin_labels,",",bin_labels+base.res,")")
+  mat[,bin1:=ordered(paste0("[",begin1,",",begin1+base.res,")"),bin_labels)]
+  mat[,bin2:=ordered(paste0("[",begin2,",",begin2+base.res,")"),bin_labels)]
+  setcolorder(mat,c("name","bin1","begin1","bin2","begin2"))
+  mat
+}
+  
+
+
 
