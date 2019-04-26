@@ -98,7 +98,7 @@ If you use this software, please acknowledge the following paper
 
 Spill YG, Castillo D, Vidal E, Marti-Renom MA, "Binless normalization of Hi-C data
 provides significant interaction and difference detection independent of resolution",
-Nature Communications, 10:1938 (2019) [doi:0.1038/s41467-019-09907-2](https://doi.org/0.1038/s41467-019-09907-2) 
+Nature Communications, 10:1938 (2019) [doi:10.1038/s41467-019-09907-2](https://rdcu.be/byHAs) 
 
 ### File format description
 
