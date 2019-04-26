@@ -96,9 +96,9 @@ or suggest new features. We are looking forward to your feedback!
 
 If you use this software, please acknowledge the following paper
 
-Spill YG, Castillo D, Marti-Renom MA, "Binless normalization of Hi-C data
-provides significant interaction and difference detection independently of
-resolution", bioRxiv 214403; [doi:10.1101/214403](https://doi.org/10.1101/214403) 
+Spill YG, Castillo D, Vidal E, Marti-Renom MA, "Binless normalization of Hi-C data
+provides significant interaction and difference detection independent of resolution",
+Nature Communications, 10:1938 (2019) [doi:0.1038/s41467-019-09907-2](https://doi.org/0.1038/s41467-019-09907-2) 
 
 ### File format description
 
