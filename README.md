@@ -31,6 +31,9 @@ Binless uses the following packages: `data.table`, `Hmisc`, `foreach`,
 `doParallel`, `MASS`, `matrixStats`, `ggplot2`, `dplyr`, `Matrix`, `quadprog`,
 `scales`, `utils`
 
+Also, you will need the GNU Scientific Library (GSL) available on your computer.
+If you use a mac and homebrew, `brew install gsl` should be enough.
+
 Binless has been developed and tested on a MacBook Pro (2015) and on a CentOS 7 
 linux workstation with 128Gb RAM and 32 cores. Resource usage can go from modest 
 (fast binless will run on a laptop for loci <10Mb) to huge (fast binless on
