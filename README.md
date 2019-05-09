@@ -20,7 +20,7 @@ Installation should take about 10 minutes.
 You can also install it manually as follows:
 
 * Download the latest release [here](../../releases/latest)
-* Unpack it in a clean folder on your machine, and hit `R CMD INSTALL --preclean binless`
+* Unpack it in a clean folder on your machine, and hit `R CMD INSTALL binless`
   in a shell.
 * If it complains that some packages are not installed, you must install them in
   R using `install.packages`
