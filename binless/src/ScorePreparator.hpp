@@ -24,13 +24,9 @@ public:
         compute();
     }
     
-    std::vector<int> get_cvgroup() const { return cvgroup_; }
     Rcpp::IntegerVector get_assembler_var() const { return Rcpp::wrap(cvgroup_); }
     
-    std::vector<double> get_beta_cv() const { return beta_cv_; }
     Rcpp::NumericVector get_likelihood_var() const { return Rcpp::wrap(beta_cv_); }
-    
-    std::vector<double> get_betas() const { return betas_; }
     
 private:
     
