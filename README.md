@@ -20,7 +20,7 @@ Installation should take about 10 minutes.
 You can also install it manually as follows:
 
 * Download the latest release [here](../../releases/latest)
-* Unpack it in a clean folder on your machine, and hit `R CMD INSTALL --preclean binless`
+* Unpack it in a clean folder on your machine, and hit `R CMD INSTALL binless`
   in a shell.
 * If it complains that some packages are not installed, you must install them in
   R using `install.packages`
@@ -30,6 +30,10 @@ The minimum required R version is `3.2.0`
 Binless uses the following packages: `data.table`, `Hmisc`, `foreach`,
 `doParallel`, `MASS`, `matrixStats`, `ggplot2`, `dplyr`, `Matrix`, `quadprog`,
 `scales`, `utils`
+
+Also, you will need some common C++ libraries: the GNU Scientific Library (GSL),
+boost, OpenMP and Eigen. If you use a mac and homebrew, type
+`brew install gsl libomp boost eigen` in a terminal and that should be it.
 
 Binless has been developed and tested on a MacBook Pro (2015) and on a CentOS 7 
 linux workstation with 128Gb RAM and 32 cores. Resource usage can go from modest 
@@ -96,9 +100,9 @@ or suggest new features. We are looking forward to your feedback!
 
 If you use this software, please acknowledge the following paper
 
-Spill YG, Castillo D, Marti-Renom MA, "Binless normalization of Hi-C data
-provides significant interaction and difference detection independently of
-resolution", bioRxiv 214403; [doi:10.1101/214403](https://doi.org/10.1101/214403) 
+Spill YG, Castillo D, Vidal E, Marti-Renom MA, "Binless normalization of Hi-C data
+provides significant interaction and difference detection independent of resolution",
+Nature Communications, 10:1938 (2019) [doi:10.1038/s41467-019-09907-2](https://rdcu.be/byHAs) 
 
 ### File format description
 
