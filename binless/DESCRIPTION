@@ -27,6 +27,7 @@ Imports:
     utils
 LinkingTo: BH (>= 1.60.0), Rcpp (>= 0.12.0), RcppEigen
 RoxygenNote: 6.1.1
+Encoding: UTF-8
 NeedsCompilation: yes
 Collate: 
     'CppDocs.R'
