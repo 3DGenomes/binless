@@ -17,7 +17,7 @@ the resulting observations based on the distance of each interaction}
 " "
 }
 \description{
-Make a virtual 4C plot
+Will show value of binless matrix at this viewpoint, along with (rescaled) original observations
 }
 \examples{
 " "
