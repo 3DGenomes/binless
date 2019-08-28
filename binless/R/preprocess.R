@@ -244,10 +244,15 @@ prepare_for_sparse_cs_norm = function(data, both=F, circularize=-1) {
   stopifnot(all(X[,id==.I])) #IDs must start at one and have no gaps, for current stan implementation
   #
   cat("Produce count list\n")
+  contact.names = c("contact.close", "contact.down", "contact.far", "contact.up")
   Y=dcast.data.table(enrich[id1 != id2 
-                            & category %in% c("contact.close", "contact.down", "contact.far", "contact.up"),
+                            & category %in% contact.names,
                             .(id1,id2,pos1=re.closest1,pos2=re.closest2,category,N)],
                      ...~category, value.var="N", fill=0)
+  if (!all(contact.names %in% colnames(Y))) {
+    missing <- contact.names[!contact.names %in% colnames(Y)]
+    Y[,missing] <- 0
+  }
   setkey(Y,id1,id2)
   Y[,distance:=pos2-pos1]
   if (circularize>0) Y[,distance:=pmin(distance,circularize-distance+1)]
